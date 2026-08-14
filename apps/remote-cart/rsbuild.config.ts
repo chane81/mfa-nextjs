@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { pluginModuleFederation } from "@module-federation/rsbuild-plugin";
@@ -9,8 +9,20 @@ const PORT = 3002;
 const DIST = resolve(process.cwd(), "dist");
 const PUBLIC_URL = `http://localhost:${PORT}`;
 
-/** dev 서버가 디스크에서 직접 내려주는 경로들 (preview 는 dist 정적 서빙으로 커버된다) */
-const SERVED = /^\/(mf-server\.cjs|mf-version\.json|v[0-9a-f]+\/mf-server\.cjs)$/;
+/** dev 서버가 디스크에서 직접 내려주는 경로 (빌드 산출물은 serve-remote-dist.mjs 가 서빙) */
+const SERVED = /^\/(mf-server\.cjs|mf-version\.json)$/;
+
+/**
+ * 빌드 버전. `scripts/mf-build-version.mjs` 가 빌드 직전에 써 둔다.
+ *
+ * assetPrefix 와 출력 경로를 동시에 결정해 웹 자산까지 `/v<version>/` 불변 경로로 내보낸다.
+ * dev(watch)에는 파일이 없을 수 있고, 그때는 버전 없는 경로로 떨어뜨린다.
+ */
+const VERSION = existsSync(resolve(process.cwd(), ".mf-version"))
+  ? readFileSync(resolve(process.cwd(), ".mf-version"), "utf8").trim()
+  : null;
+const ASSET_PREFIX = VERSION ? `${PUBLIC_URL}/v${VERSION}` : PUBLIC_URL;
+const DIST_ROOT = VERSION ? `dist/v${VERSION}` : "dist";
 
 /**
  * cart remote — Rsbuild(Rspack) + @module-federation/rsbuild-plugin
@@ -89,6 +101,8 @@ export default defineConfig({
     ],
   },
   output: {
-    assetPrefix: PUBLIC_URL,
+    assetPrefix: ASSET_PREFIX,
+    // 웹 자산 전체를 버전 디렉터리로 내보낸다 → 배포된 URL 은 다시 바뀌지 않는다
+    distPath: { root: DIST_ROOT },
   },
 });

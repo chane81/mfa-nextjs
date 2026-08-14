@@ -20,9 +20,12 @@
   - 번들 태그와 페이지 태그 분리 + 번들은 `{ expire: 0 }` 즉시 만료
   - warm 실패 시 페이지 캐시를 건드리지 않고 502 중단
 - [x] **remote 버전 핀** — remote 가 `mf-version.json` 으로 버전 공표, host 는 그걸 읽어 수렴
-  - 산출물 해시 = 버전, `v<hash>/mf-server.cjs` 불변 경로 → 롤백 가능
-  - 웹훅 없이도 인스턴스 전부 수렴(실측 5초, TTL 30초) → 브로드캐스트 불필요
-  - 같은 버전을 서버 엔트리와 브라우저 양쪽에 적용 → hydration 정합
+  - 버전 = 빌드 ID(git SHA). 웹·SSR 산출물 **전부** `v<version>/` 불변 경로로 배포
+  - 소스 변경 없는 재배포도 새 버전 — 운영성 초기화 배포에서 host 가 확실히 갈아탄다
+  - 웹훅 없이도 인스턴스 전부 수렴(실측 30초 = TTL) → 브로드캐스트 불필요
+  - 같은 버전을 서버 엔트리와 브라우저 양쪽에 적용 → 브라우저 요청 17/17 버전 경로, 콘솔 에러 0
+  - 롤백 = `mf-version.json` 만 되돌리기 (자산 3개 버전 보존)
+  - remote `start` 를 번들러 preview → 공용 정적 서버로 교체 (CDN 의미론: `/v*` immutable)
 - [x] `/internal/mf-warm` 인증 — middleware 상수시간 시크릿 검사
   - 페이지 안 `notFound()` 는 상태 코드를 못 바꾼다(레이아웃이 이미 flush됨) → middleware 필요
 

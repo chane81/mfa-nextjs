@@ -130,7 +130,16 @@ function bundleFetchInit(remote: RemoteName): RequestInit {
  * 모르면 버전 없는 엔트리로 폴백한다 — dev 이거나 stamp 를 안 돌린 remote 다.
  */
 async function resolveEntry(remote: RemoteName): Promise<{ url: string; version: string }> {
-  const info = await fetchRemoteVersion(remote);
+  /**
+   * 이미 아는 버전이 있으면 **재조회하지 않는다.**
+   *
+   * 버전 갱신은 레이아웃(`RemoteVersionSync`)과 재배포 웹훅의 책임이다. 여기서 또 조회하면
+   * warm 도중 Data Cache 의 옛 응답을 집어 방금 정한 버전을 덮어쓰는 경쟁이 생긴다.
+   * (실측: 롤포워드 웹훅이 "공표=새 버전, 적재=옛 버전"으로 실패했다)
+   *
+   * 아무것도 모르는 콜드 상태에서만 직접 읽는다.
+   */
+  const info = knownVersion(remote) ?? (await fetchRemoteVersion(remote));
   if (!info) return { url: fallbackSsrEntry(remote), version: UNVERSIONED };
   return { url: `${remoteOrigin(remote)}${info.ssrEntry}`, version: info.version };
 }

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { federation } from "@module-federation/vite";
@@ -8,15 +8,29 @@ import { defineConfig, type Connect, type Plugin } from "vite";
 const PORT = 3001;
 
 /**
- * SSR 번들과 버전 매니페스트를 dev / preview 서버에서 내려준다.
- * 웹 번들은 dev 에서 메모리로 서빙되지만 이 파일들은 빌드가 디스크에 쓰므로 직접 읽는다.
+ * 빌드 버전. `scripts/mf-build-version.mjs` 가 빌드 직전에 써 둔다.
  *
- * 세 경로를 연다.
- *   /mf-server.cjs            — 버전 없는 최신본 (dev 및 폴백)
- *   /v<hash>/mf-server.cjs    — 불변 아티팩트. host 는 평소 이쪽을 쓴다
- *   /mf-version.json          — 현재 버전 공표. host 가 폴링해 재배포를 알아챈다
+ * 이 값이 자산 URL 접두사와 출력 디렉터리를 동시에 결정한다. 그래서 **웹 자산까지**
+ * `/v<version>/` 아래 불변 경로로 나가고, 재배포가 기존 URL 을 덮어쓰지 않는다.
+ * (버전이 내용 해시가 아니라 빌드 ID 인 이유는 mf-build-version.mjs 주석 참고)
+ *
+ * dev 서버는 버전 경로를 쓰지 않는다 — 매 저장마다 경로가 바뀌면 의미가 없다.
  */
-const SERVED = /^\/(mf-server\.cjs|mf-version\.json|v[0-9a-f]+\/mf-server\.cjs)$/;
+function buildVersion(): string | null {
+  const file = resolve(process.cwd(), ".mf-version");
+  if (!existsSync(file)) return null;
+  return readFileSync(file, "utf8").trim();
+}
+
+/**
+ * SSR 번들을 dev 서버에서 내려준다.
+ * 웹 번들은 dev 에서 메모리로 서빙되지만 SSR 번들은 watch 빌드가 디스크에 쓰므로 직접 읽는다.
+ *
+ * dev 전용이다. 빌드 산출물은 `scripts/serve-remote-dist.mjs` 가 서빙한다.
+ *   /mf-server.cjs    — dev watch 빌드가 디스크에 쓰는 버전 없는 번들
+ *   /mf-version.json  — 있으면 내려준다(직전 빌드 산출물). dev 에서는 보통 없다
+ */
+const SERVED = /^\/(mf-server\.cjs|mf-version\.json)$/;
 
 function serveSsrBundle(): Plugin {
   const middleware: Connect.NextHandleFunction = (req, res, next) => {
@@ -59,7 +73,15 @@ function serveSsrBundle(): Plugin {
  * remote 쪽은 번들러가 자유롭기 때문에 Vite 로 빌드하고,
  * host(Next.js 16 / Turbopack) 는 런타임 API 로만 이 remote 를 소비한다.
  */
-export default defineConfig({
+export default defineConfig(({ command }) => {
+  /**
+   * dev 는 버전 경로를 쓰지 않는다. 매 저장마다 경로가 바뀌면 의미가 없고,
+   * dev 서버는 메모리에서 서빙하므로 불변성도 필요 없다.
+   */
+  const version = command === "build" ? buildVersion() : null;
+  const base = version ? `http://localhost:${PORT}/v${version}/` : `http://localhost:${PORT}/`;
+
+  return {
   plugins: [
     react(),
     serveSsrBundle(),
@@ -129,11 +151,14 @@ export default defineConfig({
       "react/jsx-dev-runtime",
     ],
   },
-  base: `http://localhost:${PORT}/`,
+  base,
   build: {
+    // 웹 자산 전체를 버전 디렉터리로 내보낸다 → 배포된 URL 은 다시 바뀌지 않는다
+    outDir: version ? `dist/v${version}` : "dist",
     // Module Federation 은 top-level await 를 사용한다
     target: "chrome89",
     minify: false,
     cssCodeSplit: false,
   },
+  };
 });

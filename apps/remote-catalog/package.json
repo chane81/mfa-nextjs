@@ -5,13 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n web,ssr -c magenta,gray \"vite --port 3001 --strictPort\" \"vite build --config vite.config.server.ts --watch\"",
-    "build": "vite build && pnpm build:ssr && pnpm stamp",
-    "stamp": "node ../../scripts/stamp-remote-version.mjs catalog",
+    "build": "node ../../scripts/mf-build-version.mjs && vite build && pnpm build:ssr && pnpm stamp",
     "build:ssr": "vite build --config vite.config.server.ts",
-    "start": "vite preview --port 3001 --strictPort",
+    "stamp": "node ../../scripts/stamp-remote-version.mjs catalog",
+    "start": "node ../../scripts/serve-remote-dist.mjs 3001",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf dist .turbo node_modules/.vite"
+    "clean": "rm -rf dist .mf-version .turbo node_modules/.vite"
   },
   "dependencies": {
     "@mfa/contracts": "workspace:*",

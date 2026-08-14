@@ -264,59 +264,70 @@ middleware 는 렌더 파이프라인 진입 전에 돌아 진짜 404 를 낸다
 바꾼 방식: remote 가 자기 버전을 **공표**하고, 모든 인스턴스가 그걸 읽는다.
 
 ```
-remote 빌드 → scripts/stamp-remote-version.mjs
-  dist/v<hash>/mf-server.cjs   ← 불변 아티팩트 (롤백 가능, 덮어쓰기 없음)
-  dist/mf-version.json         ← { version, ssrEntry } 공표
+remote 빌드
+  scripts/mf-build-version.mjs   빌드 전: 버전 결정 → .mf-version
+  vite build / rsbuild build     base·assetPrefix = /v<version>/, 출력도 dist/v<version>/
+  scripts/stamp-remote-version.mjs
+    dist/mf-version.json         { version, ssrEntry, webEntry, contentHash } 공표
 ```
 
-버전은 **산출물 내용의 해시**다. 타임스탬프가 아니라 해시라서, 내용이 같으면 버전도 같고
-무의미한 캐시 무효화가 일어나지 않는다.
+#### 왜 버전이 내용 해시가 아니라 빌드 ID 인가
 
-host 는 `mf-version.json` 을 30초 TTL 로 읽어 캐시 키와 엔트리 URL 을 만든다.
+자산 URL 접두사는 빌드 **전에** 정해져야 하는데 내용 해시는 빌드가 끝나야 나온다. 순환이다.
+그래서 버전은 빌드 ID(CI 면 git SHA)로 잡고, 내용 해시는 `contentHash` 로 함께 공표한다.
+
+부수 효과는 **의도한 것**이다. 소스가 그대로여도 재배포하면 새 버전이 된다 —
+메모리·스토리지 압박으로 초기화 배포를 하는 운영 상황에서 host 가 확실히 갈아탄다.
+"내용이 같으니 갈아탈 필요 없다"고 판단해버리면 그런 배포가 무의미해진다.
+
+#### 실측
 
 | 확인 | 결과 |
 | --- | --- |
-| 서버가 쓰는 엔트리 | `http://localhost:3001/v07ad386df312/mf-server.cjs` |
-| 브라우저에 심긴 버전 | `{"catalog":"07ad386df312","cart":"e2ac0faf9f61"}` |
-| 페이지 10회 요청 중 `mf-version.json` 조회 | **1회** (TTL 캐시 정상) |
+| 서버 엔트리 | `http://localhost:3001/v<version>/mf-server.cjs` |
+| 브라우저 엔트리 | `http://localhost:3001/v<version>/mf-manifest.json` |
+| 매니페스트 안 `publicPath` | `http://localhost:3001/v<version>/` |
+| 브라우저 remote 요청 17건 중 버전 경로 | **17건** (버전 없음 0건) |
+| 콘솔 에러/경고 | **0건** |
+| 페이지 10회 요청 중 `mf-version.json` 조회 | **1회** |
 
 #### 웹훅 없이 수렴하는가
 
 인스턴스 A(:3000)와 B(:3010)를 띄우고 **아무 통보도 하지 않은 채** remote 만 재배포:
 
 ```
-+  0s  A=c681f2c57351  B=c681f2c57351
-+  5s  A=07ad386df312 ✅  B=07ad386df312 ✅
++  0s  A=…mst10wm1  B=…mst10wm1
++ 25s  A=…mst10wm1  B=…mst10wm1
++ 30s  A=…mst11vbo ✅  B=…mst11vbo ✅
 ```
 
-→ 브로드캐스트가 필요 없다. 웹훅은 이 수렴을 **앞당기는 최적화**일 뿐,
-정확성의 전제가 아니다. 웹훅을 못 받은 인스턴스도 TTL 안에 따라온다.
+TTL(30초)에 맞춰 둘 다 수렴한다. **브로드캐스트가 필요 없다.**
+웹훅은 이 수렴을 앞당기는 최적화일 뿐 정확성의 전제가 아니다.
 
-#### hydration 정합
+#### 롤백
 
-같은 렌더에서 결정된 버전을 서버 엔트리와 브라우저 양쪽에 쓴다.
-캐시된 HTML 이 오래 살아도 그 HTML 이 어떤 remote 로 만들어졌는지가 확정된다.
-
-⚠️ **한계**: SSR 번들만 진짜 불변 경로다. 웹 자산은 아직 쿼리(`?v=`)로만 구분해서,
-remote 가 파일을 덮어쓰면 옛 버전 URL 이 새 코드를 받는다. 진짜 고정은 remote 가
-웹 자산까지 불변 접두사로 배포해야 한다(CDN 배포에서 `base`/`assetPrefix` 를 버전별로).
-
-#### warm 성공 판정을 다시 고쳤다
-
-버전 도입 후 **오탐**이 생겼다. 같은 버전을 재배포하면 warm 이 캐시 히트로 끝나
-로드 카운트가 안 올라가고, 정상인데 502 가 났다.
-
-판정을 두 조각으로 나눴다.
-
-1. **생존 확인** — 웹훅이 직접 `mf-version.json` 을 읽는다. 실패하면 remote 장애로 보고 중단.
-2. **적재 확인** — warm 뒤에 "공표된 버전 == 적재된 버전"인지 본다.
-   로드가 일어났는지가 아니라 **결과 상태**를 본다.
+`mf-version.json` 을 옛 버전으로 되돌리기만 하면 된다. 자산은 3개 버전까지 남겨둔다.
 
 ```
-remote 죽임      → 502 detail="버전 매니페스트를 읽지 못했습니다" · 페이지 캐시 그대로
-같은 버전 재배포  → 200 warmed=ok            (예전엔 502 오탐)
-새 버전 재배포    → 200 warmed=ok + 새 버전
+롤백  → 웹훅 200 version=…rq7v → 캐시 MISS → 새로 렌더 → HIT
+브라우저 재확인: 버전 경로 17/17, 콘솔 에러 0
+롤포워드 → 웹훅 200 version=…uf9j → 동일
 ```
+
+보존이 왜 필요한지는 실수로 확인했다. dist 를 통째로 지우자 **캐시에 남아 있던 옛 HTML 이
+가리키는 버전 경로가 404** 나면서 remote 가 렌더되지 않았다. 캐시된 HTML 의 수명만큼은
+그 버전의 자산이 살아 있어야 한다.
+
+#### 이 과정에서 또 드러난 함정 2개
+
+**(a) warm 중에는 버전을 재조회하면 안 된다.** SSR 레이어가 `mf-version.json` 을 다시 읽으면
+Data Cache 의 옛 응답을 집어 웹훅이 방금 정한 버전을 덮어썼다. 롤포워드 웹훅이
+"공표=새 버전, 적재=옛 버전"으로 실패했다. 버전 갱신 책임을 레이아웃과 웹훅으로 좁히고,
+로더는 아는 버전을 쓰기만 한다(콜드일 때만 직접 조회).
+
+**(b) 롤백은 `lazy()` 캐시에 걸린다.** 되돌아간 버전의 lazy 엔트리가 이미 남아 있어
+로더가 아예 호출되지 않고, 그래서 "무엇을 적재했는지"가 갱신되지 않아 warm 이 실패로 보였다.
+warm 요청에 nonce 를 실어 lazy 캐시를 우회한다(warm 경로 전용).
 
 ### 9. 캐시는 레이어별로, 무효화 신호는 globalThis 로
 
@@ -377,7 +388,7 @@ MF_REVALIDATE_SECRET=lab-secret pnpm --filter @mfa/host start
 ## 남은 숙제
 
 - [x] remote 엔트리 버전 핀 + 멀티 인스턴스 수렴 → 발견 8
-- [ ] 웹 자산까지 불변 접두사로 배포 (지금은 SSR 번들만 진짜 버전 경로)
-- [ ] 롤백 실측 — `mf-version.json` 을 옛 버전으로 되돌렸을 때 host 가 따라오는지
+- [x] 웹 자산까지 불변 접두사로 배포 → 발견 8
+- [x] 롤백 실측 → 발견 8
 - [ ] remote origin 허용 목록 + 번들 무결성 검증(SRI/서명) — host 서버가 남의 코드를 실행한다
 - [ ] `/products/[id]` 에 `generateStaticParams` 도입 시 빌드-remote 결합도 측정

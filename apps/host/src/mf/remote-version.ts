@@ -38,8 +38,10 @@ export function remoteVersionTag(remote: RemoteName): string {
 
 export interface RemoteVersion {
   version: string;
-  /** 오리진 기준 상대 경로 */
+  /** host 서버가 받아 실행하는 node 번들 (오리진 기준 상대 경로) */
   ssrEntry: string;
+  /** 브라우저 MF 런타임이 읽는 매니페스트 (오리진 기준 상대 경로) */
+  webEntry: string;
 }
 
 /**
@@ -102,6 +104,12 @@ export function knownVersions(): Partial<Record<RemoteName, string>> {
   return out;
 }
 
+/** 브라우저가 쓸 절대 URL. 서버가 이 HTML 을 만들 때 쓴 버전과 같은 값이다. */
+export function webEntryUrl(remote: RemoteName): string | null {
+  const info = knownVersion(remote);
+  return info ? `${remoteOrigin(remote)}${info.webEntry}` : null;
+}
+
 /**
  * remote 가 공표한 현재 버전을 읽는다.
  *
@@ -124,9 +132,13 @@ export async function fetchRemoteVersion(remote: RemoteName): Promise<RemoteVers
     if (!res.ok) return null;
 
     const body = (await res.json()) as Partial<RemoteVersion>;
-    if (!body.version || !body.ssrEntry) return null;
+    if (!body.version || !body.ssrEntry || !body.webEntry) return null;
 
-    const info: RemoteVersion = { version: body.version, ssrEntry: body.ssrEntry };
+    const info: RemoteVersion = {
+      version: body.version,
+      ssrEntry: body.ssrEntry,
+      webEntry: body.webEntry,
+    };
     rememberVersion(remote, info);
     return info;
   } catch {

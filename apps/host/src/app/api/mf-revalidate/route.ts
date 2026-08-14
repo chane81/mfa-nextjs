@@ -95,7 +95,11 @@ export async function POST(req: Request) {
   // 3. warm — SSR 레이어가 그 버전의 번들을 갖게 만든다
   let warmed: string | null = null;
   if (!skipWarm && published) {
-    const warmUrl = new URL(`/internal/mf-warm?remote=${remote}`, url.origin);
+    // nonce 로 lazy 캐시를 우회해 로더를 반드시 태운다 (롤백 대응)
+    const warmUrl = new URL(
+      `/internal/mf-warm?remote=${remote}&version=${published.version}&nonce=${published.version}-${Date.now()}`,
+      url.origin,
+    );
     try {
       const res = await fetch(warmUrl, { cache: "no-store", headers: mfSecretHeader() });
       await res.text();

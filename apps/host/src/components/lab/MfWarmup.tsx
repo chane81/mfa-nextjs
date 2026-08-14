@@ -13,19 +13,28 @@ import { RemoteComponent } from "@/mf/RemoteComponent";
  *
  * 여기서 프로퍼티로 콜백을 넘기는 것도 client component 라서 가능하다
  * (server component 에서 넘기면 직렬화 불가로 터진다).
+ *
+ * `nonce` 는 `lazy()` 캐시를 우회해 로더를 반드시 한 번 태우기 위한 값이다.
+ * 없으면 롤백처럼 "이미 본 적 있는 버전"으로 갈 때 로더가 아예 호출되지 않는다.
  */
-export function MfWarmup({ remotes }: { remotes: RemoteName[] }) {
+export function MfWarmup({ remotes, nonce }: { remotes: RemoteName[]; nonce: string }) {
   return (
     <div hidden aria-hidden>
       {remotes.includes("catalog") ? (
         <RemoteComponent
           module="catalog/ProductGrid"
           fallbackLabel="warm: catalog"
+          reloadKey={nonce}
           props={{ category: "all", onSelect: () => {} }}
         />
       ) : null}
       {remotes.includes("cart") ? (
-        <RemoteComponent module="cart/CartBadge" fallbackLabel="warm: cart" props={{}} />
+        <RemoteComponent
+          module="cart/CartBadge"
+          fallbackLabel="warm: cart"
+          reloadKey={nonce}
+          props={{}}
+        />
       ) : null}
     </div>
   );

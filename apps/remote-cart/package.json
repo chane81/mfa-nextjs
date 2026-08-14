@@ -5,13 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n web,ssr -c green,gray \"rsbuild dev\" \"rsbuild build --config rsbuild.server.config.ts --watch\"",
-    "build": "rsbuild build && pnpm build:ssr && pnpm stamp",
-    "stamp": "node ../../scripts/stamp-remote-version.mjs cart",
+    "build": "node ../../scripts/mf-build-version.mjs && rsbuild build && pnpm build:ssr && pnpm stamp",
     "build:ssr": "rsbuild build --config rsbuild.server.config.ts",
-    "start": "rsbuild preview",
+    "stamp": "node ../../scripts/stamp-remote-version.mjs cart",
+    "start": "node ../../scripts/serve-remote-dist.mjs 3002",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf dist .turbo"
+    "clean": "rm -rf dist .mf-version .turbo"
   },
   "dependencies": {
     "@mfa/contracts": "workspace:*",

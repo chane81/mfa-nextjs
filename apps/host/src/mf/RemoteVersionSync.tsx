@@ -1,6 +1,6 @@
 import { REMOTE_NAMES } from "@mfa/contracts";
 
-import { fetchRemoteVersion } from "./remote-version";
+import { fetchRemoteVersion, remoteOrigin } from "./remote-version";
 
 /**
  * remote 버전을 새로 읽어 globalThis 에 반영하고, 브라우저에도 같은 값을 넘긴다.
@@ -19,16 +19,21 @@ import { fetchRemoteVersion } from "./remote-version";
  * 서버가 이 HTML 을 만들 때 쓴 버전을 그대로 심어준다. 브라우저는 그 버전으로 remote 엔트리를
  * 요청하므로, 서버 마크업과 hydrate 하는 코드가 같은 빌드가 된다.
  *
- * 한계: 지금 웹 번들은 버전 경로가 아니라 쿼리(`?v=`)로만 구분된다. 재배포가 파일을
- * 덮어쓰면 옛 버전 URL 이 새 코드를 받는다. 진짜 고정은 remote 가 웹 자산까지
- * 불변 접두사로 배포해야 가능하다(CDN 배포에서 할 일). SSR 번들은 이미 불변 경로다.
+ * 넘기는 값은 버전 문자열이 아니라 **매니페스트 URL** 이다. remote 가 웹 자산을
+ * `/v<version>/` 불변 경로로 배포하므로, 이 URL 은 다른 코드를 가리키게 되지 않는다.
  */
 export async function RemoteVersionSync() {
-  const entries = await Promise.all(
-    REMOTE_NAMES.map(async (remote) => [remote, (await fetchRemoteVersion(remote))?.version] as const),
+  const resolved = await Promise.all(
+    REMOTE_NAMES.map(async (remote) => {
+      const info = await fetchRemoteVersion(remote);
+      return [
+        remote,
+        info ? { version: info.version, entry: `${remoteOrigin(remote)}${info.webEntry}` } : null,
+      ] as const;
+    }),
   );
 
-  const versions = Object.fromEntries(entries.filter(([, version]) => version));
+  const versions = Object.fromEntries(resolved.filter(([, info]) => info));
 
   return (
     <script

@@ -26,10 +26,13 @@ type PropsOf<K extends RemoteModuleId> =
  */
 const lazyCache = new Map<string, ComponentType<Record<string, unknown>>>();
 
-function getLazyRemote(id: RemoteModuleId): ComponentType<Record<string, unknown>> {
+function getLazyRemote(
+  id: RemoteModuleId,
+  reloadKey?: string,
+): ComponentType<Record<string, unknown>> {
   const remote = id.split("/")[0] as RemoteName;
   // 브라우저에는 서버가 심어준 버전이 있고(RemoteVersionSync), 없으면 unversioned 로 고정된다
-  const key = `${id}@${knownVersion(remote)?.version ?? "unversioned"}`;
+  const key = `${id}@${knownVersion(remote)?.version ?? "unversioned"}${reloadKey ? `#${reloadKey}` : ""}`;
 
   const cached = lazyCache.get(key);
   if (cached) return cached;
@@ -45,6 +48,14 @@ interface RemoteComponentProps<K extends RemoteModuleId> {
   module: K;
   props?: PropsOf<K>;
   fallbackLabel?: string;
+  /**
+   * lazy 캐시를 우회하는 키. warm 경로 전용이다.
+   *
+   * 같은 버전으로 되돌리는 롤백에서는 그 버전의 lazy 엔트리가 이미 캐시에 남아 있어
+   * 로더가 호출되지 않는다. 그러면 "무엇을 적재했는지"가 갱신되지 않아 warm 이
+   * 성공을 증명하지 못한다. 이 키를 매번 바꾸면 로더를 반드시 한 번 태운다.
+   */
+  reloadKey?: string;
 }
 
 /**
@@ -60,13 +71,14 @@ export function RemoteComponent<K extends RemoteModuleId>({
   module: moduleId,
   props,
   fallbackLabel,
+  reloadKey,
 }: RemoteComponentProps<K>) {
   const remoteName = moduleId.split("/")[0] as keyof typeof REMOTE_ENTRIES;
   const placeholder = <Skeleton label={fallbackLabel ?? `${moduleId} 불러오는 중…`} />;
 
   // lazyCache 덕분에 moduleId 당 컴포넌트 정체성이 고정된다.
   // 린터는 "렌더 중 컴포넌트 생성"으로 보지만 실제로는 모듈 스코프 캐시에서 꺼내 쓴다.
-  const Remote = getLazyRemote(moduleId);
+  const Remote = getLazyRemote(moduleId, reloadKey);
 
   return (
     <RemoteBoundary remoteName={remoteName} entry={REMOTE_ENTRIES[remoteName]}>

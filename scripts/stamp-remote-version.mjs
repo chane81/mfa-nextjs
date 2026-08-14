@@ -1,25 +1,24 @@
 #!/usr/bin/env node
 /**
- * remote 빌드 산출물에 버전을 찍는다.
+ * remote 가 방금 만든 빌드를 "현재 버전"으로 공표한다. 빌드 **후에** 실행된다.
  *
  * ## 왜 필요한가
- * host 는 remote 를 **런타임에** 받아 서버에서 실행한다. 그래서 두 가지가 필요하다.
+ * host 는 remote 를 런타임에 받아 서버에서 실행한다. 그래서 두 가지가 필요하다.
  *
- * 1. **불변 아티팩트** — `mf-server.cjs` 는 재배포 때 덮어써진다. 같은 URL 이 다른 코드를
- *    가리키면 롤백도, 캐시된 HTML 과의 정합성 보장도 불가능하다.
- *    `v<hash>/mf-server.cjs` 로 복사해 버전마다 고유 URL 을 만든다.
+ * 1. **불변 아티팩트** — 자산이 재배포 때 덮어써지면 롤백도, 캐시된 HTML 과의 정합성
+ *    보장도 불가능하다. 웹·SSR 산출물이 전부 `v<version>/` 아래로 나가므로
+ *    한 번 배포된 URL 의 내용은 다시 바뀌지 않는다.
  *
- * 2. **공표된 현재 버전** — host 를 여러 인스턴스로 띄우면 웹훅은 그중 하나에만 닿는다.
- *    나머지 인스턴스가 스스로 알아채려면 remote 가 "지금 버전이 뭔지"를 공표해야 한다.
- *    `mf-version.json` 이 그 역할이다. host 는 이걸 짧은 TTL 로 폴링해 수렴한다.
+ * 2. **공표된 현재 버전** — host 를 여러 인스턴스로 띄우면 재배포 웹훅은 하나에만 닿는다.
+ *    나머지가 스스로 알아채려면 remote 가 "지금 버전이 뭔지"를 공표해야 한다.
+ *    host 는 `mf-version.json` 을 짧은 TTL 로 읽어 수렴한다.
  *
- * 버전은 **산출물 내용의 해시**다. 타임스탬프가 아니라 해시인 이유:
- * 내용이 같으면 버전도 같아야 무의미한 캐시 무효화가 안 일어난다.
+ * 롤백은 이 파일만 옛 버전으로 되돌리면 된다. 자산은 그대로 남아 있다.
  *
  * 사용: node scripts/stamp-remote-version.mjs <remote-name> [distDir]
  */
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const [remote, distArg] = process.argv.slice(2);
@@ -28,26 +27,38 @@ if (!remote) {
   process.exit(1);
 }
 
-const dist = resolve(process.cwd(), distArg ?? "dist");
-const ssrBundle = join(dist, "mf-server.cjs");
+const cwd = process.cwd();
+const dist = resolve(cwd, distArg ?? "dist");
 
-if (!existsSync(ssrBundle)) {
-  console.error(`[stamp] ${ssrBundle} 가 없습니다. SSR 빌드가 먼저 돌아야 합니다.`);
+const versionFile = resolve(cwd, ".mf-version");
+if (!existsSync(versionFile)) {
+  console.error("[stamp] .mf-version 이 없습니다. 빌드 전에 mf-build-version.mjs 가 돌아야 합니다.");
   process.exit(1);
 }
-
-/** 웹 번들의 정체성도 버전에 반영한다 — 둘 중 하나만 바뀌어도 새 버전이어야 한다 */
-const parts = [readFileSync(ssrBundle)];
-const manifest = join(dist, "mf-manifest.json");
-if (existsSync(manifest)) parts.push(readFileSync(manifest));
-
-const hash = createHash("sha256");
-for (const part of parts) hash.update(part);
-const version = hash.digest("hex").slice(0, 12);
+const version = readFileSync(versionFile, "utf8").trim();
 
 const versionDir = join(dist, `v${version}`);
-mkdirSync(versionDir, { recursive: true });
-copyFileSync(ssrBundle, join(versionDir, "mf-server.cjs"));
+const ssrBundle = join(versionDir, "mf-server.cjs");
+const manifest = join(versionDir, "mf-manifest.json");
+
+for (const [label, file] of [
+  ["SSR 번들", ssrBundle],
+  ["MF 매니페스트", manifest],
+]) {
+  if (!existsSync(file)) {
+    console.error(`[stamp] ${label} 이 없습니다: ${file}`);
+    process.exit(1);
+  }
+}
+
+/**
+ * 내용 해시는 버전으로 쓰지 않고 메타로만 남긴다.
+ * 버전은 빌드 ID 라 내용이 같아도 매번 달라지는데, "실제로 코드가 바뀌었는지"는
+ * 이 값으로 판단할 수 있다(불필요한 배포를 걸러내는 용도).
+ */
+const hash = createHash("sha256");
+hash.update(readFileSync(ssrBundle));
+hash.update(readFileSync(manifest));
 
 writeFileSync(
   join(dist, "mf-version.json"),
@@ -55,8 +66,11 @@ writeFileSync(
     {
       remote,
       version,
-      /** host 가 이 경로를 origin 에 붙여 SSR 번들을 받는다 */
+      contentHash: hash.digest("hex").slice(0, 12),
+      /** host 서버가 받아 실행하는 node 번들 */
       ssrEntry: `/v${version}/mf-server.cjs`,
+      /** 브라우저 MF 런타임이 읽는 매니페스트 */
+      webEntry: `/v${version}/mf-manifest.json`,
     },
     null,
     2,
@@ -65,22 +79,29 @@ writeFileSync(
 
 /**
  * 옛 버전 디렉터리를 3개까지 남긴다.
- *
  * 0개면 롤백이 불가능하고, 무제한이면 dist 가 계속 부푼다.
  * 실제 배포라면 CDN 보존 정책이 할 일이라 여기서는 로컬 실험용 최소치만 둔다.
  */
 const KEEP = 3;
-const versions = readdirSync(dist, { withFileTypes: true })
+const dirs = readdirSync(dist, { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && entry.name.startsWith("v"))
-  .map((entry) => ({ name: entry.name, at: existsSync(join(dist, entry.name, "mf-server.cjs")) }))
-  .filter((entry) => entry.at)
   .map((entry) => entry.name)
-  .sort();
+  .filter((name) => existsSync(join(dist, name, "mf-server.cjs")))
+  // 오래된 것부터 지운다. 버전 문자열은 정렬 가능한 형식이 아니라 mtime 을 쓴다.
+  .sort((a, b) => statSync(join(dist, a)).mtimeMs - statSync(join(dist, b)).mtimeMs);
 
-if (versions.length > KEEP) {
-  for (const stale of versions.filter((name) => name !== `v${version}`).slice(0, versions.length - KEEP)) {
-    rmSync(join(dist, stale), { recursive: true, force: true });
-  }
+for (const stale of dirs.filter((name) => name !== `v${version}`).slice(0, Math.max(0, dirs.length - KEEP))) {
+  rmSync(join(dist, stale), { recursive: true, force: true });
+  console.log(`[stamp] 오래된 버전 정리: ${stale}`);
 }
 
-console.log(`[stamp] ${remote} → ${version} (v${version}/mf-server.cjs)`);
+/**
+ * 버전 파일은 여기서 지운다.
+ *
+ * 남겨두면 다음 `dev` 실행이 이 파일을 주워 버전 경로로 빌드하려 든다.
+ * dev 는 버전이 필요 없고(메모리 서빙), 매 저장마다 경로가 바뀌면 오히려 방해다.
+ * 버전은 이 시점부터 `mf-version.json` 이 단독으로 들고 있다.
+ */
+rmSync(versionFile, { force: true });
+
+console.log(`[stamp] ${remote} → ${version} (v${version}/)`);
