@@ -1,0 +1,22 @@
+node_modules
+.pnpm-store
+.turbo
+
+# 빌드 산출물
+.next
+dist
+out
+build
+
+# 환경변수
+.env
+.env.local
+.env.*.local
+
+# TS 증분 빌드 / Module Federation 자동 생성 타입
+*.tsbuildinfo
+@mf-types
+
+# 로그 / OS
+*.log
+.DS_Store

@@ -1,0 +1,30 @@
+{
+  "name": "@mfa/zone-checkout",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3003",
+    "build": "next build",
+    "start": "next start --port 3003",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf .next .turbo"
+  },
+  "dependencies": {
+    "@mfa/contracts": "workspace:*",
+    "@mfa/ui": "workspace:*",
+    "next": "^16.3.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@mfa/eslint-config": "workspace:*",
+    "@mfa/typescript-config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "eslint": "^10.8.1",
+    "typescript": "6.0.3"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "extends": "@mfa/typescript-config/base.json",
+  "compilerOptions": {
+    // cart-store 가 window/localStorage 를 옵셔널하게 사용하므로 DOM 타입 필요
+    "lib": ["DOM", "DOM.Iterable", "ES2023"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "node_modules"]
+}

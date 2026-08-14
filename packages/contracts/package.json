@@ -1,0 +1,29 @@
+{
+  "name": "@mfa/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "devDependencies": {
+    "@mfa/eslint-config": "workspace:*",
+    "@mfa/typescript-config": "workspace:*",
+    "@types/react": "^19.2.2",
+    "eslint": "^10.8.1",
+    "typescript": "6.0.3"
+  }
+}

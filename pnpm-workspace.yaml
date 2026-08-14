@@ -1,0 +1,41 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+minimumReleaseAgeExclude:
+  - '@module-federation/vite@1.20.7'
+  - '@next/env@16.3.1'
+  - '@next/eslint-plugin-next@16.3.1'
+  - '@next/swc-darwin-arm64@16.3.1'
+  - '@next/swc-darwin-x64@16.3.1'
+  - '@next/swc-linux-arm64-gnu@16.3.1'
+  - '@next/swc-linux-arm64-musl@16.3.1'
+  - '@next/swc-linux-x64-gnu@16.3.1'
+  - '@next/swc-linux-x64-musl@16.3.1'
+  - '@next/swc-win32-arm64-msvc@16.3.1'
+  - '@next/swc-win32-x64-msvc@16.3.1'
+  - '@rsbuild/core@2.1.13'
+  - '@rspack/binding-darwin-arm64@2.1.10'
+  - '@rspack/binding-darwin-x64@2.1.10'
+  - '@rspack/binding-linux-arm64-gnu@2.1.10'
+  - '@rspack/binding-linux-arm64-musl@2.1.10'
+  - '@rspack/binding-linux-ppc64-gnu@2.1.10'
+  - '@rspack/binding-linux-riscv64-gnu@2.1.10'
+  - '@rspack/binding-linux-riscv64-musl@2.1.10'
+  - '@rspack/binding-linux-s390x-gnu@2.1.10'
+  - '@rspack/binding-linux-x64-gnu@2.1.10'
+  - '@rspack/binding-linux-x64-musl@2.1.10'
+  - '@rspack/binding-wasm32-wasi@2.1.10'
+  - '@rspack/binding-win32-arm64-msvc@2.1.10'
+  - '@rspack/binding-win32-ia32-msvc@2.1.10'
+  - '@rspack/binding-win32-x64-msvc@2.1.10'
+  - '@rspack/binding@2.1.10'
+  - '@rspack/core@2.1.10'
+  - next@16.3.1
+
+# Next.js / Vite / Rsbuild 가 각자 네이티브 바이너리를 빌드하므로 승인 목록에 등록
+onlyBuiltDependencies:
+  - "@tailwindcss/oxide"
+  - esbuild
+  - sharp
+  - unrs-resolver
