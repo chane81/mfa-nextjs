@@ -21,7 +21,7 @@ const ZONE_CHECKOUT_URL = process.env.ZONE_CHECKOUT_URL ?? "http://localhost:300
  *
  * 그래서 SSR·ISR·Cache Components 세 모드는 한 빌드에 공존할 수 없다.
  * Cache Components 실험은 `experiment/cache-components` 브랜치에서 따로 돌린다.
- * (docs/04-experiments/01-cache-modes.md)
+ * (docs/04-experiments/03-cache-modes.md)
  */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
