@@ -1,20 +1,38 @@
-import { connection } from "next/server";
-import { Suspense } from "react";
+import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 
 import { REMOTE_NAMES, type RemoteName } from "@mfa/contracts";
 
 import { MfWarmup } from "@/components/lab/MfWarmup";
+import { checkMfSecret } from "@/lib/mf-secret";
 
 /**
  * warm 전용 라우트. 사람이 볼 화면이 아니라 `/api/mf-revalidate` 가 내부에서 호출한다.
  *
  * 하는 일: remote 를 SSR 레이어에서 한 번 렌더해 번들 캐시를 채운다.
- * 그 뒤에 페이지 캐시를 무효화하면, 재생성 렌더가 네트워크를 기다리지 않는다.
+ * 그 뒤에 페이지 캐시를 무효화하면 재생성 렌더가 네트워크를 기다리지 않는다.
  *
- * 절대 캐시되면 안 되므로 `connection()` 으로 요청마다 렌더시킨다.
+ * ## 인증
+ * `/api/mf-revalidate` 와 **같은 시크릿**을 요구한다. 이 라우트는 요청 하나로 host 가
+ * remote 번들을 받아 실행하게 만들 수 있으므로 열어두면 안 된다.
+ * 실패는 401 이 아니라 `notFound()` — 라우트 존재 자체를 알릴 이유가 없다.
+ *
+ * ## 왜 `instant = false` 인가
+ * 인증을 Suspense 안(스트리밍 구간)에서 하면 **정적 셸이 200 으로 먼저 나간 뒤**
+ * `notFound()` 가 실행돼 상태 코드를 못 바꾼다. 실측에서 미인증 요청이 200 으로 나왔다.
+ *
+ * `instant = false` 는 "이 세그먼트는 블로킹해도 된다"는 Cache Components 의 명시적
+ * 이스케이프 해치다. 셸을 먼저 흘리지 않으므로 응답 헤더 전에 404 를 낼 수 있다.
+ * 즉시 렌더가 가치인 사용자 화면이 아니라 내부 훅이므로 이쪽이 맞다.
  */
-async function Warm({ searchParams }: { searchParams: Promise<{ remote?: string }> }) {
-  await connection();
+export const instant = false;
+
+export default async function MfWarmPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ remote?: string }>;
+}) {
+  if (!checkMfSecret(await headers())) notFound();
 
   const { remote } = await searchParams;
   const remotes: RemoteName[] =
@@ -29,17 +47,5 @@ async function Warm({ searchParams }: { searchParams: Promise<{ remote?: string 
         warmed: {remotes.join(", ")}
       </p>
     </>
-  );
-}
-
-export default function MfWarmPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ remote?: string }>;
-}) {
-  return (
-    <Suspense fallback={null}>
-      <Warm searchParams={searchParams} />
-    </Suspense>
   );
 }

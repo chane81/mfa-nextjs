@@ -2,6 +2,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 
 import { REMOTE_NAMES, type RemoteName } from "@mfa/contracts";
 
+import { checkMfSecret, mfSecretHeader } from "@/lib/mf-secret";
 import { loadCount } from "@/mf/loader-stats";
 import { bumpRemoteGeneration, remoteBundleTag, remoteCacheTag } from "@/mf/server-loader";
 
@@ -25,11 +26,11 @@ import { bumpRemoteGeneration, remoteBundleTag, remoteCacheTag } from "@/mf/serv
  *   1. 세대 bump — 모든 레이어의 번들 캐시가 다음 접근에서 스스로 무효화된다
  *   2. warm     — `/internal/mf-warm` 을 자기 자신에게 요청해 **SSR 레이어**를 데운다.
  *                 실패하면 여기서 멈춘다. 옛 캐시를 계속 서빙하는 편이 스켈레톤보다 낫다.
+ *                 그 라우트도 같은 시크릿을 요구하므로 헤더를 그대로 전달한다.
  *   3. 무효화   — 그제서야 페이지 캐시를 깬다. 재생성 렌더는 네트워크를 기다리지 않는다.
  */
 export async function POST(req: Request) {
-  const secret = process.env.MF_REVALIDATE_SECRET;
-  if (!secret || req.headers.get("x-mf-secret") !== secret) {
+  if (!checkMfSecret(req.headers)) {
     return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
      */
     const before = loadCount(remote);
     try {
-      const res = await fetch(warmUrl, { cache: "no-store" });
+      const res = await fetch(warmUrl, { cache: "no-store", headers: mfSecretHeader() });
       await res.text();
       if (!res.ok) throw new Error(`warm 응답 ${res.status}`);
       if (loadCount(remote) <= before) {

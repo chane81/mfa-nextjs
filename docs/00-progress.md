@@ -19,6 +19,8 @@
   - `lazy()` 캐시 키에 세대 반영 — 안 하면 무효화가 로더까지 닿지 않음
   - 번들 태그와 페이지 태그 분리 + 번들은 `{ expire: 0 }` 즉시 만료
   - warm 실패 시 페이지 캐시를 건드리지 않고 502 중단
+- [x] `/internal/mf-warm` 인증 — middleware 상수시간 시크릿 검사
+  - 페이지 안 `notFound()` 는 상태 코드를 못 바꾼다(레이아웃이 이미 flush됨) → middleware 필요
 
 ### 결과
 
@@ -209,7 +211,7 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 - [ ] remote 버전 핀/롤백 전략 — 엔트리 URL 에 버전 경로(`/v2026-08-14/mf-server.cjs`)
 - [x] remote 재배포 시 host 서버 캐시 무효화 경로 → `/api/mf-revalidate` + `cacheTag` (5차)
 - [x] 무효화 시 remote 번들 선 warm → 스켈레톤 위험 제거 (5차 발견 6)
-- [ ] `/internal/mf-warm` 접근 제어 (현재 무인증, 내부망 가정)
+- [x] `/internal/mf-warm` 접근 제어 → middleware 시크릿 검사 (5차 발견 7)
 - [ ] 캐시 스코프 없이 프리렌더되는 정적 라우트(`/` 등)의 무효화 경로 정리
 - [ ] remote 배포 파이프라인 시뮬레이션 (remote 만 재배포했을 때 host 무중단 여부)
 - [ ] SSR 실패 시 CSR 폴백 — 서버 로드 실패해도 브라우저에서 재시도

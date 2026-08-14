@@ -227,7 +227,36 @@ lazy 캐시 키에 세대를 넣어 고쳤다 (`${id}@${generation}`). 고친 �
 warm#2  → fetches 1 → 2   ✅
 ```
 
-### 7. 캐시는 레이어별로, 무효화 신호는 globalThis 로
+### 7. warm 라우트는 인증이 필요하고, 그 인증은 middleware 여야 한다 🔒
+
+`/internal/mf-warm` 은 요청 하나로 host 서버가 remote 번들을 받아 **`new Function` 으로
+실행**하게 만든다. 무인증이면 서버사이드 코드 실행 경로를 외부에서 트리거할 수 있고,
+반복 호출로 remote 재fetch·재평가를 강제하는 증폭 벡터가 된다.
+
+문제는 **어디서 막느냐**였다. 페이지 컴포넌트 안에서 `notFound()` 를 불러도 상태 코드가
+**200 으로 나간다** — 그 시점엔 루트 레이아웃이 이미 flush 되기 시작해 헤더가 확정된 뒤다.
+`instant = false` 로 PPR 셸을 없애도 결과는 같았다.
+
+| 막는 위치 | 미인증 요청 결과 |
+| --- | --- |
+| 페이지 안 `notFound()` (PPR) | `200` + 본문만 404 화면 |
+| 페이지 안 `notFound()` + `instant = false` | `200` |
+| **middleware** | **`404`** |
+
+middleware 는 렌더 파이프라인 진입 전에 돌아 진짜 404 를 낸다. 페이지 안 검사도 그대로
+남겨뒀다 — matcher 가 틀어져도 뚫리지 않도록.
+
+시크릿 비교는 상수시간으로 하되 `node:crypto` 는 안 쓴다. middleware 가 edge 런타임에서
+돌 수 있어 node builtin 을 못 쓰기 때문이다. 시크릿이 **미설정이면 전부 거부**한다
+(미설정을 "인증 없음"으로 읽으면 환경변수 빠뜨린 배포가 조용히 열린다).
+
+```
+헤더 없음        404      틀린 시크릿     404
+길이 다른 시크릿  404      맞는 시크릿     200 (warm 수행)
+시크릿 미설정     전부 404 · 웹훅도 401
+```
+
+### 8. 캐시는 레이어별로, 무효화 신호는 globalThis 로
 
 `bundleCache` 를 레이어 간에 공유하면 안 된다. Next 는 RSC 레이어와 SSR 레이어의
 모듈 그래프를 분리하고 각 레이어의 `import * as React` 가 다른 React 빌드로 해석된다.
@@ -284,6 +313,11 @@ MF_REVALIDATE_SECRET=lab-secret pnpm --filter @mfa/host start
 ## 남은 숙제
 
 - [ ] remote 재배포 ↔ 캐시된 HTML 의 hydration mismatch 창 실측 (엔트리 버전 핀 필요)
-- [ ] host 멀티 인스턴스에서 세대 카운터 브로드캐스트 (지금은 프로세스 로컬)
-- [ ] `/internal/mf-warm` 접근 제어 (지금은 무인증 — 내부망 가정)
+- [ ] host 멀티 인스턴스에서 세대 카운터 전파 (지금은 프로세스 로컬)
+
+      세대가 `globalThis` = 프로세스 로컬이라, replica 를 여러 개 띄우면 웹훅을 받은
+      인스턴스만 갱신되고 나머지는 재시작 전까지 옛 remote 를 계속 서빙한다.
+      후보: ① 엔트리 URL 에 버전 경로(`/v2026-08-14/mf-server.cjs`) — 새 배포 = 새 URL 이라
+      인스턴스마다 자연 무효화, ② 번들 ETag 주기 확인으로 세대 자동 도출, ③ Redis pub/sub.
+      ①은 hydration mismatch 대책(엔트리 버전 핀)과 같은 작업이라 겸사겸사 된다.
 - [ ] `/products/[id]` 에 `generateStaticParams` 도입 시 빌드-remote 결합도 측정
