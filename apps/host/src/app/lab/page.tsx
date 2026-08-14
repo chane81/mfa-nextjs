@@ -41,21 +41,22 @@ export default function LabIndexPage() {
       <div style={{ display: "grid", gap: tokens.space(4) }}>
         {LAB_ORDER.map((mode) => {
           const spec = LAB_MODES[mode];
-          const style = {
-            textDecoration: "none",
-            color: "inherit",
-            border: `1px solid hsl(${spec.hue} 60% 45% / 0.5)`,
-            background: `hsl(${spec.hue} 60% 45% / 0.08)`,
-            borderRadius: tokens.radius.lg,
-            padding: tokens.space(5),
-            display: "flex",
-            flexDirection: "column",
-            gap: tokens.space(2),
-            opacity: spec.branch ? 0.65 : 1,
-          } as const;
-
-          const body = (
-            <>
+          return (
+            <Link
+              key={mode}
+              href={`/lab/${mode}`}
+              style={{
+                textDecoration: "none",
+                color: "inherit",
+                border: `1px solid hsl(${spec.hue} 60% 45% / 0.5)`,
+                background: `hsl(${spec.hue} 60% 45% / 0.08)`,
+                borderRadius: tokens.radius.lg,
+                padding: tokens.space(5),
+                display: "flex",
+                flexDirection: "column",
+                gap: tokens.space(2),
+              }}
+            >
               <strong style={{ fontSize: 16 }}>{spec.label}</strong>
               <code style={{ fontSize: 12, color: tokens.color.textMuted }}>
                 {spec.segmentConfig}
@@ -63,23 +64,6 @@ export default function LabIndexPage() {
               <span style={{ fontSize: 13, lineHeight: 1.6, color: tokens.color.textMuted }}>
                 {spec.expect}
               </span>
-              {spec.branch ? (
-                <span style={{ fontSize: 12, color: tokens.color.danger }}>
-                  이 빌드에는 없음 — cacheComponents 는 앱 전역 설정이라{" "}
-                  <code>dynamic</code> / <code>revalidate</code> 와 공존할 수 없다.{" "}
-                  <code>{spec.branch}</code> 브랜치 빌드에서만 존재한다.
-                </span>
-              ) : null}
-            </>
-          );
-
-          return spec.branch ? (
-            <div key={mode} style={style}>
-              {body}
-            </div>
-          ) : (
-            <Link key={mode} href={`/lab/${mode}`} style={style}>
-              {body}
             </Link>
           );
         })}

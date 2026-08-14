@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import { tokens } from "@mfa/ui";
 
 import { CartSection } from "@/components/CartSection";

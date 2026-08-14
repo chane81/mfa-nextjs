@@ -11,20 +11,30 @@ import type { NextConfig } from "next";
 const ZONE_CHECKOUT_URL = process.env.ZONE_CHECKOUT_URL ?? "http://localhost:3003";
 
 /**
- * Cache Components(`cacheComponents: true`)는 여기서 켜지 않는다.
+ * Cache Components 를 켠다. Next 16 의 기본 방향이다.
  *
- * 실측 결과 이 옵션은 **앱 전역 all-or-nothing** 이다. 켜는 순간
- * `export const dynamic` / `export const revalidate` 가 전부 컴파일 에러가 된다.
+ * 16 부터 `dynamic` / `revalidate` / `fetchCache` 세그먼트 설정은 `use cache` +
+ * `cacheLife` 로 **대체**됐다. 켠 상태에서 옛 설정을 남기면 컴파일 에러가 난다.
  *
  *   Error: Route segment config "revalidate" is not compatible with
  *          `nextConfig.cacheComponents`. Please remove it.
  *
- * 그래서 SSR·ISR·Cache Components 세 모드는 한 빌드에 공존할 수 없다.
- * Cache Components 실험은 `experiment/cache-components` 브랜치에서 따로 돌린다.
- * (docs/04-experiments/03-cache-modes.md)
+ * 이행 매핑 (공식 가이드 기준):
+ *   dynamic = "force-dynamic" → 삭제. 캐시하지 않으면 기본이 동적이다.
+ *                                요청 시점 실행이 꼭 필요하면 `connection()` + `<Suspense>`.
+ *   revalidate = N            → "use cache" + cacheLife(...)
+ *   experimental_ppr          → 삭제. PPR 이 Cache Components 에 흡수됐다.
+ *   dynamicParams             → 미지원. 삭제.
+ *
+ * 점진 이행이 필요하면 세그먼트에 `export const instant = false` 로 검증만 미룰 수 있다.
+ *
+ * https://nextjs.org/docs/app/guides/migrating-to-cache-components
+ * 측정 결과: docs/04-experiments/03-cache-modes.md
  */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+
+  cacheComponents: true,
 
   // 워크스페이스 패키지는 dist(JS)로 빌드되지만, 소스맵/트리셰이킹을 위해 명시
   transpilePackages: ["@mfa/ui", "@mfa/contracts"],

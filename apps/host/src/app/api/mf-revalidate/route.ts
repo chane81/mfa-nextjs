@@ -4,8 +4,6 @@ import { REMOTE_NAMES, type RemoteName } from "@mfa/contracts";
 
 import { invalidateServerBundle, remoteCacheTag } from "@/mf/server-loader";
 
-export const dynamic = "force-dynamic";
-
 /**
  * remote 배포 파이프라인이 host 캐시를 깨우는 엔드포인트.
  *
@@ -43,9 +41,18 @@ export async function POST(req: Request) {
   // "max" = 최대 만료. remote 가 실제로 바뀐 시점이므로 즉시 무효화가 맞다.
   revalidateTag(remoteCacheTag(remote), "max");
 
-  // remote 마크업을 품고 있는 라우트들. 실제 운영이라면 remote → 라우트 맵을 따로 관리한다.
-  const paths = ["/", "/lab/isr", "/lab/cache", "/products/[id]"];
+  /**
+   * 기본은 **태그만** 깬다.
+   *
+   * `"use cache"` 스코프가 `cacheTag(remoteCacheTag(...))` 로 자기 의존성을 선언하므로
+   * host 는 "어느 라우트가 이 remote 를 쓰는지" 목록을 관리할 필요가 없다.
+   *
+   * 다만 캐시 스코프 없이 통째로 프리렌더된 정적 라우트(`/` 등)는 태그가 없다.
+   * 그런 라우트까지 깨야 하면 `?paths=1` 로 경로 무효화를 함께 돌린다.
+   */
+  const alsoPaths = new URL(req.url).searchParams.get("paths") === "1";
+  const paths = alsoPaths ? ["/", "/lab/isr", "/lab/cache", "/products/[id]"] : [];
   for (const path of paths) revalidatePath(path, "page");
 
-  return Response.json({ ok: true, remote, revalidated: paths });
+  return Response.json({ ok: true, remote, tag: remoteCacheTag(remote), revalidated: paths });
 }

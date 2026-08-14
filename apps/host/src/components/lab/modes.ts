@@ -5,40 +5,32 @@ export type LabMode = "ssr" | "isr" | "cache";
 export interface LabModeSpec {
   label: string;
   hue: number;
-  /** 이 모드를 만드는 라우트 세그먼트 설정 한 줄 */
+  /** 이 모드를 만드는 코드 한 줄 */
   segmentConfig: string;
   expect: string;
-  /**
-   * 이 빌드에서 라우트가 존재하는지.
-   *
-   * cacheComponents 는 앱 전역 설정이고 `dynamic`/`revalidate` 세그먼트 설정과
-   * 공존할 수 없어서, cache 모드는 별도 브랜치 빌드에서만 살아 있다.
-   */
-  branch?: string;
 }
 
 export const LAB_MODES: Record<LabMode, LabModeSpec> = {
   ssr: {
-    label: "SSR — 요청마다 렌더",
+    label: "요청마다 렌더 (구 force-dynamic)",
     hue: 205,
-    segmentConfig: 'export const dynamic = "force-dynamic"',
+    segmentConfig: "await connection() + <Suspense>",
     expect:
-      "새로고침할 때마다 서버 렌더 시각이 바뀐다. host 프로세스가 remote 번들을 이미 평가해뒀다면 재평가는 없지만, 렌더는 요청마다 돈다.",
+      "새로고침할 때마다 서버 렌더 시각이 바뀐다. 정적 셸은 프리렌더되고 이 패널만 요청 시 스트리밍된다(PPR).",
   },
   isr: {
-    label: "ISR — 주기 재생성",
+    label: "ISR 등가 (구 revalidate = 60)",
     hue: 140,
-    segmentConfig: "export const revalidate = 60",
+    segmentConfig: '"use cache" + cacheLife({ revalidate: 60 })',
     expect:
       "서버 렌더 시각이 60초 동안 얼어붙는다. 그 사이 remote 마크업은 캐시된 HTML 에서 그대로 나온다.",
   },
   cache: {
-    label: "Cache Components — use cache",
+    label: "태그 무효화 (MFA 에 필요한 형태)",
     hue: 45,
-    segmentConfig: '"use cache" + cacheLife() + cacheTag()',
+    segmentConfig: '"use cache" + cacheLife("minutes") + cacheTag(remote)',
     expect:
-      "셸은 캐시된 RSC 페이로드에서 나온다. remote 가 정적 셸에 들어가는지, Suspense 구멍으로 스트리밍되는지가 관전 포인트.",
-    branch: "experiment/cache-components",
+      "시간이 아니라 이벤트로 깬다. remote 재배포 웹훅이 이 태그를 만료시키면 즉시 재생성된다.",
   },
 };
 
