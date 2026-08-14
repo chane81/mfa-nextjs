@@ -15,10 +15,14 @@
 - [x] `/api/lab/stats`, `/api/mf-revalidate` (remote 배포 → host 캐시 무효화 웹훅)
 - [x] 캐시 스코프에 `cacheTag(remoteCacheTag(remote))` — 스코프가 의존 remote 를 자기 선언
 - [x] **warm-then-revalidate** — 스켈레톤이 캐시에 굳는 위험 제거
-  - 세대 카운터(globalThis)로 레이어를 넘는 무효화 신호, 캐시는 레이어별 유지
-  - `lazy()` 캐시 키에 세대 반영 — 안 하면 무효화가 로더까지 닿지 않음
+  - 무효화 신호만 globalThis 로 공유, 캐시는 레이어별 유지(레이어마다 React 가 다르다)
+  - `lazy()` 캐시 키에 remote 버전 반영 — 안 하면 무효화가 로더까지 닿지 않음
   - 번들 태그와 페이지 태그 분리 + 번들은 `{ expire: 0 }` 즉시 만료
   - warm 실패 시 페이지 캐시를 건드리지 않고 502 중단
+- [x] **remote 버전 핀** — remote 가 `mf-version.json` 으로 버전 공표, host 는 그걸 읽어 수렴
+  - 산출물 해시 = 버전, `v<hash>/mf-server.cjs` 불변 경로 → 롤백 가능
+  - 웹훅 없이도 인스턴스 전부 수렴(실측 5초, TTL 30초) → 브로드캐스트 불필요
+  - 같은 버전을 서버 엔트리와 브라우저 양쪽에 적용 → hydration 정합
 - [x] `/internal/mf-warm` 인증 — middleware 상수시간 시크릿 검사
   - 페이지 안 `notFound()` 는 상태 코드를 못 바꾼다(레이아웃이 이미 flush됨) → middleware 필요
 
@@ -208,7 +212,7 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 ## 다음에 해볼 것
 
 - [ ] remote SSR 번들 신뢰 경계 강화 — origin 허용목록 + SRI/서명 검증
-- [ ] remote 버전 핀/롤백 전략 — 엔트리 URL 에 버전 경로(`/v2026-08-14/mf-server.cjs`)
+- [x] remote 버전 핀/롤백 전략 — `/v<hash>/mf-server.cjs` 불변 경로 (5차)
 - [x] remote 재배포 시 host 서버 캐시 무효화 경로 → `/api/mf-revalidate` + `cacheTag` (5차)
 - [x] 무효화 시 remote 번들 선 warm → 스켈레톤 위험 제거 (5차 발견 6)
 - [x] `/internal/mf-warm` 접근 제어 → middleware 시크릿 검사 (5차 발견 7)

@@ -52,6 +52,28 @@ const REACT_VERSION = "19.2.8";
 
 let initialized = false;
 
+/**
+ * 서버가 이 HTML 을 만들 때 쓴 remote 버전을 엔트리 URL 에 반영한다.
+ * (`RemoteVersionSync` 가 `window.__MFA_REMOTE_VERSIONS__` 로 심어준다)
+ *
+ * 목적은 **서버 마크업과 hydrate 하는 코드를 같은 빌드로 맞추는 것**이다.
+ * 캐시된 HTML 이 오래 살아 있을수록 이 창이 벌어지고, 어긋나면 hydration 이 깨진다.
+ *
+ * 한계: 웹 자산은 아직 버전 경로가 아니라 쿼리로만 구분된다. remote 가 파일을 덮어쓰면
+ * 옛 버전 쿼리가 새 코드를 받는다. 진짜 고정은 remote 가 웹 자산을 불변 접두사로
+ * 배포해야 가능하다(SSR 번들은 이미 `/v<hash>/` 불변 경로다).
+ */
+function versionedEntry(remote: "catalog" | "cart", entry: string): string {
+  const versions = (globalThis as { __MFA_REMOTE_VERSIONS__?: Record<string, string> })
+    .__MFA_REMOTE_VERSIONS__;
+  const version = versions?.[remote];
+  if (!version) return entry;
+
+  const url = new URL(entry);
+  url.searchParams.set("v", version);
+  return url.toString();
+}
+
 function ensureInit(): void {
   if (initialized) return;
 
@@ -59,8 +81,8 @@ function ensureInit(): void {
   init({
     name: "host",
     remotes: [
-      { name: "catalog", entry: CATALOG_ENTRY },
-      { name: "cart", entry: CART_ENTRY },
+      { name: "catalog", entry: versionedEntry("catalog", CATALOG_ENTRY) },
+      { name: "cart", entry: versionedEntry("cart", CART_ENTRY) },
     ],
     // host 가 이미 가진 React 를 remote 에 주입 → remote 번들의 React 는 로드되지 않는다
     shared: {

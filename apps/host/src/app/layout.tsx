@@ -4,6 +4,7 @@ import { Suspense, type ReactNode } from "react";
 import { tokens } from "@mfa/ui";
 
 import { SiteHeader } from "@/components/SiteHeader";
+import { RemoteVersionSync } from "@/mf/RemoteVersionSync";
 
 export const metadata: Metadata = {
   title: "MFA Shop — Next.js 16 host",
@@ -22,6 +23,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           minHeight: "100vh",
         }}
       >
+        {/*
+          remote 버전을 매 렌더마다 다시 읽어 globalThis 와 브라우저에 반영한다.
+          이게 있어야 웹훅을 못 받은 host 인스턴스도 스스로 재배포를 알아챈다.
+        */}
+        <Suspense fallback={null}>
+          <RemoteVersionSync />
+        </Suspense>
+
         {/*
           cacheComponents 를 켜면 `usePathname()` 같은 client hook 이 prerender 를 막는다
           (digest: CLIENT_HOOK_DYNAMIC). Suspense 로 감싸 셸 뒤로 스트리밍시킨다.

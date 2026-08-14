@@ -6,8 +6,11 @@ import { defineConfig } from "@rsbuild/core";
 import { pluginReact } from "@rsbuild/plugin-react";
 
 const PORT = 3002;
-const SSR_BUNDLE = resolve(process.cwd(), "dist/mf-server.cjs");
+const DIST = resolve(process.cwd(), "dist");
 const PUBLIC_URL = `http://localhost:${PORT}`;
+
+/** dev 서버가 디스크에서 직접 내려주는 경로들 (preview 는 dist 정적 서빙으로 커버된다) */
+const SERVED = /^\/(mf-server\.cjs|mf-version\.json|v[0-9a-f]+\/mf-server\.cjs)$/;
 
 /**
  * cart remote — Rsbuild(Rspack) + @module-federation/rsbuild-plugin
@@ -50,25 +53,36 @@ export default defineConfig({
     // 청크가 3002 절대경로로 로드되도록 고정
     assetPrefix: PUBLIC_URL,
     /**
-     * SSR 번들을 dev 서버에서도 내려준다.
-     * 웹 번들은 메모리에서 서빙되지만 SSR 번들은 watch 빌드가 디스크에 쓰므로 직접 읽는다.
-     * host 서버가 이 URL 을 fetch 해서 remote 를 서버 렌더링한다.
+     * SSR 번들과 버전 매니페스트를 dev 서버에서 내려준다.
+     * 웹 번들은 메모리에서 서빙되지만 이 파일들은 빌드가 디스크에 쓰므로 직접 읽는다.
+     * (preview 는 dist 를 정적으로 서빙하므로 이 미들웨어가 필요 없다)
+     *
+     *   /mf-server.cjs          — 버전 없는 최신본
+     *   /v<hash>/mf-server.cjs  — 불변 아티팩트
+     *   /mf-version.json        — 현재 버전 공표
      */
     setupMiddlewares: [
       (middlewares) => {
         middlewares.unshift((req, res, next) => {
-          if (req.url?.split("?")[0] !== "/mf-server.cjs") {
+          const path = req.url?.split("?")[0] ?? "";
+          if (!SERVED.test(path)) {
             next();
             return;
           }
           try {
-            res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+            const body = readFileSync(resolve(DIST, `.${path}`), "utf8");
+            res.setHeader(
+              "Content-Type",
+              path.endsWith(".json")
+                ? "application/json; charset=utf-8"
+                : "application/javascript; charset=utf-8",
+            );
             res.setHeader("Access-Control-Allow-Origin", "*");
             res.setHeader("Cache-Control", "no-store");
-            res.end(readFileSync(SSR_BUNDLE, "utf8"));
+            res.end(body);
           } catch {
             res.statusCode = 404;
-            res.end("// SSR 번들 없음. watch 빌드가 도는지 확인하세요.");
+            res.end("// 없음. `pnpm build` (stamp 포함) 또는 watch 빌드를 확인하세요.");
           }
         });
       },

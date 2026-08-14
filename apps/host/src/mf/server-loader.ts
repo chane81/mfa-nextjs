@@ -3,10 +3,17 @@ import * as ReactJSXDevRuntime from "react/jsx-dev-runtime";
 import * as ReactJSXRuntime from "react/jsx-runtime";
 import * as ReactDOM from "react-dom";
 
-import type { RemoteModuleId, RemoteModuleMap, RemoteName } from "@mfa/contracts";
+import { REMOTE_NAMES, type RemoteModuleId, type RemoteModuleMap, type RemoteName } from "@mfa/contracts";
 
 import { normalizeModule } from "./interop";
 import { recordEval, recordFetch, recordLoad } from "./loader-stats";
+import {
+  fallbackSsrEntry,
+  fetchRemoteVersion,
+  knownVersion,
+  markBundleReady,
+  remoteOrigin,
+} from "./remote-version";
 
 /**
  * remote 를 **서버에서** 로드하는 로더.
@@ -29,11 +36,6 @@ import { recordEval, recordFetch, recordLoad } from "./loader-stats";
  * 운영에서는 remote origin 을 허용 목록으로 고정하고 무결성 검증(SRI 등)을 붙일 것.
  */
 
-const SSR_ENTRIES: Record<RemoteName, string> = {
-  catalog: process.env.REMOTE_CATALOG_SSR_ENTRY ?? "http://localhost:3001/mf-server.cjs",
-  cart: process.env.REMOTE_CART_SSR_ENTRY ?? "http://localhost:3002/mf-server.cjs",
-};
-
 /**
  * remote 서버 번들이 external 로 남긴 모듈 — host 인스턴스를 넘긴다.
  *
@@ -51,11 +53,15 @@ const INJECTED: Record<string, unknown> = {
 type ExposeMap = Record<string, unknown>;
 
 interface CacheEntry {
-  generation: number;
+  /** 이 엔트리를 만든 remote 버전. 버전이 바뀌면 버린다. */
+  version: string;
   exposes: Promise<ExposeMap>;
 }
 
 const bundleCache = new Map<RemoteName, CacheEntry>();
+
+/** 버전을 모를 때 쓰는 캐시 키 (dev, 또는 stamp 안 한 remote) */
+const UNVERSIONED = "unversioned";
 
 /**
  * remote 하나에 태그가 **두 개**인 이유.
@@ -76,7 +82,7 @@ export function remoteCacheTag(remote: RemoteName): string {
 }
 
 /**
- * ## remote 세대(generation) — 레이어를 넘는 무효화 신호
+ * ## 캐시는 레이어별로, 무효화 신호는 globalThis 로
  *
  * `bundleCache` 는 **레이어마다 별도 인스턴스**여야 한다. Next 는 RSC 레이어와
  * SSR 레이어의 모듈 그래프를 분리하고, 각 레이어의 `import * as React` 가 서로 다른
@@ -86,31 +92,12 @@ export function remoteCacheTag(remote: RemoteName): string {
  * 그런데 무효화 신호는 반대로 **모든 레이어에 닿아야 한다**. Route Handler(RSC 레이어)에서
  * remote 재배포를 통보받아도 페이지를 실제로 렌더하는 SSR 레이어의 Map 은 그대로이기 때문이다.
  *
- * 그래서 캐시는 레이어별로 두되, **세대 카운터만 globalThis 에 둔다.**
- * 카운터가 올라가면 각 레이어가 다음 접근에서 스스로 자기 캐시를 버리고 다시 평가한다.
+ * 그래서 캐시는 레이어별로 두고, **버전 문자열만 globalThis 로 공유한다**
+ * (`remote-version.ts`). 버전이 바뀌면 각 레이어가 다음 접근에서 스스로 캐시를 버린다.
+ *
+ * 프로세스 안 카운터가 아니라 remote 가 공표한 버전을 쓰는 이유는 멀티 인스턴스다.
+ * 카운터는 웹훅이 닿은 인스턴스에만 오르지만, 버전은 모든 인스턴스가 같은 출처에서 읽는다.
  */
-const GENERATION_KEY = "__mfaRemoteGeneration";
-
-type GenerationHolder = typeof globalThis & {
-  [GENERATION_KEY]?: Partial<Record<RemoteName, number>>;
-};
-
-function generations(): Partial<Record<RemoteName, number>> {
-  const g = globalThis as GenerationHolder;
-  g[GENERATION_KEY] ??= {};
-  return g[GENERATION_KEY];
-}
-
-export function currentGeneration(remote: RemoteName): number {
-  return generations()[remote] ?? 0;
-}
-
-/** remote 가 재배포됐다고 알린다. 모든 레이어의 번들 캐시가 다음 접근에서 무효화된다. */
-export function bumpRemoteGeneration(remote: RemoteName): number {
-  const next = currentGeneration(remote) + 1;
-  generations()[remote] = next;
-  return next;
-}
 
 /**
  * remote 번들을 받을 때 쓰는 fetch 옵션.
@@ -120,10 +107,11 @@ export function bumpRemoteGeneration(remote: RemoteName): number {
  *
  * ⚠️ 여기 붙는 `next.tags` 는 **Data Cache 계층에만** 붙는다.
  * 페이지의 `"use cache"` 엔트리는 이 태그로 깨지지 않는다 — 그건 캐시 스코프 안에서
- * `cacheTag()` 로 직접 달아야 한다. 무효화 대상이 세 층이다:
- *   1. 이 fetch 응답      → revalidateTag(remoteBundleTag)
- *   2. 평가된 expose 맵    → bumpRemoteGeneration
- *   3. 페이지 캐시        → revalidateTag(remoteCacheTag)
+ * `cacheTag()` 로 직접 달아야 한다. 무효화 대상이 네 층이다:
+ *   1. 버전 매니페스트    → revalidateTag(remoteVersionTag)
+ *   2. 이 fetch 응답      → revalidateTag(remoteBundleTag)
+ *   3. 평가된 expose 맵    → 버전이 바뀌면 자동
+ *   4. 페이지 캐시        → revalidateTag(remoteCacheTag)
  * 실측: docs/04-experiments/03-cache-modes.md
  */
 function bundleFetchInit(remote: RemoteName): RequestInit {
@@ -134,8 +122,20 @@ function bundleFetchInit(remote: RemoteName): RequestInit {
   } as RequestInit;
 }
 
-async function loadServerBundle(remote: RemoteName): Promise<ExposeMap> {
-  const url = SSR_ENTRIES[remote];
+/**
+ * 이번에 받을 SSR 번들 URL 과 그 버전.
+ *
+ * 버전을 알면 불변 경로(`/v<hash>/mf-server.cjs`)를 쓴다. 같은 URL 이 다른 코드를
+ * 가리키지 않으므로 캐시된 HTML 이 어떤 remote 로 만들어졌는지가 확정된다.
+ * 모르면 버전 없는 엔트리로 폴백한다 — dev 이거나 stamp 를 안 돌린 remote 다.
+ */
+async function resolveEntry(remote: RemoteName): Promise<{ url: string; version: string }> {
+  const info = await fetchRemoteVersion(remote);
+  if (!info) return { url: fallbackSsrEntry(remote), version: UNVERSIONED };
+  return { url: `${remoteOrigin(remote)}${info.ssrEntry}`, version: info.version };
+}
+
+async function loadServerBundle(remote: RemoteName, url: string): Promise<ExposeMap> {
   recordFetch(remote);
   const res = await fetch(url, bundleFetchInit(remote));
   if (!res.ok) {
@@ -172,20 +172,27 @@ async function loadServerBundle(remote: RemoteName): Promise<ExposeMap> {
   return exposes;
 }
 
-function getServerBundle(remote: RemoteName): Promise<ExposeMap> {
+async function getServerBundle(remote: RemoteName): Promise<ExposeMap> {
+  const { url, version } = await resolveEntry(remote);
+
   // dev 에서는 remote 의 watch 빌드가 계속 번들을 갱신하므로 캐시하지 않는다
-  if (process.env.NODE_ENV !== "production") return loadServerBundle(remote);
+  if (process.env.NODE_ENV !== "production") return loadServerBundle(remote, url);
 
-  const generation = currentGeneration(remote);
   const cached = bundleCache.get(remote);
-  if (cached && cached.generation === generation) return cached.exposes;
+  if (cached && cached.version === version) return cached.exposes;
 
-  const exposes = loadServerBundle(remote).catch((error: unknown) => {
-    // 실패한 promise 를 캐시에 남기면 서버가 살아있는 동안 계속 실패한다
-    if (bundleCache.get(remote)?.exposes === exposes) bundleCache.delete(remote);
-    throw error;
-  });
-  bundleCache.set(remote, { generation, exposes });
+  const exposes = loadServerBundle(remote, url)
+    .then((loaded) => {
+      // "이 버전을 실제로 들고 있다"를 전역에 알린다 — warm 성공 판정의 근거
+      markBundleReady(remote, version);
+      return loaded;
+    })
+    .catch((error: unknown) => {
+      // 실패한 promise 를 캐시에 남기면 서버가 살아있는 동안 계속 실패한다
+      if (bundleCache.get(remote)?.exposes === exposes) bundleCache.delete(remote);
+      throw error;
+    });
+  bundleCache.set(remote, { version, exposes });
   return exposes;
 }
 
@@ -222,4 +229,14 @@ export async function loadRemoteModuleOnServer<K extends RemoteModuleId>(
   return { default: Component } as RemoteModuleMap[K];
 }
 
-export const SSR_REMOTE_ENTRIES = SSR_ENTRIES;
+/** 진단용 — 지금 이 인스턴스가 어느 엔트리를 보고 있는지 */
+export function ssrEntrySnapshot(): Record<RemoteName, string> {
+  return REMOTE_NAMES.reduce(
+    (acc, remote) => {
+      const info = knownVersion(remote);
+      acc[remote] = info ? `${remoteOrigin(remote)}${info.ssrEntry}` : fallbackSsrEntry(remote);
+      return acc;
+    },
+    {} as Record<RemoteName, string>,
+  );
+}

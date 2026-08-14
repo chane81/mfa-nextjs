@@ -8,23 +8,36 @@ import { defineConfig, type Connect, type Plugin } from "vite";
 const PORT = 3001;
 
 /**
- * SSR 번들(dist/mf-server.cjs)을 dev / preview 서버에서도 그대로 내려준다.
- * 웹 번들은 dev 에서 메모리로 서빙되지만 SSR 번들은 watch 빌드가 디스크에 쓰므로 직접 읽는다.
- * host 서버가 이 URL 을 fetch 해서 remote 를 서버 렌더링한다.
+ * SSR 번들과 버전 매니페스트를 dev / preview 서버에서 내려준다.
+ * 웹 번들은 dev 에서 메모리로 서빙되지만 이 파일들은 빌드가 디스크에 쓰므로 직접 읽는다.
+ *
+ * 세 경로를 연다.
+ *   /mf-server.cjs            — 버전 없는 최신본 (dev 및 폴백)
+ *   /v<hash>/mf-server.cjs    — 불변 아티팩트. host 는 평소 이쪽을 쓴다
+ *   /mf-version.json          — 현재 버전 공표. host 가 폴링해 재배포를 알아챈다
  */
-function serveSsrBundle(): Plugin {
-  const file = resolve(process.cwd(), "dist/mf-server.cjs");
+const SERVED = /^\/(mf-server\.cjs|mf-version\.json|v[0-9a-f]+\/mf-server\.cjs)$/;
 
+function serveSsrBundle(): Plugin {
   const middleware: Connect.NextHandleFunction = (req, res, next) => {
-    if (req.url?.split("?")[0] !== "/mf-server.cjs") return next();
+    const path = req.url?.split("?")[0] ?? "";
+    if (!SERVED.test(path)) return next();
+
     try {
-      res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+      const body = readFileSync(resolve(process.cwd(), `dist${path}`), "utf8");
+      res.setHeader(
+        "Content-Type",
+        path.endsWith(".json")
+          ? "application/json; charset=utf-8"
+          : "application/javascript; charset=utf-8",
+      );
       res.setHeader("Access-Control-Allow-Origin", "*");
+      // 버전 경로는 불변이라 오래 캐시해도 되지만, 로컬 실험에서는 혼동만 키운다
       res.setHeader("Cache-Control", "no-store");
-      res.end(readFileSync(file, "utf8"));
+      res.end(body);
     } catch {
       res.statusCode = 404;
-      res.end("// SSR 번들이 아직 없습니다. `pnpm build:ssr` 또는 dev 의 watch 빌드를 확인하세요.");
+      res.end("// 아직 없습니다. `pnpm build` (stamp 포함) 또는 dev watch 빌드를 확인하세요.");
     }
   };
 
