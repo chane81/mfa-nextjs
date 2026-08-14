@@ -1,28 +1,31 @@
 # 진행 상황
 
-## 2026-08-14 (5차) — 캐시 실험: MFA 에서 ISR / Cache Components 실측
+## 2026-08-14 (5차) — Cache Components 이행 + MFA 캐시 실측
 
 질문: **런타임 MF 를 쓰면 Next 의 ISR·Cache Components 를 잃는가?** → **아니오.**
 
+전제 정정: Next 16 은 `dynamic` / `revalidate` / `fetchCache` 세그먼트 설정을
+`use cache` + `cacheLife` 로 **대체**했다. 그래서 host 전체를 `cacheComponents: true` 로 이행했다.
+
 ### 한 일
 
-- [x] `/lab` 실험 하네스 추가 — 세 라우트가 같은 remote 를 렌더, 세그먼트 설정만 다름
-- [x] `server-loader` 에 프로덕션 태그 캐시(`force-cache` + `next.tags`) + `invalidateServerBundle()`
+- [x] host 전면 이행 — 세그먼트 설정 삭제, `connection()`+`<Suspense>` / `"use cache"`+`cacheLife` 로 재표현
+- [x] `/lab` 실험 하네스 — 세 라우트가 같은 remote 를 렌더, 캐시 선언만 다름
 - [x] `loader-stats` — remote 번들 fetch/eval 계측 (globalThis, RSC/SSR 레이어 공유)
 - [x] `/api/lab/stats`, `/api/mf-revalidate` (remote 배포 → host 캐시 무효화 웹훅)
-- [x] `experiment/cache-components` 브랜치에서 `cacheComponents: true` 전면 이행 후 재측정
+- [x] 캐시 스코프에 `cacheTag(remoteCacheTag(remote))` — 스코프가 의존 remote 를 자기 선언
 
 ### 결과
 
 | 판정 | 결과 |
 | --- | --- |
-| ISR 캐시된 HTML 에 remote 마크업 | ✅ 있음 (빌드 프리렌더 · 런타임 재생성 모두) |
-| ISR HIT 구간의 remote 번들 fetch/eval | ✅ **0 / 0** (SSR 은 1회차 2/2) |
-| TTFB | SSR 69→6ms vs ISR 5→2ms |
-| on-demand 무효화 웹훅 | ✅ MISS→재생성→HIT, 잘못된 시크릿 401 |
-| cacheComponents 에서 세 모드 공존 | ❌ **앱 전역 all-or-nothing** — `dynamic`/`revalidate` 전면 금지 |
+| 캐시된 HTML 에 remote 마크업 | ✅ 있음 (빌드 프리렌더 · 런타임 재생성 모두) |
+| 캐시 HIT 구간의 remote 번들 fetch/eval | ✅ **0 / 0** (동적 라우트는 1회차 1/1) |
+| TTFB | 동적 74→9ms vs 캐시 5→2ms |
+| 태그만으로 무효화 | ✅ 됨 — 단 `cacheTag()` 로 달아야 함. `fetch` 의 `next.tags` 로는 안 됨 |
+| `revalidateTag` 동작 | SWR — 1회 `STALE` 후 백그라운드 갱신 → 새 렌더 |
 | cacheComponents 이행 비용 | 대부분 MFA 무관 (`usePathname`·`params` → Suspense) |
-| remote fetch 태그의 `"use cache"` 전파 | ❌ 안 됨 → host 가 remote→라우트 맵 관리 필요 |
+| `generateStaticParams` 빈 배열 | ❌ 금지 → host 빌드는 remote 기동에 의존 |
 | 재생성 중 스켈레톤 캐싱 | ⚠️ 1회 관측, 재현 실패 — 위험으로 기록 |
 
 전문: [04-experiments/03-cache-modes.md](./04-experiments/03-cache-modes.md)
@@ -199,9 +202,9 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 
 - [ ] remote SSR 번들 신뢰 경계 강화 — origin 허용목록 + SRI/서명 검증
 - [ ] remote 버전 핀/롤백 전략 — 엔트리 URL 에 버전 경로(`/v2026-08-14/mf-server.cjs`)
-- [x] remote 재배포 시 host 서버 캐시 무효화 경로 → `/api/mf-revalidate` (5차)
-- [ ] 무효화 시 remote 번들 선 warm → 스켈레톤이 캐시에 굳는 위험 제거 (5차 발견 5)
-- [ ] remote → 라우트 맵 관리 방식 결정 (태그가 `"use cache"` 로 전파되지 않음, 5차 발견 4)
+- [x] remote 재배포 시 host 서버 캐시 무효화 경로 → `/api/mf-revalidate` + `cacheTag` (5차)
+- [ ] 무효화 시 remote 번들 선 warm → 스켈레톤이 캐시에 굳는 위험 제거 (5차 발견 6)
+- [ ] 캐시 스코프 없이 프리렌더되는 정적 라우트(`/` 등)의 무효화 경로 정리
 - [ ] remote 배포 파이프라인 시뮬레이션 (remote 만 재배포했을 때 host 무중단 여부)
 - [ ] SSR 실패 시 CSR 폴백 — 서버 로드 실패해도 브라우저에서 재시도
 - [ ] 초기 로딩 성능 측정 — SSR 경로의 TTFB / LCP 정량화

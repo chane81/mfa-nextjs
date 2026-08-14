@@ -61,9 +61,15 @@ export function remoteCacheTag(remote: RemoteName): string {
  * remote 번들을 받을 때 쓰는 fetch 옵션.
  *
  * dev 는 remote watch 빌드가 계속 번들을 갱신하므로 항상 새로 받는다.
- * 프로덕션은 태그를 달아 Next 의 Data Cache 에 올린다. 이게 있어야
- * remote 재배포 시 `revalidateTag()` 로 host 캐시를 무효화할 수 있다.
- * (태그가 없으면 무효화 지점이 프로세스 재시작밖에 없다)
+ * 프로덕션은 Next 의 Data Cache 에 올려 요청마다 다시 받지 않게 한다.
+ *
+ * ⚠️ 여기 붙는 `next.tags` 는 **Data Cache 계층에만** 붙는다.
+ * 페이지의 `"use cache"` 엔트리는 이 태그로 깨지지 않는다 — 그건 캐시 스코프 안에서
+ * `cacheTag()` 로 직접 달아야 한다. 무효화가 세 층이라 세 층 다 건드려야 한다:
+ *   1. 이 fetch 응답 (revalidateTag → 아래 태그)
+ *   2. 평가 완료된 expose 맵 (invalidateServerBundle)
+ *   3. 페이지 캐시 (revalidateTag → 페이지가 cacheTag 로 단 같은 이름)
+ * 실측: docs/04-experiments/03-cache-modes.md
  */
 function bundleFetchInit(remote: RemoteName): RequestInit {
   if (process.env.NODE_ENV !== "production") return { cache: "no-store" };
