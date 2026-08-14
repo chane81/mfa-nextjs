@@ -1,8 +1,6 @@
 import { getLoaderStats, resetLoaderStats } from "@/mf/loader-stats";
 import { SSR_REMOTE_ENTRIES } from "@/mf/server-loader";
 
-export const dynamic = "force-dynamic";
-
 /**
  * remote 서버 번들 로더 계측 값을 읽는다.
  *

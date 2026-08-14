@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { tokens } from "@mfa/ui";
 
@@ -22,7 +22,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           minHeight: "100vh",
         }}
       >
-        <SiteHeader />
+        {/*
+          cacheComponents 를 켜면 `usePathname()` 같은 client hook 이 prerender 를 막는다
+          (digest: CLIENT_HOOK_DYNAMIC). Suspense 로 감싸 셸 뒤로 스트리밍시킨다.
+          MFA 와 무관한 일반적인 Next 16 이행 비용이다.
+        */}
+        <Suspense fallback={<div style={{ height: 57 }} />}>
+          <SiteHeader />
+        </Suspense>
         <main
           style={{
             maxWidth: 1120,

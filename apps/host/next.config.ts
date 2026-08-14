@@ -11,20 +11,24 @@ import type { NextConfig } from "next";
 const ZONE_CHECKOUT_URL = process.env.ZONE_CHECKOUT_URL ?? "http://localhost:3003";
 
 /**
- * Cache Components(`cacheComponents: true`)는 여기서 켜지 않는다.
+ * ⚠️ 이 브랜치(`experiment/cache-components`)는 Cache Components 를 켠 상태다.
  *
- * 실측 결과 이 옵션은 **앱 전역 all-or-nothing** 이다. 켜는 순간
+ * 이 옵션은 **앱 전역 all-or-nothing** 이다. 켜는 순간
  * `export const dynamic` / `export const revalidate` 가 전부 컴파일 에러가 된다.
  *
  *   Error: Route segment config "revalidate" is not compatible with
  *          `nextConfig.cacheComponents`. Please remove it.
  *
- * 그래서 SSR·ISR·Cache Components 세 모드는 한 빌드에 공존할 수 없다.
- * Cache Components 실험은 `experiment/cache-components` 브랜치에서 따로 돌린다.
- * (docs/04-experiments/01-cache-modes.md)
+ * 그래서 main 의 세그먼트 설정을 전부 걷어내고 런타임 API 로 다시 표현했다.
+ *   force-dynamic  → await connection()
+ *   revalidate = N → "use cache" + cacheLife({ revalidate: N })
+ *
+ * 비교 결과: docs/04-experiments/01-cache-modes.md
  */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+
+  cacheComponents: true,
 
   // 워크스페이스 패키지는 dist(JS)로 빌드되지만, 소스맵/트리셰이킹을 위해 명시
   transpilePackages: ["@mfa/ui", "@mfa/contracts"],
