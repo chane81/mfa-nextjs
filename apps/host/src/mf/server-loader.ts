@@ -6,6 +6,7 @@ import * as ReactDOM from "react-dom";
 import type { RemoteModuleId, RemoteModuleMap, RemoteName } from "@mfa/contracts";
 
 import { normalizeModule } from "./interop";
+import { recordEval, recordFetch } from "./loader-stats";
 
 /**
  * remote 를 **서버에서** 로드하는 로더.
@@ -51,9 +52,31 @@ type ExposeMap = Record<string, unknown>;
 
 const bundleCache = new Map<RemoteName, Promise<ExposeMap>>();
 
+/** remote 배포 파이프라인이 host 캐시를 깨울 때 쓰는 태그 이름 */
+export function remoteCacheTag(remote: RemoteName): string {
+  return `mf-remote:${remote}`;
+}
+
+/**
+ * remote 번들을 받을 때 쓰는 fetch 옵션.
+ *
+ * dev 는 remote watch 빌드가 계속 번들을 갱신하므로 항상 새로 받는다.
+ * 프로덕션은 태그를 달아 Next 의 Data Cache 에 올린다. 이게 있어야
+ * remote 재배포 시 `revalidateTag()` 로 host 캐시를 무효화할 수 있다.
+ * (태그가 없으면 무효화 지점이 프로세스 재시작밖에 없다)
+ */
+function bundleFetchInit(remote: RemoteName): RequestInit {
+  if (process.env.NODE_ENV !== "production") return { cache: "no-store" };
+  return {
+    cache: "force-cache",
+    next: { tags: [remoteCacheTag(remote)] },
+  } as RequestInit;
+}
+
 async function loadServerBundle(remote: RemoteName): Promise<ExposeMap> {
   const url = SSR_ENTRIES[remote];
-  const res = await fetch(url, { cache: "no-store" });
+  recordFetch(remote);
+  const res = await fetch(url, bundleFetchInit(remote));
   if (!res.ok) {
     throw new Error(`remote '${remote}' SSR 번들 응답 ${res.status} (${url})`);
   }
@@ -75,6 +98,7 @@ async function loadServerBundle(remote: RemoteName): Promise<ExposeMap> {
     e: ExposeMap,
     r: (id: string) => unknown,
   ) => void;
+  recordEval();
   factory(moduleObj, moduleObj.exports, requireShim);
 
   const raw = moduleObj.exports;
@@ -100,6 +124,20 @@ function getServerBundle(remote: RemoteName): Promise<ExposeMap> {
   });
   bundleCache.set(remote, promise);
   return promise;
+}
+
+/**
+ * 평가까지 끝난 번들 캐시를 버린다.
+ *
+ * `revalidateTag()` 는 Next 의 Data Cache(=fetch 응답)만 건드린다.
+ * 이 Map 은 `new Function` 평가 결과라 Next 가 모른다. remote 재배포 시
+ * 둘 다 비워야 옛 remote 코드가 프로세스에 남지 않는다.
+ *
+ * 한계: 프로세스 로컬이다. host 를 여러 인스턴스로 띄우면 전 인스턴스에 브로드캐스트해야 한다.
+ */
+export function invalidateServerBundle(remote?: RemoteName): void {
+  if (remote) bundleCache.delete(remote);
+  else bundleCache.clear();
 }
 
 /** 서버에서 remote 모듈 하나를 가져온다. 반환 형태는 브라우저 로더와 동일하다. */

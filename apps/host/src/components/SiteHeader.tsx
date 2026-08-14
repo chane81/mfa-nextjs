@@ -13,6 +13,8 @@ const NAV = [
   // /checkout 은 host 라우트 + cart remote → 소프트 내비게이션
   { href: "/checkout", label: "결제" },
   { href: "/debug", label: "MF 진단" },
+  // SSR / ISR / Cache Components 비교 실험
+  { href: "/lab", label: "캐시 실험" },
   // 비교용으로 남긴 Multi-Zone 앱. zone 경계는 하드 내비게이션이 강제된다.
   { href: "/legacy-checkout", label: "결제(zone·비교용)", external: true },
 ] as const;

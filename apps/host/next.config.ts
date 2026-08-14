@@ -10,6 +10,19 @@ import type { NextConfig } from "next";
  */
 const ZONE_CHECKOUT_URL = process.env.ZONE_CHECKOUT_URL ?? "http://localhost:3003";
 
+/**
+ * Cache Components(`cacheComponents: true`)는 여기서 켜지 않는다.
+ *
+ * 실측 결과 이 옵션은 **앱 전역 all-or-nothing** 이다. 켜는 순간
+ * `export const dynamic` / `export const revalidate` 가 전부 컴파일 에러가 된다.
+ *
+ *   Error: Route segment config "revalidate" is not compatible with
+ *          `nextConfig.cacheComponents`. Please remove it.
+ *
+ * 그래서 SSR·ISR·Cache Components 세 모드는 한 빌드에 공존할 수 없다.
+ * Cache Components 실험은 `experiment/cache-components` 브랜치에서 따로 돌린다.
+ * (docs/04-experiments/01-cache-modes.md)
+ */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 

@@ -8,7 +8,10 @@
     "NEXT_PUBLIC_REMOTE_CART_ENTRY",
     "REMOTE_CATALOG_SSR_ENTRY",
     "REMOTE_CART_SSR_ENTRY",
-    "ZONE_CHECKOUT_URL"
+    "ZONE_CHECKOUT_URL",
+    // remote 재배포 → host 캐시 무효화 웹훅 시크릿.
+    // 여기 등록하지 않으면 turbo 가 태스크 환경에서 걸러낸다(strict env).
+    "MF_REVALIDATE_SECRET"
   ],
   "tasks": {
     "build": {
