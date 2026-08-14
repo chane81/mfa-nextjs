@@ -1,4 +1,12 @@
-import type { RemoteName } from "@mfa/contracts";
+import { REMOTE_NAMES, type RemoteName } from "@mfa/contracts";
+
+import {
+  assertAllowedOrigin,
+  assertManifestSignature,
+  assertSafeEntryPath,
+  allowedOrigins,
+  signedPayload,
+} from "./remote-trust";
 
 /**
  * remote 버전 해석.
@@ -42,6 +50,13 @@ export interface RemoteVersion {
   ssrEntry: string;
   /** 브라우저 MF 런타임이 읽는 매니페스트 (오리진 기준 상대 경로) */
   webEntry: string;
+  /** SSR 번들의 SRI 값. 평가 전에 대조한다. */
+  ssrIntegrity?: string;
+}
+
+/** 허용 오리진. 기본값은 설정된 remote 오리진들뿐이라 이미 닫혀 있다. */
+export function trustedOrigins(): string[] {
+  return allowedOrigins(REMOTE_NAMES.map((remote) => new URL(SSR_ENTRIES[remote]).origin));
 }
 
 /**
@@ -80,20 +95,58 @@ export function rememberVersion(remote: RemoteName, info: RemoteVersion): void {
  */
 const READY_KEY = "__mfaReadyVersions";
 
-type ReadyHolder = typeof globalThis & { [READY_KEY]?: Partial<Record<RemoteName, string>> };
+interface ReadyState {
+  version: string;
+  /** 적재된 시점의 warm 세대. "언제 적재했는지"까지 봐야 warm 이 증명이 된다. */
+  epoch: number;
+}
 
-function ready(): Partial<Record<RemoteName, string>> {
+type ReadyHolder = typeof globalThis & { [READY_KEY]?: Partial<Record<RemoteName, ReadyState>> };
+
+function ready(): Partial<Record<RemoteName, ReadyState>> {
   const g = globalThis as ReadyHolder;
   g[READY_KEY] ??= {};
   return g[READY_KEY];
 }
 
-export function markBundleReady(remote: RemoteName, version: string): void {
-  ready()[remote] = version;
+export function markBundleReady(remote: RemoteName, version: string, epoch: number): void {
+  ready()[remote] = { version, epoch };
 }
 
 export function readyVersion(remote: RemoteName): string | null {
-  return ready()[remote] ?? null;
+  return ready()[remote]?.version ?? null;
+}
+
+/**
+ * "이번 warm 에서 이 버전을 실제로 적재했는가."
+ *
+ * 버전만 비교하면 예전에 같은 버전을 적재해 둔 상태를 성공으로 오인한다.
+ * 실제로 번들이 변조된 배포가 그 구멍으로 통과했다(무결성 검사는 막았는데 웹훅은 200).
+ */
+export function isBundleReady(remote: RemoteName, version: string, epoch: number): boolean {
+  const state = ready()[remote];
+  return state?.version === version && state.epoch === epoch;
+}
+
+/**
+ * warm 세대. 올리면 다음 접근에서 번들을 **다시 받아 다시 검증**한다.
+ *
+ * 버전만으로 캐시를 키잉하면 "같은 버전인데 바이트가 바뀐" 경우를 못 잡는다.
+ * 정상 배포에서는 버전이 늘 바뀌므로 그런 상황은 변조이거나 깨진 파이프라인이고,
+ * warm 은 그걸 잡아내야 의미가 있다. 그래서 warm 은 캐시를 믿지 않는다.
+ */
+const EPOCH_KEY = "__mfaWarmEpoch";
+
+type EpochHolder = typeof globalThis & { [EPOCH_KEY]?: number };
+
+export function warmEpoch(): number {
+  return (globalThis as EpochHolder)[EPOCH_KEY] ?? 0;
+}
+
+export function bumpWarmEpoch(): number {
+  const next = warmEpoch() + 1;
+  (globalThis as EpochHolder)[EPOCH_KEY] = next;
+  return next;
 }
 
 export function knownVersions(): Partial<Record<RemoteName, string>> {
@@ -127,21 +180,44 @@ export async function fetchRemoteVersion(remote: RemoteName): Promise<RemoteVers
       ? ({ next: { revalidate: 30, tags: [remoteVersionTag(remote)] } } as RequestInit)
       : { cache: "no-store" };
 
+  type Manifest = Partial<RemoteVersion> & { signature?: string; webIntegrity?: string };
+
+  // 네트워크 실패는 조용히 넘긴다 — remote 가 잠깐 안 뜬 것과 거부는 다른 사건이다
+  const body = await (async (): Promise<Manifest | null> => {
+    try {
+      assertAllowedOrigin(remote, url, trustedOrigins());
+      const res = await fetch(url, init);
+      if (!res.ok) return null;
+      return (await res.json()) as Manifest;
+    } catch {
+      return null;
+    }
+  })();
+
+  if (!body?.version || !body.ssrEntry || !body.webEntry) return null;
+  const { version, ssrEntry, webEntry, ssrIntegrity, webIntegrity, signature } = body;
+
+  /**
+   * 이 매니페스트는 **remote 가 주는 값**이다. 그대로 믿으면
+   * "다른 오리진에서 받아 실행하라"는 지시를 그대로 따르게 된다.
+   * 경로 형태를 먼저 좁히고, 서명이 있으면 출처까지 확인한다.
+   *
+   * 검증 실패는 조용히 넘기지 않는다. 폴백으로 흘러가면 막은 의미가 없다.
+   */
   try {
-    const res = await fetch(url, init);
-    if (!res.ok) return null;
-
-    const body = (await res.json()) as Partial<RemoteVersion>;
-    if (!body.version || !body.ssrEntry || !body.webEntry) return null;
-
-    const info: RemoteVersion = {
-      version: body.version,
-      ssrEntry: body.ssrEntry,
-      webEntry: body.webEntry,
-    };
-    rememberVersion(remote, info);
-    return info;
-  } catch {
+    assertSafeEntryPath(remote, ssrEntry, version);
+    assertSafeEntryPath(remote, webEntry, version);
+    await assertManifestSignature(
+      remote,
+      signedPayload({ remote, version, ssrEntry, webEntry, ssrIntegrity, webIntegrity }),
+      signature,
+    );
+  } catch (error) {
+    console.error(`[mf] remote '${remote}' 버전 매니페스트 거부:`, error);
     return null;
   }
+
+  const info: RemoteVersion = { version, ssrEntry, webEntry, ssrIntegrity };
+  rememberVersion(remote, info);
+  return info;
 }

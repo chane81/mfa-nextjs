@@ -17,7 +17,7 @@
  *
  * 사용: node scripts/stamp-remote-version.mjs <remote-name> [distDir]
  */
-import { createHash } from "node:crypto";
+import { createHash, createPrivateKey, sign } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -60,22 +60,60 @@ const hash = createHash("sha256");
 hash.update(readFileSync(ssrBundle));
 hash.update(readFileSync(manifest));
 
+/** SRI 형식. host 가 받은 바이트를 평가 **전에** 이 값과 대조한다. */
+const integrity = (file) => `sha384-${createHash("sha384").update(readFileSync(file)).digest("base64")}`;
+
+const payload = {
+  remote,
+  version,
+  /** host 서버가 받아 실행하는 node 번들 */
+  ssrEntry: `/v${version}/mf-server.cjs`,
+  /** 브라우저 MF 런타임이 읽는 매니페스트 */
+  webEntry: `/v${version}/mf-manifest.json`,
+  ssrIntegrity: integrity(ssrBundle),
+  webIntegrity: integrity(manifest),
+};
+
+/**
+ * 서명은 **오리진이 통째로 털린 경우**를 막는 유일한 수단이다.
+ * 오리진이 주는 해시와 오리진이 주는 번들을 대조하는 것만으로는 못 막는다.
+ *
+ * 키가 없으면 서명 없이 내보낸다. host 쪽에서 `MF_REQUIRE_SIGNATURE=1` 로 강제할 수 있다.
+ * 서명 대상은 신뢰 판단에 쓰이는 필드만, 고정 순서로 (host 의 signedPayload 와 같은 형식).
+ */
+const signedPayload = JSON.stringify([
+  payload.remote,
+  payload.version,
+  payload.ssrEntry,
+  payload.webEntry,
+  payload.ssrIntegrity,
+  payload.webIntegrity,
+]);
+
+let signature = null;
+if (process.env.MF_SIGNING_KEY) {
+  const key = createPrivateKey({
+    key: Buffer.from(process.env.MF_SIGNING_KEY, "base64"),
+    format: "der",
+    type: "pkcs8",
+  });
+  signature = sign(null, Buffer.from(signedPayload, "utf8"), key).toString("base64");
+}
+
 writeFileSync(
   join(dist, "mf-version.json"),
   `${JSON.stringify(
     {
-      remote,
-      version,
+      ...payload,
       contentHash: hash.digest("hex").slice(0, 12),
-      /** host 서버가 받아 실행하는 node 번들 */
-      ssrEntry: `/v${version}/mf-server.cjs`,
-      /** 브라우저 MF 런타임이 읽는 매니페스트 */
-      webEntry: `/v${version}/mf-manifest.json`,
+      ...(signature ? { signature } : {}),
     },
     null,
     2,
   )}\n`,
 );
+
+console.log(`[stamp] 무결성 ${payload.ssrIntegrity.slice(0, 20)}… / 서명 ${signature ? "있음" : "없음"}`);
 
 /**
  * 옛 버전 디렉터리를 3개까지 남긴다.

@@ -26,6 +26,10 @@
   - 같은 버전을 서버 엔트리와 브라우저 양쪽에 적용 → 브라우저 요청 17/17 버전 경로, 콘솔 에러 0
   - 롤백 = `mf-version.json` 만 되돌리기 (자산 3개 버전 보존)
   - remote `start` 를 번들러 preview → 공용 정적 서버로 교체 (CDN 의미론: `/v*` immutable)
+- [x] **remote 신뢰 경계** — 오리진 허용 목록 + 경로 검증 + SRI 무결성 + Ed25519 서명
+  - 변조 6종을 실제로 시도해 전부 거부 확인 (거부하면서 서비스는 계속 뜬다)
+  - warm 은 캐시를 믿지 않고 매번 다시 받아 다시 검증
+  - 개인키는 remote CI, 공개키는 host — 같은 곳에 두면 막으려던 걸 못 막는다
 - [x] `/internal/mf-warm` 인증 — middleware 상수시간 시크릿 검사
   - 페이지 안 `notFound()` 는 상태 코드를 못 바꾼다(레이아웃이 이미 flush됨) → middleware 필요
 
@@ -214,7 +218,7 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 
 ## 다음에 해볼 것
 
-- [ ] remote SSR 번들 신뢰 경계 강화 — origin 허용목록 + SRI/서명 검증
+- [x] remote SSR 번들 신뢰 경계 — origin 허용목록 + SRI + Ed25519 서명 (5차)
 - [x] remote 버전 핀/롤백 전략 — `/v<hash>/mf-server.cjs` 불변 경로 (5차)
 - [x] remote 재배포 시 host 서버 캐시 무효화 경로 → `/api/mf-revalidate` + `cacheTag` (5차)
 - [x] 무효화 시 remote 번들 선 warm → 스켈레톤 위험 제거 (5차 발견 6)

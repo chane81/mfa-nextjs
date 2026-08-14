@@ -3,7 +3,14 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { REMOTE_NAMES, type RemoteName } from "@mfa/contracts";
 
 import { checkMfSecret, mfSecretHeader } from "@/lib/mf-secret";
-import { fetchRemoteVersion, knownVersion, readyVersion, remoteVersionTag } from "@/mf/remote-version";
+import {
+  fetchRemoteVersion,
+  isBundleReady,
+  knownVersion,
+  readyVersion,
+  remoteVersionTag,
+  warmEpoch,
+} from "@/mf/remote-version";
 import { remoteBundleTag, remoteCacheTag } from "@/mf/server-loader";
 
 /**
@@ -115,9 +122,10 @@ export async function POST(req: Request) {
      * 로드 횟수 증가로 판정하면 안 된다 — 같은 버전이면 캐시 히트라 로드가 아예 안 일어나고,
      * 정상인데도 실패로 오판한다(실측에서 502 오탐으로 드러났다).
      */
-    if (readyVersion(remote) !== published.version) {
+    if (!isBundleReady(remote, published.version, warmEpoch())) {
       return abort(
-        `warm 후에도 적재된 버전이 다릅니다 (공표=${published.version}, 적재=${readyVersion(remote) ?? "없음"})`,
+        `warm 이 이 버전을 적재하지 못했습니다 (공표=${published.version}, 적재=${readyVersion(remote) ?? "없음"}). ` +
+          `무결성·서명 검증에서 거부됐을 수 있습니다 — 서버 로그를 확인하세요.`,
       );
     }
     warmed = "ok";

@@ -24,12 +24,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         }}
       >
         {/*
-          remote 버전을 매 렌더마다 다시 읽어 globalThis 와 브라우저에 반영한다.
+          remote 버전을 읽어 globalThis 와 브라우저에 반영한다.
           이게 있어야 웹훅을 못 받은 host 인스턴스도 스스로 재배포를 알아챈다.
+
+          Suspense 로 감싸지 않는다 — 셸 뒤로 스트리밍되면 브라우저 MF 런타임이
+          초기화될 때 값이 없어 버전 없는 엔트리로 붙는다. 대신 캐시한다.
         */}
-        <Suspense fallback={null}>
-          <RemoteVersionSync />
-        </Suspense>
+        <RemoteVersionSync />
 
         {/*
           cacheComponents 를 켜면 `usePathname()` 같은 client hook 이 prerender 를 막는다

@@ -13,7 +13,10 @@ import {
   knownVersion,
   markBundleReady,
   remoteOrigin,
+  trustedOrigins,
+  warmEpoch,
 } from "./remote-version";
+import { assertAllowedOrigin, assertIntegrity } from "./remote-trust";
 
 /**
  * remote 를 **서버에서** 로드하는 로더.
@@ -55,6 +58,8 @@ type ExposeMap = Record<string, unknown>;
 interface CacheEntry {
   /** 이 엔트리를 만든 remote 버전. 버전이 바뀌면 버린다. */
   version: string;
+  /** 만든 시점의 warm 세대. warm 은 캐시를 믿지 않고 다시 받아 다시 검증한다. */
+  epoch: number;
   exposes: Promise<ExposeMap>;
 }
 
@@ -129,7 +134,9 @@ function bundleFetchInit(remote: RemoteName): RequestInit {
  * 가리키지 않으므로 캐시된 HTML 이 어떤 remote 로 만들어졌는지가 확정된다.
  * 모르면 버전 없는 엔트리로 폴백한다 — dev 이거나 stamp 를 안 돌린 remote 다.
  */
-async function resolveEntry(remote: RemoteName): Promise<{ url: string; version: string }> {
+async function resolveEntry(
+  remote: RemoteName,
+): Promise<{ url: string; version: string; integrity?: string }> {
   /**
    * 이미 아는 버전이 있으면 **재조회하지 않는다.**
    *
@@ -141,16 +148,34 @@ async function resolveEntry(remote: RemoteName): Promise<{ url: string; version:
    */
   const info = knownVersion(remote) ?? (await fetchRemoteVersion(remote));
   if (!info) return { url: fallbackSsrEntry(remote), version: UNVERSIONED };
-  return { url: `${remoteOrigin(remote)}${info.ssrEntry}`, version: info.version };
+  return {
+    url: `${remoteOrigin(remote)}${info.ssrEntry}`,
+    version: info.version,
+    integrity: info.ssrIntegrity,
+  };
 }
 
-async function loadServerBundle(remote: RemoteName, url: string): Promise<ExposeMap> {
+async function loadServerBundle(
+  remote: RemoteName,
+  url: string,
+  integrity: string | undefined,
+): Promise<ExposeMap> {
+  // 실행 직전이 아니라 요청 직전에 먼저 막는다 — 허용되지 않은 곳은 아예 부르지 않는다
+  assertAllowedOrigin(remote, url, trustedOrigins());
+
   recordFetch(remote);
   const res = await fetch(url, bundleFetchInit(remote));
   if (!res.ok) {
     throw new Error(`remote '${remote}' SSR 번들 응답 ${res.status} (${url})`);
   }
-  const code = await res.text();
+
+  /**
+   * 텍스트로 바꾸기 전에 **바이트 그대로** 대조한다.
+   * 이 아래 줄부터는 남의 코드를 이 프로세스에서 실행하는 구간이다.
+   */
+  const bytes = await res.arrayBuffer();
+  await assertIntegrity(remote, bytes, integrity);
+  const code = new TextDecoder().decode(bytes);
 
   const requireShim = (id: string): unknown => {
     const injected = INJECTED[id];
@@ -182,18 +207,19 @@ async function loadServerBundle(remote: RemoteName, url: string): Promise<Expose
 }
 
 async function getServerBundle(remote: RemoteName): Promise<ExposeMap> {
-  const { url, version } = await resolveEntry(remote);
+  const { url, version, integrity } = await resolveEntry(remote);
 
   // dev 에서는 remote 의 watch 빌드가 계속 번들을 갱신하므로 캐시하지 않는다
-  if (process.env.NODE_ENV !== "production") return loadServerBundle(remote, url);
+  if (process.env.NODE_ENV !== "production") return loadServerBundle(remote, url, integrity);
 
+  const epoch = warmEpoch();
   const cached = bundleCache.get(remote);
-  if (cached && cached.version === version) return cached.exposes;
+  if (cached && cached.version === version && cached.epoch === epoch) return cached.exposes;
 
-  const exposes = loadServerBundle(remote, url)
+  const exposes = loadServerBundle(remote, url, integrity)
     .then((loaded) => {
       // "이 버전을 실제로 들고 있다"를 전역에 알린다 — warm 성공 판정의 근거
-      markBundleReady(remote, version);
+      markBundleReady(remote, version, epoch);
       return loaded;
     })
     .catch((error: unknown) => {
@@ -201,7 +227,7 @@ async function getServerBundle(remote: RemoteName): Promise<ExposeMap> {
       if (bundleCache.get(remote)?.exposes === exposes) bundleCache.delete(remote);
       throw error;
     });
-  bundleCache.set(remote, { version, exposes });
+  bundleCache.set(remote, { version, epoch, exposes });
   return exposes;
 }
 

@@ -11,7 +11,15 @@
     "ZONE_CHECKOUT_URL",
     // remote 재배포 → host 캐시 무효화 웹훅 시크릿.
     // 여기 등록하지 않으면 turbo 가 태스크 환경에서 걸러낸다(strict env).
-    "MF_REVALIDATE_SECRET"
+    "MF_REVALIDATE_SECRET",
+    // remote 신뢰 경계 (docs/04-experiments/03-cache-modes.md 발견 9)
+    "REMOTE_ALLOWED_ORIGINS",
+    "MF_REMOTE_PUBLIC_KEY",
+    "MF_REQUIRE_SIGNATURE",
+    "MF_REQUIRE_INTEGRITY",
+    // remote 빌드가 매니페스트에 서명할 때 쓰는 개인키 (remote 파이프라인 전용)
+    "MF_SIGNING_KEY",
+    "MF_BUILD_VERSION"
   ],
   "tasks": {
     "build": {

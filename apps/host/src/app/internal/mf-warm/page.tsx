@@ -5,7 +5,7 @@ import { REMOTE_NAMES, type RemoteName } from "@mfa/contracts";
 
 import { MfWarmup } from "@/components/lab/MfWarmup";
 import { checkMfSecret } from "@/lib/mf-secret";
-import { rememberVersion } from "@/mf/remote-version";
+import { bumpWarmEpoch } from "@/mf/remote-version";
 
 /**
  * warm 전용 라우트. 사람이 볼 화면이 아니라 `/api/mf-revalidate` 가 내부에서 호출한다.
@@ -31,30 +31,33 @@ export const instant = false;
 export default async function MfWarmPage({
   searchParams,
 }: {
-  searchParams: Promise<{ remote?: string; nonce?: string; version?: string }>;
+  searchParams: Promise<{ remote?: string; nonce?: string }>;
 }) {
   if (!checkMfSecret(await headers())) notFound();
 
-  const { remote, nonce, version } = await searchParams;
+  const { remote, nonce } = await searchParams;
   const remotes: RemoteName[] =
     remote && (REMOTE_NAMES as readonly string[]).includes(remote)
       ? [remote as RemoteName]
       : [...REMOTE_NAMES];
 
   /**
-   * 웹훅이 정한 버전을 그대로 고정한다.
+   * 캐시를 무효화하고 시작한다.
    *
-   * 여기서 버전을 다시 조회하면 Data Cache 의 옛 응답을 집어 방금 정한 버전을 덮어쓸 수 있다.
-   * warm 의 목적은 "이 버전을 적재하는 것"이지 "지금 버전이 뭔지 알아내는 것"이 아니다.
+   * warm 은 "이 배포를 실제로 적재할 수 있는가"를 증명하는 절차라, 이미 갖고 있는 걸
+   * 재사용하면 증명이 되지 않는다. 같은 버전으로 바이트만 바뀐 경우(변조·깨진 배포)도
+   * 여기서 걸린다.
    */
-  const single = remotes.length === 1 ? remotes[0] : undefined;
-  if (single && version) {
-    rememberVersion(single, {
-      version,
-      ssrEntry: `/v${version}/mf-server.cjs`,
-      webEntry: `/v${version}/mf-manifest.json`,
-    });
-  }
+  bumpWarmEpoch();
+
+  /**
+   * 버전은 여기서 다시 정하지 않는다.
+   *
+   * 한때 `version` 쿼리로 받은 값을 globalThis 에 덮어썼는데, 그 재구성본에는
+   * 무결성 값이 빠져 있어서 두 번째 웹훅부터 로드가 거부됐다.
+   * 지금은 로더가 이미 아는 버전을 그대로 쓰므로(재조회하지 않으므로) 그럴 필요가 없다.
+   * 버전을 정하는 곳은 웹훅과 레이아웃 두 군데뿐이다.
+   */
 
   return (
     <>
