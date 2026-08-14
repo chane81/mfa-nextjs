@@ -6,7 +6,7 @@ import * as ReactDOM from "react-dom";
 import type { RemoteModuleId, RemoteModuleMap, RemoteName } from "@mfa/contracts";
 
 import { normalizeModule } from "./interop";
-import { recordEval, recordFetch } from "./loader-stats";
+import { recordEval, recordFetch, recordLoad } from "./loader-stats";
 
 /**
  * remote 를 **서버에서** 로드하는 로더.
@@ -50,11 +50,66 @@ const INJECTED: Record<string, unknown> = {
 
 type ExposeMap = Record<string, unknown>;
 
-const bundleCache = new Map<RemoteName, Promise<ExposeMap>>();
+interface CacheEntry {
+  generation: number;
+  exposes: Promise<ExposeMap>;
+}
 
-/** remote 배포 파이프라인이 host 캐시를 깨울 때 쓰는 태그 이름 */
+const bundleCache = new Map<RemoteName, CacheEntry>();
+
+/**
+ * remote 하나에 태그가 **두 개**인 이유.
+ *
+ * warm-then-revalidate 는 순서가 전부다. 번들 fetch 계층을 먼저 깨서 새 코드를 받고,
+ * 그게 성공한 뒤에야 페이지 캐시를 깬다. 태그가 하나면 이 순서를 못 만든다 —
+ * 번들을 깨는 순간 페이지도 같이 깨져서 재생성이 warm 보다 먼저 일어날 수 있다.
+ */
+
+/** ① remote 번들 fetch 응답(Data Cache)용 */
+export function remoteBundleTag(remote: RemoteName): string {
+  return `mf-remote-bundle:${remote}`;
+}
+
+/** ② remote 를 렌더하는 페이지의 `"use cache"` 스코프용 */
 export function remoteCacheTag(remote: RemoteName): string {
   return `mf-remote:${remote}`;
+}
+
+/**
+ * ## remote 세대(generation) — 레이어를 넘는 무효화 신호
+ *
+ * `bundleCache` 는 **레이어마다 별도 인스턴스**여야 한다. Next 는 RSC 레이어와
+ * SSR 레이어의 모듈 그래프를 분리하고, 각 레이어의 `import * as React` 가 서로 다른
+ * React 빌드로 해석된다. 평가된 remote 번들에는 그 레이어의 React 가 주입되어 있으므로
+ * 레이어 간에 공유하면 `useState` 가 깨진다.
+ *
+ * 그런데 무효화 신호는 반대로 **모든 레이어에 닿아야 한다**. Route Handler(RSC 레이어)에서
+ * remote 재배포를 통보받아도 페이지를 실제로 렌더하는 SSR 레이어의 Map 은 그대로이기 때문이다.
+ *
+ * 그래서 캐시는 레이어별로 두되, **세대 카운터만 globalThis 에 둔다.**
+ * 카운터가 올라가면 각 레이어가 다음 접근에서 스스로 자기 캐시를 버리고 다시 평가한다.
+ */
+const GENERATION_KEY = "__mfaRemoteGeneration";
+
+type GenerationHolder = typeof globalThis & {
+  [GENERATION_KEY]?: Partial<Record<RemoteName, number>>;
+};
+
+function generations(): Partial<Record<RemoteName, number>> {
+  const g = globalThis as GenerationHolder;
+  g[GENERATION_KEY] ??= {};
+  return g[GENERATION_KEY];
+}
+
+export function currentGeneration(remote: RemoteName): number {
+  return generations()[remote] ?? 0;
+}
+
+/** remote 가 재배포됐다고 알린다. 모든 레이어의 번들 캐시가 다음 접근에서 무효화된다. */
+export function bumpRemoteGeneration(remote: RemoteName): number {
+  const next = currentGeneration(remote) + 1;
+  generations()[remote] = next;
+  return next;
 }
 
 /**
@@ -65,17 +120,17 @@ export function remoteCacheTag(remote: RemoteName): string {
  *
  * ⚠️ 여기 붙는 `next.tags` 는 **Data Cache 계층에만** 붙는다.
  * 페이지의 `"use cache"` 엔트리는 이 태그로 깨지지 않는다 — 그건 캐시 스코프 안에서
- * `cacheTag()` 로 직접 달아야 한다. 무효화가 세 층이라 세 층 다 건드려야 한다:
- *   1. 이 fetch 응답 (revalidateTag → 아래 태그)
- *   2. 평가 완료된 expose 맵 (invalidateServerBundle)
- *   3. 페이지 캐시 (revalidateTag → 페이지가 cacheTag 로 단 같은 이름)
+ * `cacheTag()` 로 직접 달아야 한다. 무효화 대상이 세 층이다:
+ *   1. 이 fetch 응답      → revalidateTag(remoteBundleTag)
+ *   2. 평가된 expose 맵    → bumpRemoteGeneration
+ *   3. 페이지 캐시        → revalidateTag(remoteCacheTag)
  * 실측: docs/04-experiments/03-cache-modes.md
  */
 function bundleFetchInit(remote: RemoteName): RequestInit {
   if (process.env.NODE_ENV !== "production") return { cache: "no-store" };
   return {
     cache: "force-cache",
-    next: { tags: [remoteCacheTag(remote)] },
+    next: { tags: [remoteBundleTag(remote)] },
   } as RequestInit;
 }
 
@@ -113,6 +168,7 @@ async function loadServerBundle(remote: RemoteName): Promise<ExposeMap> {
   if (!exposes || typeof exposes !== "object") {
     throw new Error(`remote '${remote}' SSR 번들이 expose 맵을 내보내지 않았습니다`);
   }
+  recordLoad(remote);
   return exposes;
 }
 
@@ -120,30 +176,32 @@ function getServerBundle(remote: RemoteName): Promise<ExposeMap> {
   // dev 에서는 remote 의 watch 빌드가 계속 번들을 갱신하므로 캐시하지 않는다
   if (process.env.NODE_ENV !== "production") return loadServerBundle(remote);
 
+  const generation = currentGeneration(remote);
   const cached = bundleCache.get(remote);
-  if (cached) return cached;
+  if (cached && cached.generation === generation) return cached.exposes;
 
-  const promise = loadServerBundle(remote).catch((error: unknown) => {
+  const exposes = loadServerBundle(remote).catch((error: unknown) => {
     // 실패한 promise 를 캐시에 남기면 서버가 살아있는 동안 계속 실패한다
-    bundleCache.delete(remote);
+    if (bundleCache.get(remote)?.exposes === exposes) bundleCache.delete(remote);
     throw error;
   });
-  bundleCache.set(remote, promise);
-  return promise;
+  bundleCache.set(remote, { generation, exposes });
+  return exposes;
 }
 
 /**
- * 평가까지 끝난 번들 캐시를 버린다.
+ * remote 번들을 미리 받아 평가해둔다 (warm).
  *
- * `revalidateTag()` 는 Next 의 Data Cache(=fetch 응답)만 건드린다.
- * 이 Map 은 `new Function` 평가 결과라 Next 가 모른다. remote 재배포 시
- * 둘 다 비워야 옛 remote 코드가 프로세스에 남지 않는다.
+ * **이 함수를 호출한 레이어의 캐시만** 데워진다. 그게 요점이다 —
+ * 페이지 캐시를 무효화하기 **전에** SSR 레이어를 데워두면, 재생성 렌더가
+ * 네트워크를 기다리지 않고 즉시 remote 마크업을 만들어낸다.
  *
- * 한계: 프로세스 로컬이다. host 를 여러 인스턴스로 띄우면 전 인스턴스에 브로드캐스트해야 한다.
+ * warm 없이 무효화하면 재생성 렌더가 remote 를 기다리다 Suspense fallback 상태로
+ * 캐시에 굳을 수 있다(실측 기록: docs/04-experiments/03-cache-modes.md 발견 6).
  */
-export function invalidateServerBundle(remote?: RemoteName): void {
-  if (remote) bundleCache.delete(remote);
-  else bundleCache.clear();
+export async function warmServerBundle(remote: RemoteName): Promise<number> {
+  const exposes = await getServerBundle(remote);
+  return Object.keys(exposes).length;
 }
 
 /** 서버에서 remote 모듈 하나를 가져온다. 반환 형태는 브라우저 로더와 동일하다. */

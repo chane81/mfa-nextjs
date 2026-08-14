@@ -17,17 +17,26 @@ export interface LoaderStats {
   fetches: number;
   /** `new Function` 으로 번들을 평가한 횟수 */
   evals: number;
-  /** remote 별 fetch 횟수 */
+  /** remote 별 fetch **시도** 횟수 (실패 포함) */
   byRemote: Record<string, number>;
+  /**
+   * remote 별 **성공** 횟수 — expose 맵까지 확보된 것만 센다.
+   *
+   * warm 이 실제로 성공했는지 판정하는 데 쓴다. HTTP 응답 코드로는 판정할 수 없다.
+   * warm 페이지는 `RemoteBoundary` 로 감싸여 있어 remote 가 죽어도 200 을 돌려주기 때문이다.
+   */
+  loads: Record<string, number>;
 }
 
 const KEY = "__mfaLoaderStats";
 
 type Holder = typeof globalThis & { [KEY]?: LoaderStats };
 
+const empty = (): LoaderStats => ({ fetches: 0, evals: 0, byRemote: {}, loads: {} });
+
 function holder(): LoaderStats {
   const g = globalThis as Holder;
-  g[KEY] ??= { fetches: 0, evals: 0, byRemote: {} };
+  g[KEY] ??= empty();
   return g[KEY];
 }
 
@@ -41,12 +50,23 @@ export function recordEval(): void {
   holder().evals += 1;
 }
 
+/** expose 맵까지 확보된 시점에만 호출한다 */
+export function recordLoad(remote: string): void {
+  const stats = holder();
+  stats.loads[remote] = (stats.loads[remote] ?? 0) + 1;
+}
+
+/** remote 가 지금까지 몇 번 성공적으로 로드됐는지 (warm 성공 판정용) */
+export function loadCount(remote: string): number {
+  return holder().loads[remote] ?? 0;
+}
+
 export function getLoaderStats(): LoaderStats {
   const stats = holder();
-  return { ...stats, byRemote: { ...stats.byRemote } };
+  return { ...stats, byRemote: { ...stats.byRemote }, loads: { ...stats.loads } };
 }
 
 export function resetLoaderStats(): void {
   const g = globalThis as Holder;
-  g[KEY] = { fetches: 0, evals: 0, byRemote: {} };
+  g[KEY] = empty();
 }

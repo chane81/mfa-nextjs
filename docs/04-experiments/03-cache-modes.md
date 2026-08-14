@@ -166,16 +166,81 @@ remote 재배포 시나리오에서는 이게 맞다 — 사용자에게 잠깐 
 → **host 빌드는 remote 가 떠 있어야 한다**는 제약이 남는다. 프리렌더 대상을 1개로 줄여
 영향은 최소화할 수 있다.
 
-### 6. 간헐 위험 — 재생성 중 스켈레톤이 캐시될 수 있다 ⚠️
+### 6. 스켈레톤 캐싱 위험 — 재현했고 고쳤다 ✅
 
-무효화 직후 첫 재생성에서 `/lab/isr` 이 remote 마크업 없이 Suspense fallback 상태로
-**캐시된 사례를 1회 관측**했다. 그 엔트리는 이후 `HIT` 로 계속 서빙됐다.
-콜드 프로세스에서 순서를 바꿔 재시도했을 때는 재현되지 않았다.
+처음엔 "1회 관측, 재현 실패"로 적었다. 조건을 고정하니 **결정적으로 재현**된다.
 
-대응 후보 (미구현):
+재현 조건: remote SSR 번들 응답이 느리고(+800ms 지연 프록시), host 프로세스와
+Data Cache 가 모두 콜드인 상태에서 페이지 캐시가 무효화될 때.
+재생성 렌더가 remote 를 기다리다 **Suspense fallback 상태로 캐시에 굳고**,
+그 엔트리가 이후 `HIT` 로 계속 서빙된다.
 
-- 웹훅에서 remote 번들을 **선(先) warm** 한 뒤 무효화
-- remote 로드 실패 시 throw 시켜 실패한 결과가 캐시에 저장되지 않게 하기
+| 라운드 4회 (콜드 프로세스, remote +800ms) | 스켈레톤이 캐시됨 |
+| --- | --- |
+| A. 무효화만 (`?warm=0`) | **4 / 4** |
+| B. warm-then-revalidate | **0 / 4** |
+
+#### 고친 방식 — warm-then-revalidate
+
+웹훅이 세 단계를 순서대로 밟는다.
+
+1. **번들 계층만 무효화** — 세대 bump + `revalidateTag(번들태그, { expire: 0 })`
+2. **warm** — `/internal/mf-warm` 을 자기 자신에게 요청해 SSR 레이어에서 번들을 실제로 평가
+3. **페이지 캐시 무효화** — `revalidateTag(페이지태그, "max")`
+
+warm 이 실패하면 3을 하지 않고 502 로 중단한다. 실측:
+
+```
+전   cache=HIT  at=13:24:59  remote=true
+웹훅 502 {"error":"warm 실패 — 페이지 캐시를 건드리지 않고 중단했습니다"}
+후   cache=HIT  at=13:24:59  remote=true   ← 옛 캐시 그대로
+```
+
+#### 이 과정에서 드러난 함정 4개
+
+**(a) 태그가 하나면 순서를 못 만든다.** 번들 fetch 와 페이지가 같은 태그를 쓰면
+번들을 깨는 순간 페이지도 깨져서 재생성이 warm 보다 먼저 일어난다.
+`mf-remote-bundle:<name>`(Data Cache)과 `mf-remote:<name>`(페이지)로 분리했다.
+
+**(b) 번들 태그는 `"max"` 가 아니라 `{ expire: 0 }` 이어야 한다.**
+`"max"` 는 SWR 이라 다음 fetch 가 **옛 번들 바이트**를 그대로 돌려준다.
+그러면 warm 이 옛 remote 코드를 데우고, remote 가 죽어 있어도 "성공"해버려 장애를 못 잡는다.
+
+**(c) warm 성공 판정은 HTTP 상태로 못 한다.** warm 페이지의 remote 는 `RemoteBoundary`
+안에 있어서 remote 가 죽어도 200 이 나온다. globalThis 계측기의 **성공 로드 카운터**가
+증가했는지로 판정한다.
+
+**(d) `lazy()` 캐시가 옛 remote 를 프로세스 수명 내내 고정한다.** ← 제일 지독했다.
+`RemoteComponent` 는 모듈 스코프 Map 에 `lazy(() => loadRemoteModule(id))` 를 캐시한다.
+React 의 `lazy()` 는 한 번 resolve 되면 결과를 영구히 들고 있으므로, 번들 캐시를 아무리 비워도
+로더가 다시 불리지 않는다. warm 요청이 네트워크를 전혀 타지 않는 형태로 드러났다.
+
+```
+warm#1  → fetches 0 → 1   (첫 로드)
+bump    → 세대 +1
+warm#2  → fetches 1 → 1   ❌ 로더가 안 불림
+```
+
+lazy 캐시 키에 세대를 넣어 고쳤다 (`${id}@${generation}`). 고친 뒤:
+
+```
+warm#2  → fetches 1 → 2   ✅
+```
+
+### 7. 캐시는 레이어별로, 무효화 신호는 globalThis 로
+
+`bundleCache` 를 레이어 간에 공유하면 안 된다. Next 는 RSC 레이어와 SSR 레이어의
+모듈 그래프를 분리하고 각 레이어의 `import * as React` 가 다른 React 빌드로 해석된다.
+평가된 remote 번들에는 그 레이어의 React 가 주입돼 있어서, 공유하면 `useState` 가 깨진다.
+
+반대로 무효화 신호는 모든 레이어에 닿아야 한다. Route Handler(RSC 레이어)가 재배포를
+통보받아도 페이지를 렌더하는 SSR 레이어의 캐시는 그대로이기 때문이다.
+
+→ **캐시는 레이어별 모듈 스코프, 세대 카운터만 globalThis.**
+카운터가 오르면 각 레이어가 다음 접근에서 스스로 캐시를 버린다.
+
+같은 이유로 warm 은 반드시 **client component 경유**로 해야 한다.
+remote 번들을 평가하는 로더 인스턴스가 그 레이어에 있기 때문이다.
 
 ## 재현 방법
 
@@ -199,9 +264,26 @@ MF_REVALIDATE_SECRET=lab-secret pnpm --filter @mfa/host start
 > Cache Components 에서 각 스코프는 `cacheTag` 로 의존 remote 를 스스로 선언하고,
 > remote CI 는 그 태그 하나만 만료시킨다. MFA 가 추가로 요구하는 배관은 **웹훅 하나**뿐이다.
 
+## 재현용 도구
+
+지연 프록시로 위험 조건을 고정한다 (프로덕션 코드는 건드리지 않는다).
+
+```bash
+# remote SSR 번들 앞에 800ms 지연을 넣는 프록시
+DELAY_MS=800 node slow-proxy.mjs        # :3011 → :3001
+
+# host 를 그 프록시로 향하게 띄운다
+REMOTE_CATALOG_SSR_ENTRY=http://localhost:3011/mf-server.cjs \
+MF_REVALIDATE_SECRET=lab-secret pnpm --filter @mfa/host start
+
+# 라운드마다 host 재기동 + fetch-cache 삭제로 콜드 조건 고정
+```
+
+`?warm=0` 으로 warm 을 끄면 옛 동작(대조군)이 재현된다.
+
 ## 남은 숙제
 
-- [ ] 스켈레톤 캐싱 위험(발견 6) 재현 조건 특정 + warm-then-revalidate 구현
 - [ ] remote 재배포 ↔ 캐시된 HTML 의 hydration mismatch 창 실측 (엔트리 버전 핀 필요)
-- [ ] host 멀티 인스턴스에서 `invalidateServerBundle` 브로드캐스트
+- [ ] host 멀티 인스턴스에서 세대 카운터 브로드캐스트 (지금은 프로세스 로컬)
+- [ ] `/internal/mf-warm` 접근 제어 (지금은 무인증 — 내부망 가정)
 - [ ] `/products/[id]` 에 `generateStaticParams` 도입 시 빌드-remote 결합도 측정
