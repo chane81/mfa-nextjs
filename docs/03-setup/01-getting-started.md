@@ -58,6 +58,9 @@ remote 는 앱마다 **프로세스가 둘**이다(`concurrently`).
 
 5. `/debug` → 두 remote manifest 의 실제 `exposes` 목록
 
+6. `/lab` → SSR · ISR 등가 · 태그 무효화 세 모드 비교
+   (`GET /api/lab/stats` 로 번들 fetch/eval 횟수와 이 인스턴스가 아는 버전을 볼 수 있다)
+
 ## 빌드
 
 ```bash
@@ -66,20 +69,32 @@ pnpm typecheck
 pnpm lint
 ```
 
-remote 의 `build` 는 두 단계다.
+remote 의 `build` 는 **네 단계**다. 버전을 빌드 전에 정해야 자산 URL 접두사에 넣을 수 있다.
 
 ```jsonc
 // apps/remote-catalog/package.json
-"build":     "vite build && pnpm build:ssr",
-"build:ssr": "vite build --config vite.config.server.ts"
+"build":     "node ../../scripts/mf-build-version.mjs && vite build && pnpm build:ssr && pnpm stamp",
+"build:ssr": "vite build --config vite.config.server.ts",
+"stamp":     "node ../../scripts/stamp-remote-version.mjs catalog"
 ```
 
-두 산출물이 같은 `dist/` 에 들어간다.
+| 단계 | 하는 일 |
+| --- | --- |
+| `mf-build-version` | 버전 결정(git SHA → 타임스탬프) → `.mf-version` |
+| 웹 빌드 | `base`/`assetPrefix` = `/v<version>/`, 출력도 `dist/v<version>/` |
+| SSR 빌드 | 같은 버전 디렉터리에 `mf-server.cjs` |
+| `stamp` | 무결성·서명 계산 → `dist/mf-version.json` 공표, 옛 버전 3개까지 정리 |
+
+산출물 배치와 각 필드의 의미는
+[02-architecture/04-remote-lifecycle.md](../02-architecture/04-remote-lifecycle.md) 참고.
 
 ```
-dist/remoteEntry.js      ← 브라우저
-dist/mf-manifest.json    ← 브라우저
-dist/mf-server.cjs       ← host 서버 (SSR)
+dist/
+├── mf-version.json       ← 현재 버전 공표
+└── v<version>/           ← 불변
+    ├── mf-manifest.json  ← 브라우저
+    ├── remoteEntry.js
+    └── mf-server.cjs     ← host 서버 (SSR)
 ```
 
 ## 프로덕션 미리보기
@@ -89,29 +104,71 @@ pnpm build
 pnpm start
 ```
 
-remote 는 `vite preview` / `rsbuild preview` 로 뜬다.
-실제 배포에서는 remote 의 `dist/` 를 정적 호스팅에 올리고 host 의 환경변수를 그 주소로 바꾼다.
+remote 는 번들러 preview 가 아니라 **공용 정적 서버**로 뜬다
+(`scripts/serve-remote-dist.mjs`). 두 번들러의 preview 가 버전 경로를 서빙하는 방식이 달라서
+배포 표면을 하나로 통일했고, 실제 배포에서 그 자리는 CDN 이다.
+
+```
+/v<version>/…      Cache-Control: public, max-age=31536000, immutable
+/mf-version.json   Cache-Control: no-store
+```
 
 > `mf-server.cjs` 는 host **서버**가 가져간다. CDN 에 올리더라도 host 서버에서 접근 가능해야 한다.
+
+### 재배포 통보 (선택)
+
+remote 를 다시 배포했으면 host 에 알려 캐시를 즉시 갱신할 수 있다.
+
+```bash
+curl -XPOST "$HOST_URL/api/mf-revalidate" \
+  -H "x-mf-secret: $MF_REVALIDATE_SECRET" \
+  -H 'content-type: application/json' \
+  -d '{"remote":"catalog"}'
+```
+
+**안 보내도 된다.** 모든 host 인스턴스가 30초 TTL 안에 `mf-version.json` 을 다시 읽어
+스스로 수렴한다. 웹훅은 그걸 즉시로 당길 뿐이다.
+
+### 서명 (선택)
+
+```bash
+node scripts/gen-signing-key.mjs
+# MF_SIGNING_KEY       → remote CI 에만
+# MF_REMOTE_PUBLIC_KEY → host 에만  (+ MF_REQUIRE_SIGNATURE=1)
+```
 
 ## 환경변수
 
 `apps/host/.env.local`:
 
 ```
-# [브라우저] remote 웹 번들
+# [브라우저] 버전 정보를 못 읽었을 때의 폴백 엔트리
 NEXT_PUBLIC_REMOTE_CATALOG_ENTRY=http://localhost:3001/mf-manifest.json
 NEXT_PUBLIC_REMOTE_CART_ENTRY=http://localhost:3002/mf-manifest.json
 
 # [서버] remote SSR 번들 — NEXT_PUBLIC_ 을 붙이지 않는다
+# 오리진 허용 목록의 기본값도 여기서 나온다
 REMOTE_CATALOG_SSR_ENTRY=http://localhost:3001/mf-server.cjs
 REMOTE_CART_SSR_ENTRY=http://localhost:3002/mf-server.cjs
+
+# 재배포 통보 · warm 라우트 인증. 미설정이면 둘 다 전부 거부한다
+MF_REVALIDATE_SECRET=change-me
 
 # Multi-Zones 비교용
 ZONE_CHECKOUT_URL=http://localhost:3003
 ```
 
 브라우저용만 `NEXT_PUBLIC_` 이 필요하다. 서버용 SSR 엔트리는 브라우저에 노출할 이유가 없다.
+
+정상 동작 시 브라우저는 이 폴백이 아니라 **서버가 심어준 버전 경로 엔트리**를 쓴다.
+서버 마크업과 hydrate 하는 코드를 같은 빌드로 맞추기 위해서다.
+
+보안·운영용 나머지 변수(`REMOTE_ALLOWED_ORIGINS`, `MF_REMOTE_PUBLIC_KEY`,
+`MF_REQUIRE_SIGNATURE`, `MF_REQUIRE_INTEGRITY`)는
+[04-remote-lifecycle.md](../02-architecture/04-remote-lifecycle.md#운영-레퍼런스) 에 정리돼 있다.
+
+> 새 환경변수는 `turbo.json` 의 `globalEnv` 에도 등록해야 한다. turbo 는 strict env 라
+> 등록하지 않은 변수를 태스크 환경에서 걸러낸다(모르고 지나가면 설정이 조용히 무시된다).
 
 ## 개별 앱만 실행
 
