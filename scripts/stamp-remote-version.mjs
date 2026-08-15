@@ -36,6 +36,10 @@ if (!existsSync(versionFile)) {
   process.exit(1);
 }
 const version = readFileSync(versionFile, "utf8").trim();
+if (!version) {
+  console.error("[stamp] .mf-version 이 비어 있습니다. mf-build-version.mjs 가 버전을 못 정했습니다.");
+  process.exit(1);
+}
 
 const versionDir = join(dist, `v${version}`);
 const ssrBundle = join(versionDir, "mf-server.cjs");

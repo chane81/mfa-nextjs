@@ -16,7 +16,7 @@ const DIST = resolve(process.cwd(), "dist");
  * 빌드 시점에 굳는 값이라 배포 파이프라인에서 빌드 인자로 넘긴다.
  * (docs/03-setup/04-dokploy.md)
  */
-const PUBLIC_URL = (process.env.REMOTE_CART_PUBLIC_URL ?? `http://localhost:${PORT}`).replace(
+const PUBLIC_URL = (process.env.REMOTE_CART_PUBLIC_URL || `http://localhost:${PORT}`).replace(
   /\/+$/,
   "",
 );

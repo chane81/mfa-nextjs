@@ -33,8 +33,15 @@ function gitVersion() {
   }
 }
 
+/**
+ * 빈 문자열은 "설정 안 됨"으로 본다.
+ *
+ * `??` 로 두면 빈 값이 그대로 버전이 된다. Dockerfile 에서 `ARG MF_BUILD_VERSION` 을
+ * 값 없이 선언하면 `ENV MF_BUILD_VERSION=""` 이 되는데, 그때 버전이 통째로 사라져
+ * 자산이 `dist/v<ver>/` 가 아니라 `dist/` 로 나가고 stamp 가 산출물을 못 찾는다.
+ */
 const version =
-  process.env.MF_BUILD_VERSION ?? gitVersion() ?? `t${Date.now().toString(36)}`;
+  process.env.MF_BUILD_VERSION?.trim() || gitVersion() || `t${Date.now().toString(36)}`;
 
 /** 자산 경로에 들어가므로 안전한 문자만 남긴다 */
 const safe = version.replace(/[^a-zA-Z0-9._-]/g, "-");

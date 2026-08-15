@@ -10,7 +10,8 @@ import type { NextConfig } from "next";
  * 대신 host 는 브라우저에서 @module-federation/runtime 으로 remote 를 로드한다.
  * (자세한 근거: docs/01-research/01-nextjs-mf-eol.md)
  */
-const ZONE_CHECKOUT_URL = process.env.ZONE_CHECKOUT_URL ?? "http://localhost:3003";
+// 빈 문자열도 "설정 안 됨"으로 본다 — 값 없는 빌드 인자가 ENV="" 로 들어오기 때문이다
+const ZONE_CHECKOUT_URL = process.env.ZONE_CHECKOUT_URL || "http://localhost:3003";
 
 /**
  * Cache Components 를 켠다. Next 16 의 기본 방향이다.
