@@ -133,6 +133,35 @@ remote 는 `scripts/**` 도 본다. 빌드 버전·서명·서빙이 전부 그 
 Dokploy UI 에서 경로는 입력 후 **＋ 버튼을 눌러야 목록에 들어간다**. 입력만 하고 저장하면
 값이 사라진다.
 
+## 배포하면서 실제로 밟은 함정
+
+### 값 없는 빌드 인자는 빈 문자열로 도착한다
+
+`ARG MF_BUILD_VERSION` 을 기본값 없이 선언하고 `ENV` 로 넘기면 컨테이너 안에서
+`MF_BUILD_VERSION=""` 이 된다. `??` 는 `null`/`undefined` 에서만 폴백하므로 빈 값이
+그대로 버전이 되어, 자산이 `dist/` 로 나가고 stamp 가 `dist/v/` 를 찾다 실패한다.
+
+배포 시점 env 를 읽는 자리는 전부 `||` 를 쓴다. 지금 해당하는 곳:
+`mf-build-version.mjs`, remote 두 곳의 `PUBLIC_URL`, host 의 `ZONE_CHECKOUT_URL`.
+
+### Next standalone 이 @swc/helpers 의 ESM 파일을 빠뜨린다
+
+빌드는 성공하고 배포도 Done 으로 끝나는데 컨테이너가 부팅에서 죽는다.
+
+```
+Cannot find module '/app/node_modules/.pnpm/next@…/node_modules/@swc/helpers/esm/_interop_require_default.js'
+```
+
+파일 트레이싱이 이 패키지의 CJS 진입점만 따라가서 디렉터리는 만들어지되 절반만 찬다.
+두 Next 앱의 Dockerfile 이 빌드 직후 스토어의 원본 패키지를 그 위에 덮어쓴다.
+덮어쓸 대상을 못 찾으면 이미지 빌드를 실패시킨다 — Next 가 고쳐지면 조용히 흘러가는 대신
+빌드 에러로 드러나야 한다.
+
+### Dokploy 로그 뷰어는 실시간이 아니다
+
+빌드 로그 다이얼로그는 열 때 한 번 읽고 갱신하지 않는다. 닫았다 열어도 같은 스냅샷이
+나올 수 있다. 진행 여부는 Deployments 목록의 상태값(Running/Done/Error)으로 판단한다.
+
 ## 로컬 선검증
 
 ```bash
