@@ -107,7 +107,15 @@ export async function assertIntegrity(
 ): Promise<void> {
   if (!expected) {
     if (integrityRequired()) {
-      throw new Error(`remote '${remote}' 매니페스트에 무결성 값이 없습니다`);
+      /**
+       * 로컬에서 이걸 만나는 경우는 대개 하나다 — 그 포트에 **dev 서버가 떠 있다.**
+       * dev 는 `mf-version.json` 을 공표하지 않으므로(불변 경로를 안 쓴다) 버전도
+       * 무결성도 없는 폴백 엔트리로 흘러온다. 힌트를 여기 붙여둔다.
+       */
+      throw new Error(
+        `remote '${remote}' 매니페스트에 무결성 값이 없습니다. ` +
+          `그 오리진에 dev 서버가 떠 있지 않은지 확인하세요 — 빌드는 dev 가 아니라 dist 를 서빙해야 합니다.`,
+      );
     }
     return;
   }

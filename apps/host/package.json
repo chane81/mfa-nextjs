@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --port 3000",
-    "build": "node ../../scripts/with-remote-dist.mjs next build",
+    "build": "concurrently --kill-others --success first -n catalog,cart,next -c magenta,green,gray \"node ../../scripts/serve-remote-dist.mjs 3001 ../remote-catalog/dist\" \"node ../../scripts/serve-remote-dist.mjs 3002 ../remote-cart/dist\" \"next build\"",
     "docker:build": "next build",
     "start": "next start --port 3000",
     "lint": "eslint .",
@@ -26,6 +26,7 @@
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
+    "concurrently": "^9.2.1",
     "eslint": "^10.8.1",
     "typescript": "6.0.3"
   }

@@ -80,21 +80,35 @@ TypeError: fetch failed ... ECONNREFUSED
 `RemoteBoundary` 는 이걸 못 막는다. 런타임 장애는 에러 박스로 격리되지만 **프리렌더 실패는
 빌드 실패**다. 그래서 `pnpm build` 한 번으로 끝나도록 두 조각이 맞물려 있다.
 
-| 조각 | 담당 | 어디에 |
-| --- | --- | --- |
-| remote 를 먼저 빌드한다 | turbo | `turbo.json` 의 `@mfa/host#build.dependsOn` |
-| 빌드된 `dist` 를 띄웠다 내린다 | 래퍼 | `scripts/with-remote-dist.mjs` |
+| 조각 | 담당 |
+| --- | --- |
+| remote 를 먼저 빌드한다 | turbo — `turbo.json` 의 `@mfa/host#build.dependsOn` |
+| 빌드하는 동안 `dist` 를 서빙한다 | host 의 `build` 스크립트 (`concurrently`) |
 
-두 번째를 turbo 로 못 쓰는 이유는 [05-troubleshooting/01-known-issues.md](../05-troubleshooting/01-known-issues.md) 에 실측과 함께 있다.
+```jsonc
+// apps/host/package.json
+"build": "concurrently --kill-others --success first -n catalog,cart,next \
+  \"node ../../scripts/serve-remote-dist.mjs 3001 ../remote-catalog/dist\" \
+  \"node ../../scripts/serve-remote-dist.mjs 3002 ../remote-cart/dist\" \
+  \"next build\""
+```
 
-래퍼는 **이미 응답하는 오리진은 건드리지 않는다.** 판정 기준은 `/mf-version.json` 이다.
-그래서 배포 빌드(remote 가 이미 공개 도메인에 있는 상태)에서는 아무 일도 하지 않는다.
-원격 오리진이 응답하지 않으면 로컬 `dist` 로 대신 띄우지 않고 실패시킨다 —
-배포된 것과 다른 코드로 빌드된 host 가 나오는 게 더 나쁘다.
+`--success first` 는 "먼저 끝난 프로세스의 종료 코드를 쓴다"는 뜻이다. 서버는 안 끝나므로
+그건 항상 `next build` 다. `--kill-others` 가 빌드가 끝나는 즉시 서버를 내린다.
+
+**준비 대기는 없다.** 필요 없어서다 — 서버 바인딩은 `+1ms`, `next build` 의 첫 remote 요청은
+`+6451ms` 다(실측). 컴파일과 타입체크가 그 앞을 다 막고 있다.
+
+두 번째 조각을 turbo 로 못 쓰는 이유(`with` 사이드카는 `turbo run build` 를 종료시키지
+못한다)는 [05-troubleshooting/01-known-issues.md](../05-troubleshooting/01-known-issues.md) 에
+실측과 함께 있다.
+
+배포 이미지는 이 스크립트를 쓰지 않는다. `docker:build` 라는 별도 태스크를 부르고, 거기서
+remote 는 이미 배포된 공개 도메인이다.
 
 > `pnpm dev` 를 띄운 채로는 빌드하지 않는다. dev 서버는 버전 매니페스트를 공표하지 않으므로
-> (그래야 dev 가 불변 경로를 찾지 않는다) 래퍼는 그 포트를 "안 뜬 상태"로 보고 자기 서버를
-> 올리려다 포트 충돌로 실패한다. 그때 나오는 메시지가 정확히 그걸 알려준다.
+> (그래야 dev 가 불변 경로를 찾지 않는다) 빌드가 무결성 값을 못 찾고 죽는다.
+> 에러 메시지에 그 힌트가 들어 있다.
 
 remote 의 `build` 는 **네 단계**다. 버전을 빌드 전에 정해야 자산 URL 접두사에 넣을 수 있다.
 
@@ -166,24 +180,28 @@ node scripts/gen-signing-key.mjs
 
 ## 환경변수
 
-`apps/host/.env.local`:
+**로컬은 아무것도 설정하지 않아도 된다.** 기본값이 코드에 있다.
+
+| 이름 | 기본값 | 읽는 곳 |
+| --- | --- | --- |
+| `NEXT_PUBLIC_REMOTE_CATALOG_ENTRY` | `http://localhost:3001/mf-manifest.json` | `src/mf/runtime.ts` |
+| `NEXT_PUBLIC_REMOTE_CART_ENTRY` | `http://localhost:3002/mf-manifest.json` | 〃 |
+| `REMOTE_CATALOG_SSR_ENTRY` | `http://localhost:3001/mf-server.cjs` | `src/mf/remote-version.ts` |
+| `REMOTE_CART_SSR_ENTRY` | `http://localhost:3002/mf-server.cjs` | 〃 |
+
+한때 `apps/host/.env.local` 로 이 값들을 그대로 다시 적어뒀다가 지웠다. 기본값과 한 글자도
+다르지 않은 파일이었고, gitignore 라 **turbo 캐시 입력에서 빠져** 값을 바꿔도 캐시된 옛
+빌드가 복원되는 함정만 만들었다(그 자리는 `inputs` 로 막아뒀다).
+
+바꿔야 할 때만 만든다. 예를 들어 remote 를 다른 포트에 띄웠거나 재배포 웹훅을 테스트할 때:
 
 ```
-# [브라우저] 버전 정보를 못 읽었을 때의 폴백 엔트리
-NEXT_PUBLIC_REMOTE_CATALOG_ENTRY=http://localhost:3001/mf-manifest.json
-NEXT_PUBLIC_REMOTE_CART_ENTRY=http://localhost:3002/mf-manifest.json
-
-# [서버] remote SSR 번들 — NEXT_PUBLIC_ 을 붙이지 않는다
-# 오리진 허용 목록의 기본값도 여기서 나온다
-REMOTE_CATALOG_SSR_ENTRY=http://localhost:3001/mf-server.cjs
-REMOTE_CART_SSR_ENTRY=http://localhost:3002/mf-server.cjs
-
-# 재배포 통보 · warm 라우트 인증. 미설정이면 둘 다 전부 거부한다
-MF_REVALIDATE_SECRET=change-me
-
+# apps/host/.env.local
+MF_REVALIDATE_SECRET=change-me    # 미설정이면 /api/mf-revalidate 는 전부 거부한다
 ```
 
-브라우저용만 `NEXT_PUBLIC_` 이 필요하다. 서버용 SSR 엔트리는 브라우저에 노출할 이유가 없다.
+브라우저용만 `NEXT_PUBLIC_` 이 필요하다. 서버용 SSR 엔트리는 브라우저에 노출할 이유가 없고,
+**오리진 허용 목록의 기본값이 그 값에서 나온다.**
 
 정상 동작 시 브라우저는 이 폴백이 아니라 **서버가 심어준 버전 경로 엔트리**를 쓴다.
 서버 마크업과 hydrate 하는 코드를 같은 빌드로 맞추기 위해서다.

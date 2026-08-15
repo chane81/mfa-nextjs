@@ -10,7 +10,7 @@
     "dev": "turbo run dev",
     "dev:wait-remotes": "node scripts/wait-for-remotes.mjs",
     "build": "turbo run build",
-    "start": "turbo run start",
+    "start": "pnpm build && turbo run start",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean && rm -rf node_modules"

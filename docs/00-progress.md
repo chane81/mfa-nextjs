@@ -67,7 +67,11 @@ turbo 공식 패턴(`with` 사이드카 + 유한 readiness 프로브)을 실제�
 | 조각 | 담당 |
 | --- | --- |
 | remote 를 먼저 빌드 | turbo (`@mfa/host#build.dependsOn`) |
-| 준비 대기 · 끝나면 내리기 | `scripts/with-remote-dist.mjs` (host `build` 스크립트가 감쌈) |
+| 빌드 동안 `dist` 서빙 · 끝나면 내리기 | host `build` 스크립트의 `concurrently --kill-others --success first` |
+
+처음엔 전용 래퍼(`scripts/with-remote-dist.mjs`, 221줄)를 썼다가 `concurrently` 한 줄로 접었다.
+래퍼가 하던 일 중 실제로 필요했던 건 "띄웠다 내리기"뿐이었다 — 준비 대기는 경쟁이 아니었고
+(바인딩 `+1ms` vs 첫 요청 `+6451ms`), no-op 분기는 `docker:build` 가 갈라지며 쓸모가 없어졌다.
 
 - [x] `pnpm build` / `pnpm start` 콜드 상태에서 동작 (15/15 태스크, `/checkout` 에 `주문서`)
 - [x] host 이미지는 이 게이트를 타지 않는다 — 태스크 이름을 나눴다(`build` / `docker:build`).
@@ -77,6 +81,10 @@ turbo 공식 패턴(`with` 사이드카 + 유한 readiness 프로브)을 실제�
 - [x] compose 를 2단계로 분리 — 빌드 컨테이너는 compose 네트워크 밖이라 `host.docker.internal`
 - [x] `.env.local` 이 캐시를 깨게 했다 (`inputs: ["$TURBO_DEFAULT$", ".env*"]`).
   gitignore 된 파일이 기본 입력에서 빠지는데, 그 파일이 프리렌더 결과를 정하고 있었다
+- [x] 이어서 `apps/host/.env.local` 자체를 삭제 — 코드 기본값의 복사본이었다.
+  로컬은 이제 환경변수 설정 없이 그냥 돈다
+- [x] `pnpm start` 를 `pnpm build && turbo run start` 로 — 빌드 중 임시 서버와
+  remote `start` 가 같은 포트를 동시에 잡으려다 둘 다 죽었다
 - [x] `WAIT_FOR_REMOTES_TIMEOUT` 을 `globalEnv` 에 등록 — A-10 을 그대로 다시 밟았다.
   `=1` 을 줬는데 60초를 기다렸고, 등록 후 1.17초
 

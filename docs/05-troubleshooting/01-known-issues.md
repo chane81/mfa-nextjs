@@ -42,7 +42,27 @@ host 빌드가 끝나도 죽지 않는다. 문서도 "중단 시(Ctrl-C) 모든 
 | 준비될 때까지 대기 | O — 유한 프로브 태스크 |
 | **끝나면 내리기** | **X** |
 
-그래서 마지막 한 걸음만 `scripts/with-remote-dist.mjs` 가 감싼다. 순서는 계속 turbo 가 소유한다.
+순수 turbo 로 가는 다른 변형은 더 나쁘다. `serve` 태스크가 서버를 detach 하고 즉시 exit 하면
+그래프는 깔끔해지지만 아무도 안 죽여서 3001/3002 에 남고, 다음 `pnpm dev` 가 포트 충돌한다.
+
+그래서 마지막 한 걸음은 host 의 `build` 스크립트가 처리한다. 처음엔 전용 래퍼 스크립트를
+썼다가(`scripts/with-remote-dist.mjs`, 221줄) `concurrently` 한 줄로 접었다.
+
+```jsonc
+"build": "concurrently --kill-others --success first -n catalog,cart,next \
+  \"node ../../scripts/serve-remote-dist.mjs 3001 ../remote-catalog/dist\" \
+  \"node ../../scripts/serve-remote-dist.mjs 3002 ../remote-cart/dist\" \
+  \"next build\""
+```
+
+래퍼가 하던 일 중 실제로 필요했던 건 "띄웠다 내리기"뿐이었다. 나머지는 전부 뺐다.
+
+| 래퍼가 하던 일 | 왜 뺐나 |
+| --- | --- |
+| 준비될 때까지 폴링 | 경쟁이 아니었다 — 바인딩 `+1ms` vs 첫 요청 `+6451ms`(실측) |
+| 이미 뜬 오리진이면 no-op | 이미지가 `docker:build` 로 갈라져서 이 스크립트를 안 탄다 |
+| `.env.local` 파싱 | 그 파일이 코드 기본값을 그대로 다시 적은 것이라 삭제했다 |
+| dev 점유 감지 | 무결성 에러로 죽는다. 힌트를 그 에러 메시지에 넣었다 |
 
 ### B-3. 그 게이트를 host 이미지가 타면 안 된다 — 끊는 건 **이름**으로
 
@@ -81,15 +101,35 @@ RUN pnpm turbo run docker:build --filter=@mfa/host
 
 플래그로 되돌릴 게 없어졌다. "이미지는 remote 를 안 빌드한다"가 태스크 정의 한 곳에만 있다.
 
-### B-4. dev 서버가 떠 있으면 조용히 15초를 버린다
+### B-4. dev 서버가 떠 있으면 포트 충돌조차 안 난다
 
 정적 서버가 `:3001` 에 뜨는 데 **성공한다.** Vite dev 가 `127.0.0.1` 에 바인딩하면
-우리 서버는 `::` 에 붙을 수 있어서, 요청은 계속 dev 로 가는데 우리 프로세스는 멀쩡히 살아
-있다. 죽기를 기다려도 안 죽고 타임아웃까지 가서 "응답하지 않습니다" 라는 엉뚱한 결론이 난다.
+우리 서버는 `::` 에 붙을 수 있어서, 요청은 계속 dev 로 가는데 우리 프로세스는 멀쩡히 산다.
+"포트가 겹치면 EADDRINUSE 로 알려주겠지"가 성립하지 않는다.
 
-- **해결**: 띄우기 **전에** TCP 연결로 포트 점유를 먼저 본다. 점유돼 있는데 `mf-version.json`
-  을 안 주면 그 자리에서 실패시킨다(1초). dev 는 버전 매니페스트를 공표하지 않으므로
-  이 조합이 곧 "dev 가 떠 있다"는 뜻이다.
+빌드는 죽는다 — dev 는 `mf-version.json` 을 공표하지 않으므로 무결성 값 없는 폴백 엔트리로
+흘러가서 거부된다. 다만 그 메시지만으로는 원인이 안 보인다. 그래서 힌트를 에러에 넣었다.
+
+```
+Error: remote 'catalog' 매니페스트에 무결성 값이 없습니다.
+       그 오리진에 dev 서버가 떠 있지 않은지 확인하세요 — 빌드는 dev 가 아니라 dist 를 서빙해야 합니다.
+```
+
+### B-4b. `pnpm start` 가 자기 자신과 포트를 다툰다
+
+`turbo run start` 만 부르면 `@mfa/host#build`(빌드 중 3001/3002 에 정적 서버를 띄운다)와
+`@mfa/remote-*#start`(같은 포트)가 **동시에** 스케줄된다. `start` 는 자기 패키지의 `build`
+만 기다리기 때문이다. 둘 다 EADDRINUSE 로 죽는다.
+
+```
+[cart] node .../serve-remote-dist.mjs 3002 ... exited with code 1
+--> Sending SIGTERM to other processes..
+[next] next build exited with code 143
+```
+
+- **해결**: 루트 `start` 를 `pnpm build && turbo run start` 로 둔다. 빌드를 먼저 끝내두면
+  두 번째 turbo 호출에서 host 빌드가 **캐시 히트라 실행되지 않고**, 따라서 임시 서버도
+  안 뜬다. remote 만 포트를 잡는다.
 
 ### B-5. 빈 문자열 env 가 `new URL("")` 로 터질 자리가 남아 있었다
 
@@ -141,6 +181,9 @@ Next 가 읽기 때문에 turbo 에게는 보이지 않는다.
 
 `$TURBO_DEFAULT$` 는 기본 집합을 유지하면서 덧붙이라는 뜻이다. 이걸 빼고 `.env*` 만 적으면
 소스 변경이 캐시를 못 깨는 정반대의 사고가 난다.
+
+> 그 뒤 `apps/host/.env.local` 자체를 지웠다. 코드 기본값을 한 글자도 안 틀리게 다시 적은
+> 파일이라 얻는 게 없었다. `inputs` 는 남겨둔다 — 누가 다시 만들면 그 순간 일한다.
 
 ### B-8. A-10 을 또 밟았다 — `WAIT_FOR_REMOTES_TIMEOUT` 미등록
 
