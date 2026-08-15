@@ -30,7 +30,15 @@ COPY packages/contracts/package.json packages/contracts/
 COPY packages/eslint-config/package.json packages/eslint-config/
 COPY packages/typescript-config/package.json packages/typescript-config/
 COPY packages/ui/package.json packages/ui/
-RUN --mount=type=cache,target=/pnpm/store pnpm install --frozen-lockfile
+# trustLockfile: 락파일이 이미 커밋·리뷰를 거쳤으므로 minimumReleaseAge / trustPolicy
+# 재검증을 건너뛴다. 이 검증은 항목마다 레지스트리를 때려 빌드에 수 분을 얹는다.
+# fetch* 는 느린 회선에서 install 이 통째로 죽는 걸 막는다(기본 타임아웃 60초).
+RUN --mount=type=cache,target=/pnpm/store \
+    pnpm install --frozen-lockfile \
+      --config.trustLockfile=true \
+      --config.fetchRetries=5 \
+      --config.fetchTimeout=300000 \
+      --config.fetchRetryMaxtimeout=180000
 
 # ------------------------------------------------------------ builder
 FROM base AS builder
