@@ -39,7 +39,14 @@ COPY packages/contracts/package.json packages/contracts/
 COPY packages/eslint-config/package.json packages/eslint-config/
 COPY packages/typescript-config/package.json packages/typescript-config/
 COPY packages/ui/package.json packages/ui/
-RUN --mount=type=cache,target=/pnpm/store,sharing=locked pnpm install --frozen-lockfile
+# cart 만 빌드하므로 host(next)와 catalog(vite)의 툴체인은 받지 않는다.
+# 제외 필터라 루트 패키지는 남는다 — 루트 devDependency 인 turbo 가 필요하다.
+# 여기서 빠지는 것: next(198M) + @next/swc(85M) + vite(2.3M) — 설치 기준
+# 네트워크/공급망 설정은 base 스테이지의 pnpm_config_* 참고.
+RUN --mount=type=cache,target=/pnpm/store,sharing=locked \
+    pnpm install --frozen-lockfile \
+      --filter '!@mfa/host' \
+      --filter '!@mfa/remote-catalog'
 
 FROM base AS builder
 COPY --from=deps /repo/node_modules ./node_modules

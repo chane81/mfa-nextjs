@@ -55,7 +55,15 @@ COPY packages/contracts/package.json packages/contracts/
 COPY packages/eslint-config/package.json packages/eslint-config/
 COPY packages/typescript-config/package.json packages/typescript-config/
 COPY packages/ui/package.json packages/ui/
-RUN --mount=type=cache,target=/pnpm/store,sharing=locked pnpm install --frozen-lockfile
+# 이 이미지는 host 만 빌드하므로 remote 의 툴체인을 받을 이유가 없다.
+# 제외 필터를 쓰면 **루트 패키지가 남는다** — 루트 devDependency 인 turbo 가 필요하기 때문이다.
+# (`--filter '@mfa/host...'` 는 루트를 빼버려서 `pnpm turbo` 가 없어진다. 실측으로 확인)
+# 여기서 빠지는 것: @rspack/binding(40M), @rsbuild/core(5.3M), vite(2.3M) — 설치 기준
+# 네트워크/공급망 설정은 base 스테이지의 pnpm_config_* 참고.
+RUN --mount=type=cache,target=/pnpm/store,sharing=locked \
+    pnpm install --frozen-lockfile \
+      --filter '!@mfa/remote-catalog' \
+      --filter '!@mfa/remote-cart'
 
 # ------------------------------------------------------------ builder
 FROM base AS builder
