@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n web,ssr -c green,gray \"rsbuild dev\" \"rsbuild build --config rsbuild.server.config.ts --watch\"",
+    "dev": "concurrently -n web,ssr -c green,gray --kill-others \"rsbuild dev\" \"rsbuild build --config rsbuild.server.config.ts --watch\"",
     "build": "node ../../scripts/mf-build-version.mjs && rsbuild build && pnpm build:ssr && pnpm stamp",
     "build:ssr": "rsbuild build --config rsbuild.server.config.ts",
     "stamp": "node ../../scripts/stamp-remote-version.mjs cart",

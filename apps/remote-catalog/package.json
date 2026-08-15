@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n web,ssr -c magenta,gray \"vite --port 3001 --strictPort\" \"vite build --config vite.config.server.ts --watch\"",
+    "dev": "concurrently -n web,ssr -c magenta,gray --kill-others \"vite --port 3001 --strictPort\" \"vite build --config vite.config.server.ts --watch\"",
     "build": "node ../../scripts/mf-build-version.mjs && vite build && pnpm build:ssr && pnpm stamp",
     "build:ssr": "vite build --config vite.config.server.ts",
     "stamp": "node ../../scripts/stamp-remote-version.mjs catalog",
