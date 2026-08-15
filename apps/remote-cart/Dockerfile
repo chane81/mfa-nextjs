@@ -17,10 +17,17 @@ ARG NODE_VERSION=22-slim
 FROM node:${NODE_VERSION} AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
-RUN npm install -g pnpm@11.18.0
+RUN npm install -g pnpm@11.21.0
 # Node 는 DNS 응답에서 AAAA 를 먼저 고른다. 이 호스트에서 IPv6 경로가 블랙홀이라
 # registry.npmjs.org 연결이 에러도 없이 매달렸다(도커 이미지 pull 은 dockerd 라 무사했다).
 ENV NODE_OPTIONS=--dns-result-order=ipv4first
+# pnpm 네트워크/공급망 설정. 각 값의 근거는 apps/host/Dockerfile 의 같은 블록에 있다.
+# 요약: 환경변수로 줘야 한다(`--config.<키>` 는 숫자를 문자열로 흘려 깨진다),
+#       trust_lockfile 로 매 설치 2m43s 짜리 공급망 재검증을 건너뛰고,
+#       기본 60s fetch_timeout 으로는 큰 tarball 을 못 받는다.
+ENV pnpm_config_trust_lockfile=true
+ENV pnpm_config_fetch_timeout=600000
+ENV pnpm_config_network_concurrency=8
 WORKDIR /repo
 
 FROM base AS deps

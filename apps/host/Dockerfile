@@ -11,14 +11,37 @@ ARG NODE_VERSION=22-slim
 
 # ---------------------------------------------------------------- base
 FROM node:${NODE_VERSION} AS base
-ENV PNPM_HOME=/pnpm
-ENV PATH=$PNPM_HOME:$PATH
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 # packageManager 필드와 같은 버전으로 고정. corepack 대신 npm 설치를 쓰는 이유는
 # 구형 Node 이미지의 corepack 서명 키가 최신 pnpm 을 거부하는 사고를 피하기 위함.
-RUN npm install -g pnpm@11.18.0
+RUN npm install -g pnpm@11.21.0
 # Node 는 DNS 응답에서 AAAA 를 먼저 고른다. 이 호스트에서 IPv6 경로가 블랙홀이라
 # registry.npmjs.org 연결이 에러도 없이 매달렸다(도커 이미지 pull 은 dockerd 라 무사했다).
 ENV NODE_OPTIONS=--dns-result-order=ipv4first
+#
+# pnpm 네트워크 설정. **환경변수로 준다** — `--config.<키>` CLI 형식은 값을 문자열로
+# 흘려서 숫자 설정이 깨진다(실측):
+#   [ERROR] Expected `concurrency` to be a number from 1 and up, got `8` (string)
+# 문서화된 방식은 `pnpm_config_` 접두사 + snake_case 다. https://pnpm.io/configuring
+#
+# trust_lockfile — 공급망 검증 패스를 건너뛴다.
+#   pnpm 11 의 minimumReleaseAge 기본값이 1440(하루)이라, --frozen-lockfile 이어도
+#   설치마다 락파일 전체(454 entries)의 게시 시각을 registry 에 물어본다. 실측 2m43s.
+#   락파일은 개발 머신과 CI 에서 이미 검증됐고 이 이미지는 그걸 물질화만 한다.
+#   대신 **오염된 락파일은 여기서 못 걸러낸다** — 그 검증은 저장소 밖 기여자를 받는
+#   시점에 저장소 쪽에서 해야 한다. https://pnpm.io/settings/dependency-resolution
+#
+# fetch_timeout — 기본 60s 로는 큰 tarball 을 못 받는다. 실측 실패 로그가 정확히
+#   60.68 / 130.7 / 250.8 — 재시도 3번이 전부 60초에서 잘렸다. 걸린 건 next(198M),
+#   @next/swc-linux-arm64-gnu(85M), @turbo/linux-arm64 뿐이고 작은 메타데이터 JSON 은
+#   전부 통과했다. 즉 DNS 가 아니라 대역폭 문제다.
+#
+# network_concurrency — 기본은 워커 수에 따라 16~64 로 자동. 큰 tarball 이 동시에
+#   대역폭을 나눠 가지면 전부 느려져 **다 같이** 타임아웃한다. 줄여서 순서대로 받게 한다.
+ENV pnpm_config_trust_lockfile=true
+ENV pnpm_config_fetch_timeout=600000
+ENV pnpm_config_network_concurrency=8
 WORKDIR /repo
 
 # ------------------------------------------------------------- deps
