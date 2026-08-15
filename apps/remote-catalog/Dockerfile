@@ -28,7 +28,6 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/host/package.json apps/host/
 COPY apps/remote-cart/package.json apps/remote-cart/
 COPY apps/remote-catalog/package.json apps/remote-catalog/
-COPY apps/zone-checkout/package.json apps/zone-checkout/
 COPY packages/contracts/package.json packages/contracts/
 COPY packages/eslint-config/package.json packages/eslint-config/
 COPY packages/typescript-config/package.json packages/typescript-config/

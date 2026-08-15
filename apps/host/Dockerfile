@@ -28,7 +28,6 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/host/package.json apps/host/
 COPY apps/remote-cart/package.json apps/remote-cart/
 COPY apps/remote-catalog/package.json apps/remote-catalog/
-COPY apps/zone-checkout/package.json apps/zone-checkout/
 COPY packages/contracts/package.json packages/contracts/
 COPY packages/eslint-config/package.json packages/eslint-config/
 COPY packages/typescript-config/package.json packages/typescript-config/
@@ -47,10 +46,6 @@ ARG NEXT_PUBLIC_REMOTE_CATALOG_ENTRY
 ARG NEXT_PUBLIC_REMOTE_CART_ENTRY
 ENV NEXT_PUBLIC_REMOTE_CATALOG_ENTRY=${NEXT_PUBLIC_REMOTE_CATALOG_ENTRY}
 ENV NEXT_PUBLIC_REMOTE_CART_ENTRY=${NEXT_PUBLIC_REMOTE_CART_ENTRY}
-
-# zone rewrite 대상은 next.config.ts 가 빌드 시점에 읽는다
-ARG ZONE_CHECKOUT_URL
-ENV ZONE_CHECKOUT_URL=${ZONE_CHECKOUT_URL}
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
