@@ -59,14 +59,14 @@ ENV REMOTE_CART_SSR_ENTRY=${REMOTE_CART_SSR_ENTRY}
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# `build` 가 아니라 `build:image` 다. 산출물은 같고 remote 게이트만 없다.
+# `build` 가 아니라 `docker:build` 다. 산출물은 같고 remote 게이트만 없다.
 #
 # 로컬 `build` 는 워크스페이스 remote 를 먼저 빌드해 띄운다. 이미지에서 remote 는 이미
 # 배포된 공개 도메인이라 그럴 이유가 없고, 하면 catalog 빌드 실패가 host 배포까지 끌고
 # 내려간다. 근거는 turbo.json 의 해당 태스크 주석.
 #
 # ^build 의존성(@mfa/contracts, @mfa/ui)은 turbo 가 알아서 먼저 빌드한다.
-RUN pnpm turbo run build:image --filter=@mfa/host
+RUN pnpm turbo run docker:build --filter=@mfa/host
 
 # Next 파일 트레이싱이 @swc/helpers 의 `esm/` 를 standalone 에 담지 않는다.
 # pnpm 이 isolated 링커라 이 패키지가 next 의 중첩 node_modules 안 심링크로 들어가는데,

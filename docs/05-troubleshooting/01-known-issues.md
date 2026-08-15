@@ -73,10 +73,10 @@ RUN pnpm turbo run build --filter='@mfa/host^...' \
 | 태스크 | remote 게이트 | 쓰는 곳 |
 | --- | --- | --- |
 | `@mfa/host#build` | 있음 | 로컬 (`pnpm build`, `pnpm start`) |
-| `@mfa/host#build:image` | 없음 (`^build` 만) | `apps/host/Dockerfile` |
+| `@mfa/host#docker:build` | 없음 (`^build` 만) | `apps/host/Dockerfile` |
 
 ```dockerfile
-RUN pnpm turbo run build:image --filter=@mfa/host
+RUN pnpm turbo run docker:build --filter=@mfa/host
 ```
 
 플래그로 되돌릴 게 없어졌다. "이미지는 remote 를 안 빌드한다"가 태스크 정의 한 곳에만 있다.

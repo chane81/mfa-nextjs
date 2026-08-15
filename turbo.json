@@ -63,7 +63,7 @@
      * 로컬에서 이걸 직접 부를 일은 없다. remote 가 안 떠 있으면 프리렌더가 ECONNREFUSED 로
      * 죽는다 — 그게 `build` 가 감싸주는 부분이다.
      */
-    "@mfa/host#build:image": {
+    "@mfa/host#docker:build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
