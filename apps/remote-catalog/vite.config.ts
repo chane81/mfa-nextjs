@@ -41,14 +41,39 @@ function buildVersion(): string | null {
  * 웹 번들은 dev 에서 메모리로 서빙되지만 SSR 번들은 watch 빌드가 디스크에 쓰므로 직접 읽는다.
  *
  * dev 전용이다. 빌드 산출물은 `scripts/serve-remote-dist.mjs` 가 서빙한다.
- *   /mf-server.cjs    — dev watch 빌드가 디스크에 쓰는 버전 없는 번들
- *   /mf-version.json  — 있으면 내려준다(직전 빌드 산출물). dev 에서는 보통 없다
+ *   /mf-server.cjs — dev watch 빌드가 디스크에 쓰는 버전 없는 번들
+ *
+ * **`mf-version.json` 은 일부러 빼 둔다.** dev 는 버전 경로로 배포하지 않는데,
+ * 직전 `pnpm build` 가 남긴 파일을 내려주면 하지도 않은 배포를 공표하게 된다.
+ * 그러면 host 가 `/v<ver>/mf-server.cjs` 를 요청하고, dev 서버는 그 경로를 모르니
+ * SPA 폴백(200)을 돌려주며, 그 바이트가 공표된 해시와 달라 무결성 검사에서 죽는다.
+ *
+ *   Error: remote 'catalog' 번들 무결성 불일치 (공표=sha384-…, 실제=sha384-…)
+ *
+ * 안 내려주면 host 는 버전을 모르는 상태가 되어 버전 없는 엔트리로 폴백한다.
+ * 그게 dev 에서 의도된 경로다(`server-loader.ts` 의 `resolveEntry` 주석).
  */
-const SERVED = /^\/(mf-server\.cjs|mf-version\.json)$/;
+const SERVED = /^\/mf-server\.cjs$/;
+
+/**
+ * dev 에 존재하지 않는 배포 개념. 그냥 next() 로 흘리면 Vite 의 SPA 폴백이
+ * `index.html` 을 200 으로 돌려주고, host 는 그걸 매니페스트로 파싱하려다 실패한다.
+ * 결과는 같지만(폴백) 원인이 로그에서 사라진다. 여기서 명시적으로 404 를 준다.
+ */
+const NOT_IN_DEV = /^\/mf-version\.json$/;
 
 function serveSsrBundle(): Plugin {
   const middleware: Connect.NextHandleFunction = (req, res, next) => {
     const path = req.url?.split("?")[0] ?? "";
+
+    if (NOT_IN_DEV.test(path)) {
+      res.statusCode = 404;
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.end('{"error":"dev 에는 버전 공표가 없습니다. host 는 버전 없는 엔트리로 폴백합니다."}');
+      return;
+    }
+
     if (!SERVED.test(path)) return next();
 
     try {

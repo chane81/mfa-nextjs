@@ -21,8 +21,14 @@ const PUBLIC_URL = (process.env.REMOTE_CART_PUBLIC_URL || `http://localhost:${PO
   "",
 );
 
-/** dev 서버가 디스크에서 직접 내려주는 경로 (빌드 산출물은 serve-remote-dist.mjs 가 서빙) */
-const SERVED = /^\/(mf-server\.cjs|mf-version\.json)$/;
+/**
+ * dev 서버가 디스크에서 직접 내려주는 경로 (빌드 산출물은 serve-remote-dist.mjs 가 서빙).
+ *
+ * **`mf-version.json` 은 일부러 뺐다.** 근거는 catalog 쪽 vite.config.ts 주석 참고 —
+ * 요약하면 직전 빌드가 남긴 매니페스트를 dev 에서 공표하면 host 가 버전 경로를 요청하고,
+ * dev 서버가 모르는 경로라 폴백 응답을 주면서 무결성 검사에서 죽는다.
+ */
+const SERVED = /^\/mf-server\.cjs$/;
 
 /**
  * 빌드 버전. `scripts/mf-build-version.mjs` 가 빌드 직전에 써 둔다.
@@ -77,13 +83,14 @@ export default defineConfig({
     // 청크가 3002 절대경로로 로드되도록 고정
     assetPrefix: PUBLIC_URL,
     /**
-     * SSR 번들과 버전 매니페스트를 dev 서버에서 내려준다.
-     * 웹 번들은 메모리에서 서빙되지만 이 파일들은 빌드가 디스크에 쓰므로 직접 읽는다.
+     * SSR 번들을 dev 서버에서 내려준다.
+     * 웹 번들은 메모리에서 서빙되지만 이 파일은 watch 빌드가 디스크에 쓰므로 직접 읽는다.
      * (preview 는 dist 를 정적으로 서빙하므로 이 미들웨어가 필요 없다)
      *
-     *   /mf-server.cjs          — 버전 없는 최신본
-     *   /v<hash>/mf-server.cjs  — 불변 아티팩트
-     *   /mf-version.json        — 현재 버전 공표
+     *   /mf-server.cjs — watch 빌드가 쓰는 버전 없는 최신본
+     *
+     * 버전 경로(`/v<hash>/…`)와 버전 공표(`mf-version.json`)는 dev 에 없다.
+     * 배포 산출물의 개념이라 `serve-remote-dist.mjs` 가 담당한다.
      */
     setupMiddlewares: [
       (middlewares) => {
