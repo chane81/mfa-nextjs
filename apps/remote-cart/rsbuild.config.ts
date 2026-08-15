@@ -16,10 +16,9 @@ const DIST = resolve(process.cwd(), "dist");
  * 빌드 시점에 굳는 값이라 배포 파이프라인에서 빌드 인자로 넘긴다.
  * (docs/03-setup/04-dokploy.md)
  */
-const PUBLIC_URL = (process.env.REMOTE_CART_PUBLIC_URL || `http://localhost:${PORT}`).replace(
-  /\/+$/,
-  "",
-);
+const PUBLIC_URL = (
+  process.env.REMOTE_CART_PUBLIC_URL || `http://localhost:${PORT}`
+).replace(/\/+$/, "");
 
 /**
  * dev 서버가 디스크에서 직접 내려주는 경로 (빌드 산출물은 serve-remote-dist.mjs 가 서빙).
@@ -29,6 +28,15 @@ const PUBLIC_URL = (process.env.REMOTE_CART_PUBLIC_URL || `http://localhost:${PO
  * dev 서버가 모르는 경로라 폴백 응답을 주면서 무결성 검사에서 죽는다.
  */
 const SERVED = /^\/mf-server\.cjs$/;
+
+/** preview 는 빌드 산출물을 서빙하는 자리라 버전 공표도 의미가 있다 */
+const SERVED_IN_PREVIEW = /^\/(mf-server\.cjs|mf-version\.json)$/;
+
+/**
+ * dev 에 존재하지 않는 배포 개념. 그냥 next() 로 흘리면 무엇이 이 요청을 처리했는지가
+ * 응답에 따라 달라져 원인 추적이 어렵다. 여기서 명시적으로 404 를 준다.
+ */
+const NOT_IN_DEV = /^\/mf-version\.json$/;
 
 /**
  * 빌드 버전. `scripts/mf-build-version.mjs` 가 빌드 직전에 써 둔다.
@@ -78,46 +86,65 @@ export default defineConfig({
     strictPort: true,
     // host(3000) 에서 remoteEntry 를 교차 출처로 로드
     cors: { origin: "*" },
+    /**
+     * SSR 번들을 서버에서 직접 내려준다.
+     * 웹 번들은 메모리에서 서빙되지만 이 파일은 watch 빌드가 디스크에 쓰므로 직접 읽는다.
+     *
+     *   /mf-server.cjs — watch 빌드가 쓰는 버전 없는 최신본
+     *
+     * 버전 경로(`/v<hash>/…`)는 어느 쪽에도 없다. 배포 산출물의 개념이라
+     * `serve-remote-dist.mjs` 가 담당한다.
+     *
+     * `action` 으로 dev 와 preview 를 가른다. 이 훅은 **양쪽 모두에서** 호출되는데,
+     * 버전 공표(`mf-version.json`)는 dev 에 없고 preview(빌드 산출물)에는 있다.
+     * 구분하지 않으면 preview 가 자기 매니페스트를 404 로 감춘다.
+     *
+     * 옛 `dev.setupMiddlewares` 는 Rsbuild 2 에서 deprecated 다 (기동 시 경고 출력).
+     */
+    setup: ({ server, action }) => {
+      const dev = action === "dev";
+
+      server.middlewares.use((req, res, next) => {
+        const path = req.url?.split("?")[0] ?? "";
+
+        if (dev && NOT_IN_DEV.test(path)) {
+          res.statusCode = 404;
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.end(
+            '{"error":"dev 에는 버전 공표가 없습니다. host 는 버전 없는 엔트리로 폴백합니다."}',
+          );
+          return;
+        }
+
+        if (!(dev ? SERVED : SERVED_IN_PREVIEW).test(path)) {
+          next();
+          return;
+        }
+
+        try {
+          const body = readFileSync(resolve(DIST, `.${path}`), "utf8");
+          res.setHeader(
+            "Content-Type",
+            path.endsWith(".json")
+              ? "application/json; charset=utf-8"
+              : "application/javascript; charset=utf-8",
+          );
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.setHeader("Cache-Control", "no-store");
+          res.end(body);
+        } catch {
+          res.statusCode = 404;
+          res.end(
+            "// 없음. `pnpm build` (stamp 포함) 또는 watch 빌드를 확인하세요.",
+          );
+        }
+      });
+    },
   },
   dev: {
     // 청크가 3002 절대경로로 로드되도록 고정
     assetPrefix: PUBLIC_URL,
-    /**
-     * SSR 번들을 dev 서버에서 내려준다.
-     * 웹 번들은 메모리에서 서빙되지만 이 파일은 watch 빌드가 디스크에 쓰므로 직접 읽는다.
-     * (preview 는 dist 를 정적으로 서빙하므로 이 미들웨어가 필요 없다)
-     *
-     *   /mf-server.cjs — watch 빌드가 쓰는 버전 없는 최신본
-     *
-     * 버전 경로(`/v<hash>/…`)와 버전 공표(`mf-version.json`)는 dev 에 없다.
-     * 배포 산출물의 개념이라 `serve-remote-dist.mjs` 가 담당한다.
-     */
-    setupMiddlewares: [
-      (middlewares) => {
-        middlewares.unshift((req, res, next) => {
-          const path = req.url?.split("?")[0] ?? "";
-          if (!SERVED.test(path)) {
-            next();
-            return;
-          }
-          try {
-            const body = readFileSync(resolve(DIST, `.${path}`), "utf8");
-            res.setHeader(
-              "Content-Type",
-              path.endsWith(".json")
-                ? "application/json; charset=utf-8"
-                : "application/javascript; charset=utf-8",
-            );
-            res.setHeader("Access-Control-Allow-Origin", "*");
-            res.setHeader("Cache-Control", "no-store");
-            res.end(body);
-          } catch {
-            res.statusCode = 404;
-            res.end("// 없음. `pnpm build` (stamp 포함) 또는 watch 빌드를 확인하세요.");
-          }
-        });
-      },
-    ],
   },
   output: {
     assetPrefix: ASSET_PREFIX,

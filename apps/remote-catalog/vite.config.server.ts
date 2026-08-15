@@ -13,7 +13,14 @@ import { defineConfig } from "vite";
 function versionDir(): string {
   const file = resolve(process.cwd(), ".mf-version");
   if (!existsSync(file)) return "dist";
-  return `dist/v${readFileSync(file, "utf8").trim()}`;
+
+  /**
+   * 파일이 있어도 **내용이 비어 있으면 없는 것으로 본다.**
+   * 안 그러면 `dist/v` 라는 버전 없는 버전 경로가 만들어져,
+   * 빈 값을 falsy 로 거르는 웹 빌드와 출력 경로가 어긋난다.
+   */
+  const version = readFileSync(file, "utf8").trim();
+  return version ? `dist/v${version}` : "dist";
 }
 
 /**
@@ -36,7 +43,12 @@ export default defineConfig({
     minify: false,
     target: "node20",
     rollupOptions: {
-      external: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
+      external: [
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+      ],
       output: {
         format: "cjs",
         entryFileNames: "mf-server.cjs",

@@ -7,11 +7,16 @@ import { pluginReact } from "@rsbuild/plugin-react";
 /**
  * 빌드 버전. 웹 빌드와 **같은 값**이어야 한다 — 둘이 한 배포 단위다.
  * `.mf-version` 을 공유하므로 자연히 맞는다. watch(dev)에는 없을 수 있다.
+ *
+ * 파일이 있어도 **내용이 비어 있으면 없는 것으로 본다.** 존재 여부만 보면
+ * `dist/v` 라는 버전 없는 버전 경로가 만들어져, 웹 빌드(빈 값을 falsy 로 거르는)와
+ * 출력 경로가 어긋난다.
  */
 const VERSION_FILE = resolve(process.cwd(), ".mf-version");
-const DIST_ROOT = existsSync(VERSION_FILE)
-  ? `dist/v${readFileSync(VERSION_FILE, "utf8").trim()}`
-  : "dist";
+const VERSION = existsSync(VERSION_FILE)
+  ? readFileSync(VERSION_FILE, "utf8").trim()
+  : "";
+const DIST_ROOT = VERSION ? `dist/v${VERSION}` : "dist";
 
 /**
  * cart remote 의 SSR(node) 번들 빌드 설정.
