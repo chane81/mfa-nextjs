@@ -3,11 +3,12 @@
 > **결론 먼저: 채택하지 않았다.**
 > zone 경계를 넘을 때 **하드 내비게이션이 강제**되기 때문이다.
 > 하드 내비게이션이면 SPA 설계를 할 이유가 사라진다.
-> 실제 결제 경로는 `cart/CheckoutFlow` remote 로 옮겼고,
-> 이 zone 앱은 `/legacy-checkout` 으로 밀어 **비교 대상으로만** 남겼다.
+> 실제 결제 경로는 `cart/CheckoutFlow` remote 로 옮겼다.
 > → [02-architecture/03-ssr-and-soft-nav.md](../02-architecture/03-ssr-and-soft-nav.md)
 >
-> 아래 기록은 "왜 안 되는지"를 실측으로 남긴 것이다. 경로는 전부 `/checkout` → `/legacy-checkout` 으로 바뀌었다.
+> **앱은 삭제됐다(6차).** `apps/zone-checkout` 과 host 의 `/legacy-checkout` rewrite 는
+> 저장소에 더 이상 없다. 아래 기록은 "왜 안 되는지"를 실측으로 남긴 것이라 그대로 둔다.
+> 당시 경로는 `/checkout` → `/legacy-checkout` 이었다.
 
 ## 가설
 

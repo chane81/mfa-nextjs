@@ -27,12 +27,6 @@ services:
     ports: ["3002:3002"]
     volumes: ["cart-dist:/data"]
 
-  zone-checkout:
-    build:
-      context: .
-      dockerfile: apps/zone-checkout/Dockerfile
-    ports: ["3003:3003"]
-
   host:
     build:
       context: .
@@ -41,19 +35,17 @@ services:
         # 브라우저가 읽는 값 → 호스트 머신에서 닿는 주소여야 한다
         NEXT_PUBLIC_REMOTE_CATALOG_ENTRY: http://localhost:3001/mf-manifest.json
         NEXT_PUBLIC_REMOTE_CART_ENTRY: http://localhost:3002/mf-manifest.json
-        ZONE_CHECKOUT_URL: http://zone-checkout:3003
     ports: ["3000:3000"]
     environment:
       # host **서버**가 읽는 값 → 컨테이너 네트워크 내부 주소
       REMOTE_CATALOG_SSR_ENTRY: http://remote-catalog:3001/mf-server.cjs
       REMOTE_CART_SSR_ENTRY: http://remote-cart:3002/mf-server.cjs
-      ZONE_CHECKOUT_URL: http://zone-checkout:3003
       # 서버가 코드를 받아 실행하는 오리진 허용목록
       REMOTE_ALLOWED_ORIGINS: http://remote-catalog:3001,http://remote-cart:3002
       MF_REVALIDATE_SECRET: local-dev-secret
       # 로컬 compose 는 서명 없이 빌드된다(build secret 미전달). 강제하면 안 뜬다.
       MF_REQUIRE_SIGNATURE: "0"
-    depends_on: [remote-catalog, remote-cart, zone-checkout]
+    depends_on: [remote-catalog, remote-cart]
 
 volumes:
   catalog-dist:

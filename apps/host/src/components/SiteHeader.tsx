@@ -15,8 +15,6 @@ const NAV = [
   { href: "/debug", label: "MF 진단" },
   // SSR / ISR / Cache Components 비교 실험
   { href: "/lab", label: "캐시 실험" },
-  // 비교용으로 남긴 Multi-Zone 앱. zone 경계는 하드 내비게이션이 강제된다.
-  { href: "/legacy-checkout", label: "결제(zone·비교용)", external: true },
 ] as const;
 
 export function SiteHeader() {
@@ -61,34 +59,19 @@ export function SiteHeader() {
         </Link>
 
         <nav style={{ display: "flex", gap: tokens.space(4), flex: 1 }}>
-          {NAV.map((item) =>
-            "external" in item && item.external ? (
-              // multi-zone 경계를 넘을 때는 <a> 로 하드 내비게이션해야 한다
-              <a
-                key={item.href}
-                href={item.href}
-                style={{
-                  color: tokens.color.textMuted,
-                  textDecoration: "none",
-                  fontSize: 14,
-                }}
-              >
-                {item.label}
-              </a>
-            ) : (
-              <Link
-                key={item.href}
-                href={item.href}
-                style={{
-                  color: pathname === item.href ? tokens.color.accent : tokens.color.textMuted,
-                  textDecoration: "none",
-                  fontSize: 14,
-                }}
-              >
-                {item.label}
-              </Link>
-            ),
-          )}
+          {NAV.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              style={{
+                color: pathname === item.href ? tokens.color.accent : tokens.color.textMuted,
+                textDecoration: "none",
+                fontSize: 14,
+              }}
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
 
         {/* 헤더 배지 자체가 cart remote 에서 온다 */}

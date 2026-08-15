@@ -4,12 +4,12 @@
 
 질문: **remote 를 host 와 독립적으로 재배포할 수 있는가?** → 배포 표면을 먼저 만들었다.
 
-앱마다 별도 Application 4개로 올렸다. 한 Compose 로 묶으면 "remote 만 재배포"를
+앱마다 별도 Application 으로 올렸다(당시 4개, zone 삭제 후 3개). 한 Compose 로 묶으면 "remote 만 재배포"를
 아예 시도할 수 없어서 미완 항목이 그대로 남는다.
 
 ### 한 일
 
-- [x] Dockerfile 4개 — 빌드 컨텍스트는 저장소 루트(pnpm 워크스페이스)
+- [x] Dockerfile — 빌드 컨텍스트는 저장소 루트(pnpm 워크스페이스)
 - [x] Next 앱 `output: "standalone"` + `outputFileTracingRoot` (isolated 링커 대응)
 - [x] remote 자산 URL 을 env 로 분리 — 하드코딩된 `localhost:3001/3002` 는 배포 불가였다
 - [x] remote 진입점이 `dist` 를 영속 볼륨에 **덧붙인다** — `/v<ver>/` 불변성과 롤백 보존
@@ -30,7 +30,23 @@
 | 불변 경로 캐시 헤더 | ✅ `max-age=31536000, immutable` |
 | 소프트 내비 (`/` → `/checkout`) | ✅ document 요청 0 |
 | 크로스 remote 상태 공유 (Vite → Rsbuild) | ✅ `0원` → `189,000원` |
-| zone 프록시 (`/legacy-checkout`) | ✅ 별도 앱 응답 |
+| zone 프록시 (`/legacy-checkout`) | ✅ 별도 앱 응답 — 확인 후 앱 삭제(아래) |
+
+### Multi-Zones 폐기
+
+대조군으로 남겨뒀던 `apps/zone-checkout` 을 삭제했다. 기각 판단은 2차에서 이미 끝났고,
+배포 환경에서까지 동작을 확인(assetPrefix 프록시·하이드레이션·상호작용)한 뒤로는
+얻을 게 없는데 앱 하나만큼의 유지 비용이 계속 들었다.
+
+- [x] `apps/zone-checkout` 삭제
+- [x] host 의 `/legacy-checkout*` rewrite 3개 + `ZONE_CHECKOUT_URL` 제거
+- [x] 헤더의 `결제(zone·비교용)` 링크 제거 → 외부 링크 분기 자체가 사라져 `SiteHeader` 가 단순해졌다
+- [x] turbo `globalEnv`, `docker-compose.yml`, `.env.local`, 배포 문서에서 zone 제거
+- [x] Dokploy `mfa-zone-checkout` 서비스 삭제
+
+**기각 근거는 남긴다.** 실험 기록(`04-experiments/02-multi-zones.md`)과 ADR-003 은
+"앱 삭제됨" 표시만 붙여 유지했다. 나중에 같은 질문이 왔을 때 근거 없이 다시 재보는 게
+더 비싸다.
 
 ### 배포에서만 드러난 결함
 

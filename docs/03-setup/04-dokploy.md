@@ -1,6 +1,6 @@
 # Dokploy 배포
 
-컨테이너 4개를 **각각 별도 Application** 으로 올린다. 한 Compose 로 묶지 않는 이유는
+컨테이너 3개를 **각각 별도 Application** 으로 올린다. 한 Compose 로 묶지 않는 이유는
 `docs/00-progress.md` 의 미완 항목 때문이다 — "remote 만 재배포했을 때 host 가 무중단인가"는
 remote 를 host 와 독립적으로 재배포할 수 있어야 검증된다.
 
@@ -9,9 +9,8 @@ remote 를 host 와 독립적으로 재배포할 수 있어야 검증된다.
 | `mfa-host` | `apps/host/Dockerfile` | 3000 | 필요 | — |
 | `mfa-remote-catalog` | `apps/remote-catalog/Dockerfile` | 3001 | 필요 (브라우저가 직접 받는다) | `/data` |
 | `mfa-remote-cart` | `apps/remote-cart/Dockerfile` | 3002 | 필요 (브라우저가 직접 받는다) | `/data` |
-| `mfa-zone-checkout` | `apps/zone-checkout/Dockerfile` | 3003 | 불필요 (host 가 rewrite 로 프록시) | — |
 
-네 개 모두 **Build Context 는 저장소 루트(`.`)** 다. pnpm 워크스페이스라 앱 디렉터리만으로는
+셋 모두 **Build Context 는 저장소 루트(`.`)** 다. pnpm 워크스페이스라 앱 디렉터리만으로는
 빌드되지 않는다. Dokploy 의 Build Type 은 `Dockerfile`, Docker Context Path 는 `.` 로 둔다.
 
 ## 왜 remote 에 볼륨이 필요한가
@@ -47,7 +46,6 @@ remote → host 순서다. 두 가지 이유가 있다.
 | --- | --- | --- |
 | host | `NEXT_PUBLIC_REMOTE_CATALOG_ENTRY` | `https://<catalog-도메인>/mf-manifest.json` |
 | host | `NEXT_PUBLIC_REMOTE_CART_ENTRY` | `https://<cart-도메인>/mf-manifest.json` |
-| host | `ZONE_CHECKOUT_URL` | `http://<zone-내부-서비스명>:3003` |
 | remote-catalog | `REMOTE_CATALOG_PUBLIC_URL` | `https://<catalog-도메인>` |
 | remote-catalog | `MF_BUILD_VERSION` | 커밋 SHA (선택, 없으면 타임스탬프) |
 | remote-cart | `REMOTE_CART_PUBLIC_URL` | `https://<cart-도메인>` |
@@ -67,7 +65,6 @@ git SHA 폴백이 동작하지 않고 타임스탬프 버전이 나온다. 커�
 | --- | --- | --- |
 | `REMOTE_CATALOG_SSR_ENTRY` | `https://<catalog-도메인>/mf-server.cjs` | host **서버**가 받아 실행할 node 번들 |
 | `REMOTE_CART_SSR_ENTRY` | `https://<cart-도메인>/mf-server.cjs` | 〃 |
-| `ZONE_CHECKOUT_URL` | `http://<zone-내부-서비스명>:3003` | rewrite 대상 |
 | `MF_REVALIDATE_SECRET` | 랜덤 문자열 | `/api/mf-revalidate` · `/internal/mf-warm` 접근 검사 |
 | `REMOTE_ALLOWED_ORIGINS` | (보통 생략) | 생략하면 위 SSR 엔트리 오리진만 허용 — 기본이 이미 닫혀 있다 |
 | `MF_REMOTE_PUBLIC_KEY` | Ed25519 공개키(base64) | 매니페스트 서명 검증 |
@@ -111,14 +108,10 @@ Dokploy 의 배포 후 커맨드(Post-deploy)나 GitHub Actions 마지막 단계
 | `mfa-host` | `mfa.lakegreen.net` | `web-mfa-host-0es2dw` | 3000 |
 | `mfa-remote-catalog` | `mfa-catalog.lakegreen.net` | `web-mfa-remote-catalog-x4ijue` | 3001 |
 | `mfa-remote-cart` | `mfa-cart.lakegreen.net` | `web-mfa-remote-cart-…` | 3002 |
-| `mfa-zone-checkout` | 없음 | `web-mfa-zone-checkout-of97yu` | 3003 |
-
-zone 은 공개 도메인이 없다. host 가 `ZONE_CHECKOUT_URL=http://web-mfa-zone-checkout-of97yu:3003`
-으로 dokploy-network 안에서 직접 부른다.
 
 ### Watch Paths
 
-한 저장소에 앱이 4개라 푸시 하나가 4개를 전부 재빌드하지 않도록 서비스마다 경로를 건다.
+한 저장소에 앱이 3개라 푸시 하나가 셋을 전부 재빌드하지 않도록 서비스마다 경로를 건다.
 공유 패키지가 바뀌면 소비자도 다시 빌드돼야 하므로 `packages/**` 를 모두에 넣는다.
 
 | 서비스 | 경로 |
@@ -126,7 +119,6 @@ zone 은 공개 도메인이 없다. host 가 `ZONE_CHECKOUT_URL=http://web-mfa-
 | host | `apps/host/**`, `packages/**`, `pnpm-lock.yaml` |
 | remote-catalog | `apps/remote-catalog/**`, `packages/**`, `scripts/**`, `pnpm-lock.yaml` |
 | remote-cart | `apps/remote-cart/**`, `packages/**`, `scripts/**`, `pnpm-lock.yaml` |
-| zone-checkout | `apps/zone-checkout/**`, `packages/**`, `pnpm-lock.yaml` |
 
 remote 는 `scripts/**` 도 본다. 빌드 버전·서명·서빙이 전부 그 디렉터리에 있다.
 
@@ -142,7 +134,7 @@ Dokploy UI 에서 경로는 입력 후 **＋ 버튼을 눌러야 목록에 들�
 그대로 버전이 되어, 자산이 `dist/` 로 나가고 stamp 가 `dist/v/` 를 찾다 실패한다.
 
 배포 시점 env 를 읽는 자리는 전부 `||` 를 쓴다. 지금 해당하는 곳:
-`mf-build-version.mjs`, remote 두 곳의 `PUBLIC_URL`, host 의 `ZONE_CHECKOUT_URL`.
+`mf-build-version.mjs`, remote 두 곳의 `PUBLIC_URL`.
 
 ### Next standalone 이 @swc/helpers 의 ESM 파일을 빠뜨린다
 
@@ -153,7 +145,7 @@ Cannot find module '/app/node_modules/.pnpm/next@…/node_modules/@swc/helpers/e
 ```
 
 파일 트레이싱이 이 패키지의 CJS 진입점만 따라가서 디렉터리는 만들어지되 절반만 찬다.
-두 Next 앱의 Dockerfile 이 빌드 직후 스토어의 원본 패키지를 그 위에 덮어쓴다.
+host 의 Dockerfile 이 빌드 직후 스토어의 원본 패키지를 그 위에 덮어쓴다.
 덮어쓸 대상을 못 찾으면 이미지 빌드를 실패시킨다 — Next 가 고쳐지면 조용히 흘러가는 대신
 빌드 에러로 드러나야 한다.
 

@@ -44,7 +44,6 @@ loadRemoteModule("cart/CheckoutFlow")
 | --- | --- | --- |
 | remote SSR | `curl /checkout \| grep 주문서` | ✅ 초기 HTML 에 존재 |
 | 소프트 내비 (`/`→`/checkout`) | document 요청 수 | ✅ **0** |
-| 하드 내비 (`/`→`/legacy-checkout`) | document 요청 수 | 1 (대조군) |
 | hydration | 브라우저 콘솔 | ✅ 에러 0 |
 | 크로스 remote 상태 공유 | 담기 → 헤더 배지 | ✅ `0원` → `189,000원` |
 
@@ -55,7 +54,6 @@ loadRemoteModule("cart/CheckoutFlow")
 | `apps/host` | 3000 | Next.js 16 / Turbopack | 셸 · 라우팅 · remote 소비(서버+브라우저) |
 | `apps/remote-catalog` | 3001 | **Vite 8** | 상품 목록 / 상세 |
 | `apps/remote-cart` | 3002 | **Rsbuild 2 (Rspack)** | 장바구니 / 배지 / 결제 |
-| `apps/zone-checkout` | 3003 | Next.js 16 | Multi-Zone **비교용** (기각) |
 
 remote 를 일부러 다른 번들러로 만들었다.
 "번들러가 달라도 런타임 계약만 맞으면 된다"를 실제로 확인하기 위해서다.
@@ -74,7 +72,7 @@ remote 를 일부러 다른 번들러로 만들었다.
 - [실행 방법](./docs/03-setup/01-getting-started.md)
 - [버전 고정 근거](./docs/03-setup/02-versions.md)
 - [실험 A — 런타임 MF](./docs/04-experiments/01-runtime-mf.md)
-- [실험 B — Multi-Zones (기각)](./docs/04-experiments/02-multi-zones.md)
+- [실험 B — Multi-Zones (기각·앱 삭제됨)](./docs/04-experiments/02-multi-zones.md)
 - [트러블슈팅](./docs/05-troubleshooting/01-known-issues.md)
 
 ## 스크립트

@@ -449,7 +449,7 @@ function getLazyRemote(id: RemoteModuleId) {
 JSX 사용 지점에는 캐시 근거를 적은 `eslint-disable-next-line` 을 남겼다.
 (린터는 동적 remote 라는 맥락을 알 수 없다)
 
-## 6. Multi-Zone 경계에서 `@next/next/no-html-link-for-pages` 오탐
+## 6. Multi-Zone 경계에서 `@next/next/no-html-link-for-pages` 오탐 (앱 삭제됨)
 
 ```
 error  Do not use an `<a>` element to navigate to `/`.
@@ -468,6 +468,9 @@ rules: { "@next/next/no-html-link-for-pages": "off" }
 
 host 에서 zone 으로 나가는 `window.location.href = "/checkout"` 도 같은 이유로
 `@next/next/no-location-assign-relative-destination` 을 국소 해제했다.
+
+zone 앱은 6차에서 삭제됐다. 이 항목은 Multi-Zones 를 다시 시도할 때 같은 곳에서
+막히지 않도록 남겨둔다.
 
 ## 7. `@mfa/contracts` 빌드가 `window` 를 못 찾음
 

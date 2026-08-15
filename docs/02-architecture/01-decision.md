@@ -31,7 +31,7 @@
   - ❌ Node 런타임 전용(Edge 불가, `new Function` 평가 필요).
 - 상세: [03-ssr-and-soft-nav.md](./03-ssr-and-soft-nav.md)
 
-## ADR-003 — Multi-Zones 는 채택하지 않는다 (비교용으로만 유지)
+## ADR-003 — Multi-Zones 는 채택하지 않는다 (앱도 삭제)
 
 - 상태: 기각 (2026-08-14)
 - 맥락: 초판은 `/checkout` 을 별도 Next 앱(zone)으로 분리했다.
@@ -40,7 +40,8 @@
   측정값: `/` → `/legacy-checkout` document 요청 **1건**(하드),
   `/` → `/checkout`(remote) document 요청 **0건**(소프트).
 - 결정: 결제 화면을 `cart` remote 의 `CheckoutFlow` 로 옮긴다.
-  라우터는 host 하나만 둔다. zone 앱은 `/legacy-checkout` 으로 밀어 비교 대상으로만 남긴다.
+  라우터는 host 하나만 둔다. zone 앱은 한동안 `/legacy-checkout` 에 대조군으로 뒀다가
+  6차에서 삭제했다 — 결론이 확정된 뒤로는 유지 비용만 남았다.
 - 결과:
   - ⭕ 전 구간 소프트 내비게이션.
   - ⭕ 런타임 상태 공유가 그대로 유지된다(localStorage 왕복 불필요).

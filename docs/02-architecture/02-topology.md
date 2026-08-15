@@ -25,8 +25,7 @@
      ├── /products/:id  → catalog/ProductDetail                   (소프트)
      ├── /cart          → cart/CartPanel                          (소프트)
      ├── /checkout      → cart/CheckoutFlow                       (소프트)
-     ├── /debug         → MF 진단
-     └── /legacy-checkout → rewrite → zone-checkout :3003         (하드, 비교용)
+     └── /debug         → MF 진단
 ```
 
 ## 앱 목록
@@ -36,7 +35,6 @@
 | `apps/host` | 3000 | Next.js 16 / Turbopack | 셸 · 라우팅 · remote 소비(브라우저+서버) | `.next` |
 | `apps/remote-catalog` | 3001 | Vite 8 | 상품 목록 / 상세 | `remoteEntry.js` + `mf-server.cjs` |
 | `apps/remote-cart` | 3002 | Rsbuild 2 (Rspack) | 장바구니 / 배지 / **결제** | `remoteEntry.js` + `mf-server.cjs` |
-| `apps/zone-checkout` | 3003 | Next.js 16 / Turbopack | Multi-Zone **비교용** (기각) | `.next` |
 
 ## 공유 패키지
 

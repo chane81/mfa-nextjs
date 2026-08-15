@@ -165,46 +165,6 @@ importers:
         specifier: ^8.2.1
         version: 8.2.1(@types/node@24.13.3)(jiti@2.4.2)
 
-  apps/zone-checkout:
-    dependencies:
-      '@mfa/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@mfa/ui':
-        specifier: workspace:*
-        version: link:../../packages/ui
-      next:
-        specifier: ^16.3.1
-        version: 16.3.1(@babel/core@7.29.7(supports-color@8.1.1))(@types/node@24.13.3)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.2.8
-        version: 19.2.8(react@19.2.8)
-    devDependencies:
-      '@mfa/eslint-config':
-        specifier: workspace:*
-        version: link:../../packages/eslint-config
-      '@mfa/typescript-config':
-        specifier: workspace:*
-        version: link:../../packages/typescript-config
-      '@types/node':
-        specifier: ^24.10.1
-        version: 24.13.3
-      '@types/react':
-        specifier: ^19.2.2
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: ^19.2.2
-        version: 19.2.4(@types/react@19.2.18)
-      eslint:
-        specifier: ^10.8.1
-        version: 10.8.1(jiti@2.4.2)(supports-color@8.1.1)
-      typescript:
-        specifier: 6.0.3
-        version: 6.0.3
-
   packages/contracts:
     devDependencies:
       '@mfa/eslint-config':

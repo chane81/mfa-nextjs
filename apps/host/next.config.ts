@@ -10,9 +10,6 @@ import type { NextConfig } from "next";
  * 대신 host 는 브라우저에서 @module-federation/runtime 으로 remote 를 로드한다.
  * (자세한 근거: docs/01-research/01-nextjs-mf-eol.md)
  */
-// 빈 문자열도 "설정 안 됨"으로 본다 — 값 없는 빌드 인자가 ENV="" 로 들어오기 때문이다
-const ZONE_CHECKOUT_URL = process.env.ZONE_CHECKOUT_URL || "http://localhost:3003";
-
 /**
  * Cache Components 를 켠다. Next 16 의 기본 방향이다.
  *
@@ -57,29 +54,6 @@ const nextConfig: NextConfig = {
 
   // 워크스페이스 패키지는 dist(JS)로 빌드되지만, 소스맵/트리셰이킹을 위해 명시
   transpilePackages: ["@mfa/ui", "@mfa/contracts"],
-
-  async rewrites() {
-    /**
-     * 실험 B(Multi-Zones)는 **비교용으로만** 남겨두었다.
-     * zone 경계는 하드 내비게이션이 강제되어 SPA 설계가 무의미해지므로
-     * 실제 결제 경로(/checkout)는 remote 로 옮겼다. (docs/02-architecture/03-ssr-and-soft-nav.md)
-     */
-    return [
-      {
-        source: "/legacy-checkout",
-        destination: `${ZONE_CHECKOUT_URL}/legacy-checkout`,
-      },
-      {
-        source: "/legacy-checkout/:path*",
-        destination: `${ZONE_CHECKOUT_URL}/legacy-checkout/:path*`,
-      },
-      {
-        // zone 의 정적 자산(assetPrefix)도 같은 도메인으로 프록시해야 한다
-        source: "/legacy-checkout-static/:path*",
-        destination: `${ZONE_CHECKOUT_URL}/legacy-checkout-static/:path*`,
-      },
-    ];
-  },
 };
 
 export default nextConfig;

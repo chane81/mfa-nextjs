@@ -33,7 +33,6 @@ remote 는 앱마다 **프로세스가 둘**이다(`concurrently`).
 | http://localhost:3000 | host (여기서 시작) |
 | http://localhost:3001 | catalog remote 단독 실행 |
 | http://localhost:3002 | cart remote 단독 실행 |
-| http://localhost:3003/legacy-checkout | Multi-Zone 비교용 앱 |
 | http://localhost:3000/debug | **MF 진단 화면** |
 
 ## 확인 순서
@@ -54,7 +53,6 @@ remote 는 앱마다 **프로세스가 둘**이다(`concurrently`).
 
 4. **소프트 내비게이션 확인** — DevTools Network 를 `Doc` 필터로 켜둔다
    - 헤더 `결제` 클릭 → **document 요청이 늘지 않는다** (remote, 소프트)
-   - 헤더 `결제(zone·비교용)` 클릭 → **document 요청 1건** (Multi-Zone, 하드)
 
 5. `/debug` → 두 remote manifest 의 실제 `exposes` 목록
 
@@ -154,8 +152,6 @@ REMOTE_CART_SSR_ENTRY=http://localhost:3002/mf-server.cjs
 # 재배포 통보 · warm 라우트 인증. 미설정이면 둘 다 전부 거부한다
 MF_REVALIDATE_SECRET=change-me
 
-# Multi-Zones 비교용
-ZONE_CHECKOUT_URL=http://localhost:3003
 ```
 
 브라우저용만 `NEXT_PUBLIC_` 이 필요하다. 서버용 SSR 엔트리는 브라우저에 노출할 이유가 없다.
@@ -189,7 +185,7 @@ remote 가 안 떠 있으면 host 는 죽지 않는다.
 `next start` 는 프로세스 이름이 `next-server` 라서 `pkill -f 'next start'` 로 잡히지 않는다.
 
 ```bash
-for p in 3000 3001 3002 3003; do
+for p in 3000 3001 3002; do
   lsof -nP -iTCP:$p -sTCP:LISTEN -t | xargs -r kill -9
 done
 ```

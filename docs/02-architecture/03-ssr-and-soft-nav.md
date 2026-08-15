@@ -50,7 +50,7 @@ remote 는 여전히 라우터를 모른다. 이동은 콜백으로 host 에 위
 | --- | --- | --- |
 | `/` → `/checkout` (remote) | **0** | 소프트 ✅ |
 | `/` → `/products/:id` (remote) | **0** | 소프트 ✅ |
-| `/` → `/legacy-checkout` (zone) | **1** | 하드 ❌ |
+| `/` → `/legacy-checkout` (zone·삭제됨) | **1** | 하드 ❌ |
 
 ## 2. remote SSR — host 서버가 remote 의 node 번들을 실행한다
 
@@ -150,8 +150,10 @@ export const dynamic = "force-dynamic";
 | RSC 불가 | remote 는 여전히 클라이언트 컴포넌트다. 서버 컴포넌트를 federate 할 수는 없다 |
 | Edge 런타임 불가 | `new Function` 평가가 필요해 Node 런타임 전용 |
 
-## 5. Multi-Zone 앱은 왜 남겨뒀나
+## 5. Multi-Zone 앱은 어떻게 됐나
 
-`apps/zone-checkout` 은 `/legacy-checkout` 으로 옮겨 **비교 대상**으로만 유지한다.
-같은 저장소에서 두 방식의 내비게이션 성격 차이를 직접 눌러 확인할 수 있다.
-헤더의 `결제`(remote, 소프트) vs `결제(zone·비교용)`(하드) 를 번갈아 눌러보면 된다.
+`apps/zone-checkout` 을 `/legacy-checkout` 에 대조군으로 두고 헤더에서 두 내비게이션을
+번갈아 눌러 성격 차이를 확인할 수 있게 했었다. 위 표의 측정값이 그때 나온 것이다.
+
+측정이 끝나고 결론이 확정된 뒤로는 유지 비용만 남아 **6차에서 앱과 rewrite 를 삭제했다.**
+기각 근거는 [04-experiments/02-multi-zones.md](../04-experiments/02-multi-zones.md) 에 남아 있다.
