@@ -44,7 +44,7 @@ host 빌드가 끝나도 죽지 않는다. 문서도 "중단 시(Ctrl-C) 모든 
 
 그래서 마지막 한 걸음만 `scripts/with-remote-dist.mjs` 가 감싼다. 순서는 계속 turbo 가 소유한다.
 
-### B-3. 그 의존을 host 이미지가 타면 안 된다
+### B-3. 그 게이트를 host 이미지가 타면 안 된다 — 끊는 건 **이름**으로
 
 `--filter=@mfa/host` 는 `dependsOn` 의 `pkg#task` 를 **필터와 무관하게** 끌고 온다.
 
@@ -55,15 +55,31 @@ $ pnpm turbo run build --filter=@mfa/host --dry=json
   - @mfa/remote-catalog#build
 ```
 
-host 이미지에서 remote 는 이미 배포된 공개 도메인이다. 그래서 Dockerfile 이 두 번 부른다.
+문제는 낭비가 아니라 **커플링**이다. 이렇게 두면 catalog 빌드가 깨질 때 host 배포까지
+같이 깨진다. 이 저장소가 증명하려는 독립 배포가 빌드 그래프에서 다시 묶이는 것이다.
+
+처음엔 Dockerfile 에서 플래그로 끊었다.
 
 ```dockerfile
 RUN pnpm turbo run build --filter='@mfa/host^...' \
  && pnpm turbo run build --filter=@mfa/host --only
 ```
 
-`@mfa/host^...` 가 패키지 의존(`@mfa/contracts`, `@mfa/ui`)을 덮고, `--only` 가 태스크
-의존을 끊는다. 실제 의존은 전부 앞쪽이 덮으므로 `--only` 가 끊는 건 remote 게이트뿐이다.
+동작은 하는데 **의도가 두 파일에 흩어진다.** turbo.json 이 의존을 걸고 Dockerfile 이
+그걸 되돌리는 모양이라, 읽는 사람이 두 곳을 대조해야 뜻이 잡힌다.
+
+지금은 태스크 이름을 나눈다. 같은 산출물, 게이트만 다르다.
+
+| 태스크 | remote 게이트 | 쓰는 곳 |
+| --- | --- | --- |
+| `@mfa/host#build` | 있음 | 로컬 (`pnpm build`, `pnpm start`) |
+| `@mfa/host#build:image` | 없음 (`^build` 만) | `apps/host/Dockerfile` |
+
+```dockerfile
+RUN pnpm turbo run build:image --filter=@mfa/host
+```
+
+플래그로 되돌릴 게 없어졌다. "이미지는 remote 를 안 빌드한다"가 태스크 정의 한 곳에만 있다.
 
 ### B-4. dev 서버가 떠 있으면 조용히 15초를 버린다
 

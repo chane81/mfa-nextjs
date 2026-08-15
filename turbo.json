@@ -43,11 +43,28 @@
      * 그 한 걸음만 host 의 build 스크립트가 감싼다(scripts/with-remote-dist.mjs).
      *
      * ⚠️ 패키지 스코프 설정은 기본 `build` 를 **상속하지 않고 대체**한다. outputs 를 다시 적는 이유다.
-     * ⚠️ host 이미지는 이 의존을 타면 안 된다(쓰지도 않을 remote 를 이미지 안에서 빌드하게 된다).
-     *    apps/host/Dockerfile 이 `--only` 로 끊는다.
      */
     "@mfa/host#build": {
       "dependsOn": ["^build", "@mfa/remote-catalog#build", "@mfa/remote-cart#build"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+
+    /**
+     * 이미지용 host 빌드. `build` 와 산출물은 같고 **remote 게이트만 없다.**
+     *
+     * 이미지 안에서 remote 는 이미 배포된 공개 도메인이다. 워크스페이스 remote 를 빌드할
+     * 이유가 없을 뿐 아니라, 빌드해버리면 catalog 빌드가 깨질 때 host 배포까지 같이 깨진다 —
+     * 이 저장소가 증명하려는 독립 배포가 빌드 그래프에서 다시 묶인다.
+     *
+     * 이름을 나눠 끊는다. `--filter` 는 `pkg#task` 의존을 필터와 무관하게 끌고 오므로
+     * 같은 `build` 이름으로는 못 끊는다(끊으려면 Dockerfile 이 `--only` 같은 플래그로
+     * turbo.json 을 되돌려야 하고, 그러면 의도가 두 파일에 흩어진다).
+     *
+     * 로컬에서 이걸 직접 부를 일은 없다. remote 가 안 떠 있으면 프리렌더가 ECONNREFUSED 로
+     * 죽는다 — 그게 `build` 가 감싸주는 부분이다.
+     */
+    "@mfa/host#build:image": {
+      "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "dev": {

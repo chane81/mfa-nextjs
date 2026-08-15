@@ -177,9 +177,12 @@ Error occurred prerendering page "/_not-found"
 TypeError: fetch failed ... ECONNREFUSED
 ```
 
-host 이미지 빌드는 워크스페이스 remote 를 빌드하지 않는다(`--filter='@mfa/host^...'` +
-`--only`). 이미지 안의 로컬 `dist` 로 대신 서빙하는 폴백도 없다 — 배포된 remote 와 다른
-코드로 빌드된 host 가 나오는 게 더 나쁘기 때문이다. 근거와 실측:
+host 이미지 빌드는 워크스페이스 remote 를 빌드하지 않는다. 그러려고 태스크 이름을 나눴다 —
+이미지는 `build` 가 아니라 **`build:image`** 를 부른다(로컬용 remote 게이트가 없는 쪽).
+그렇게 안 하면 catalog 빌드 실패가 host 배포까지 끌고 내려간다.
+
+이미지 안의 로컬 `dist` 로 대신 서빙하는 폴백도 없다 — 배포된 remote 와 다른 코드로 빌드된
+host 가 나오는 게 더 나쁘기 때문이다. 근거와 실측:
 [05-troubleshooting/01-known-issues.md](../05-troubleshooting/01-known-issues.md) B 절.
 
 ## 로컬 선검증

@@ -70,7 +70,8 @@ turbo 공식 패턴(`with` 사이드카 + 유한 readiness 프로브)을 실제�
 | 준비 대기 · 끝나면 내리기 | `scripts/with-remote-dist.mjs` (host `build` 스크립트가 감쌈) |
 
 - [x] `pnpm build` / `pnpm start` 콜드 상태에서 동작 (15/15 태스크, `/checkout` 에 `주문서`)
-- [x] host 이미지는 이 의존을 타지 않는다 — `--filter='@mfa/host^...'` + `--only`
+- [x] host 이미지는 이 게이트를 타지 않는다 — 태스크 이름을 나눴다(`build` / `build:image`).
+  Dockerfile 이 플래그로 turbo.json 을 되돌리는 모양은 의도가 두 파일에 흩어져서 접었다
 - [x] `REMOTE_*_SSR_ENTRY` 를 host Dockerfile `ARG` 로 명시 (빌드 시점에도 필요한 값이다)
 - [x] `remote-version.ts` 의 `??` → `||` (빈 `ARG` 가 `new URL("")` 로 터질 자리였다)
 - [x] compose 를 2단계로 분리 — 빌드 컨테이너는 compose 네트워크 밖이라 `host.docker.internal`

@@ -59,19 +59,14 @@ ENV REMOTE_CART_SSR_ENTRY=${REMOTE_CART_SSR_ENTRY}
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# 두 번에 나눠 부르는 이유.
+# `build` 가 아니라 `build:image` 다. 산출물은 같고 remote 게이트만 없다.
 #
-# `@mfa/host#build` 는 turbo.json 에서 remote 빌드에 의존한다 — 로컬 빌드는 remote 를
-# 먼저 만들어 띄워야 하기 때문이다. 그런데 이 이미지에서 remote 는 **이미 배포된 공개
-# 도메인**이라 워크스페이스 remote 를 빌드할 이유가 없다. 그대로 두면 쓰지도 않을 산출물을
-# (게다가 PUBLIC_URL 도 없이) 이미지 안에서 만든다.
+# 로컬 `build` 는 워크스페이스 remote 를 먼저 빌드해 띄운다. 이미지에서 remote 는 이미
+# 배포된 공개 도메인이라 그럴 이유가 없고, 하면 catalog 빌드 실패가 host 배포까지 끌고
+# 내려간다. 근거는 turbo.json 의 해당 태스크 주석.
 #
-#   1) `@mfa/host^...` — host 의 패키지 의존(@mfa/contracts, @mfa/ui)만
-#   2) `--only`        — host 자신만. 태스크 의존을 타지 않는다.
-#
-# 실제 의존은 전부 1) 이 덮는다. 2) 가 끊는 건 remote 게이트뿐이다.
-RUN pnpm turbo run build --filter='@mfa/host^...' \
- && pnpm turbo run build --filter=@mfa/host --only
+# ^build 의존성(@mfa/contracts, @mfa/ui)은 turbo 가 알아서 먼저 빌드한다.
+RUN pnpm turbo run build:image --filter=@mfa/host
 
 # Next 파일 트레이싱이 @swc/helpers 의 `esm/` 를 standalone 에 담지 않는다.
 # pnpm 이 isolated 링커라 이 패키지가 next 의 중첩 node_modules 안 심링크로 들어가는데,
