@@ -47,11 +47,31 @@ ARG NEXT_PUBLIC_REMOTE_CART_ENTRY
 ENV NEXT_PUBLIC_REMOTE_CATALOG_ENTRY=${NEXT_PUBLIC_REMOTE_CATALOG_ENTRY}
 ENV NEXT_PUBLIC_REMOTE_CART_ENTRY=${NEXT_PUBLIC_REMOTE_CART_ENTRY}
 
+# SSR 엔트리는 런타임 값이면서 **빌드 시점에도 필요하다**.
+# 프리렌더가 remote 의 SSR 번들을 실제로 받아 실행하기 때문이다. 여기서 안 넘기면
+# 빌드가 기본값(localhost:3001/3002)을 보고 아무것도 못 받아 실패한다.
+# 빈 값으로 도착해도 안전하도록 읽는 쪽은 `||` 로 폴백한다(src/mf/remote-version.ts).
+ARG REMOTE_CATALOG_SSR_ENTRY
+ARG REMOTE_CART_SSR_ENTRY
+ENV REMOTE_CATALOG_SSR_ENTRY=${REMOTE_CATALOG_SSR_ENTRY}
+ENV REMOTE_CART_SSR_ENTRY=${REMOTE_CART_SSR_ENTRY}
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# ^build 의존성(@mfa/contracts, @mfa/ui)까지 turbo 가 알아서 먼저 빌드한다
-RUN pnpm turbo run build --filter=@mfa/host
+# 두 번에 나눠 부르는 이유.
+#
+# `@mfa/host#build` 는 turbo.json 에서 remote 빌드에 의존한다 — 로컬 빌드는 remote 를
+# 먼저 만들어 띄워야 하기 때문이다. 그런데 이 이미지에서 remote 는 **이미 배포된 공개
+# 도메인**이라 워크스페이스 remote 를 빌드할 이유가 없다. 그대로 두면 쓰지도 않을 산출물을
+# (게다가 PUBLIC_URL 도 없이) 이미지 안에서 만든다.
+#
+#   1) `@mfa/host^...` — host 의 패키지 의존(@mfa/contracts, @mfa/ui)만
+#   2) `--only`        — host 자신만. 태스크 의존을 타지 않는다.
+#
+# 실제 의존은 전부 1) 이 덮는다. 2) 가 끊는 건 remote 게이트뿐이다.
+RUN pnpm turbo run build --filter='@mfa/host^...' \
+ && pnpm turbo run build --filter=@mfa/host --only
 
 # Next 파일 트레이싱이 @swc/helpers 의 `esm/` 를 standalone 에 담지 않는다.
 # pnpm 이 isolated 링커라 이 패키지가 next 의 중첩 node_modules 안 심링크로 들어가는데,

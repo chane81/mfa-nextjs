@@ -46,6 +46,8 @@ remote → host 순서다. 두 가지 이유가 있다.
 | --- | --- | --- |
 | host | `NEXT_PUBLIC_REMOTE_CATALOG_ENTRY` | `https://<catalog-도메인>/mf-manifest.json` |
 | host | `NEXT_PUBLIC_REMOTE_CART_ENTRY` | `https://<cart-도메인>/mf-manifest.json` |
+| host | `REMOTE_CATALOG_SSR_ENTRY` | `https://<catalog-도메인>/mf-server.cjs` |
+| host | `REMOTE_CART_SSR_ENTRY` | `https://<cart-도메인>/mf-server.cjs` |
 | remote-catalog | `REMOTE_CATALOG_PUBLIC_URL` | `https://<catalog-도메인>` |
 | remote-catalog | `MF_BUILD_VERSION` | 커밋 SHA (선택, 없으면 타임스탬프) |
 | remote-cart | `REMOTE_CART_PUBLIC_URL` | `https://<cart-도메인>` |
@@ -55,6 +57,17 @@ remote → host 순서다. 두 가지 이유가 있다.
 청크 URL 접두사(`base` / `assetPrefix`)가 되어 산출물 안에 박힌다. **둘 다 런타임 변경 불가.**
 remote 도메인을 바꾸면 재빌드해야 한다.
 
+`REMOTE_*_SSR_ENTRY` 는 성격이 다르다. **런타임 값이면서 빌드 시점에도 필요하다.**
+host 빌드가 프리렌더 도중 이 주소에서 remote 의 SSR 번들을 실제로 받아 실행하기 때문이다.
+빌드 인자로 안 넘기면 기본값(localhost)을 보고 아무것도 못 받아 빌드가 실패한다.
+런타임 env 에도 **같은 값을 그대로** 넣는다(아래 표).
+
+> Dokploy 는 `Create Environment File` 이 켜져 있으면 런타임 env 를 `.env` 로 만들어
+> 빌드 컨텍스트에 넣는다. 빌드 로그의 `- Environments: .env` 가 그거고, 빌드 인자를
+> 안 넣었는데도 프리렌더가 통과하던 이유였다. **그 경로에 기대지 않는다.** 저장소에 안
+> 적히는 우회로라 로컬·compose·다른 PaaS 에서 전부 재현이 안 된다. 필요한 값은 Dockerfile
+> 의 `ARG` 로 드러내고 빌드 인자로 명시해 넘긴다.
+
 `.git` 은 빌드 컨텍스트에서 제외된다(`.dockerignore`). 그래서 `mf-build-version.mjs` 의
 git SHA 폴백이 동작하지 않고 타임스탬프 버전이 나온다. 커밋과 배포 버전을 맞추려면
 `MF_BUILD_VERSION` 을 명시적으로 넘긴다.
@@ -63,7 +76,7 @@ git SHA 폴백이 동작하지 않고 타임스탬프 버전이 나온다. 커�
 
 | 이름 | 값 예시 | 의미 |
 | --- | --- | --- |
-| `REMOTE_CATALOG_SSR_ENTRY` | `https://<catalog-도메인>/mf-server.cjs` | host **서버**가 받아 실행할 node 번들 |
+| `REMOTE_CATALOG_SSR_ENTRY` | `https://<catalog-도메인>/mf-server.cjs` | host **서버**가 받아 실행할 node 번들 (빌드 인자에도 같은 값) |
 | `REMOTE_CART_SSR_ENTRY` | `https://<cart-도메인>/mf-server.cjs` | 〃 |
 | `MF_REVALIDATE_SECRET` | 랜덤 문자열 | `/api/mf-revalidate` · `/internal/mf-warm` 접근 검사 |
 | `REMOTE_ALLOWED_ORIGINS` | (보통 생략) | 생략하면 위 SSR 엔트리 오리진만 허용 — 기본이 이미 닫혀 있다 |
@@ -154,12 +167,33 @@ host 의 Dockerfile 이 빌드 직후 스토어의 원본 패키지를 그 위�
 빌드 로그 다이얼로그는 열 때 한 번 읽고 갱신하지 않는다. 닫았다 열어도 같은 스냅샷이
 나올 수 있다. 진행 여부는 Deployments 목록의 상태값(Running/Done/Error)으로 판단한다.
 
+### host 빌드가 remote 오리진에 닿아야 한다
+
+배포 순서(remote → host)가 권장이 아니라 **강제**인 이유다. host 빌드는 프리렌더 도중
+remote 의 SSR 번들을 HTTP 로 받아 실행하므로, remote 가 안 떠 있으면 이렇게 죽는다.
+
+```
+Error occurred prerendering page "/_not-found"
+TypeError: fetch failed ... ECONNREFUSED
+```
+
+host 이미지 빌드는 워크스페이스 remote 를 빌드하지 않는다(`--filter='@mfa/host^...'` +
+`--only`). 이미지 안의 로컬 `dist` 로 대신 서빙하는 폴백도 없다 — 배포된 remote 와 다른
+코드로 빌드된 host 가 나오는 게 더 나쁘기 때문이다. 근거와 실측:
+[05-troubleshooting/01-known-issues.md](../05-troubleshooting/01-known-issues.md) B 절.
+
 ## 로컬 선검증
 
 ```bash
-docker compose up --build
+docker compose up -d --build remote-catalog remote-cart
+docker compose up --build host
 curl -s localhost:3000/checkout | grep 주문서   # remote SSR 확인
 ```
+
+두 번에 나누는 이유가 위와 같다. host **이미지를 만드는 시점에** remote 가 실제로 떠 있어야
+한다. `depends_on` 은 런타임 순서지 빌드 순서가 아니다. 빌드 컨테이너는 compose 네트워크에도
+붙지 않아서, host 빌드는 `remote-catalog:3001` 이 아니라 퍼블리시된 호스트 포트
+(`host.docker.internal:3001`)로 나간다.
 
 `docker-compose.yml` 은 로컬 검증 전용이다. `PUBLIC_URL` 이 localhost 로 굳으므로
 이 이미지를 그대로 배포하면 안 된다.

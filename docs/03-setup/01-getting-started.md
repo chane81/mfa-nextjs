@@ -67,6 +67,35 @@ pnpm typecheck
 pnpm lint
 ```
 
+### host 빌드는 remote 가 **떠 있어야** 끝난다
+
+host 빌드는 순수한 컴파일이 아니다. 프리렌더 도중 remote 의 SSR 번들을 HTTP 로 받아
+실행한다(`src/mf/server-loader.ts`). remote 오리진이 안 뜨면 이렇게 죽는다.
+
+```
+Error occurred prerendering page "/_not-found"
+TypeError: fetch failed ... ECONNREFUSED
+```
+
+`RemoteBoundary` 는 이걸 못 막는다. 런타임 장애는 에러 박스로 격리되지만 **프리렌더 실패는
+빌드 실패**다. 그래서 `pnpm build` 한 번으로 끝나도록 두 조각이 맞물려 있다.
+
+| 조각 | 담당 | 어디에 |
+| --- | --- | --- |
+| remote 를 먼저 빌드한다 | turbo | `turbo.json` 의 `@mfa/host#build.dependsOn` |
+| 빌드된 `dist` 를 띄웠다 내린다 | 래퍼 | `scripts/with-remote-dist.mjs` |
+
+두 번째를 turbo 로 못 쓰는 이유는 [05-troubleshooting/01-known-issues.md](../05-troubleshooting/01-known-issues.md) 에 실측과 함께 있다.
+
+래퍼는 **이미 응답하는 오리진은 건드리지 않는다.** 판정 기준은 `/mf-version.json` 이다.
+그래서 배포 빌드(remote 가 이미 공개 도메인에 있는 상태)에서는 아무 일도 하지 않는다.
+원격 오리진이 응답하지 않으면 로컬 `dist` 로 대신 띄우지 않고 실패시킨다 —
+배포된 것과 다른 코드로 빌드된 host 가 나오는 게 더 나쁘다.
+
+> `pnpm dev` 를 띄운 채로는 빌드하지 않는다. dev 서버는 버전 매니페스트를 공표하지 않으므로
+> (그래야 dev 가 불변 경로를 찾지 않는다) 래퍼는 그 포트를 "안 뜬 상태"로 보고 자기 서버를
+> 올리려다 포트 충돌로 실패한다. 그때 나오는 메시지가 정확히 그걸 알려준다.
+
 remote 의 `build` 는 **네 단계**다. 버전을 빌드 전에 정해야 자산 URL 접두사에 넣을 수 있다.
 
 ```jsonc

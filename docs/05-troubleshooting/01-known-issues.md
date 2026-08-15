@@ -2,6 +2,110 @@
 
 전부 이 저장소를 세우면서 재현된 것들이다. 로그는 실제 출력.
 
+## B. (6차) 로컬에서 `pnpm build` 가 안 됐다
+
+### B-1. host 빌드는 remote 가 **떠 있어야** 끝난다
+
+```
+Error occurred prerendering page "/_not-found"
+TypeError: fetch failed
+    at async E (src/mf/server-loader.ts:167:15)
+  [cause]: AggregateError: ... code: 'ECONNREFUSED'
+```
+
+배포에서는 remote 가 이미 공개 도메인에 떠 있어서 안 보이던 요구사항이다. 로컬에는
+그걸 서빙하는 게 없다. `turbo run build` 는 host 와 remote 를 **동시에** 돌리므로
+빌드 순서를 맞춰도 이건 안 풀린다 — 필요한 건 "먼저 빌드"가 아니라 **"떠 있는 상태"** 다.
+
+`RemoteBoundary` 는 못 막는다. 런타임 장애는 에러 박스로 격리되지만 프리렌더에서
+던져진 에러는 **빌드 실패**다. 실측으로 확인했다.
+
+### B-2. turbo 의 `with` 사이드카로는 `build` 를 못 끝낸다
+
+turbo 공식 패턴은 `with`(동시 실행) + 유한 readiness 프로브다.
+([coordinating-runtime-dependencies](https://turborepo.dev/docs/guides/coordinating-runtime-dependencies))
+그대로 넣어보면 **순서도 준비 대기도 정확히 동작한다.**
+
+```
+@mfa/remote-cart:serve:      [serve-dist] :3002 → .../apps/remote-cart/dist
+@mfa/remote-cart:serve:ready: ready 3002
+@mfa/host:build:             ✓ Generating static pages (14/14)
+```
+
+그런데 **`turbo run build` 가 종료하지 않는다.** 사이드카가 `persistent: true` 라
+host 빌드가 끝나도 죽지 않는다. 문서도 "중단 시(Ctrl-C) 모든 태스크를 종료한다"고 쓴다 —
+그 패턴은 `dev` 용이지 반드시 exit 해야 하는 `build` 용이 아니다.
+
+| 조각 | turbo 가 되나 |
+| --- | --- |
+| remote 를 먼저 빌드 | O — `@mfa/host#build.dependsOn` |
+| 준비될 때까지 대기 | O — 유한 프로브 태스크 |
+| **끝나면 내리기** | **X** |
+
+그래서 마지막 한 걸음만 `scripts/with-remote-dist.mjs` 가 감싼다. 순서는 계속 turbo 가 소유한다.
+
+### B-3. 그 의존을 host 이미지가 타면 안 된다
+
+`--filter=@mfa/host` 는 `dependsOn` 의 `pkg#task` 를 **필터와 무관하게** 끌고 온다.
+
+```
+$ pnpm turbo run build --filter=@mfa/host --dry=json
+  - @mfa/host#build
+  - @mfa/remote-cart#build      ← 이미지 안에서 쓰지도 않을 remote 를 빌드한다
+  - @mfa/remote-catalog#build
+```
+
+host 이미지에서 remote 는 이미 배포된 공개 도메인이다. 그래서 Dockerfile 이 두 번 부른다.
+
+```dockerfile
+RUN pnpm turbo run build --filter='@mfa/host^...' \
+ && pnpm turbo run build --filter=@mfa/host --only
+```
+
+`@mfa/host^...` 가 패키지 의존(`@mfa/contracts`, `@mfa/ui`)을 덮고, `--only` 가 태스크
+의존을 끊는다. 실제 의존은 전부 앞쪽이 덮으므로 `--only` 가 끊는 건 remote 게이트뿐이다.
+
+### B-4. dev 서버가 떠 있으면 조용히 15초를 버린다
+
+정적 서버가 `:3001` 에 뜨는 데 **성공한다.** Vite dev 가 `127.0.0.1` 에 바인딩하면
+우리 서버는 `::` 에 붙을 수 있어서, 요청은 계속 dev 로 가는데 우리 프로세스는 멀쩡히 살아
+있다. 죽기를 기다려도 안 죽고 타임아웃까지 가서 "응답하지 않습니다" 라는 엉뚱한 결론이 난다.
+
+- **해결**: 띄우기 **전에** TCP 연결로 포트 점유를 먼저 본다. 점유돼 있는데 `mf-version.json`
+  을 안 주면 그 자리에서 실패시킨다(1초). dev 는 버전 매니페스트를 공표하지 않으므로
+  이 조합이 곧 "dev 가 떠 있다"는 뜻이다.
+
+### B-5. 빈 문자열 env 가 `new URL("")` 로 터질 자리가 남아 있었다
+
+`REMOTE_*_SSR_ENTRY` 를 Dockerfile `ARG` 로 받게 하면서 드러났다.
+
+```ts
+process.env.REMOTE_CATALOG_SSR_ENTRY ?? "http://localhost:3001/mf-server.cjs"
+```
+
+값 없는 `ARG` 는 `ENV VAR=""` 로 도착하고, `??` 는 빈 문자열을 유효한 값으로 받는다.
+`docs/03-setup/04-dokploy.md` 에 이미 같은 함정을 적어뒀는데 이 자리를 빠뜨렸다. `||` 로 고침.
+
+### B-6. 배포 빌드는 문서에 없는 경로로 통과하고 있었다
+
+로컬에서 실패하는 빌드가 Dokploy 에서는 14/14 프리렌더에 성공했다. 빌드 로그를 보고 알았다.
+
+```
+#23 5.984 @mfa/host:build: - Environments: .env
+```
+
+Dokploy 의 `Create Environment File` 이 런타임 env 를 `.env` 로 만들어 빌드에 넣어주고 있었다.
+그래서 빌드 인자에 `REMOTE_*_SSR_ENTRY` 가 없는데도 프리렌더가 remote 에 닿았다.
+
+**동작하는데 재현이 안 되는 상태**였다. 저장소 어디에도 안 적힌 우회로라 로컬·compose·다른
+PaaS 에서 전부 깨진다. Dockerfile `ARG` 로 드러내고 빌드 인자로 명시해 넘기도록 바꿨다.
+
+> 부작용 주의: `ARG` 를 선언했으므로 이제 빌드 인자를 **안 넣으면** `ENV VAR=""` 가 `.env`
+> 보다 우선해서 빌드가 깨진다(Next 는 이미 설정된 `process.env` 를 `.env` 로 덮지 않는다).
+> 그래서 Dockerfile 변경과 Dokploy 빌드 인자 추가는 같이 가야 한다.
+
+---
+
 ## A. (5차) 캐시 · 버전 · 신뢰 경계에서 밟은 것들
 
 전부 **조용히 잘못 동작하는** 부류였다. 빌드는 통과하고 화면도 멀쩡한데 결과가 틀리다.

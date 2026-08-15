@@ -54,6 +54,31 @@
 - Next standalone 이 `@swc/helpers` 의 ESM 파일을 빠뜨려 컨테이너가 부팅에서 죽었다
   (빌드는 성공, 배포는 Done 으로 끝난다)
 
+### 로컬 빌드 복구
+
+배포만 되고 **로컬에서 `pnpm build` 가 안 됐다.** host 빌드는 프리렌더 도중 remote 의
+SSR 번들을 HTTP 로 받아 실행하는데, 배포에서는 remote 가 이미 공개 도메인에 떠 있어서
+그 요구사항이 보이지 않았다.
+
+turbo 로 순서를 주면 될 것 같지만 아니다. 필요한 건 "먼저 빌드"가 아니라 **"떠 있는 상태"** 다.
+turbo 공식 패턴(`with` 사이드카 + 유한 readiness 프로브)을 실제로 넣어보면 순서도 준비
+대기도 정확히 동작하는데, 사이드카가 `persistent` 라 **`turbo run build` 가 끝나지 않는다.**
+
+| 조각 | 담당 |
+| --- | --- |
+| remote 를 먼저 빌드 | turbo (`@mfa/host#build.dependsOn`) |
+| 준비 대기 · 끝나면 내리기 | `scripts/with-remote-dist.mjs` (host `build` 스크립트가 감쌈) |
+
+- [x] `pnpm build` / `pnpm start` 콜드 상태에서 동작 (15/15 태스크, `/checkout` 에 `주문서`)
+- [x] host 이미지는 이 의존을 타지 않는다 — `--filter='@mfa/host^...'` + `--only`
+- [x] `REMOTE_*_SSR_ENTRY` 를 host Dockerfile `ARG` 로 명시 (빌드 시점에도 필요한 값이다)
+- [x] `remote-version.ts` 의 `??` → `||` (빈 `ARG` 가 `new URL("")` 로 터질 자리였다)
+- [x] compose 를 2단계로 분리 — 빌드 컨테이너는 compose 네트워크 밖이라 `host.docker.internal`
+
+부작용으로 진단이 하나 좋아졌다. dev 서버가 떠 있는 채로 빌드하면 정적 서버가 `::` 에
+붙는 데 **성공해서** 15초를 버리고 엉뚱한 결론이 났는데, 띄우기 전에 TCP 로 포트 점유를
+먼저 보게 해서 1초 만에 "dev 를 내리라"고 말한다.
+
 ## 2026-08-14 (5차) — Cache Components 이행 + MFA 캐시 실측
 
 질문: **런타임 MF 를 쓰면 Next 의 ISR·Cache Components 를 잃는가?** → **아니오.**

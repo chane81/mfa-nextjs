@@ -28,6 +28,28 @@
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
+    /**
+     * host 빌드는 순수한 컴파일이 아니다. 프리렌더 중에 remote 의 SSR 번들을 HTTP 로 받아
+     * 실행하므로(`apps/host/src/mf/server-loader.ts`) 빌드 시점에 remote 오리진이 살아 있어야 한다.
+     * 배포에서는 remote 가 이미 떠 있어서 안 보이던 요구사항이다.
+     *
+     * 그래서 두 가지가 필요하다.
+     *   ① remote 를 먼저 빌드한다        → 여기서 선언한다
+     *   ② 빌드된 dist 를 띄운 채로 둔다   → turbo 가 못 한다
+     *
+     * ②를 turbo 로 쓰면 `with`(사이드카) + 유한 readiness 프로브 조합인데, 사이드카가
+     * `persistent: true` 라 host 빌드가 끝나도 죽지 않아 **`turbo run build` 가 종료하지 않는다**
+     * (실측). 그 패턴은 Ctrl-C 로 끝내는 `dev` 용이지 반드시 exit 해야 하는 `build` 용이 아니다.
+     * 그 한 걸음만 host 의 build 스크립트가 감싼다(scripts/with-remote-dist.mjs).
+     *
+     * ⚠️ 패키지 스코프 설정은 기본 `build` 를 **상속하지 않고 대체**한다. outputs 를 다시 적는 이유다.
+     * ⚠️ host 이미지는 이 의존을 타면 안 된다(쓰지도 않을 remote 를 이미지 안에서 빌드하게 된다).
+     *    apps/host/Dockerfile 이 `--only` 로 끊는다.
+     */
+    "@mfa/host#build": {
+      "dependsOn": ["^build", "@mfa/remote-catalog#build", "@mfa/remote-cart#build"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
