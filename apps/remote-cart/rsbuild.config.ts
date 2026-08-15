@@ -7,7 +7,19 @@ import { pluginReact } from "@rsbuild/plugin-react";
 
 const PORT = 3002;
 const DIST = resolve(process.cwd(), "dist");
-const PUBLIC_URL = `http://localhost:${PORT}`;
+/**
+ * 이 remote 가 배포된 **공개 오리진**. assetPrefix 가 여기서 나온다.
+ *
+ * host 는 자기 도메인에서 이 remote 의 청크를 받아간다. 상대 경로면 브라우저가
+ * host 도메인에서 청크를 찾으므로 절대 URL 이어야 한다.
+ *
+ * 빌드 시점에 굳는 값이라 배포 파이프라인에서 빌드 인자로 넘긴다.
+ * (docs/03-setup/04-dokploy.md)
+ */
+const PUBLIC_URL = (process.env.REMOTE_CART_PUBLIC_URL ?? `http://localhost:${PORT}`).replace(
+  /\/+$/,
+  "",
+);
 
 /** dev 서버가 디스크에서 직접 내려주는 경로 (빌드 산출물은 serve-remote-dist.mjs 가 서빙) */
 const SERVED = /^\/(mf-server\.cjs|mf-version\.json)$/;

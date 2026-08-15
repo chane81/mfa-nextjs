@@ -8,6 +8,20 @@ import { defineConfig, type Connect, type Plugin } from "vite";
 const PORT = 3001;
 
 /**
+ * 이 remote 가 배포된 **공개 오리진**. 자산 URL 접두사(`base`)가 여기서 나온다.
+ *
+ * host 는 자기 도메인에서 이 remote 의 청크를 받아간다. 그래서 상대 경로로는 안 되고
+ * 절대 URL 이어야 한다 — 상대 경로면 브라우저가 host 도메인에서 청크를 찾는다.
+ *
+ * 빌드 시점에 굳는 값이라 배포 파이프라인에서 빌드 인자로 넘겨야 한다.
+ * (docs/03-setup/04-dokploy.md)
+ */
+const PUBLIC_URL = (process.env.REMOTE_CATALOG_PUBLIC_URL ?? `http://localhost:${PORT}`).replace(
+  /\/+$/,
+  "",
+);
+
+/**
  * 빌드 버전. `scripts/mf-build-version.mjs` 가 빌드 직전에 써 둔다.
  *
  * 이 값이 자산 URL 접두사와 출력 디렉터리를 동시에 결정한다. 그래서 **웹 자산까지**
@@ -79,7 +93,7 @@ export default defineConfig(({ command }) => {
    * dev 서버는 메모리에서 서빙하므로 불변성도 필요 없다.
    */
   const version = command === "build" ? buildVersion() : null;
-  const base = version ? `http://localhost:${PORT}/v${version}/` : `http://localhost:${PORT}/`;
+  const base = version ? `${PUBLIC_URL}/v${version}/` : `${PUBLIC_URL}/`;
 
   return {
   plugins: [
@@ -122,7 +136,7 @@ export default defineConfig(({ command }) => {
     strictPort: true,
     // host(3000) 에서 교차 출처로 remoteEntry 를 받아야 하므로 CORS 허용
     cors: true,
-    origin: `http://localhost:${PORT}`,
+    origin: PUBLIC_URL,
   },
   preview: {
     port: PORT,

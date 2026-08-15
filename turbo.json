@@ -19,7 +19,10 @@
     "MF_REQUIRE_INTEGRITY",
     // remote 빌드가 매니페스트에 서명할 때 쓰는 개인키 (remote 파이프라인 전용)
     "MF_SIGNING_KEY",
-    "MF_BUILD_VERSION"
+    "MF_BUILD_VERSION",
+    // remote 자산 URL 접두사. 빌드 시점에 산출물에 굳는다 (docs/03-setup/04-dokploy.md)
+    "REMOTE_CATALOG_PUBLIC_URL",
+    "REMOTE_CART_PUBLIC_URL"
   ],
   "tasks": {
     "build": {
