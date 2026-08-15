@@ -1,6 +1,6 @@
-import { fileURLToPath } from "node:url";
+import { fileURLToPath } from 'node:url';
 
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 /**
  * host — Next.js 16 / Turbopack
@@ -38,7 +38,7 @@ const nextConfig: NextConfig = {
    * 컨테이너 배포용 자립 산출물(.next/standalone).
    * 런타임 이미지에 pnpm 워크스페이스 전체를 넣지 않으려면 필요하다.
    */
-  output: "standalone",
+  output: 'standalone',
 
   /**
    * 추적 루트를 저장소 루트로 올린다.
@@ -48,28 +48,52 @@ const nextConfig: NextConfig = {
    * 부작용: standalone 산출물이 이 루트 구조를 미러링한다.
    *   .next/standalone/apps/host/server.js  ← 진입점 경로가 한 단계 깊어진다
    */
-  outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
+  outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
 
   /**
    * 파일 트레이싱이 `@swc/helpers` 의 `esm/` 를 통째로 빠뜨린다.
-   *
-   * 이 패키지는 `cjs/` 와 `esm/` 를 둘 다 들고 있는데, 트레이서는 CJS 조건만 따라가
-   * `cjs/` 와 `package.json` 만 담는다. 그런데 런타임 청크가 `esm/` 쪽을 직접 부른다.
    * 빌드도 배포도 성공한 채로 컨테이너가 부팅에서 죽는다:
    *
    *   Cannot find module '.../@swc/helpers/esm/_interop_require_default.js'
+   *     at resolveExports (node:internal/modules/cjs/loader)
+   *
+   * ## 왜 트레이서와 런타임이 어긋나나
+   *
+   * `@swc/helpers` 는 서브패스마다 조건부 exports 를 준다. 0.5.23 기준:
+   *
+   *   "./_/_interop_require_default": {
+   *     "module-sync": "./esm/_interop_require_default.js",   ← Node 가 require(esm) 로 고르는 것
+   *     "webpack":     "./esm/_interop_require_default.js",
+   *     "import":      "./esm/_interop_require_default.js",
+   *     "default":     "./cjs/_interop_require_default.cjs"   ← 트레이서가 고르는 것
+   *   }
+   *
+   * Node 는 `require(esm)` 이 켜져 있으면 `module-sync` 를 적용해 **esm** 을 집는다.
+   * Next 의 파일 트레이서는 그 조건을 안 써서 **cjs** 만 담는다. 그래서 담긴 적 없는
+   * 파일을 런타임이 요구한다. 실측(같은 Node, 같은 리졸버):
+   *
+   *   @swc/helpers 0.5.23 (next 16) → esm/_interop_require_default.js
+   *   @swc/helpers 0.5.5  (next 14) → cjs/_interop_require_default.cjs   ← module-sync 조건 자체가 없다
+   *
+   * 즉 next 14 시절 프로젝트에서 이 설정이 필요 없었던 건 우연이 아니라 exports 맵이
+   * 달라서다. pnpm·모노레포·Turbopack·Node 버전과는 무관하다(전부 대조 확인).
+   *
+   * 런타임에서 `--no-experimental-require-module` 로 막아도 cjs 로 떨어지긴 하지만,
+   * 실험 플래그에 기대는 대신 필요한 파일을 담는 쪽을 택한다.
    *
    * 값은 **프로젝트 루트(apps/host) 기준 glob** 이고, `outputFileTracingRoot` 안이면
    * `../` 로 밖을 가리켜도 된다. pnpm 이 isolated 링커라 실체가 `.pnpm` 아래에 있다.
    */
   outputFileTracingIncludes: {
-    "/**/*": ["../../node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/esm/**/*"],
+    '/**/*': [
+      '../../node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/esm/**/*'
+    ]
   },
 
   cacheComponents: true,
 
   // 워크스페이스 패키지는 dist(JS)로 빌드되지만, 소스맵/트리셰이킹을 위해 명시
-  transpilePackages: ["@mfa/ui", "@mfa/contracts"],
+  transpilePackages: ['@mfa/ui', '@mfa/contracts']
 };
 
 export default nextConfig;
