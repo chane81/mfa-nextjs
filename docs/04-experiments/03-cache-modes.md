@@ -227,7 +227,7 @@ lazy 캐시 키에 remote 버전을 넣어 고쳤다 (`${id}@${version}`). 고�
 warm#2  → fetches 1 → 2   ✅
 ```
 
-### 7. warm 라우트는 인증이 필요하고, 그 인증은 middleware 여야 한다 🔒
+### 7. warm 라우트는 인증이 필요하고, 그 인증은 proxy 여야 한다 🔒
 
 `/internal/mf-warm` 은 요청 하나로 host 서버가 remote 번들을 받아 **`new Function` 으로
 실행**하게 만든다. 무인증이면 서버사이드 코드 실행 경로를 외부에서 트리거할 수 있고,
@@ -241,12 +241,12 @@ warm#2  → fetches 1 → 2   ✅
 | --- | --- |
 | 페이지 안 `notFound()` (PPR) | `200` + 본문만 404 화면 |
 | 페이지 안 `notFound()` + `instant = false` | `200` |
-| **middleware** | **`404`** |
+| **proxy** | **`404`** |
 
-middleware 는 렌더 파이프라인 진입 전에 돌아 진짜 404 를 낸다. 페이지 안 검사도 그대로
+proxy 는 렌더 파이프라인 진입 전에 돌아 진짜 404 를 낸다. 페이지 안 검사도 그대로
 남겨뒀다 — matcher 가 틀어져도 뚫리지 않도록.
 
-시크릿 비교는 상수시간으로 하되 `node:crypto` 는 안 쓴다. middleware 가 edge 런타임에서
+시크릿 비교는 상수시간으로 하되 `node:crypto` 는 안 쓴다. proxy 가 edge 런타임에서
 돌 수 있어 node builtin 을 못 쓰기 때문이다. 시크릿이 **미설정이면 전부 거부**한다
 (미설정을 "인증 없음"으로 읽으면 환경변수 빠뜨린 배포가 조용히 열린다).
 

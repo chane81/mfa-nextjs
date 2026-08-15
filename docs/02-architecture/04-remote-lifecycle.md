@@ -239,5 +239,5 @@ curl -s "$HOST_URL/api/lab/stats?refresh=1" | jq
   빈 배열을 못 주기 때문에 프리렌더가 remote 를 필요로 한다.
 - **서명은 매니페스트까지만 보장한다.** 웹 청크 하나하나의 무결성은 브라우저 SRI 로
   따로 걸어야 한다(미구현).
-- **`/internal/mf-warm` 은 내부 라우트다.** middleware 시크릿으로 막혀 있지만
+- **`/internal/mf-warm` 은 내부 라우트다.** proxy 시크릿으로 막혀 있지만
   네트워크 레벨에서도 외부에 노출하지 않는 편이 낫다.

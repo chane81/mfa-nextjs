@@ -16,6 +16,9 @@
 - [x] 매니페스트 Ed25519 서명 — 개인키는 BuildKit secret, 공개키는 host 런타임 env
 - [x] Watch Paths 로 앱별 재배포 분리 (`packages/**` 는 공통)
 - [x] 배포 문서 `docs/03-setup/04-dokploy.md`
+- [x] `middleware.ts` → `proxy.ts` (Next 16 에서 middleware 파일 규약 deprecated)
+  - 파일명과 export 이름만 바뀌고 `config.matcher` 는 그대로. 빌드 출력도 `ƒ Proxy (Middleware)`
+  - 5차의 "warm 라우트 인증은 middleware 여야 한다" 결론은 그대로 유효하다 — 이름만 바뀌었다
 
 ### 배포 환경 실측
 
