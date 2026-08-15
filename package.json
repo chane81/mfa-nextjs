@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "turbo run dev",
+    "dev:wait-remotes": "node scripts/wait-for-remotes.mjs",
     "build": "turbo run build",
     "start": "turbo run start",
     "lint": "turbo run lint",

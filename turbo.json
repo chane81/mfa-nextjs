@@ -33,6 +33,30 @@
       "cache": false,
       "persistent": true
     },
+
+    /**
+     * host 는 remote 가 준비된 뒤에 뜬다.
+     *
+     * turbo 로는 "remote dev 가 먼저" 를 직접 못 쓴다 — persistent 태스크에는 의존할 수
+     * 없기 때문이다(끝나지 않는 태스크에 의존하면 의존하는 쪽이 영영 안 돈다. turbo 가
+     * `persistent: true` 로 그 상황을 막는다). `with` 는 동시 실행이지 순서가 아니다.
+     *
+     * 그래서 **끝나는** 태스크로 준비를 기다리게 하고 host 만 거기에 의존시킨다.
+     * `dev` 전체에 걸면 remote 도 이 태스크를 기다리게 되어 교착한다 — 대기 태스크는
+     * remote 가 뜨기를 기다리는데 remote 는 대기 태스크가 끝나기를 기다린다.
+     *
+     * 근거: scripts/wait-for-remotes.mjs
+     */
+    "@mfa/host#dev": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["//#dev:wait-remotes"]
+    },
+
+    // 캐시하면 두 번째 실행부터 대기를 건너뛰어 존재 이유가 사라진다
+    "//#dev:wait-remotes": {
+      "cache": false
+    },
     "start": {
       "dependsOn": ["build"],
       "cache": false,
