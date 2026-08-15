@@ -104,6 +104,35 @@ curl -X POST https://<host-도메인>/api/mf-revalidate \
 Dokploy 의 배포 후 커맨드(Post-deploy)나 GitHub Actions 마지막 단계에 걸어두면 된다.
 웹훅이 닿지 않은 host 인스턴스는 `mf-version.json` 을 짧은 TTL 로 읽어 스스로 수렴한다.
 
+## 실제 배포 구성
+
+| 서비스 | 공개 도메인 | 컨테이너 이름(내부 DNS) | 포트 |
+| --- | --- | --- | --- |
+| `mfa-host` | `mfa.lakegreen.net` | `web-mfa-host-0es2dw` | 3000 |
+| `mfa-remote-catalog` | `mfa-catalog.lakegreen.net` | `web-mfa-remote-catalog-x4ijue` | 3001 |
+| `mfa-remote-cart` | `mfa-cart.lakegreen.net` | `web-mfa-remote-cart-…` | 3002 |
+| `mfa-zone-checkout` | 없음 | `web-mfa-zone-checkout-of97yu` | 3003 |
+
+zone 은 공개 도메인이 없다. host 가 `ZONE_CHECKOUT_URL=http://web-mfa-zone-checkout-of97yu:3003`
+으로 dokploy-network 안에서 직접 부른다.
+
+### Watch Paths
+
+한 저장소에 앱이 4개라 푸시 하나가 4개를 전부 재빌드하지 않도록 서비스마다 경로를 건다.
+공유 패키지가 바뀌면 소비자도 다시 빌드돼야 하므로 `packages/**` 를 모두에 넣는다.
+
+| 서비스 | 경로 |
+| --- | --- |
+| host | `apps/host/**`, `packages/**`, `pnpm-lock.yaml` |
+| remote-catalog | `apps/remote-catalog/**`, `packages/**`, `scripts/**`, `pnpm-lock.yaml` |
+| remote-cart | `apps/remote-cart/**`, `packages/**`, `scripts/**`, `pnpm-lock.yaml` |
+| zone-checkout | `apps/zone-checkout/**`, `packages/**`, `pnpm-lock.yaml` |
+
+remote 는 `scripts/**` 도 본다. 빌드 버전·서명·서빙이 전부 그 디렉터리에 있다.
+
+Dokploy UI 에서 경로는 입력 후 **＋ 버튼을 눌러야 목록에 들어간다**. 입력만 하고 저장하면
+값이 사라진다.
+
 ## 로컬 선검증
 
 ```bash
