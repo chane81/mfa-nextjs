@@ -1,5 +1,40 @@
 # 진행 상황
 
+## 2026-08-15 (6차) — 컨테이너 배포 (Dokploy)
+
+질문: **remote 를 host 와 독립적으로 재배포할 수 있는가?** → 배포 표면을 먼저 만들었다.
+
+앱마다 별도 Application 4개로 올렸다. 한 Compose 로 묶으면 "remote 만 재배포"를
+아예 시도할 수 없어서 미완 항목이 그대로 남는다.
+
+### 한 일
+
+- [x] Dockerfile 4개 — 빌드 컨텍스트는 저장소 루트(pnpm 워크스페이스)
+- [x] Next 앱 `output: "standalone"` + `outputFileTracingRoot` (isolated 링커 대응)
+- [x] remote 자산 URL 을 env 로 분리 — 하드코딩된 `localhost:3001/3002` 는 배포 불가였다
+- [x] remote 진입점이 `dist` 를 영속 볼륨에 **덧붙인다** — `/v<ver>/` 불변성과 롤백 보존
+- [x] 매니페스트 Ed25519 서명 — 개인키는 BuildKit secret, 공개키는 host 런타임 env
+- [x] Watch Paths 로 앱별 재배포 분리 (`packages/**` 는 공통)
+- [x] 배포 문서 `docs/03-setup/04-dokploy.md`
+
+### 배포 환경 실측
+
+| 검증 | 결과 |
+| --- | --- |
+| remote SSR (`/checkout` 초기 HTML) | ✅ `주문서` 포함 |
+| 서명 강제(`MF_REQUIRE_SIGNATURE=1`)에서 remote 로드 | ✅ 통과 |
+| 서버가 remote 버전 핀 주입 | ✅ `/v<ver>/mf-manifest.json` 절대 URL |
+| 불변 경로 캐시 헤더 | ✅ `max-age=31536000, immutable` |
+| 소프트 내비 (`/` → `/checkout`) | ✅ document 요청 0 |
+| 크로스 remote 상태 공유 (Vite → Rsbuild) | ✅ `0원` → `189,000원` |
+| zone 프록시 (`/legacy-checkout`) | ✅ 별도 앱 응답 |
+
+### 배포에서만 드러난 결함
+
+- 빈 문자열 env 가 `??` 를 통과해 빌드 버전이 사라졌다 → 배포 시점 env 는 `||` 로 읽는다
+- Next standalone 이 `@swc/helpers` 의 ESM 파일을 빠뜨려 컨테이너가 부팅에서 죽었다
+  (빌드는 성공, 배포는 Done 으로 끝난다)
+
 ## 2026-08-14 (5차) — Cache Components 이행 + MFA 캐시 실측
 
 질문: **런타임 MF 를 쓰면 Next 의 ISR·Cache Components 를 잃는가?** → **아니오.**
@@ -224,7 +259,7 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 - [x] 무효화 시 remote 번들 선 warm → 스켈레톤 위험 제거 (5차 발견 6)
 - [x] `/internal/mf-warm` 접근 제어 → middleware 시크릿 검사 (5차 발견 7)
 - [ ] 캐시 스코프 없이 프리렌더되는 정적 라우트(`/` 등)의 무효화 경로 정리
-- [ ] remote 배포 파이프라인 시뮬레이션 (remote 만 재배포했을 때 host 무중단 여부)
+- [~] remote 배포 파이프라인 시뮬레이션 — 배포 표면은 만들었다(6차). 무중단 재배포 실측은 남았다
 - [ ] SSR 실패 시 CSR 폴백 — 서버 로드 실패해도 브라우저에서 재시도
 - [ ] 초기 로딩 성능 측정 — SSR 경로의 TTFB / LCP 정량화
 - [ ] 프레임워크 혼용 remote (Vue/Svelte)로 자유도 한계 확인
