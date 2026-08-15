@@ -50,6 +50,22 @@ const nextConfig: NextConfig = {
    */
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
 
+  /**
+   * 파일 트레이싱이 `@swc/helpers` 의 `esm/` 를 통째로 빠뜨린다.
+   *
+   * 이 패키지는 `cjs/` 와 `esm/` 를 둘 다 들고 있는데, 트레이서는 CJS 조건만 따라가
+   * `cjs/` 와 `package.json` 만 담는다. 그런데 런타임 청크가 `esm/` 쪽을 직접 부른다.
+   * 빌드도 배포도 성공한 채로 컨테이너가 부팅에서 죽는다:
+   *
+   *   Cannot find module '.../@swc/helpers/esm/_interop_require_default.js'
+   *
+   * 값은 **프로젝트 루트(apps/host) 기준 glob** 이고, `outputFileTracingRoot` 안이면
+   * `../` 로 밖을 가리켜도 된다. pnpm 이 isolated 링커라 실체가 `.pnpm` 아래에 있다.
+   */
+  outputFileTracingIncludes: {
+    "/**/*": ["../../node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/esm/**/*"],
+  },
+
   cacheComponents: true,
 
   // 워크스페이스 패키지는 dist(JS)로 빌드되지만, 소스맵/트리셰이킹을 위해 명시

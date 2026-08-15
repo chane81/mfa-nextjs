@@ -68,30 +68,14 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # ^build 의존성(@mfa/contracts, @mfa/ui)은 turbo 가 알아서 먼저 빌드한다.
 RUN pnpm turbo run docker:build --filter=@mfa/host
 
-# Next 파일 트레이싱이 @swc/helpers 의 `esm/` 를 standalone 에 담지 않는다.
-# pnpm 이 isolated 링커라 이 패키지가 next 의 중첩 node_modules 안 심링크로 들어가는데,
-# 트레이서가 CJS 진입점만 따라가고 ESM 쪽 파일을 놓친다. 런타임에 이렇게 죽는다:
+# @swc/helpers 의 `esm/` 이 standalone 에 실제로 담겼는지 확인한다.
+#
+# 파일 트레이싱이 이걸 빠뜨리면 빌드도 배포도 성공한 채로 컨테이너가 부팅에서 죽는다:
 #   Cannot find module '.../@swc/helpers/esm/_interop_require_default.js'
-# 스토어의 원본 패키지를 standalone 트리 위에 통째로 덮어써서 메운다.
-RUN set -eu; \
-    std="apps/host/.next/standalone"; \
-    src="$(find /repo/node_modules/.pnpm -maxdepth 4 -type d -path '*/@swc/helpers' | head -1)"; \
-    test -n "$src"; \
-    found=0; \
-    for dst in "$std"/node_modules/.pnpm/*/node_modules/@swc/helpers; do \
-      [ -d "$dst" ] || continue; \
-      cp -R "$src"/. "$dst"/; \
-      found=1; \
-    done; \
-    if [ "$found" = 0 ]; then \
-      for nextdir in "$std"/node_modules/.pnpm/next@*/node_modules; do \
-        [ -d "$nextdir" ] || continue; \
-        mkdir -p "$nextdir/@swc/helpers"; \
-        cp -R "$src"/. "$nextdir/@swc/helpers"/; \
-        found=1; \
-      done; \
-    fi; \
-    test "$found" = 1
+# 담기게 하는 쪽은 next.config.ts 의 outputFileTracingIncludes 다. 여기서는 그게 먹었는지만 본다.
+# Next 가 이 버그를 고쳐 include 가 필요 없어지든, 반대로 include 가 조용히 안 먹든,
+# 배포된 뒤가 아니라 여기서 드러나야 한다.
+RUN find apps/host/.next/standalone -path '*@swc/helpers/esm/_interop_require_default.js' | grep -q .
 
 # ------------------------------------------------------------- runner
 FROM node:${NODE_VERSION} AS runner

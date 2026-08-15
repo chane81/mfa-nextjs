@@ -157,10 +157,30 @@ Dokploy UI 에서 경로는 입력 후 **＋ 버튼을 눌러야 목록에 들�
 Cannot find module '/app/node_modules/.pnpm/next@…/node_modules/@swc/helpers/esm/_interop_require_default.js'
 ```
 
-파일 트레이싱이 이 패키지의 CJS 진입점만 따라가서 디렉터리는 만들어지되 절반만 찬다.
-host 의 Dockerfile 이 빌드 직후 스토어의 원본 패키지를 그 위에 덮어쓴다.
-덮어쓸 대상을 못 찾으면 이미지 빌드를 실패시킨다 — Next 가 고쳐지면 조용히 흘러가는 대신
-빌드 에러로 드러나야 한다.
+이 패키지는 `cjs/` 와 `esm/` 를 둘 다 들고 있는데, 트레이서가 CJS 조건만 따라가서
+`cjs/` 와 `package.json` 만 담는다. 그런데 런타임 청크가 `esm/` 쪽을 직접 부른다.
+
+Next 의 공식 탈출구가 정확히 이 용도다.
+
+```ts
+// apps/host/next.config.ts
+outputFileTracingIncludes: {
+  "/**/*": ["../../node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/esm/**/*"],
+},
+```
+
+값은 프로젝트 루트(`apps/host`) 기준 glob 이고, `outputFileTracingRoot` 안이면 `../` 로
+밖을 가리켜도 된다. pnpm 이 isolated 링커라 실체가 `.pnpm` 아래 있어서 이 경로가 된다.
+
+> 처음엔 Dockerfile 에서 스토어 원본을 standalone 위에 덮어쓰는 셸 19줄로 때웠다.
+> pnpm 쪽 노브(`nodeLinker: hoisted`, `publicHoistPattern`)로 풀릴까 봐 문서를 뒤졌는데
+> 그쪽은 **배치**를 바꾸는 설정이라 이 문제와 무관하다. 무엇이 트레이스되는지의 문제였다.
+
+Dockerfile 에는 검증 한 줄만 남긴다. include 가 조용히 안 먹는 날을 잡기 위해서다.
+
+```dockerfile
+RUN find apps/host/.next/standalone -path '*@swc/helpers/esm/_interop_require_default.js' | grep -q .
+```
 
 ### Dokploy 로그 뷰어는 실시간이 아니다
 

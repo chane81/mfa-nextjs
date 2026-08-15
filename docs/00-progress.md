@@ -52,7 +52,10 @@
 
 - 빈 문자열 env 가 `??` 를 통과해 빌드 버전이 사라졌다 → 배포 시점 env 는 `||` 로 읽는다
 - Next standalone 이 `@swc/helpers` 의 ESM 파일을 빠뜨려 컨테이너가 부팅에서 죽었다
-  (빌드는 성공, 배포는 Done 으로 끝난다)
+  (빌드는 성공, 배포는 Done 으로 끝난다) → `outputFileTracingIncludes` 로 해결.
+  처음엔 Dockerfile 셸 19줄로 때웠는데 Next 공식 옵션 한 줄이면 됐다.
+  pnpm 쪽 노브(`nodeLinker: hoisted`, `publicHoistPattern`)는 **배치**를 바꾸는 설정이라
+  이 문제와 무관했다 — 무엇이 트레이스되는지의 문제였다
 
 ### 로컬 빌드 복구
 
