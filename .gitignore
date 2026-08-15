@@ -17,6 +17,13 @@ build
 *.tsbuildinfo
 @mf-types
 
+# Next 가 생성하는 타입 진입점.
+# 공식 문서는 커밋을 권장하지만 Next 16 은 마지막 실행이 dev 였는지 build 였는지에 따라
+# 이 파일을 `.next/dev/types/...` <-> `.next/types/...` 로 다시 쓴다.
+# 이 저장소는 앱별 watch path 로 재배포를 분리하므로, 그 왕복이 그대로 헛배포가 된다.
+# 없어도 typecheck 는 통과한다(실측).
+next-env.d.ts
+
 # 로그 / OS
 *.log
 .DS_Store
