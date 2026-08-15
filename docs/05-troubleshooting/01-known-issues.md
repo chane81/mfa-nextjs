@@ -120,6 +120,42 @@ PaaS 에서 전부 깨진다. Dockerfile `ARG` 로 드러내고 빌드 인자로
 > 보다 우선해서 빌드가 깨진다(Next 는 이미 설정된 `process.env` 를 `.env` 로 덮지 않는다).
 > 그래서 Dockerfile 변경과 Dokploy 빌드 인자 추가는 같이 가야 한다.
 
+### B-7. `.env.local` 을 바꿔도 turbo 캐시가 안 깨진다
+
+`REMOTE_*_SSR_ENTRY` 를 바꾸면 프리렌더 결과가 달라진다 — 어느 오리진에서 SSR 번들을 받아
+마크업을 만들지가 그 값에서 나오기 때문이다. 그런데 캐시는 그대로였다.
+
+```
+$ pnpm turbo run build --filter=@mfa/host      →  FULL TURBO
+$ echo '# probe' >> apps/host/.env.local
+$ pnpm turbo run build --filter=@mfa/host      →  FULL TURBO   ❌ 옛 .next 복원
+```
+
+turbo 의 기본 입력 집합은 **git 이 추적하는 파일**이다. `.env.local` 은 gitignore 라 빠진다.
+`globalEnv` 도 못 막는다 — turbo 가 보는 건 프로세스 env 이고, `.env.local` 은 태스크 **안에서**
+Next 가 읽기 때문에 turbo 에게는 보이지 않는다.
+
+```jsonc
+"@mfa/host#build": { "inputs": ["$TURBO_DEFAULT$", ".env*"], ... }
+```
+
+`$TURBO_DEFAULT$` 는 기본 집합을 유지하면서 덧붙이라는 뜻이다. 이걸 빼고 `.env*` 만 적으면
+소스 변경이 캐시를 못 깨는 정반대의 사고가 난다.
+
+### B-8. A-10 을 또 밟았다 — `WAIT_FOR_REMOTES_TIMEOUT` 미등록
+
+```
+$ time WAIT_FOR_REMOTES_TIMEOUT=1 pnpm turbo run dev:wait-remotes --force
+[wait-remotes] catalog 가 60000ms 안에 응답하지 않았습니다.
+  → 1:00.86 total          ❌ 1ms 를 줬는데 60초를 기다렸다
+```
+
+`globalEnv` 에 없으면 turbo 가 태스크 환경에서 지운다. **에러도 경고도 없다**(A-10 과 같은 함정).
+lint 규칙 `turbo/no-undeclared-env-vars` 도 못 잡는다 — 그 변수를 읽는 게 앱 소스가 아니라
+`scripts/` 아래 파일이라 lint 대상이 아니다.
+
+등록 후 `1.17s`. **`scripts/` 에서 새 env 를 읽기 시작하면 `globalEnv` 를 같이 본다.**
+
 ---
 
 ## A. (5차) 캐시 · 버전 · 신뢰 경계에서 밟은 것들

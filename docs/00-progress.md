@@ -75,6 +75,10 @@ turbo 공식 패턴(`with` 사이드카 + 유한 readiness 프로브)을 실제�
 - [x] `REMOTE_*_SSR_ENTRY` 를 host Dockerfile `ARG` 로 명시 (빌드 시점에도 필요한 값이다)
 - [x] `remote-version.ts` 의 `??` → `||` (빈 `ARG` 가 `new URL("")` 로 터질 자리였다)
 - [x] compose 를 2단계로 분리 — 빌드 컨테이너는 compose 네트워크 밖이라 `host.docker.internal`
+- [x] `.env.local` 이 캐시를 깨게 했다 (`inputs: ["$TURBO_DEFAULT$", ".env*"]`).
+  gitignore 된 파일이 기본 입력에서 빠지는데, 그 파일이 프리렌더 결과를 정하고 있었다
+- [x] `WAIT_FOR_REMOTES_TIMEOUT` 을 `globalEnv` 에 등록 — A-10 을 그대로 다시 밟았다.
+  `=1` 을 줬는데 60초를 기다렸고, 등록 후 1.17초
 
 부작용으로 진단이 하나 좋아졌다. dev 서버가 떠 있는 채로 빌드하면 정적 서버가 `::` 에
 붙는 데 **성공해서** 15초를 버리고 엉뚱한 결론이 났는데, 띄우기 전에 TCP 로 포트 점유를
