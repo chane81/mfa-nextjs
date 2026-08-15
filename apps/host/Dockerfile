@@ -58,6 +58,31 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # ^build 의존성(@mfa/contracts, @mfa/ui)까지 turbo 가 알아서 먼저 빌드한다
 RUN pnpm turbo run build --filter=@mfa/host
 
+# Next 파일 트레이싱이 @swc/helpers 의 `esm/` 를 standalone 에 담지 않는다.
+# pnpm 이 isolated 링커라 이 패키지가 next 의 중첩 node_modules 안 심링크로 들어가는데,
+# 트레이서가 CJS 진입점만 따라가고 ESM 쪽 파일을 놓친다. 런타임에 이렇게 죽는다:
+#   Cannot find module '.../@swc/helpers/esm/_interop_require_default.js'
+# 스토어의 원본 패키지를 standalone 트리 위에 통째로 덮어써서 메운다.
+RUN set -eu; \
+    std="apps/host/.next/standalone"; \
+    src="$(find /repo/node_modules/.pnpm -maxdepth 4 -type d -path '*/@swc/helpers' | head -1)"; \
+    test -n "$src"; \
+    found=0; \
+    for dst in "$std"/node_modules/.pnpm/*/node_modules/@swc/helpers; do \
+      [ -d "$dst" ] || continue; \
+      cp -R "$src"/. "$dst"/; \
+      found=1; \
+    done; \
+    if [ "$found" = 0 ]; then \
+      for nextdir in "$std"/node_modules/.pnpm/next@*/node_modules; do \
+        [ -d "$nextdir" ] || continue; \
+        mkdir -p "$nextdir/@swc/helpers"; \
+        cp -R "$src"/. "$nextdir/@swc/helpers"/; \
+        found=1; \
+      done; \
+    fi; \
+    test "$found" = 1
+
 # ------------------------------------------------------------- runner
 FROM node:${NODE_VERSION} AS runner
 WORKDIR /app
