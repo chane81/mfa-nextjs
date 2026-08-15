@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import type { NextConfig } from "next";
 
 /**
@@ -10,6 +12,10 @@ import type { NextConfig } from "next";
  */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+
+  // 컨테이너 배포용 자립 산출물. 근거는 host 의 next.config.ts 주석 참고.
+  output: "standalone",
+  outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
 
   // host 도메인에서 /legacy-checkout 하위로 서빙되므로 라우트 전체에 prefix 를 건다
   basePath: "/legacy-checkout",

@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import type { NextConfig } from "next";
 
 /**
@@ -33,6 +35,22 @@ const ZONE_CHECKOUT_URL = process.env.ZONE_CHECKOUT_URL ?? "http://localhost:300
  */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+
+  /**
+   * 컨테이너 배포용 자립 산출물(.next/standalone).
+   * 런타임 이미지에 pnpm 워크스페이스 전체를 넣지 않으려면 필요하다.
+   */
+  output: "standalone",
+
+  /**
+   * 추적 루트를 저장소 루트로 올린다.
+   * pnpm 은 node-linker=isolated 라 실제 파일이 `<repo>/node_modules/.pnpm` 에 있다.
+   * 기본값(앱 디렉터리)이면 심링크 대상이 추적 범위 밖이라 standalone 이 깨진다.
+   *
+   * 부작용: standalone 산출물이 이 루트 구조를 미러링한다.
+   *   .next/standalone/apps/host/server.js  ← 진입점 경로가 한 단계 깊어진다
+   */
+  outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
 
   cacheComponents: true,
 
