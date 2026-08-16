@@ -57,11 +57,16 @@ settings: { react: { version: "19.2" } },
 ## Node / 패키지 매니저
 
 ```
-node    v24.3.0   (next 16 요구: >=20.9.0)
-pnpm    11.18.0
+node    v24.3.0   (이 저장소 요구: >=24.19.0)
+pnpm    11.22.0
 ```
 
-`packageManager` 필드로 pnpm 11.18.0 을 고정했다.
+`packageManager` 필드로 pnpm 11.22.0 을 고정했다. 이미지 셋도 같은 버전을
+`npm install -g` 로 깐다 — corepack 을 안 쓰는 이유는 각 Dockerfile 주석 참고.
+
+node 요구가 next 16 의 `>=20.9.0` 보다 높은 이유는 `packages/remote-config` 다.
+빌드 산출물 없이 `.ts` 를 그대로 export 해서 Node 의 타입 스트리핑에 기댄다
+(근거: 그 패키지의 `src/index.ts` 상단 주석).
 
 ## 버전 재확인 방법
 
