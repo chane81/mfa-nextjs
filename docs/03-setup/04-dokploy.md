@@ -15,7 +15,7 @@ remote 를 host 와 독립적으로 재배포할 수 있어야 검증된다.
 
 ## 왜 remote 에 볼륨이 필요한가
 
-remote 배포 계약은 불변 아티팩트다(`scripts/stamp-remote-version.mjs`).
+remote 배포 계약은 불변 아티팩트다(`scripts/stamp-remote-version.ts`).
 `/v<ver>/...` 는 한 번 배포되면 내용이 바뀌지 않고, 롤백은 `mf-version.json` 만 되돌리면 끝난다.
 
 컨테이너는 휘발이라 이미지 안의 `dist` 만 서빙하면 재배포 순간 이전 버전이 사라진다.
@@ -68,7 +68,7 @@ host 빌드가 프리렌더 도중 이 주소에서 remote 의 SSR 번들을 실
 > 적히는 우회로라 로컬·compose·다른 PaaS 에서 전부 재현이 안 된다. 필요한 값은 Dockerfile
 > 의 `ARG` 로 드러내고 빌드 인자로 명시해 넘긴다.
 
-`.git` 은 빌드 컨텍스트에서 제외된다(`.dockerignore`). 그래서 `mf-build-version.mjs` 의
+`.git` 은 빌드 컨텍스트에서 제외된다(`.dockerignore`). 그래서 `mf-build-version.ts` 의
 git SHA 폴백이 동작하지 않고 타임스탬프 버전이 나온다. 커밋과 배포 버전을 맞추려면
 `MF_BUILD_VERSION` 을 명시적으로 넘긴다.
 
@@ -91,7 +91,7 @@ git SHA 폴백이 동작하지 않고 타임스탬프 버전이 나온다. 커�
 ### 서명 키
 
 ```bash
-node scripts/gen-signing-key.mjs
+node scripts/gen-signing-key.ts
 ```
 
 - 개인키(`MF_SIGNING_KEY`) → **remote 빌드**에만. Dokploy 빌드에서는 BuildKit secret
@@ -147,7 +147,7 @@ Dokploy UI 에서 경로는 입력 후 **＋ 버튼을 눌러야 목록에 들�
 그대로 버전이 되어, 자산이 `dist/` 로 나가고 stamp 가 `dist/v/` 를 찾다 실패한다.
 
 배포 시점 env 를 읽는 자리는 전부 `||` 를 쓴다. 지금 해당하는 곳:
-`mf-build-version.mjs`, remote 두 곳의 `PUBLIC_URL`.
+`mf-build-version.ts`, remote 두 곳의 `PUBLIC_URL`.
 
 ### Next standalone 이 @swc/helpers 의 ESM 파일을 빠뜨린다
 

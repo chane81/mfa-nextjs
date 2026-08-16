@@ -265,9 +265,9 @@ proxy 는 렌더 파이프라인 진입 전에 돌아 진짜 404 를 낸다. 페
 
 ```
 remote 빌드
-  scripts/mf-build-version.mjs   빌드 전: 버전 결정 → .mf-version
+  scripts/mf-build-version.ts   빌드 전: 버전 결정 → .mf-version
   vite build / rsbuild build     base·assetPrefix = /v<version>/, 출력도 dist/v<version>/
-  scripts/stamp-remote-version.mjs
+  scripts/stamp-remote-version.ts
     dist/mf-version.json         { version, ssrEntry, webEntry, contentHash } 공표
 ```
 
@@ -352,7 +352,7 @@ host **서버**가 remote 코드를 받아 `new Function` 으로 실행한다. �
 둘이 같은 곳에 있으면 막으려던 것을 못 막는다.
 
 ```bash
-node scripts/gen-signing-key.mjs      # 키쌍 생성
+node scripts/gen-signing-key.ts      # 키쌍 생성
 # remote CI :  MF_SIGNING_KEY=<private>
 # host      :  MF_REMOTE_PUBLIC_KEY=<public>  MF_REQUIRE_SIGNATURE=1
 ```

@@ -2,7 +2,8 @@
 
 ## 요구사항
 
-- Node.js **>= 20.9.0** (검증: v24.3.0)
+- Node.js **>= 24.19.0** (검증: v24.3.0) — `packages/remote-config` 가 타입 스트리핑으로
+  `.ts` 를 직접 실행하므로 이 아래 버전에서는 로드되지 않는다
 - pnpm **11.x** (검증: 11.18.0)
 
 ## 설치
@@ -67,6 +68,10 @@ pnpm typecheck
 pnpm lint
 ```
 
+`scripts/` 도 `.ts` 이고 검사 대상이다. 워크스페이스 패키지가 아니라 루트에 있어서
+turbo 루트 태스크(`//#typecheck:scripts`, `//#lint:scripts`)로 따로 걸어뒀고,
+위 두 명령에 함께 실행된다. Node 24 가 타입 스트리핑으로 직접 실행하므로 빌드는 없다.
+
 ### host 빌드는 remote 가 **떠 있어야** 끝난다
 
 host 빌드는 순수한 컴파일이 아니다. 프리렌더 도중 remote 의 SSR 번들을 HTTP 로 받아
@@ -88,10 +93,13 @@ TypeError: fetch failed ... ECONNREFUSED
 ```jsonc
 // apps/host/package.json
 "build": "concurrently --kill-others --success first -n catalog,cart,next \
-  \"node ../../scripts/serve-remote-dist.mjs 3001 ../remote-catalog/dist\" \
-  \"node ../../scripts/serve-remote-dist.mjs 3002 ../remote-cart/dist\" \
+  \"node ../../scripts/serve-remote-dist.ts catalog\" \
+  \"node ../../scripts/serve-remote-dist.ts cart\" \
   \"next build\""
 ```
+
+포트도 `dist` 위치도 인자로 안 넘긴다. remote 이름만 주면
+`packages/remote-config` 에서 파생한다 — 그래야 포트 지식이 호출부마다 복사되지 않는다.
 
 `--success first` 는 "먼저 끝난 프로세스의 종료 코드를 쓴다"는 뜻이다. 서버는 안 끝나므로
 그건 항상 `next build` 다. `--kill-others` 가 빌드가 끝나는 즉시 서버를 내린다.
@@ -114,9 +122,9 @@ remote 의 `build` 는 **네 단계**다. 버전을 빌드 전에 정해야 자�
 
 ```jsonc
 // apps/remote-catalog/package.json
-"build":     "node ../../scripts/mf-build-version.mjs && vite build && pnpm build:ssr && pnpm stamp",
+"build":     "node ../../scripts/mf-build-version.ts && vite build && pnpm build:ssr && pnpm stamp",
 "build:ssr": "vite build --config vite.config.server.ts",
-"stamp":     "node ../../scripts/stamp-remote-version.mjs catalog"
+"stamp":     "node ../../scripts/stamp-remote-version.ts catalog"
 ```
 
 | 단계               | 하는 일                                                              |
@@ -146,7 +154,7 @@ pnpm start
 ```
 
 remote 는 번들러 preview 가 아니라 **공용 정적 서버**로 뜬다
-(`scripts/serve-remote-dist.mjs`). 두 번들러의 preview 가 버전 경로를 서빙하는 방식이 달라서
+(`scripts/serve-remote-dist.ts`). 두 번들러의 preview 가 버전 경로를 서빙하는 방식이 달라서
 배포 표면을 하나로 통일했고, 실제 배포에서 그 자리는 CDN 이다.
 
 ```
@@ -173,7 +181,7 @@ curl -XPOST "$HOST_URL/api/mf-revalidate" \
 ### 서명 (선택)
 
 ```bash
-node scripts/gen-signing-key.mjs
+node scripts/gen-signing-key.ts
 # MF_SIGNING_KEY       → remote CI 에만
 # MF_REMOTE_PUBLIC_KEY → host 에만  (+ MF_REQUIRE_SIGNATURE=1)
 ```
@@ -182,12 +190,48 @@ node scripts/gen-signing-key.mjs
 
 **로컬은 아무것도 설정하지 않아도 된다.** 기본값이 코드에 있다.
 
-| 이름                               | 기본값                                   | 읽는 곳                    |
-| ---------------------------------- | ---------------------------------------- | -------------------------- |
-| `NEXT_PUBLIC_REMOTE_CATALOG_ENTRY` | `http://localhost:3001/mf-manifest.json` | `src/mf/runtime.ts`        |
-| `NEXT_PUBLIC_REMOTE_CART_ENTRY`    | `http://localhost:3002/mf-manifest.json` | 〃                         |
-| `REMOTE_CATALOG_SSR_ENTRY`         | `http://localhost:3001/mf-server.cjs`    | `src/mf/remote-version.ts` |
-| `REMOTE_CART_SSR_ENTRY`            | `http://localhost:3002/mf-server.cjs`    | 〃                         |
+| 이름                               | 기본값                                   |
+| ---------------------------------- | ---------------------------------------- |
+| `NEXT_PUBLIC_REMOTE_CATALOG_ENTRY` | `http://localhost:3001/mf-manifest.json` |
+| `NEXT_PUBLIC_REMOTE_CART_ENTRY`    | `http://localhost:3002/mf-manifest.json` |
+| `REMOTE_CATALOG_SSR_ENTRY`         | `http://localhost:3001/mf-server.cjs`    |
+| `REMOTE_CART_SSR_ENTRY`            | `http://localhost:3002/mf-server.cjs`    |
+
+이 표의 원본은 **`packages/remote-config`** 다. remote 이름·포트·env 이름·산출물
+파일명이 전부 거기 있고, 위 기본값은 그 조합에서 파생된다. **remote 를 추가할 때 고칠 곳은
+그 패키지 하나다** — 코드도, 스크립트도, 번들러 설정도, `turbo.json` 도 순회해서 읽는다.
+유일한 예외는 `docker-compose.yml`(정적 YAML 이라 모듈을 못 읽는다. 로컬 검증 전용).
+
+이름만 추가하고 정의를 빠뜨리면 `satisfies Record<RemoteName, RemoteDefinition>` 이
+컴파일 타임에 막는다 — remote 추가가 반쯤 된 채로 넘어가지 않는다.
+
+> 이 패키지만 **빌드 산출물이 없다.** `exports` 가 `src/index.ts` 를 직접 가리키고
+> Node 24 의 타입 스트리핑이 실행 시점에 타입을 지운다. 번들러 config 의 import 는
+> 프로세스 시작 즉시 일어나서 watch 빌드가 `dist/` 를 만들 틈이 없기 때문이다
+> (tsc 빌드형으로 두면 `failed to load config from vite.config.ts` 로 죽는다 — 실측).
+> 그래서 `engines.node` 가 `>=24.19.0` 이고, `erasableSyntaxOnly` 로 타입 스트리핑이
+> 처리 못 하는 문법(enum·namespace 등)을 컴파일 타임에 막는다.
+
+### 브라우저용 값이 전달되는 경로
+
+`NEXT_PUBLIC_*` 은 `process.env.리터럴` 형태만 빌드 타임에 치환된다. 동적 접근은
+치환되지 않아 브라우저에서 `undefined` 가 되므로, host **코드**에서는 remote 목록을
+순회하며 env 를 읽을 수 없다. 그래서 순회를 한 단계 앞으로 옮겼다.
+
+```
+packages/remote-config          remote 목록 + env 이름 + 기본값
+  ↓  (node 에서 순회)
+apps/host/next.config.ts        env: { MFA_REMOTE_WEB_ENTRIES: JSON.stringify(…) }
+  ↓  (Next 가 번들에 인라인)
+apps/host/src/mf/remote-endpoints.ts   리터럴 하나만 읽어 JSON.parse
+```
+
+`next.config.ts` 는 node 에서 평가되므로 순회가 가능하고, `env` 로 넘긴 값은
+`NEXT_PUBLIC_` 접두사 없이도 브라우저 번들에 인라인된다(그 접두사는 환경/`.env` 파일로
+들어온 변수에만 적용되는 규칙이다). 결과적으로 host 코드에는 remote 이름이 없다.
+
+SSR 엔트리는 이 경로를 타지 않는다. host **서버**만 쓰는 값이라 브라우저에 노출할 이유가
+없고, 서버에서는 `process.env[이름]` 동적 접근이 그대로 동작한다.
 
 한때 `apps/host/.env.local` 로 이 값들을 그대로 다시 적어뒀다가 지웠다. 기본값과 한 글자도
 다르지 않은 파일이었고, gitignore 라 **turbo 캐시 입력에서 빠져** 값을 바꿔도 캐시된 옛
@@ -212,6 +256,8 @@ MF_REVALIDATE_SECRET=change-me    # 미설정이면 /api/mf-revalidate 는 전�
 
 > 새 환경변수는 `turbo.json` 의 `globalEnv` 에도 등록해야 한다. turbo 는 strict env 라
 > 등록하지 않은 변수를 태스크 환경에서 걸러낸다(모르고 지나가면 설정이 조용히 무시된다).
+> 단 remote 주소 변수는 이미 `NEXT_PUBLIC_REMOTE_*` / `REMOTE_*` 와일드카드로 잡혀 있어
+> remote 를 추가해도 손댈 필요가 없다.
 
 ## 개별 앱만 실행
 
