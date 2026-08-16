@@ -6,13 +6,13 @@
 #   docker build -f apps/remote-cart/Dockerfile .
 #
 # catalog 와 번들러만 다르고 배포 계약은 완전히 같다.
-# 산출물 `dist/v<version>/` (웹 + mf-server.cjs) 를 serve-remote-dist.mjs 가 서빙한다.
+# 산출물 `dist/v<version>/` (웹 + mf-server.cjs) 를 serve-remote-dist.ts 가 서빙한다.
 #
 # ## 빌드 시점에 굳는 값 (런타임 env 로 못 바꾼다)
 #   REMOTE_CART_PUBLIC_URL — 자산 URL 접두사(assetPrefix). 절대 URL 이어야 한다.
 #   MF_BUILD_VERSION       — 불변 경로 `/v<ver>/`.
 #   MF_SIGNING_KEY         — 매니페스트 서명. build secret 으로 받는다.
-ARG NODE_VERSION=22-slim
+ARG NODE_VERSION=24-slim
 
 FROM node:${NODE_VERSION} AS base
 ENV PNPM_HOME=/pnpm
@@ -74,7 +74,7 @@ ENV PORT=3002
 ENV REMOTE_DIST_DIR=/data
 
 COPY --from=builder /repo/apps/remote-cart/dist ./dist
-COPY --from=builder /repo/scripts/serve-remote-dist.mjs ./scripts/serve-remote-dist.mjs
+COPY --from=builder /repo/scripts/serve-remote-dist.ts ./scripts/serve-remote-dist.ts
 COPY --from=builder /repo/scripts/docker/remote-entrypoint.sh ./scripts/remote-entrypoint.sh
 RUN chmod +x ./scripts/remote-entrypoint.sh && mkdir -p /data && chown -R node:node /data /app
 

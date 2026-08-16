@@ -1,5 +1,7 @@
 import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
+import { MF_FILES } from '@mfa/remote-config';
 
+import { SSR_ENTRIES } from './remote-endpoints';
 import {
   assertAllowedOrigin,
   assertManifestSignature,
@@ -23,19 +25,6 @@ import {
  *
  * 이 모듈은 client component 트리에서도 import 되므로 `next/*` 를 쓰지 않는다.
  */
-
-/**
- * `??` 가 아니라 `||` 다. Dockerfile 에서 `ARG` 를 값 없이 선언하면 컨테이너 안에서
- * 빈 문자열로 도착하는데, `??` 는 빈 값을 유효한 설정으로 받아 `new URL("")` 에서 터진다.
- * (같은 함정 기록: docs/03-setup/04-dokploy.md)
- */
-const SSR_ENTRIES: Record<RemoteName, string> = {
-  catalog:
-    process.env.REMOTE_CATALOG_SSR_ENTRY ||
-    'http://localhost:3001/mf-server.cjs',
-  cart:
-    process.env.REMOTE_CART_SSR_ENTRY || 'http://localhost:3002/mf-server.cjs',
-};
 
 /** remote 오리진. 버전 매니페스트와 버전 경로를 여기에 붙인다. */
 export function remoteOrigin(remote: RemoteName): string {
@@ -198,7 +187,7 @@ export function webEntryUrl(remote: RemoteName): string | null {
 export async function fetchRemoteVersion(
   remote: RemoteName,
 ): Promise<RemoteVersion | null> {
-  const url = `${remoteOrigin(remote)}/mf-version.json`;
+  const url = `${remoteOrigin(remote)}/${MF_FILES.versionManifest}`;
   const init: RequestInit =
     process.env.NODE_ENV === 'production'
       ? ({

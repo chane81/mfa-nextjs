@@ -3,7 +3,7 @@
 # remote 컨테이너 진입점.
 #
 # ## 왜 이미지의 dist 를 그대로 서빙하지 않나
-# 이 저장소의 remote 배포 계약은 **불변 아티팩트**다(scripts/stamp-remote-version.mjs 참고).
+# 이 저장소의 remote 배포 계약은 **불변 아티팩트**다(scripts/stamp-remote-version.ts 참고).
 # `/v<ver>/...` 는 한 번 배포되면 내용이 바뀌지 않고, 롤백은 `mf-version.json` 만
 # 옛 버전으로 되돌리면 끝나야 한다.
 #
@@ -54,4 +54,8 @@ if [ "$KEEP" -gt 0 ]; then
   done
 fi
 
-exec node /app/scripts/serve-remote-dist.mjs "$PORT" "$DATA_DIR"
+# ⚠️ 포트를 **숫자로** 넘긴다. 이 이미지에는 `node_modules` 가 없어서 서버 스크립트가
+# `@mfa/remote-config` 를 못 읽기 때문이다. 그쪽(remote 이름) 경로는 워크스페이스를
+# 동적 import 하므로 여기서 쓰면 부팅이 `ERR_MODULE_NOT_FOUND` 로 죽는다.
+# 근거와 두 갈래 설명: scripts/serve-remote-dist.ts 상단 주석.
+exec node /app/scripts/serve-remote-dist.ts "$PORT" "$DATA_DIR"

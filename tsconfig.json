@@ -1,0 +1,22 @@
+{
+  "extends": "@mfa/typescript-config/base.json",
+  "compilerOptions": {
+    /**
+     * `scripts/` 전용 설정. 이 스크립트들은 빌드하지 않고 Node 24 가 타입 스트리핑으로
+     * 직접 실행한다(`node scripts/wait-for-remotes.ts`). tsc 는 검사만 한다.
+     *
+     * 이 파일이 생기기 전까지 `scripts/` 는 **어느 tsconfig 에도 속하지 않아 검사가 0** 이었다.
+     * `.ts` 로 바꾸기만 하고 여기를 안 만들면 "검사되는 것처럼 보이는데 안 되는" 상태가 된다.
+     */
+    "noEmit": true,
+    /**
+     * 타입 스트리핑이 지우지 못하는 문법(enum, namespace, 파라미터 프로퍼티 등)을 막는다.
+     * 없으면 tsc 는 통과하는데 node 가 런타임에 죽는다.
+     */
+    "erasableSyntaxOnly": true,
+    "types": ["node"],
+    "tsBuildInfoFile": "./.turbo/tsconfig.tsbuildinfo"
+  },
+  "include": ["scripts/**/*.ts"],
+  "exclude": ["node_modules"]
+}

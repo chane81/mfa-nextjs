@@ -2,24 +2,30 @@
   "name": "mfa-nextjs",
   "private": true,
   "version": "0.1.0",
+  "type": "module",
   "packageManager": "pnpm@11.21.0",
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=24.19.0"
   },
   "scripts": {
     "dev": "turbo run dev",
-    "dev:wait-remotes": "node scripts/wait-for-remotes.mjs",
+    "dev:wait-remotes": "node scripts/wait-for-remotes.ts",
     "build": "turbo run build",
     "start": "pnpm build && turbo run start",
-    "lint": "turbo run lint",
-    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint lint:scripts",
+    "lint:scripts": "eslint scripts",
+    "typecheck": "turbo run typecheck typecheck:scripts",
+    "typecheck:scripts": "tsc -p tsconfig.json --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
     "@mfa/eslint-config": "workspace:*",
+    "@mfa/remote-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
+    "@types/node": "^24.10.1",
+    "eslint": "^10.8.1",
     "prettier": "3.6.2",
     "turbo": "2.10.9",
     "typescript": "6.0.3"

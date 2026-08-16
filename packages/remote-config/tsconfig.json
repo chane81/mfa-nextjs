@@ -1,0 +1,25 @@
+{
+  "extends": "@mfa/typescript-config/base.json",
+  "compilerOptions": {
+    /**
+     * 빌드 산출물이 없는 패키지다. `exports` 가 `src/index.ts` 를 직접 가리키고,
+     * Node 24 의 타입 스트리핑이 실행 시점에 타입만 지운다 (src/index.ts 상단 주석 참고).
+     * tsc 는 emit 하지 않고 검사만 한다.
+     */
+    "noEmit": true,
+    /**
+     * 타입 스트리핑이 **지우지 못하는** 문법(enum, namespace, 파라미터 프로퍼티 등)을
+     * 컴파일 타임에 막는다. 이게 없으면 tsc 는 통과하는데 node 가 런타임에 죽는다.
+     */
+    "erasableSyntaxOnly": true,
+    /**
+     * `@types/node` 를 일부러 안 쓴다. 소비처가 이 소스를 직접 검사하므로
+     * (빌드 산출물이 없다) 여기서 전역 node 타입에 기대면 브라우저용 소비처가 깨진다.
+     * 필요한 `process` 한 조각은 `src/index.ts` 에서 좁게 선언한다.
+     */
+    "types": [],
+    "tsBuildInfoFile": "./.turbo/tsconfig.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules"]
+}

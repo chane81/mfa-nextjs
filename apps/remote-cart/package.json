@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n web,ssr -c green,gray --kill-others-on-fail \"rsbuild dev\" \"rsbuild build --config rsbuild.server.config.ts --watch\"",
-    "build": "node ../../scripts/mf-build-version.mjs && rsbuild build && pnpm build:ssr && pnpm stamp",
+    "build": "node ../../scripts/mf-build-version.ts && rsbuild build && pnpm build:ssr && pnpm stamp",
     "build:ssr": "rsbuild build --config rsbuild.server.config.ts",
-    "stamp": "node ../../scripts/stamp-remote-version.mjs cart",
-    "start": "node ../../scripts/serve-remote-dist.mjs 3002",
+    "stamp": "node ../../scripts/stamp-remote-version.ts cart",
+    "start": "node ../../scripts/serve-remote-dist.ts cart",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist .mf-version .turbo"
@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@mfa/eslint-config": "workspace:*",
+    "@mfa/remote-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
     "@module-federation/rsbuild-plugin": "^2.8.2",
     "@rsbuild/core": "^2.1.13",

@@ -8,9 +8,15 @@ import * as ReactJSXRuntime from 'react/jsx-runtime';
 import * as ReactDOM from 'react-dom';
 import * as ReactDOMClient from 'react-dom/client';
 
-import type { RemoteModuleId, RemoteModuleMap } from '@mfa/contracts';
+import {
+  REMOTE_NAMES,
+  type RemoteModuleId,
+  type RemoteModuleMap,
+  type RemoteName,
+} from '@mfa/contracts';
 
 import { normalizeModule } from './interop';
+import { WEB_ENTRIES } from './remote-endpoints';
 import { loadRemoteModuleOnServer } from './server-loader';
 
 /**
@@ -24,13 +30,6 @@ import { loadRemoteModuleOnServer } from './server-loader';
  * 덕분에 remote 가 **SSR 된다**. 초기 HTML 에 remote UI 가 그대로 들어간다.
  * host 에는 여전히 번들러 플러그인이 없다 — Turbopack 은 MF 를 몰라도 된다.
  */
-
-const CATALOG_ENTRY =
-  process.env.NEXT_PUBLIC_REMOTE_CATALOG_ENTRY ??
-  'http://localhost:3001/mf-manifest.json';
-const CART_ENTRY =
-  process.env.NEXT_PUBLIC_REMOTE_CART_ENTRY ??
-  'http://localhost:3002/mf-manifest.json';
 
 /** host 가 remote 에 내려주는 공유 모듈 버전. React 가 두 번 로드되면 훅이 깨진다. */
 const REACT_VERSION = '19.2.8';
@@ -72,11 +71,11 @@ interface InjectedEntry {
   entry: string;
 }
 
-function pinnedEntry(remote: 'catalog' | 'cart', fallback: string): string {
+function pinnedEntry(remote: RemoteName): string {
   const injected = (
     globalThis as { __MFA_REMOTE_VERSIONS__?: Record<string, InjectedEntry> }
   ).__MFA_REMOTE_VERSIONS__;
-  return injected?.[remote]?.entry ?? fallback;
+  return injected?.[remote]?.entry ?? WEB_ENTRIES[remote];
 }
 
 function ensureInit(): void {
@@ -84,10 +83,7 @@ function ensureInit(): void {
 
   init({
     name: 'host',
-    remotes: [
-      { name: 'catalog', entry: pinnedEntry('catalog', CATALOG_ENTRY) },
-      { name: 'cart', entry: pinnedEntry('cart', CART_ENTRY) },
-    ],
+    remotes: REMOTE_NAMES.map((name) => ({ name, entry: pinnedEntry(name) })),
     // host 가 이미 가진 React 를 remote 에 주입 → remote 번들의 React 는 로드되지 않는다
     shared: {
       react: {
@@ -161,7 +157,8 @@ export function invalidateRemoteCache(id?: RemoteModuleId): void {
   else clientCache.clear();
 }
 
-export const REMOTE_ENTRIES = {
-  catalog: CATALOG_ENTRY,
-  cart: CART_ENTRY,
-} as const;
+/**
+ * 진단·에러 화면이 "어느 주소를 보고 있었는지" 를 표시할 때 쓴다.
+ * 버전 고정(`pinnedEntry`) 이전의 설정값이라 여기가 곧 "설정상 기대 주소"다.
+ */
+export { WEB_ENTRIES as REMOTE_ENTRIES } from './remote-endpoints';

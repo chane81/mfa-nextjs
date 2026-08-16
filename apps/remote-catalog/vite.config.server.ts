@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { MF_FILES } from '@mfa/remote-config';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
@@ -51,7 +52,7 @@ export default defineConfig({
       ],
       output: {
         format: 'cjs',
-        entryFileNames: 'mf-server.cjs',
+        entryFileNames: MF_FILES.ssrBundle,
         exports: 'named',
       },
     },

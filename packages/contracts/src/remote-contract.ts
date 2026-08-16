@@ -44,5 +44,11 @@ export interface RemoteModuleMap {
 
 export type RemoteModuleId = keyof RemoteModuleMap;
 
-export const REMOTE_NAMES = ['catalog', 'cart'] as const;
-export type RemoteName = (typeof REMOTE_NAMES)[number];
+/**
+ * remote 이름의 원본은 `@mfa/remote-config` 다 — 포트·env 이름 같은 배치 정보와
+ * 같은 자리에 있어야 remote 를 늘리거나 지울 때 한 곳만 보면 된다.
+ *
+ * 여기서 재-export 하는 이유는 소비처 때문이다. host 는 이 이름과 `RemoteModuleMap` 을
+ * 거의 항상 같이 쓰므로 import 를 둘로 쪼개면 읽기만 나빠진다.
+ */
+export { REMOTE_NAMES, type RemoteName } from '@mfa/remote-config';

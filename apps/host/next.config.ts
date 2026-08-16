@@ -1,6 +1,37 @@
 import { fileURLToPath } from 'node:url';
 
+import { REMOTE_LIST, defaultWebEntry } from '@mfa/remote-config';
 import type { NextConfig } from 'next';
+
+/**
+ * 브라우저 MF 런타임이 읽을 remote 매니페스트 URL 들. **remote 별로 손댈 곳이 없다.**
+ *
+ * ## 왜 host 코드가 아니라 여기서 만드나
+ *
+ * `NEXT_PUBLIC_*` 은 `process.env.리터럴` 형태만 빌드 타임에 치환된다. 동적 접근은
+ * 치환 대상이 아니라 브라우저에서 `undefined` 가 된다. 그래서 host **코드** 안에서는
+ * remote 목록을 순회하며 env 를 읽을 수 없고, remote 수만큼 리터럴을 적어야 했다.
+ *
+ * `next.config.ts` 는 다르다. **node 에서 평가되므로** SSOT 를 순회해 값을 다 꺼낼 수 있고,
+ * 결과를 아래 `env` 로 넘기면 Next 가 그걸 번들에 인라인한다. 그러면 host 코드는
+ * 리터럴 **하나**(`process.env.MFA_REMOTE_WEB_ENTRIES`)만 읽으면 되고, remote 가 늘어도
+ * 이 파일도 host 코드도 안 고친다 — `packages/remote-config` 만 고치면 된다.
+ *
+ * `env` 로 넣은 값은 `NEXT_PUBLIC_` 접두사 없이도 브라우저 번들에 들어간다.
+ * 그 접두사는 환경/`.env` 파일로 들어온 변수에만 적용되는 규칙이다.
+ * https://nextjs.org/docs/app/api-reference/config/next-config-js/env
+ *
+ * ⚠️ SSR 엔트리(`REMOTE_*_SSR_ENTRY`)는 여기 넣지 않는다. host **서버**만 쓰는 값이고,
+ * 브라우저에 굳이 노출할 이유가 없다. 그쪽은 서버에서 `process.env[이름]` 으로 읽는다
+ * (`src/mf/remote-endpoints.ts`).
+ */
+const REMOTE_WEB_ENTRIES = Object.fromEntries(
+  REMOTE_LIST.map(({ name, env }) => [
+    name,
+    // `||` 인 이유: 빈 `ARG` 가 빈 문자열로 도착한다 (docs/03-setup/04-dokploy.md)
+    process.env[env.webEntry] || defaultWebEntry(name),
+  ]),
+);
 
 /**
  * host — Next.js 16 / Turbopack
@@ -33,6 +64,11 @@ import type { NextConfig } from 'next';
  */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+
+  /** 위에서 SSOT 를 순회해 만든 값. 소비처는 `src/mf/remote-endpoints.ts` 하나다. */
+  env: {
+    MFA_REMOTE_WEB_ENTRIES: JSON.stringify(REMOTE_WEB_ENTRIES),
+  },
 
   /**
    * 컨테이너 배포용 자립 산출물(.next/standalone).
@@ -93,6 +129,7 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
 
   // 워크스페이스 패키지는 dist(JS)로 빌드되지만, 소스맵/트리셰이킹을 위해 명시
+  // (`@mfa/remote-config` 는 빌드 없이 소스를 그대로 export 하므로 여기 없어도 된다)
   transpilePackages: ['@mfa/ui', '@mfa/contracts'],
 };
 

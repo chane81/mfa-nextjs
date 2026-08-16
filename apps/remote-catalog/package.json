@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n web,ssr -c magenta,gray --kill-others-on-fail \"vite --port 3001 --strictPort\" \"vite build --config vite.config.server.ts --watch\"",
-    "build": "node ../../scripts/mf-build-version.mjs && vite build && pnpm build:ssr && pnpm stamp",
+    "dev": "concurrently -n web,ssr -c magenta,gray --kill-others-on-fail \"vite\" \"vite build --config vite.config.server.ts --watch\"",
+    "build": "node ../../scripts/mf-build-version.ts && vite build && pnpm build:ssr && pnpm stamp",
     "build:ssr": "vite build --config vite.config.server.ts",
-    "stamp": "node ../../scripts/stamp-remote-version.mjs catalog",
-    "start": "node ../../scripts/serve-remote-dist.mjs 3001",
+    "stamp": "node ../../scripts/stamp-remote-version.ts catalog",
+    "start": "node ../../scripts/serve-remote-dist.ts catalog",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist .mf-version .turbo node_modules/.vite"
@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@mfa/eslint-config": "workspace:*",
+    "@mfa/remote-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
     "@module-federation/vite": "^1.20.7",
     "@types/react": "^19.2.2",

@@ -11,9 +11,18 @@ importers:
       '@mfa/eslint-config':
         specifier: workspace:*
         version: link:packages/eslint-config
+      '@mfa/remote-config':
+        specifier: workspace:*
+        version: link:packages/remote-config
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:packages/typescript-config
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.13.3
+      eslint:
+        specifier: ^10.8.1
+        version: 10.8.1(jiti@2.4.2)(supports-color@8.1.1)
       prettier:
         specifier: 3.6.2
         version: 3.6.2
@@ -29,6 +38,9 @@ importers:
       '@mfa/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@mfa/remote-config':
+        specifier: workspace:*
+        version: link:../../packages/remote-config
       '@mfa/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -88,6 +100,9 @@ importers:
       '@mfa/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
+      '@mfa/remote-config':
+        specifier: workspace:*
+        version: link:../../packages/remote-config
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
@@ -137,6 +152,9 @@ importers:
       '@mfa/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
+      '@mfa/remote-config':
+        specifier: workspace:*
+        version: link:../../packages/remote-config
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
@@ -169,6 +187,10 @@ importers:
         version: 8.2.1(@types/node@24.13.3)(jiti@2.4.2)
 
   packages/contracts:
+    dependencies:
+      '@mfa/remote-config':
+        specifier: workspace:*
+        version: link:../remote-config
     devDependencies:
       '@mfa/eslint-config':
         specifier: workspace:*
@@ -216,6 +238,24 @@ importers:
       eslint:
         specifier: ^10.8.1
         version: 10.8.1(jiti@2.4.2)(supports-color@8.1.1)
+
+  packages/remote-config:
+    devDependencies:
+      '@mfa/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@mfa/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.13.3
+      eslint:
+        specifier: ^10.8.1
+        version: 10.8.1(jiti@2.4.2)(supports-color@8.1.1)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
 
   packages/typescript-config: {}
 

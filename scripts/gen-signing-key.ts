@@ -8,7 +8,7 @@
  *   remote CI :  MF_SIGNING_KEY=<private>
  *   host      :  MF_REMOTE_PUBLIC_KEY=<public>  MF_REQUIRE_SIGNATURE=1
  *
- * 사용: node scripts/gen-signing-key.mjs
+ * 사용: node scripts/gen-signing-key.ts
  */
 import { generateKeyPairSync } from 'node:crypto';
 

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { MF_SSR_BUNDLE } from '@mfa/remote-config';
 import { defineConfig } from '@rsbuild/core';
 import { pluginReact } from '@rsbuild/plugin-react';
 
@@ -29,13 +30,14 @@ const DIST_ROOT = VERSION ? `dist/v${VERSION}` : 'dist';
 export default defineConfig({
   plugins: [pluginReact()],
   source: {
-    entry: { 'mf-server': './src/server-entry.ts' },
+    // 엔트리 키가 곧 출력 파일의 `[name]` 이다 — 확장자는 아래 filename 에서 붙는다
+    entry: { [MF_SSR_BUNDLE.name]: './src/server-entry.ts' },
   },
   output: {
     target: 'node',
     // 웹 번들과 같은 버전 디렉터리에 넣는다. 웹 빌드 다음에 돌기 때문에 정리는 하지 않는다.
     distPath: { root: DIST_ROOT, js: '' },
-    filename: { js: '[name].cjs' },
+    filename: { js: `[name]${MF_SSR_BUNDLE.extension}` },
     cleanDistPath: false,
     minify: false,
     externals: {

@@ -6,13 +6,13 @@
 #   docker build -f apps/remote-catalog/Dockerfile .
 #
 # 산출물은 웹 번들 + SSR(node) 번들 두 벌이고 전부 `dist/v<version>/` 아래로 나간다.
-# 런타임은 Next 도 Vite 도 아니다 — scripts/serve-remote-dist.mjs 가 CDN 을 흉내내 서빙한다.
+# 런타임은 Next 도 Vite 도 아니다 — scripts/serve-remote-dist.ts 가 CDN 을 흉내내 서빙한다.
 #
 # ## 빌드 시점에 굳는 값 (런타임 env 로 못 바꾼다)
 #   REMOTE_CATALOG_PUBLIC_URL — 자산 URL 접두사. host 가 다른 오리진에서 청크를 받으므로 절대 URL.
 #   MF_BUILD_VERSION          — 불변 경로 `/v<ver>/` 를 정한다. 없으면 타임스탬프로 떨어진다.
 #   MF_SIGNING_KEY            — 매니페스트 Ed25519 서명. 개인키라 build secret 으로 받는다.
-ARG NODE_VERSION=22-slim
+ARG NODE_VERSION=24-slim
 
 FROM node:${NODE_VERSION} AS base
 ENV PNPM_HOME=/pnpm
@@ -79,7 +79,7 @@ ENV PORT=3001
 ENV REMOTE_DIST_DIR=/data
 
 COPY --from=builder /repo/apps/remote-catalog/dist ./dist
-COPY --from=builder /repo/scripts/serve-remote-dist.mjs ./scripts/serve-remote-dist.mjs
+COPY --from=builder /repo/scripts/serve-remote-dist.ts ./scripts/serve-remote-dist.ts
 COPY --from=builder /repo/scripts/docker/remote-entrypoint.sh ./scripts/remote-entrypoint.sh
 RUN chmod +x ./scripts/remote-entrypoint.sh && mkdir -p /data && chown -R node:node /data /app
 

@@ -11,12 +11,14 @@
  * 내용 해시는 `mf-version.json` 에 메타로 남겨 동일성 판단에 쓸 수 있게 한다.
  *
  * 우선순위: MF_BUILD_VERSION → git short SHA(+dirty) → 타임스탬프
+ *
+ * 사용: node scripts/mf-build-version.ts
  */
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-function gitVersion() {
+function gitVersion(): string | null {
   try {
     const sha = execFileSync('git', ['rev-parse', '--short=10', 'HEAD'], {
       encoding: 'utf8',

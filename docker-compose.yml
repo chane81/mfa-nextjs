@@ -18,6 +18,11 @@
 # 이 아니라 **퍼블리시된 호스트 포트**(host.docker.internal:3001)로 나간다.
 #
 # 주의: PUBLIC_URL 이 localhost 로 굳으므로 이 이미지는 배포용이 아니다.
+#
+# ⚠️ 아래 포트·env 이름·엔트리 경로의 **원본은 `packages/remote-config`** 다.
+# compose 는 정적 YAML 이라 그 모듈을 읽을 수 없어서 여기만 손으로 맞춘다 —
+# 코드·스크립트·번들러 설정·turbo.json 은 전부 SSOT 에서 파생되므로 손댈 곳이 없다.
+# 이 파일은 로컬 검증 전용이고 배포 경로가 아니라서 그 예외를 감수한다.
 services:
   remote-catalog:
     build:

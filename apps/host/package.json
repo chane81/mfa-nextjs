@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --port 3000",
-    "build": "concurrently --kill-others --success first -n catalog,cart,next -c magenta,green,gray \"node ../../scripts/serve-remote-dist.mjs 3001 ../remote-catalog/dist\" \"node ../../scripts/serve-remote-dist.mjs 3002 ../remote-cart/dist\" \"next build\"",
+    "build": "concurrently --kill-others --success first -n catalog,cart,next -c magenta,green,gray \"node ../../scripts/serve-remote-dist.ts catalog\" \"node ../../scripts/serve-remote-dist.ts cart\" \"next build\"",
     "docker:build": "next build",
     "start": "next start --port 3000",
     "lint": "eslint .",
@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@mfa/contracts": "workspace:*",
+    "@mfa/remote-config": "workspace:*",
     "@mfa/ui": "workspace:*",
     "@module-federation/runtime": "^2.8.2",
     "next": "^16.3.1",

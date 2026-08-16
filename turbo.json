@@ -4,24 +4,37 @@
   "globalDependencies": [".env", "pnpm-lock.yaml"],
   "globalEnv": [
     "NODE_ENV",
-    "NEXT_PUBLIC_REMOTE_CATALOG_ENTRY",
-    "NEXT_PUBLIC_REMOTE_CART_ENTRY",
-    "REMOTE_CATALOG_SSR_ENTRY",
-    "REMOTE_CART_SSR_ENTRY",
-    // remote 재배포 → host 캐시 무효화 웹훅 시크릿.
-    // 여기 등록하지 않으면 turbo 가 태스크 환경에서 걸러낸다(strict env).
-    "MF_REVALIDATE_SECRET",
-    // remote 신뢰 경계 (docs/04-experiments/03-cache-modes.md 발견 9)
-    "REMOTE_ALLOWED_ORIGINS",
-    "MF_REMOTE_PUBLIC_KEY",
-    "MF_REQUIRE_SIGNATURE",
-    "MF_REQUIRE_INTEGRITY",
-    // remote 빌드가 매니페스트에 서명할 때 쓰는 개인키 (remote 파이프라인 전용)
-    "MF_SIGNING_KEY",
-    "MF_BUILD_VERSION",
-    // remote 자산 URL 접두사. 빌드 시점에 산출물에 굳는다 (docs/03-setup/04-dokploy.md)
-    "REMOTE_CATALOG_PUBLIC_URL",
-    "REMOTE_CART_PUBLIC_URL",
+    /**
+     * remote 별 주소 설정 전체를 **와일드카드 두 줄**로 받는다. 이름 하나하나를 적으면
+     * remote 를 추가할 때마다 `packages/remote-config` 와 이 파일을 같이 고쳐야 하는데,
+     * 그러면 SSOT 가 반쪽이 된다. turbo 는 접두사 와일드카드를 지원하므로 이름 목록을
+     * 여기 복제하지 않아도 된다.
+     *
+     *   NEXT_PUBLIC_REMOTE_*  → 브라우저가 읽는 매니페스트 URL (…_ENTRY)
+     *   REMOTE_*              → SSR 엔트리(…_SSR_ENTRY), 자산 오리진(…_PUBLIC_URL),
+     *                           신뢰 경계(REMOTE_ALLOWED_ORIGINS),
+     *                           버전 보존 개수(REMOTE_KEEP_VERSIONS)
+     *
+     * 여기 등록하지 않은 변수는 turbo 가 태스크 환경에서 걸러낸다(strict env).
+     */
+    "NEXT_PUBLIC_REMOTE_*",
+    "REMOTE_*",
+    /**
+     * 위 `NEXT_PUBLIC_REMOTE_*` 를 순회해 만든 값을 `next.config.ts` 가 이 이름으로
+     * 번들에 굽는다(그래야 host 코드가 remote 이름을 몰라도 된다 — 그쪽 주석 참고).
+     * 보통은 환경에서 오지 않지만, 밖에서 직접 넣어 덮어쓰는 것도 유효한 사용이라
+     * turbo 가 캐시 키로 추적하게 둔다. remote 개수와 무관한 단일 이름이다.
+     */
+    "MFA_REMOTE_WEB_ENTRIES",
+    /**
+     * MF 운영 변수. remote 개수와 무관한 단일 값들이라 그대로 나열한다.
+     *   MF_REVALIDATE_SECRET  재배포 → host 캐시 무효화 웹훅 시크릿
+     *   MF_REMOTE_PUBLIC_KEY  매니페스트 서명 검증용 공개키 (host)
+     *   MF_SIGNING_KEY        매니페스트 서명용 개인키 (remote 파이프라인 전용)
+     *   MF_REQUIRE_*          서명·무결성 강제 여부
+     * 신뢰 경계 배경: docs/04-experiments/03-cache-modes.md 발견 9
+     */
+    "MF_*",
     // host dev 가 remote 를 기다리는 시간 (scripts/wait-for-remotes.mjs).
     // 등록 전에는 `WAIT_FOR_REMOTES_TIMEOUT=1` 을 줘도 60초를 다 기다렸다 — 실측.
     "WAIT_FOR_REMOTES_TIMEOUT"
@@ -135,6 +148,23 @@
     },
     "typecheck": {
       "dependsOn": ["^build"]
+    },
+
+    /**
+     * `scripts/` 는 워크스페이스 패키지가 아니라 루트에 있어서 위의 패키지 태스크에 안 잡힌다.
+     * 루트 태스크(`//#…`)로 따로 걸어야 `turbo run typecheck` / `lint` 에 포함된다.
+     *
+     * `^build` 가 필요한 이유: `stamp-remote-version.ts` 와 `wait-for-remotes.ts` 가
+     * `@mfa/remote-config` 를 읽는데, 그 패키지는 빌드가 없지만 tsc 가 타입을 풀려면
+     * 워크스페이스 그래프가 서 있어야 한다.
+     */
+    "//#typecheck:scripts": {
+      "dependsOn": ["^build"],
+      "inputs": ["scripts/**/*.ts", "tsconfig.json"]
+    },
+    "//#lint:scripts": {
+      "dependsOn": ["^build"],
+      "inputs": ["scripts/**/*.ts", "eslint.config.js"]
     },
     "clean": {
       "cache": false

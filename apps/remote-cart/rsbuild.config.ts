@@ -2,10 +2,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { pluginModuleFederation } from '@module-federation/rsbuild-plugin';
+import { MF_FILES, REMOTES, publicOrigin } from '@mfa/remote-config';
 import { defineConfig } from '@rsbuild/core';
 import { pluginReact } from '@rsbuild/plugin-react';
 
-const PORT = 3002;
+const REMOTE = REMOTES.cart;
+const PORT = REMOTE.devPort;
 const DIST = resolve(process.cwd(), 'dist');
 /**
  * 이 remote 가 배포된 **공개 오리진**. assetPrefix 가 여기서 나온다.
@@ -13,30 +15,32 @@ const DIST = resolve(process.cwd(), 'dist');
  * host 는 자기 도메인에서 이 remote 의 청크를 받아간다. 상대 경로면 브라우저가
  * host 도메인에서 청크를 찾으므로 절대 URL 이어야 한다.
  *
- * 빌드 시점에 굳는 값이라 배포 파이프라인에서 빌드 인자로 넘긴다.
- * (docs/03-setup/04-dokploy.md)
+ * 값은 `REMOTE_CART_PUBLIC_URL` 에서 오고, env 이름과 로컬 기본값은
+ * `@mfa/remote-config` 가 들고 있다. 빌드 시점에 굳는 값이라 배포 파이프라인에서
+ * 빌드 인자로 넘긴다. (docs/03-setup/04-dokploy.md)
  */
-const PUBLIC_URL = (
-  process.env.REMOTE_CART_PUBLIC_URL || `http://localhost:${PORT}`
-).replace(/\/+$/, '');
+const PUBLIC_URL = publicOrigin(REMOTE.name);
 
 /**
  * dev 서버가 디스크에서 직접 내려주는 경로 (빌드 산출물은 serve-remote-dist.mjs 가 서빙).
  *
- * **`mf-version.json` 은 일부러 뺐다.** 근거는 catalog 쪽 vite.config.ts 주석 참고 —
+ * **버전 공표 파일은 일부러 뺐다.** 근거는 catalog 쪽 vite.config.ts 주석 참고 —
  * 요약하면 직전 빌드가 남긴 매니페스트를 dev 에서 공표하면 host 가 버전 경로를 요청하고,
  * dev 서버가 모르는 경로라 폴백 응답을 주면서 무결성 검사에서 죽는다.
  */
-const SERVED = /^\/mf-server\.cjs$/;
+const SERVED = new Set([`/${MF_FILES.ssrBundle}`]);
 
 /** preview 는 빌드 산출물을 서빙하는 자리라 버전 공표도 의미가 있다 */
-const SERVED_IN_PREVIEW = /^\/(mf-server\.cjs|mf-version\.json)$/;
+const SERVED_IN_PREVIEW = new Set([
+  `/${MF_FILES.ssrBundle}`,
+  `/${MF_FILES.versionManifest}`,
+]);
 
 /**
  * dev 에 존재하지 않는 배포 개념. 그냥 next() 로 흘리면 무엇이 이 요청을 처리했는지가
  * 응답에 따라 달라져 원인 추적이 어렵다. 여기서 명시적으로 404 를 준다.
  */
-const NOT_IN_DEV = /^\/mf-version\.json$/;
+const NOT_IN_DEV = new Set([`/${MF_FILES.versionManifest}`]);
 
 /**
  * 빌드 버전. `scripts/mf-build-version.mjs` 가 빌드 직전에 써 둔다.
@@ -60,7 +64,7 @@ export default defineConfig({
   plugins: [
     pluginReact(),
     pluginModuleFederation({
-      name: 'cart',
+      name: REMOTE.name,
       filename: 'remoteEntry.js',
       exposes: {
         './CartPanel': './src/exposes/CartPanel.tsx',
@@ -107,7 +111,7 @@ export default defineConfig({
       server.middlewares.use((req, res, next) => {
         const path = req.url?.split('?')[0] ?? '';
 
-        if (dev && NOT_IN_DEV.test(path)) {
+        if (dev && NOT_IN_DEV.has(path)) {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.setHeader('Access-Control-Allow-Origin', '*');
@@ -117,7 +121,7 @@ export default defineConfig({
           return;
         }
 
-        if (!(dev ? SERVED : SERVED_IN_PREVIEW).test(path)) {
+        if (!(dev ? SERVED : SERVED_IN_PREVIEW).has(path)) {
           next();
           return;
         }

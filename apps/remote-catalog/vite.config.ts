@@ -2,10 +2,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { federation } from '@module-federation/vite';
+import { MF_FILES, REMOTES, publicOrigin } from '@mfa/remote-config';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Connect, type Plugin } from 'vite';
 
-const PORT = 3001;
+const REMOTE = REMOTES.catalog;
+const PORT = REMOTE.devPort;
 
 /**
  * 이 remote 가 배포된 **공개 오리진**. 자산 URL 접두사(`base`)가 여기서 나온다.
@@ -13,12 +15,11 @@ const PORT = 3001;
  * host 는 자기 도메인에서 이 remote 의 청크를 받아간다. 그래서 상대 경로로는 안 되고
  * 절대 URL 이어야 한다 — 상대 경로면 브라우저가 host 도메인에서 청크를 찾는다.
  *
- * 빌드 시점에 굳는 값이라 배포 파이프라인에서 빌드 인자로 넘겨야 한다.
- * (docs/03-setup/04-dokploy.md)
+ * 값은 `REMOTE_CATALOG_PUBLIC_URL` 에서 오고, env 이름과 로컬 기본값은
+ * `@mfa/remote-config` 가 들고 있다. 빌드 시점에 산출물에 굳는 값이라
+ * 배포 파이프라인에서 빌드 인자로 넘겨야 한다. (docs/03-setup/04-dokploy.md)
  */
-const PUBLIC_URL = (
-  process.env.REMOTE_CATALOG_PUBLIC_URL || `http://localhost:${PORT}`
-).replace(/\/+$/, '');
+const PUBLIC_URL = publicOrigin(REMOTE.name);
 
 /**
  * 빌드 버전. `scripts/mf-build-version.mjs` 가 빌드 직전에 써 둔다.
@@ -52,17 +53,20 @@ function buildVersion(): string | null {
  * 안 내려주면 host 는 버전을 모르는 상태가 되어 버전 없는 엔트리로 폴백한다.
  * 그게 dev 에서 의도된 경로다(`server-loader.ts` 의 `resolveEntry` 주석).
  */
-const SERVED = /^\/mf-server\.cjs$/;
+const SERVED = new Set([`/${MF_FILES.ssrBundle}`]);
 
 /** preview 는 빌드 산출물을 서빙하는 자리라 버전 공표도 의미가 있다 */
-const SERVED_IN_PREVIEW = /^\/(mf-server\.cjs|mf-version\.json)$/;
+const SERVED_IN_PREVIEW = new Set([
+  `/${MF_FILES.ssrBundle}`,
+  `/${MF_FILES.versionManifest}`,
+]);
 
 /**
  * dev 에 존재하지 않는 배포 개념. 그냥 next() 로 흘리면 Vite 의 SPA 폴백이
  * `index.html` 을 200 으로 돌려주고, host 는 그걸 매니페스트로 파싱하려다 실패한다.
  * 결과는 같지만(폴백) 원인이 로그에서 사라진다. 여기서 명시적으로 404 를 준다.
  */
-const NOT_IN_DEV = /^\/mf-version\.json$/;
+const NOT_IN_DEV = new Set([`/${MF_FILES.versionManifest}`]);
 
 /**
  * 이 미들웨어가 어느 서버에 붙었는지.
@@ -84,7 +88,7 @@ function serveSsrBundle(): Plugin {
       const path = req.url?.split('?')[0] ?? '';
       const dev = kind === 'dev';
 
-      if (dev && NOT_IN_DEV.test(path)) {
+      if (dev && NOT_IN_DEV.has(path)) {
         res.statusCode = 404;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.setHeader('Access-Control-Allow-Origin', '*');
@@ -94,7 +98,7 @@ function serveSsrBundle(): Plugin {
         return;
       }
 
-      if (!(dev ? SERVED : SERVED_IN_PREVIEW).test(path)) return next();
+      if (!(dev ? SERVED : SERVED_IN_PREVIEW).has(path)) return next();
 
       try {
         const body = readFileSync(
@@ -150,7 +154,7 @@ export default defineConfig(({ command }) => {
       react(),
       serveSsrBundle(),
       federation({
-        name: 'catalog',
+        name: REMOTE.name,
         filename: 'remoteEntry.js',
         // mf-manifest.json 을 내보내야 host 런타임이 포맷/공유 정보를 자동 판별한다
         manifest: true,

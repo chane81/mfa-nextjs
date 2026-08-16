@@ -15,7 +15,7 @@
  *
  * 롤백은 이 파일만 옛 버전으로 되돌리면 된다. 자산은 그대로 남아 있다.
  *
- * 사용: node scripts/stamp-remote-version.mjs <remote-name> [distDir]
+ * 사용: node scripts/stamp-remote-version.ts <remote-name> [distDir]
  */
 import { createHash, createPrivateKey, sign } from 'node:crypto';
 import {
@@ -28,11 +28,19 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-const [remote, distArg] = process.argv.slice(2);
-if (!remote) {
+import { MF_FILES, assertRemoteName } from '@mfa/remote-config';
+
+const [remoteArg, distArg] = process.argv.slice(2);
+if (!remoteArg) {
   console.error('usage: stamp-remote-version.mjs <remote-name> [distDir]');
   process.exit(1);
 }
+/**
+ * 이름을 여기서 검증하는 이유는 이 값이 **서명 대상 페이로드의 첫 필드**이기 때문이다.
+ * 오타난 이름으로 stamp 하면 매니페스트 자체는 멀쩡히 만들어지고, host 가 받아서
+ * 서명을 검증할 때야 실패한다 — 원인에서 한참 떨어진 자리에서 터진다.
+ */
+const remote = assertRemoteName(remoteArg);
 
 const cwd = process.cwd();
 const dist = resolve(cwd, distArg ?? 'dist');
@@ -40,26 +48,26 @@ const dist = resolve(cwd, distArg ?? 'dist');
 const versionFile = resolve(cwd, '.mf-version');
 if (!existsSync(versionFile)) {
   console.error(
-    '[stamp] .mf-version 이 없습니다. 빌드 전에 mf-build-version.mjs 가 돌아야 합니다.',
+    '[stamp] .mf-version 이 없습니다. 빌드 전에 mf-build-version.ts 가 돌아야 합니다.',
   );
   process.exit(1);
 }
 const version = readFileSync(versionFile, 'utf8').trim();
 if (!version) {
   console.error(
-    '[stamp] .mf-version 이 비어 있습니다. mf-build-version.mjs 가 버전을 못 정했습니다.',
+    '[stamp] .mf-version 이 비어 있습니다. mf-build-version.ts 가 버전을 못 정했습니다.',
   );
   process.exit(1);
 }
 
 const versionDir = join(dist, `v${version}`);
-const ssrBundle = join(versionDir, 'mf-server.cjs');
-const manifest = join(versionDir, 'mf-manifest.json');
+const ssrBundle = join(versionDir, MF_FILES.ssrBundle);
+const manifest = join(versionDir, MF_FILES.webManifest);
 
 for (const [label, file] of [
   ['SSR 번들', ssrBundle],
   ['MF 매니페스트', manifest],
-]) {
+] as const) {
   if (!existsSync(file)) {
     console.error(`[stamp] ${label} 이 없습니다: ${file}`);
     process.exit(1);
@@ -76,16 +84,16 @@ hash.update(readFileSync(ssrBundle));
 hash.update(readFileSync(manifest));
 
 /** SRI 형식. host 가 받은 바이트를 평가 **전에** 이 값과 대조한다. */
-const integrity = (file) =>
+const integrity = (file: string): string =>
   `sha384-${createHash('sha384').update(readFileSync(file)).digest('base64')}`;
 
 const payload = {
   remote,
   version,
   /** host 서버가 받아 실행하는 node 번들 */
-  ssrEntry: `/v${version}/mf-server.cjs`,
+  ssrEntry: `/v${version}/${MF_FILES.ssrBundle}`,
   /** 브라우저 MF 런타임이 읽는 매니페스트 */
-  webEntry: `/v${version}/mf-manifest.json`,
+  webEntry: `/v${version}/${MF_FILES.webManifest}`,
   ssrIntegrity: integrity(ssrBundle),
   webIntegrity: integrity(manifest),
 };
@@ -119,7 +127,7 @@ if (process.env.MF_SIGNING_KEY) {
 }
 
 writeFileSync(
-  join(dist, 'mf-version.json'),
+  join(dist, MF_FILES.versionManifest),
   `${JSON.stringify(
     {
       ...payload,
@@ -144,7 +152,7 @@ const KEEP = 3;
 const dirs = readdirSync(dist, { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && entry.name.startsWith('v'))
   .map((entry) => entry.name)
-  .filter((name) => existsSync(join(dist, name, 'mf-server.cjs')))
+  .filter((name) => existsSync(join(dist, name, MF_FILES.ssrBundle)))
   // 오래된 것부터 지운다. 버전 문자열은 정렬 가능한 형식이 아니라 mtime 을 쓴다.
   .sort(
     (a, b) => statSync(join(dist, a)).mtimeMs - statSync(join(dist, b)).mtimeMs,

@@ -21,6 +21,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist .turbo"
   },
+  "dependencies": {
+    "@mfa/remote-config": "workspace:*"
+  },
   "devDependencies": {
     "@mfa/eslint-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",

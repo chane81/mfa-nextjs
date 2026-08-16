@@ -32,6 +32,12 @@
  * 시간 안에 못 뜨면 **막지 않고 경고만 남기고 통과**한다. remote 없이 host 만 띄우는
  * 것도 정당한 작업 방식이고(진단 화면 등), dev 가 영영 안 뜨는 쪽이 더 나쁘다.
  */
+import {
+  REMOTE_LIST,
+  defaultSsrEntry,
+  defaultWebEntry,
+} from '@mfa/remote-config';
+
 const TIMEOUT_MS = Number(process.env.WAIT_FOR_REMOTES_TIMEOUT ?? 60_000);
 const INTERVAL_MS = 300;
 const FETCH_TIMEOUT_MS = 5000;
@@ -43,35 +49,21 @@ const FETCH_TIMEOUT_MS = 5000;
  * 줄어드는데, 그때마다 host 쪽 스크립트를 같이 고쳐야 한다면 그건 결합이다.
  * 필요한 모듈 URL 은 매니페스트에서 읽어낸다(`webReady`).
  *
- * 두 URL 모두 **host 가 실제로 설정에 들고 있는 값**을 그대로 쓴다.
- *   web → `apps/host/src/mf/runtime.ts` 의 remotes[].entry
- *   ssr → `apps/host/src/mf/remote-version.ts` 의 SSR 엔트리
- * 기다리는 URL 과 실제로 가져가는 URL 이 어긋나면 게이트가 헛돈다.
+ * env 이름도 기본값도 `@mfa/remote-config` 에서 온다. **기다리는 URL 과 host 가 실제로
+ * 가져가는 URL 이 어긋나면 게이트가 헛돈다** — 같은 SSOT 를 host 의
+ * `apps/host/src/mf/remote-endpoints.ts` 가 읽으므로 그 어긋남이 구조적으로 안 생긴다.
+ * (host 는 `NEXT_PUBLIC_*` 치환 제약 때문에 env 를 리터럴로 읽는다. 그쪽 주석 참고.)
  */
-const REMOTES = [
-  {
-    name: 'catalog',
-    web:
-      process.env.NEXT_PUBLIC_REMOTE_CATALOG_ENTRY ||
-      'http://localhost:3001/mf-manifest.json',
-    ssr:
-      process.env.REMOTE_CATALOG_SSR_ENTRY ||
-      'http://localhost:3001/mf-server.cjs',
-  },
-  {
-    name: 'cart',
-    web:
-      process.env.NEXT_PUBLIC_REMOTE_CART_ENTRY ||
-      'http://localhost:3002/mf-manifest.json',
-    ssr:
-      process.env.REMOTE_CART_SSR_ENTRY ||
-      'http://localhost:3002/mf-server.cjs',
-  },
-];
+const REMOTES = REMOTE_LIST.map(({ name, env }) => ({
+  name,
+  web: process.env[env.webEntry] || defaultWebEntry(name),
+  ssr: process.env[env.ssrEntry] || defaultSsrEntry(name),
+}));
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
-async function fetchOk(url) {
+async function fetchOk(url: string): Promise<Response | null> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -83,6 +75,20 @@ async function fetchOk(url) {
 }
 
 /**
+ * MF 매니페스트 중 **이 스크립트가 읽는 부분만**.
+ *
+ * 전체 스키마를 옮겨 적지 않는다. 여기서 필요한 건 "remoteEntry 가 어디 있는가" 하나이고,
+ * 나머지를 적어두면 스펙이 바뀔 때마다 쓰지도 않는 필드 때문에 이 파일을 고치게 된다.
+ * catalog(Vite)와 cart(Rsbuild)가 서로 다른 번들러인데도 이 필드들은 똑같이 채운다.
+ */
+interface MfManifest {
+  metaData?: {
+    publicPath?: string;
+    remoteEntry?: { name?: string; path?: string };
+  };
+}
+
+/**
  * 매니페스트가 스스로 공표한 remoteEntry 의 절대 URL.
  *
  * MF 매니페스트 스펙의 `metaData.publicPath` + `metaData.remoteEntry` 를 조립한다.
@@ -91,13 +97,17 @@ async function fetchOk(url) {
  *
  * `publicPath` 가 절대 URL 이 아닌 경우(`auto` 등)를 대비해 매니페스트 URL 을 기준으로 푼다.
  */
-function remoteEntryUrl(manifest, manifestUrl) {
+function remoteEntryUrl(
+  manifest: MfManifest | null,
+  manifestUrl: string,
+): string | null {
   const { publicPath, remoteEntry } = manifest?.metaData ?? {};
   if (!remoteEntry?.name) return null;
 
-  const base = /^https?:\/\//.test(publicPath ?? '')
-    ? publicPath
-    : new URL('.', manifestUrl).href;
+  const base =
+    publicPath && /^https?:\/\//.test(publicPath)
+      ? publicPath
+      : new URL('.', manifestUrl).href;
   const dir = remoteEntry.path
     ? `${remoteEntry.path.replace(/^\/+|\/+$/g, '')}/`
     : '';
@@ -120,13 +130,13 @@ function remoteEntryUrl(manifest, manifestUrl) {
  * `vite.config.ts` 의 `optimizeDeps.entries` + `include` 가 기동 시점에 프리번들을
  * 끝내주기 때문이다. ②는 그 설정이 사라지거나 remote 가 늘었을 때를 위한 보험이다.
  */
-async function webReady(manifestUrl) {
+async function webReady(manifestUrl: string): Promise<boolean> {
   const res = await fetchOk(manifestUrl);
   if (!res) return false;
 
-  let entryUrl = null;
+  let entryUrl: string | null;
   try {
-    entryUrl = remoteEntryUrl(await res.json(), manifestUrl);
+    entryUrl = remoteEntryUrl((await res.json()) as MfManifest, manifestUrl);
   } catch {
     // 매니페스트가 아직 온전한 JSON 이 아니다 — 다음 폴링에서 다시 본다
     return false;
@@ -137,15 +147,22 @@ async function webReady(manifestUrl) {
   return Boolean(await fetchOk(entryUrl));
 }
 
-const ssrReady = async (url) => Boolean(await fetchOk(url));
+const ssrReady = async (url: string): Promise<boolean> =>
+  Boolean(await fetchOk(url));
+
+interface Probe {
+  label: string;
+  url: string;
+  isReady: (url: string) => Promise<boolean>;
+}
 
 /** `{ name, web, ssr }` → 실제로 폴링할 프로브 목록 */
-const PROBES = REMOTES.flatMap(({ name, web, ssr }) => [
+const PROBES: Probe[] = REMOTES.flatMap(({ name, web, ssr }) => [
   { label: `${name} web`, url: web, isReady: webReady },
   { label: `${name} ssr`, url: ssr, isReady: ssrReady },
 ]);
 
-async function waitFor({ label, url, isReady }) {
+async function waitFor({ label, url, isReady }: Probe): Promise<boolean> {
   const started = Date.now();
   while (Date.now() - started < TIMEOUT_MS) {
     if (await isReady(url)) {
