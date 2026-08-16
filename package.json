@@ -13,6 +13,8 @@
     "start": "pnpm build && turbo run start",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {

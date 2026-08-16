@@ -1,0 +1,8 @@
+# 빌드 산출물
+.next/
+dist/
+out/
+.turbo/
+
+# 잠금 파일
+pnpm-lock.yaml
