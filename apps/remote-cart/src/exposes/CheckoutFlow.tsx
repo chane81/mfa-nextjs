@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState } from 'react';
 
-import { formatKRW, type CheckoutFlowProps } from "@mfa/contracts";
-import { Badge, Button, Panel, tokens, useCart } from "@mfa/ui";
+import { formatKRW, type CheckoutFlowProps } from '@mfa/contracts';
+import { Badge, Button, Panel, tokens, useCart } from '@mfa/ui';
 
 /**
  * host 에 노출되는 모듈: `cart/CheckoutFlow`
@@ -10,7 +10,10 @@ import { Badge, Button, Panel, tokens, useCart } from "@mfa/ui";
  * 이유: zone 경계를 넘으면 하드 내비게이션이 강제되어 SPA 설계가 무의미해진다.
  * remote 로 두면 라우팅이 host 안에 남아 소프트 내비게이션이 유지된다.
  */
-export default function CheckoutFlow({ onDone, onContinueShopping }: CheckoutFlowProps) {
+export default function CheckoutFlow({
+  onDone,
+  onContinueShopping,
+}: CheckoutFlowProps) {
   const { lines, totalPriceLabel, totalQuantity, store } = useCart();
   const [placed, setPlaced] = useState(false);
 
@@ -38,16 +41,16 @@ export default function CheckoutFlow({ onDone, onContinueShopping }: CheckoutFlo
     >
       {lines.length === 0 ? (
         <p style={{ margin: 0, color: tokens.color.textMuted, fontSize: 13 }}>
-          장바구니가 비어 있습니다.{" "}
+          장바구니가 비어 있습니다.{' '}
           <button
             type="button"
             onClick={onContinueShopping}
             style={{
-              background: "none",
-              border: "none",
+              background: 'none',
+              border: 'none',
               padding: 0,
               color: tokens.color.accent,
-              cursor: "pointer",
+              cursor: 'pointer',
               fontSize: 13,
               fontFamily: tokens.font.body,
             }}
@@ -59,11 +62,11 @@ export default function CheckoutFlow({ onDone, onContinueShopping }: CheckoutFlo
         <>
           <ul
             style={{
-              listStyle: "none",
+              listStyle: 'none',
               margin: 0,
               padding: 0,
-              display: "flex",
-              flexDirection: "column",
+              display: 'flex',
+              flexDirection: 'column',
               gap: tokens.space(2),
             }}
           >
@@ -71,8 +74,8 @@ export default function CheckoutFlow({ onDone, onContinueShopping }: CheckoutFlo
               <li
                 key={line.productId}
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
+                  display: 'flex',
+                  justifyContent: 'space-between',
                   padding: tokens.space(3),
                   background: tokens.color.surfaceAlt,
                   border: `1px solid ${tokens.color.border}`,
@@ -91,9 +94,9 @@ export default function CheckoutFlow({ onDone, onContinueShopping }: CheckoutFlo
           </ul>
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
               borderTop: `1px solid ${tokens.color.border}`,
               paddingTop: tokens.space(3),
             }}

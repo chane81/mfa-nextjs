@@ -17,37 +17,48 @@
  *
  * 사용: node scripts/stamp-remote-version.mjs <remote-name> [distDir]
  */
-import { createHash, createPrivateKey, sign } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { createHash, createPrivateKey, sign } from 'node:crypto';
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { join, resolve } from 'node:path';
 
 const [remote, distArg] = process.argv.slice(2);
 if (!remote) {
-  console.error("usage: stamp-remote-version.mjs <remote-name> [distDir]");
+  console.error('usage: stamp-remote-version.mjs <remote-name> [distDir]');
   process.exit(1);
 }
 
 const cwd = process.cwd();
-const dist = resolve(cwd, distArg ?? "dist");
+const dist = resolve(cwd, distArg ?? 'dist');
 
-const versionFile = resolve(cwd, ".mf-version");
+const versionFile = resolve(cwd, '.mf-version');
 if (!existsSync(versionFile)) {
-  console.error("[stamp] .mf-version 이 없습니다. 빌드 전에 mf-build-version.mjs 가 돌아야 합니다.");
+  console.error(
+    '[stamp] .mf-version 이 없습니다. 빌드 전에 mf-build-version.mjs 가 돌아야 합니다.',
+  );
   process.exit(1);
 }
-const version = readFileSync(versionFile, "utf8").trim();
+const version = readFileSync(versionFile, 'utf8').trim();
 if (!version) {
-  console.error("[stamp] .mf-version 이 비어 있습니다. mf-build-version.mjs 가 버전을 못 정했습니다.");
+  console.error(
+    '[stamp] .mf-version 이 비어 있습니다. mf-build-version.mjs 가 버전을 못 정했습니다.',
+  );
   process.exit(1);
 }
 
 const versionDir = join(dist, `v${version}`);
-const ssrBundle = join(versionDir, "mf-server.cjs");
-const manifest = join(versionDir, "mf-manifest.json");
+const ssrBundle = join(versionDir, 'mf-server.cjs');
+const manifest = join(versionDir, 'mf-manifest.json');
 
 for (const [label, file] of [
-  ["SSR 번들", ssrBundle],
-  ["MF 매니페스트", manifest],
+  ['SSR 번들', ssrBundle],
+  ['MF 매니페스트', manifest],
 ]) {
   if (!existsSync(file)) {
     console.error(`[stamp] ${label} 이 없습니다: ${file}`);
@@ -60,12 +71,13 @@ for (const [label, file] of [
  * 버전은 빌드 ID 라 내용이 같아도 매번 달라지는데, "실제로 코드가 바뀌었는지"는
  * 이 값으로 판단할 수 있다(불필요한 배포를 걸러내는 용도).
  */
-const hash = createHash("sha256");
+const hash = createHash('sha256');
 hash.update(readFileSync(ssrBundle));
 hash.update(readFileSync(manifest));
 
 /** SRI 형식. host 가 받은 바이트를 평가 **전에** 이 값과 대조한다. */
-const integrity = (file) => `sha384-${createHash("sha384").update(readFileSync(file)).digest("base64")}`;
+const integrity = (file) =>
+  `sha384-${createHash('sha384').update(readFileSync(file)).digest('base64')}`;
 
 const payload = {
   remote,
@@ -97,19 +109,21 @@ const signedPayload = JSON.stringify([
 let signature = null;
 if (process.env.MF_SIGNING_KEY) {
   const key = createPrivateKey({
-    key: Buffer.from(process.env.MF_SIGNING_KEY, "base64"),
-    format: "der",
-    type: "pkcs8",
+    key: Buffer.from(process.env.MF_SIGNING_KEY, 'base64'),
+    format: 'der',
+    type: 'pkcs8',
   });
-  signature = sign(null, Buffer.from(signedPayload, "utf8"), key).toString("base64");
+  signature = sign(null, Buffer.from(signedPayload, 'utf8'), key).toString(
+    'base64',
+  );
 }
 
 writeFileSync(
-  join(dist, "mf-version.json"),
+  join(dist, 'mf-version.json'),
   `${JSON.stringify(
     {
       ...payload,
-      contentHash: hash.digest("hex").slice(0, 12),
+      contentHash: hash.digest('hex').slice(0, 12),
       ...(signature ? { signature } : {}),
     },
     null,
@@ -117,7 +131,9 @@ writeFileSync(
   )}\n`,
 );
 
-console.log(`[stamp] 무결성 ${payload.ssrIntegrity.slice(0, 20)}… / 서명 ${signature ? "있음" : "없음"}`);
+console.log(
+  `[stamp] 무결성 ${payload.ssrIntegrity.slice(0, 20)}… / 서명 ${signature ? '있음' : '없음'}`,
+);
 
 /**
  * 옛 버전 디렉터리를 3개까지 남긴다.
@@ -126,13 +142,17 @@ console.log(`[stamp] 무결성 ${payload.ssrIntegrity.slice(0, 20)}… / 서명 
  */
 const KEEP = 3;
 const dirs = readdirSync(dist, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory() && entry.name.startsWith("v"))
+  .filter((entry) => entry.isDirectory() && entry.name.startsWith('v'))
   .map((entry) => entry.name)
-  .filter((name) => existsSync(join(dist, name, "mf-server.cjs")))
+  .filter((name) => existsSync(join(dist, name, 'mf-server.cjs')))
   // 오래된 것부터 지운다. 버전 문자열은 정렬 가능한 형식이 아니라 mtime 을 쓴다.
-  .sort((a, b) => statSync(join(dist, a)).mtimeMs - statSync(join(dist, b)).mtimeMs);
+  .sort(
+    (a, b) => statSync(join(dist, a)).mtimeMs - statSync(join(dist, b)).mtimeMs,
+  );
 
-for (const stale of dirs.filter((name) => name !== `v${version}`).slice(0, Math.max(0, dirs.length - KEEP))) {
+for (const stale of dirs
+  .filter((name) => name !== `v${version}`)
+  .slice(0, Math.max(0, dirs.length - KEEP))) {
   rmSync(join(dist, stale), { recursive: true, force: true });
   console.log(`[stamp] 오래된 버전 정리: ${stale}`);
 }

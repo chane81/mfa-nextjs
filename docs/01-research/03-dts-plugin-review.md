@@ -7,12 +7,12 @@
 
 ## 요약 (결론 먼저)
 
-| 질문 | 답 |
-| --- | --- |
-| 콘솔 에러 때문에 `dts` 를 꺼야만 했나? | **아니다.** 에러는 `dev` 옵션 소관이다. `dev.disableDynamicRemoteTypeHints: true` 로 끌 수 있다 |
-| 번들러 플러그인 없는 host 가 타입을 소비할 수 있나? | **가능하다.** `mf dts --fetch` CLI 로 검증 완료 |
-| 지금 도입할 가치가 있나? | **없다.** 우리 구조에서는 커버리지가 절반이고 CI 비용이 크다 |
-| 대신 뭘 할까? | remote 안에서 `RemoteModuleMap` 준수를 컴파일 타임에 강제 (도구 0개 추가) |
+| 질문                                                | 답                                                                                              |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| 콘솔 에러 때문에 `dts` 를 꺼야만 했나?              | **아니다.** 에러는 `dev` 옵션 소관이다. `dev.disableDynamicRemoteTypeHints: true` 로 끌 수 있다 |
+| 번들러 플러그인 없는 host 가 타입을 소비할 수 있나? | **가능하다.** `mf dts --fetch` CLI 로 검증 완료                                                 |
+| 지금 도입할 가치가 있나?                            | **없다.** 우리 구조에서는 커버리지가 절반이고 CI 비용이 크다                                    |
+| 대신 뭘 할까?                                       | remote 안에서 `RemoteModuleMap` 준수를 컴파일 타임에 강제 (도구 0개 추가)                       |
 
 ## 1. 콘솔 에러의 진짜 스위치는 `dts` 가 아니라 `dev` 다
 
@@ -45,9 +45,9 @@ DTS 를 유지하면서 콘솔 에러만 없애려면:
 
 ```ts
 federation({
-  dts: true,                                     // 켠 채로
-  dev: { disableDynamicRemoteTypeHints: true },  // WS 만 끔
-})
+  dts: true, // 켠 채로
+  dev: { disableDynamicRemoteTypeHints: true }, // WS 만 끔
+});
 ```
 
 ### 실측으로 확인
@@ -55,11 +55,11 @@ federation({
 catalog remote 설정을 임시로 바꿔가며 **dev 서버가 실제로 서빙하는 모듈 그래프**를 스캔했다.
 (프로덕션 `dist/` 가 아니라 `http://localhost:3001/remoteEntry.js` 부터 import 를 따라감)
 
-| 설정 | `dynamic-remote-type-hints` 주입 | DTS 생성 로그 |
-| --- | --- | --- |
-| `dts: true` (기본) | **있음** — `/remoteEntry.js` + 플러그인 모듈 | `Federated types created correctly` |
-| `dts: true` + `dev.disableDynamicRemoteTypeHints: true` | **없음** | `Federated types created correctly` |
-| `dts: false` (현재 저장소) | 없음 | 없음 |
+| 설정                                                    | `dynamic-remote-type-hints` 주입             | DTS 생성 로그                       |
+| ------------------------------------------------------- | -------------------------------------------- | ----------------------------------- |
+| `dts: true` (기본)                                      | **있음** — `/remoteEntry.js` + 플러그인 모듈 | `Federated types created correctly` |
+| `dts: true` + `dev.disableDynamicRemoteTypeHints: true` | **없음**                                     | `Federated types created correctly` |
+| `dts: false` (현재 저장소)                              | 없음                                         | 없음                                |
 
 **따라서 "DTS 를 쓰려면 콘솔 에러를 감수해야 한다"는 전제는 틀렸다.**
 현재 `dts: false` 는 여전히 유효한 선택이지만, 근거는 콘솔 에러가 아니라 아래 3~5번이다.
@@ -87,10 +87,11 @@ dts-out/
 
 ```ts
 // compiled-types/src/exposes/ProductGrid.d.ts
-import { type ProductGridProps } from "@mfa/contracts";
-export default function ProductGrid(
-  { category, onSelect }: ProductGridProps
-): import("react").JSX.Element;
+import { type ProductGridProps } from '@mfa/contracts';
+export default function ProductGrid({
+  category,
+  onSelect,
+}: ProductGridProps): import('react').JSX.Element;
 ```
 
 **여기서 이미 핵심이 드러난다.** 생성된 타입이 `@mfa/contracts` 를 그대로 import 한다.
@@ -157,9 +158,11 @@ $ mf dts --fetch true --generate false -c module-federation.config.cjs
 `index.d.ts` 가 흥미롭다. **우리가 쓰는 바로 그 패키지를 모듈 확장한다.**
 
 ```ts
-declare module "@module-federation/runtime" {
+declare module '@module-federation/runtime' {
   type RemoteKeys = 'catalog/ProductGrid' | 'catalog/ProductDetail';
-  export function loadRemote<T extends RemoteKeys, Y>(packageName: T): Promise<PackageType<T, Y>>;
+  export function loadRemote<T extends RemoteKeys, Y>(
+    packageName: T,
+  ): Promise<PackageType<T, Y>>;
 }
 ```
 
@@ -177,15 +180,17 @@ host tsconfig 에 매핑을 넣지 않으면 해석되지 않는다.
 DTS 가 타입을 붙여주는 대상은 `loadRemote()` 다. 그런데 우리 host 는 이렇게 생겼다.
 
 ```ts
-export function loadRemoteModule<K extends RemoteModuleId>(id: K): Promise<RemoteModuleMap[K]> {
-  if (typeof window === "undefined") return loadRemoteModuleOnServer(id);  // ← 우리 코드
-  return loadOnClient(id);                                                 // ← loadRemote()
+export function loadRemoteModule<K extends RemoteModuleId>(
+  id: K,
+): Promise<RemoteModuleMap[K]> {
+  if (typeof window === 'undefined') return loadRemoteModuleOnServer(id); // ← 우리 코드
+  return loadOnClient(id); // ← loadRemote()
 }
 ```
 
-| 경로 | DTS 적용 |
-| --- | --- |
-| 브라우저 (`loadRemote`) | ⭕ 모듈 확장이 먹는다 |
+| 경로                                                | DTS 적용                 |
+| --------------------------------------------------- | ------------------------ |
+| 브라우저 (`loadRemote`)                             | ⭕ 모듈 확장이 먹는다    |
 | 서버 (`server-loader.ts` 의 fetch + `new Function`) | ❌ MF 가 존재조차 모른다 |
 
 SSR 경로는 우리가 직접 만든 로더다. DTS 는 여기에 아무 타입도 못 준다.
@@ -196,15 +201,15 @@ SSR 경로는 우리가 직접 만든 로더다. DTS 는 여기에 아무 타입
 
 ## 5. 도입 비용
 
-| 항목 | 내용 |
-| --- | --- |
-| host 파이프라인 | `module-federation.config` + `mf dts --fetch` 실행 스크립트 + turbo task 추가 |
-| tsconfig | `paths: { "*": ["./@mf-types/*"] }` |
-| .gitignore | `@mf-types`, `@mf-types.zip` |
-| **CI 순서 의존** | `consumeTypes` 는 zip 을 **HTTP 로** 받는다. typecheck 전에 remote 가 **떠 있어야** 한다 |
-| dev 노이즈 | `dev.disableDynamicRemoteTypeHints: true` 필수 |
-| 빌드 시간 | remote 마다 tsc 한 번 더 (`compileInChildProcess`) |
-| 실패 모드 | remote 미기동 시 타입 소실 → `abortOnError` 를 켜면 CI 가 깨지고, 끄면 조용히 `any` 가 된다 |
+| 항목             | 내용                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------- |
+| host 파이프라인  | `module-federation.config` + `mf dts --fetch` 실행 스크립트 + turbo task 추가               |
+| tsconfig         | `paths: { "*": ["./@mf-types/*"] }`                                                         |
+| .gitignore       | `@mf-types`, `@mf-types.zip`                                                                |
+| **CI 순서 의존** | `consumeTypes` 는 zip 을 **HTTP 로** 받는다. typecheck 전에 remote 가 **떠 있어야** 한다    |
+| dev 노이즈       | `dev.disableDynamicRemoteTypeHints: true` 필수                                              |
+| 빌드 시간        | remote 마다 tsc 한 번 더 (`compileInChildProcess`)                                          |
+| 실패 모드        | remote 미기동 시 타입 소실 → `abortOnError` 를 켜면 CI 가 깨지고, 끄면 조용히 `any` 가 된다 |
 
 CI 순서 의존이 제일 크다. 지금은 `pnpm typecheck` 가 네트워크 없이 도는데,
 DTS 를 붙이면 **타입 검사에 remote 서버 기동이 전제**가 된다.
@@ -219,18 +224,21 @@ DTS 로 잡고 싶은 건 결국 **계약 드리프트**다. 우리 실패 모�
 
 ```ts
 // apps/remote-catalog/src/server-entry.ts (개념)
-import type { RemoteModuleMap } from "@mfa/contracts";
+import type { RemoteModuleMap } from '@mfa/contracts';
 
 /** `catalog/X` 계약 키 → `./X` expose 키 매핑을 타입으로 강제 */
 type CatalogExposes = {
-  [K in Extract<keyof RemoteModuleMap, `catalog/${string}`> as
-    K extends `catalog/${infer N}` ? `./${N}` : never
-  ]: RemoteModuleMap[K]["default"];
+  [K in Extract<
+    keyof RemoteModuleMap,
+    `catalog/${string}`
+  > as K extends `catalog/${infer N}`
+    ? `./${N}`
+    : never]: RemoteModuleMap[K]['default'];
 };
 
 const exposes: CatalogExposes = {
-  "./ProductGrid": ProductGrid,
-  "./ProductDetail": ProductDetail,
+  './ProductGrid': ProductGrid,
+  './ProductDetail': ProductDetail,
 };
 ```
 
@@ -267,16 +275,16 @@ DTS 가 주는 검증의 대부분을, 네트워크와 CI 순서 의존 없이 �
 
 ## 부록 — 검토 중 확인한 사실
 
-| 항목 | 값 |
-| --- | --- |
-| `@module-federation/dts-plugin` peer | `typescript ^4.9 \|\| ^5 \|\| ^6 \|\| ^7` (우리 6.0.3 OK) |
-| bin | 없음. CLI 는 `@module-federation/enhanced` 의 `mf` |
-| exports | `.`, `./core`, `./dynamic-remote-type-hints-plugin` |
-| 프로그래매틱 API | `generateTypes()`, `consumeTypes()`, `generateTypesInChildProcess()` (from `/core`) |
-| WS 플러그인 주입 조건 | `isDev()` (= `NODE_ENV === 'development'`) && `!dev.disableDynamicRemoteTypeHints` |
-| 주입 주체 | `DtsPlugin` 이 아니라 그 안에서 적용되는 `DevPlugin` |
-| host 소비 방법 | `mf dts --fetch true --generate false -c <config>` (PoC 성공) |
-| host tsconfig 요구 | `paths: { "*": ["./@mf-types/*"] }` |
+| 항목                                 | 값                                                                                  |
+| ------------------------------------ | ----------------------------------------------------------------------------------- |
+| `@module-federation/dts-plugin` peer | `typescript ^4.9 \|\| ^5 \|\| ^6 \|\| ^7` (우리 6.0.3 OK)                           |
+| bin                                  | 없음. CLI 는 `@module-federation/enhanced` 의 `mf`                                  |
+| exports                              | `.`, `./core`, `./dynamic-remote-type-hints-plugin`                                 |
+| 프로그래매틱 API                     | `generateTypes()`, `consumeTypes()`, `generateTypesInChildProcess()` (from `/core`) |
+| WS 플러그인 주입 조건                | `isDev()` (= `NODE_ENV === 'development'`) && `!dev.disableDynamicRemoteTypeHints`  |
+| 주입 주체                            | `DtsPlugin` 이 아니라 그 안에서 적용되는 `DevPlugin`                                |
+| host 소비 방법                       | `mf dts --fetch true --generate false -c <config>` (PoC 성공)                       |
+| host tsconfig 요구                   | `paths: { "*": ["./@mf-types/*"] }`                                                 |
 
 ## 출처
 

@@ -13,51 +13,57 @@
  *
  * 사용: node scripts/serve-remote-dist.mjs <port> [distDir]
  */
-import { createReadStream, existsSync, statSync } from "node:fs";
-import { createServer } from "node:http";
-import { extname, join, normalize, resolve } from "node:path";
+import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { extname, join, normalize, resolve } from 'node:path';
 
 const [portArg, distArg] = process.argv.slice(2);
 const port = Number(portArg ?? 3001);
-const dist = resolve(process.cwd(), distArg ?? "dist");
+const dist = resolve(process.cwd(), distArg ?? 'dist');
 
 const TYPES = {
-  ".js": "application/javascript; charset=utf-8",
-  ".cjs": "application/javascript; charset=utf-8",
-  ".mjs": "application/javascript; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".html": "text/html; charset=utf-8",
-  ".svg": "image/svg+xml",
-  ".map": "application/json; charset=utf-8",
+  '.js': 'application/javascript; charset=utf-8',
+  '.cjs': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.map': 'application/json; charset=utf-8',
 };
 
 createServer((req, res) => {
-  const path = decodeURIComponent((req.url ?? "/").split("?")[0]);
+  const path = decodeURIComponent((req.url ?? '/').split('?')[0]);
 
   // `..` 로 dist 밖을 못 나가게 한다
-  const target = join(dist, normalize(path).replace(/^(\.\.[/\\])+/, ""));
+  const target = join(dist, normalize(path).replace(/^(\.\.[/\\])+/, ''));
   if (!target.startsWith(dist)) {
     res.statusCode = 403;
-    res.end("forbidden");
+    res.end('forbidden');
     return;
   }
 
-  const file = existsSync(target) && statSync(target).isDirectory() ? join(target, "index.html") : target;
+  const file =
+    existsSync(target) && statSync(target).isDirectory()
+      ? join(target, 'index.html')
+      : target;
   if (!existsSync(file)) {
     res.statusCode = 404;
-    res.end("not found");
+    res.end('not found');
     return;
   }
 
-  res.setHeader("Content-Type", TYPES[extname(file)] ?? "application/octet-stream");
-  // host(3000) 가 교차 출처로 remoteEntry 를 받아야 한다
-  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader(
-    "Cache-Control",
-    path.startsWith("/v") && path !== "/mf-version.json"
-      ? "public, max-age=31536000, immutable"
-      : "no-store",
+    'Content-Type',
+    TYPES[extname(file)] ?? 'application/octet-stream',
+  );
+  // host(3000) 가 교차 출처로 remoteEntry 를 받아야 한다
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader(
+    'Cache-Control',
+    path.startsWith('/v') && path !== '/mf-version.json'
+      ? 'public, max-age=31536000, immutable'
+      : 'no-store',
   );
 
   createReadStream(file).pipe(res);

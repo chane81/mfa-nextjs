@@ -1,5 +1,5 @@
-import ProductDetail from "./exposes/ProductDetail.js";
-import ProductGrid from "./exposes/ProductGrid.js";
+import ProductDetail from './exposes/ProductDetail.js';
+import ProductGrid from './exposes/ProductGrid.js';
 
 /**
  * SSR 전용 진입점.
@@ -12,8 +12,8 @@ import ProductGrid from "./exposes/ProductGrid.js";
  * (host 의 loadRemoteModule 이 같은 문자열로 양쪽을 찾는다)
  */
 const exposes = {
-  "./ProductGrid": ProductGrid,
-  "./ProductDetail": ProductDetail,
+  './ProductGrid': ProductGrid,
+  './ProductDetail': ProductDetail,
 };
 
 export default exposes;

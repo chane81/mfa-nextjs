@@ -1,12 +1,12 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-import { pluginModuleFederation } from "@module-federation/rsbuild-plugin";
-import { defineConfig } from "@rsbuild/core";
-import { pluginReact } from "@rsbuild/plugin-react";
+import { pluginModuleFederation } from '@module-federation/rsbuild-plugin';
+import { defineConfig } from '@rsbuild/core';
+import { pluginReact } from '@rsbuild/plugin-react';
 
 const PORT = 3002;
-const DIST = resolve(process.cwd(), "dist");
+const DIST = resolve(process.cwd(), 'dist');
 /**
  * 이 remote 가 배포된 **공개 오리진**. assetPrefix 가 여기서 나온다.
  *
@@ -18,7 +18,7 @@ const DIST = resolve(process.cwd(), "dist");
  */
 const PUBLIC_URL = (
   process.env.REMOTE_CART_PUBLIC_URL || `http://localhost:${PORT}`
-).replace(/\/+$/, "");
+).replace(/\/+$/, '');
 
 /**
  * dev 서버가 디스크에서 직접 내려주는 경로 (빌드 산출물은 serve-remote-dist.mjs 가 서빙).
@@ -44,11 +44,11 @@ const NOT_IN_DEV = /^\/mf-version\.json$/;
  * assetPrefix 와 출력 경로를 동시에 결정해 웹 자산까지 `/v<version>/` 불변 경로로 내보낸다.
  * dev(watch)에는 파일이 없을 수 있고, 그때는 버전 없는 경로로 떨어뜨린다.
  */
-const VERSION = existsSync(resolve(process.cwd(), ".mf-version"))
-  ? readFileSync(resolve(process.cwd(), ".mf-version"), "utf8").trim()
+const VERSION = existsSync(resolve(process.cwd(), '.mf-version'))
+  ? readFileSync(resolve(process.cwd(), '.mf-version'), 'utf8').trim()
   : null;
 const ASSET_PREFIX = VERSION ? `${PUBLIC_URL}/v${VERSION}` : PUBLIC_URL;
-const DIST_ROOT = VERSION ? `dist/v${VERSION}` : "dist";
+const DIST_ROOT = VERSION ? `dist/v${VERSION}` : 'dist';
 
 /**
  * cart remote — Rsbuild(Rspack) + @module-federation/rsbuild-plugin
@@ -60,16 +60,16 @@ export default defineConfig({
   plugins: [
     pluginReact(),
     pluginModuleFederation({
-      name: "cart",
-      filename: "remoteEntry.js",
+      name: 'cart',
+      filename: 'remoteEntry.js',
       exposes: {
-        "./CartPanel": "./src/exposes/CartPanel.tsx",
-        "./CartBadge": "./src/exposes/CartBadge.tsx",
-        "./CheckoutFlow": "./src/exposes/CheckoutFlow.tsx",
+        './CartPanel': './src/exposes/CartPanel.tsx',
+        './CartBadge': './src/exposes/CartBadge.tsx',
+        './CheckoutFlow': './src/exposes/CheckoutFlow.tsx',
       },
       shared: {
-        react: { singleton: true, requiredVersion: "^19.0.0" },
-        "react-dom": { singleton: true, requiredVersion: "^19.0.0" },
+        react: { singleton: true, requiredVersion: '^19.0.0' },
+        'react-dom': { singleton: true, requiredVersion: '^19.0.0' },
       },
       /**
        * MF 자동 타입 생성(DTS)을 끈다. 이유는 catalog 쪽 vite.config.ts 주석 참고.
@@ -85,7 +85,7 @@ export default defineConfig({
     port: PORT,
     strictPort: true,
     // host(3000) 에서 remoteEntry 를 교차 출처로 로드
-    cors: { origin: "*" },
+    cors: { origin: '*' },
     /**
      * SSR 번들을 서버에서 직접 내려준다.
      * 웹 번들은 메모리에서 서빙되지만 이 파일은 watch 빌드가 디스크에 쓰므로 직접 읽는다.
@@ -102,15 +102,15 @@ export default defineConfig({
      * 옛 `dev.setupMiddlewares` 는 Rsbuild 2 에서 deprecated 다 (기동 시 경고 출력).
      */
     setup: ({ server, action }) => {
-      const dev = action === "dev";
+      const dev = action === 'dev';
 
       server.middlewares.use((req, res, next) => {
-        const path = req.url?.split("?")[0] ?? "";
+        const path = req.url?.split('?')[0] ?? '';
 
         if (dev && NOT_IN_DEV.test(path)) {
           res.statusCode = 404;
-          res.setHeader("Content-Type", "application/json; charset=utf-8");
-          res.setHeader("Access-Control-Allow-Origin", "*");
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.setHeader('Access-Control-Allow-Origin', '*');
           res.end(
             '{"error":"dev 에는 버전 공표가 없습니다. host 는 버전 없는 엔트리로 폴백합니다."}',
           );
@@ -123,20 +123,20 @@ export default defineConfig({
         }
 
         try {
-          const body = readFileSync(resolve(DIST, `.${path}`), "utf8");
+          const body = readFileSync(resolve(DIST, `.${path}`), 'utf8');
           res.setHeader(
-            "Content-Type",
-            path.endsWith(".json")
-              ? "application/json; charset=utf-8"
-              : "application/javascript; charset=utf-8",
+            'Content-Type',
+            path.endsWith('.json')
+              ? 'application/json; charset=utf-8'
+              : 'application/javascript; charset=utf-8',
           );
-          res.setHeader("Access-Control-Allow-Origin", "*");
-          res.setHeader("Cache-Control", "no-store");
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Cache-Control', 'no-store');
           res.end(body);
         } catch {
           res.statusCode = 404;
           res.end(
-            "// 없음. `pnpm build` (stamp 포함) 또는 watch 빌드를 확인하세요.",
+            '// 없음. `pnpm build` (stamp 포함) 또는 watch 빌드를 확인하세요.',
           );
         }
       });

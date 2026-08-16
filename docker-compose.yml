@@ -25,8 +25,8 @@ services:
       dockerfile: apps/remote-catalog/Dockerfile
       args:
         REMOTE_CATALOG_PUBLIC_URL: http://localhost:3001
-    ports: ["3001:3001"]
-    volumes: ["catalog-dist:/data"]
+    ports: ['3001:3001']
+    volumes: ['catalog-dist:/data']
 
   remote-cart:
     build:
@@ -34,8 +34,8 @@ services:
       dockerfile: apps/remote-cart/Dockerfile
       args:
         REMOTE_CART_PUBLIC_URL: http://localhost:3002
-    ports: ["3002:3002"]
-    volumes: ["cart-dist:/data"]
+    ports: ['3002:3002']
+    volumes: ['cart-dist:/data']
 
   host:
     build:
@@ -43,7 +43,7 @@ services:
       dockerfile: apps/host/Dockerfile
       # 빌드 컨테이너 → 호스트 머신. Docker Desktop 이 아닌 곳에서도 붙게 명시한다.
       extra_hosts:
-        - "host.docker.internal:host-gateway"
+        - 'host.docker.internal:host-gateway'
       args:
         # 브라우저가 읽는 값 → 호스트 머신에서 닿는 주소여야 한다
         NEXT_PUBLIC_REMOTE_CATALOG_ENTRY: http://localhost:3001/mf-manifest.json
@@ -52,7 +52,7 @@ services:
         # 이 시점엔 compose 네트워크가 없으므로 퍼블리시된 호스트 포트로 나간다.
         REMOTE_CATALOG_SSR_ENTRY: http://host.docker.internal:3001/mf-server.cjs
         REMOTE_CART_SSR_ENTRY: http://host.docker.internal:3002/mf-server.cjs
-    ports: ["3000:3000"]
+    ports: ['3000:3000']
     environment:
       # host **서버**가 읽는 값 → 컨테이너 네트워크 내부 주소
       REMOTE_CATALOG_SSR_ENTRY: http://remote-catalog:3001/mf-server.cjs
@@ -61,7 +61,7 @@ services:
       REMOTE_ALLOWED_ORIGINS: http://remote-catalog:3001,http://remote-cart:3002
       MF_REVALIDATE_SECRET: local-dev-secret
       # 로컬 compose 는 서명 없이 빌드된다(build secret 미전달). 강제하면 안 뜬다.
-      MF_REQUIRE_SIGNATURE: "0"
+      MF_REQUIRE_SIGNATURE: '0'
     depends_on: [remote-catalog, remote-cart]
 
 volumes:

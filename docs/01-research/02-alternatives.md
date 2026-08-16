@@ -6,19 +6,19 @@
 
 요구사항: Next.js 16 유지 + **remote SSR** + **소프트 내비게이션**.
 
-| 방식 | Next.js 16 | Turbopack | App Router | remote SSR | 소프트 내비 | 런타임 코드 공유 | 판정 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `@module-federation/nextjs-mf` | ❌ peer `^15` | ❌ webpack 전용 | ❌ 미지원 | ⭕ | ⭕ | ⭕ | **탈락** |
-| 런타임 MF (CSR only) | ⭕ | ⭕ (무관) | ⭕ | ❌ | ⭕ | ⭕ | 탈락(SSR 없음) |
-| **런타임 MF + 서버 사이드 remote 로딩** | ⭕ | ⭕ | ⭕ | **⭕** | **⭕** | ⭕ | **채택** |
-| Multi-Zones (rewrites / `@vercel/microfrontends`) | ⭕ | ⭕ | ⭕ | ⭕ | **❌ 하드 강제** | ❌ | 기각(비교용 유지) |
-| `@module-federation/node` | ⭕ | ❌ peer `webpack ^5.40` | — | ⭕ | ⭕ | ⭕ | 탈락(host 에 webpack 없음) |
-| `@originjs/vite-plugin-federation` | ➖ | — | — | ❌ | — | ⭕ | Vite 전용, host 로는 못 씀 |
-| `@module-federation/vite` | ➖ | — | — | ➖ | — | ⭕ | **remote 쪽에 채택** |
-| single-spa | ⭕ | ⭕ | ⚠️ | ❌ | ⭕ | ⭕ | 오버헤드 큼, 라우팅 소유권 뺏김 |
-| Native Federation (import maps) | ⭕ | ⚠️ | ⚠️ | ❌ | ⭕ | ⭕ | Angular 생태계 중심, React 예제 빈약 |
-| iframe | ⭕ | ⭕ | ⭕ | ⭕ | ❌ | ❌ | 격리는 최고, UX 최악 |
-| 모노레포 + 빌드타임 공유 | ⭕ | ⭕ | ⭕ | ⭕ | ⭕ | ❌ | 독립 배포 불가 → MFA 아님 |
+| 방식                                              | Next.js 16    | Turbopack               | App Router | remote SSR | 소프트 내비      | 런타임 코드 공유 | 판정                                 |
+| ------------------------------------------------- | ------------- | ----------------------- | ---------- | ---------- | ---------------- | ---------------- | ------------------------------------ |
+| `@module-federation/nextjs-mf`                    | ❌ peer `^15` | ❌ webpack 전용         | ❌ 미지원  | ⭕         | ⭕               | ⭕               | **탈락**                             |
+| 런타임 MF (CSR only)                              | ⭕            | ⭕ (무관)               | ⭕         | ❌         | ⭕               | ⭕               | 탈락(SSR 없음)                       |
+| **런타임 MF + 서버 사이드 remote 로딩**           | ⭕            | ⭕                      | ⭕         | **⭕**     | **⭕**           | ⭕               | **채택**                             |
+| Multi-Zones (rewrites / `@vercel/microfrontends`) | ⭕            | ⭕                      | ⭕         | ⭕         | **❌ 하드 강제** | ❌               | 기각(비교용 유지)                    |
+| `@module-federation/node`                         | ⭕            | ❌ peer `webpack ^5.40` | —          | ⭕         | ⭕               | ⭕               | 탈락(host 에 webpack 없음)           |
+| `@originjs/vite-plugin-federation`                | ➖            | —                       | —          | ❌         | —                | ⭕               | Vite 전용, host 로는 못 씀           |
+| `@module-federation/vite`                         | ➖            | —                       | —          | ➖         | —                | ⭕               | **remote 쪽에 채택**                 |
+| single-spa                                        | ⭕            | ⭕                      | ⚠️         | ❌         | ⭕               | ⭕               | 오버헤드 큼, 라우팅 소유권 뺏김      |
+| Native Federation (import maps)                   | ⭕            | ⚠️                      | ⚠️         | ❌         | ⭕               | ⭕               | Angular 생태계 중심, React 예제 빈약 |
+| iframe                                            | ⭕            | ⭕                      | ⭕         | ⭕         | ❌               | ❌               | 격리는 최고, UX 최악                 |
+| 모노레포 + 빌드타임 공유                          | ⭕            | ⭕                      | ⭕         | ⭕         | ⭕               | ❌               | 독립 배포 불가 → MFA 아님            |
 
 채택안의 상세 구현: [../02-architecture/03-ssr-and-soft-nav.md](../02-architecture/03-ssr-and-soft-nav.md)
 
@@ -28,17 +28,23 @@
 라는 **일반 npm 라이브러리 하나**를 브라우저에서 쓴다.
 
 ```ts
-import { init, loadRemote } from "@module-federation/runtime";
+import { init, loadRemote } from '@module-federation/runtime';
 
 init({
-  name: "host",
-  remotes: [{ name: "catalog", entry: "http://localhost:3001/mf-manifest.json" }],
+  name: 'host',
+  remotes: [
+    { name: 'catalog', entry: 'http://localhost:3001/mf-manifest.json' },
+  ],
   shared: {
-    react: { version: "19.2.8", lib: () => React, shareConfig: { singleton: true } },
+    react: {
+      version: '19.2.8',
+      lib: () => React,
+      shareConfig: { singleton: true },
+    },
   },
 });
 
-const mod = await loadRemote("catalog/ProductGrid");
+const mod = await loadRemote('catalog/ProductGrid');
 ```
 
 Turbopack 입장에서는 그냥 동적 fetch 를 하는 클라이언트 코드일 뿐이다.
@@ -52,11 +58,11 @@ Turbopack 입장에서는 그냥 동적 fetch 를 하는 클라이언트 코드�
 
 이 상태(CSR only)에서 잃는 것:
 
-| 잃는 것 | 설명 | 해소 여부 |
-| --- | --- | --- |
-| remote SSR | remote UI 가 초기 HTML 에 없다 | **해소** — node 타깃 번들 추가 빌드 |
-| 초기 LCP | remote 청크 다운로드가 하이드레이션 이후 시작 | **해소** — 서버가 먼저 그림 |
-| 서버 컴포넌트 | remote 는 100% 클라이언트 컴포넌트 | 미해소(원리적으로 불가) |
+| 잃는 것       | 설명                                          | 해소 여부                           |
+| ------------- | --------------------------------------------- | ----------------------------------- |
+| remote SSR    | remote UI 가 초기 HTML 에 없다                | **해소** — node 타깃 번들 추가 빌드 |
+| 초기 LCP      | remote 청크 다운로드가 하이드레이션 이후 시작 | **해소** — 서버가 먼저 그림         |
+| 서버 컴포넌트 | remote 는 100% 클라이언트 컴포넌트            | 미해소(원리적으로 불가)             |
 
 `@module-federation/node` 로 SSR 을 붙이는 게 정석이지만 peer 가 `webpack ^5.40` 이라
 Turbopack host 에는 못 쓴다. 대신 필요한 최소 동작(HTTP fetch → React 주입 → 평가)만
@@ -76,7 +82,7 @@ async rewrites() {
 
 ```ts
 // zone
-export default { basePath: "/checkout", assetPrefix: "/checkout-static" };
+export default { basePath: '/checkout', assetPrefix: '/checkout-static' };
 ```
 
 - ⭕ Next.js 16 / Turbopack / App Router / RSC / SSR 전부 100% 그대로

@@ -59,7 +59,11 @@
      * `$TURBO_DEFAULT$` 는 기본 집합을 유지하면서 덧붙이라는 뜻이다.
      */
     "@mfa/host#build": {
-      "dependsOn": ["^build", "@mfa/remote-catalog#build", "@mfa/remote-cart#build"],
+      "dependsOn": [
+        "^build",
+        "@mfa/remote-catalog#build",
+        "@mfa/remote-cart#build"
+      ],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**"]
     },

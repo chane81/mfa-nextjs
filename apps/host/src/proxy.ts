@@ -1,6 +1,6 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from 'next/server';
 
-import { checkMfSecret } from "@/lib/mf-secret";
+import { checkMfSecret } from '@/lib/mf-secret';
 
 /**
  * `/internal/*` 은 배포 파이프라인 전용이다. 시크릿 없이는 못 들어온다.
@@ -22,9 +22,9 @@ export function proxy(req: NextRequest) {
   if (checkMfSecret(req.headers)) return NextResponse.next();
 
   // 401 이 아니라 404 — 이런 라우트가 있다는 사실 자체를 알릴 이유가 없다
-  return new NextResponse("not found", { status: 404 });
+  return new NextResponse('not found', { status: 404 });
 }
 
 export const config = {
-  matcher: ["/internal/:path*"],
+  matcher: ['/internal/:path*'],
 };

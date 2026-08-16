@@ -36,11 +36,11 @@ turbo 공식 패턴은 `with`(동시 실행) + 유한 readiness 프로브다.
 host 빌드가 끝나도 죽지 않는다. 문서도 "중단 시(Ctrl-C) 모든 태스크를 종료한다"고 쓴다 —
 그 패턴은 `dev` 용이지 반드시 exit 해야 하는 `build` 용이 아니다.
 
-| 조각 | turbo 가 되나 |
-| --- | --- |
+| 조각                | turbo 가 되나                   |
+| ------------------- | ------------------------------- |
 | remote 를 먼저 빌드 | O — `@mfa/host#build.dependsOn` |
-| 준비될 때까지 대기 | O — 유한 프로브 태스크 |
-| **끝나면 내리기** | **X** |
+| 준비될 때까지 대기  | O — 유한 프로브 태스크          |
+| **끝나면 내리기**   | **X**                           |
 
 순수 turbo 로 가는 다른 변형은 더 나쁘다. `serve` 태스크가 서버를 detach 하고 즉시 exit 하면
 그래프는 깔끔해지지만 아무도 안 죽여서 3001/3002 에 남고, 다음 `pnpm dev` 가 포트 충돌한다.
@@ -57,12 +57,12 @@ host 빌드가 끝나도 죽지 않는다. 문서도 "중단 시(Ctrl-C) 모든 
 
 래퍼가 하던 일 중 실제로 필요했던 건 "띄웠다 내리기"뿐이었다. 나머지는 전부 뺐다.
 
-| 래퍼가 하던 일 | 왜 뺐나 |
-| --- | --- |
-| 준비될 때까지 폴링 | 경쟁이 아니었다 — 바인딩 `+1ms` vs 첫 요청 `+6451ms`(실측) |
-| 이미 뜬 오리진이면 no-op | 이미지가 `docker:build` 로 갈라져서 이 스크립트를 안 탄다 |
-| `.env.local` 파싱 | 그 파일이 코드 기본값을 그대로 다시 적은 것이라 삭제했다 |
-| dev 점유 감지 | 무결성 에러로 죽는다. 힌트를 그 에러 메시지에 넣었다 |
+| 래퍼가 하던 일           | 왜 뺐나                                                    |
+| ------------------------ | ---------------------------------------------------------- |
+| 준비될 때까지 폴링       | 경쟁이 아니었다 — 바인딩 `+1ms` vs 첫 요청 `+6451ms`(실측) |
+| 이미 뜬 오리진이면 no-op | 이미지가 `docker:build` 로 갈라져서 이 스크립트를 안 탄다  |
+| `.env.local` 파싱        | 그 파일이 코드 기본값을 그대로 다시 적은 것이라 삭제했다   |
+| dev 점유 감지            | 무결성 에러로 죽는다. 힌트를 그 에러 메시지에 넣었다       |
 
 ### B-3. 그 게이트를 host 이미지가 타면 안 된다 — 끊는 건 **이름**으로
 
@@ -90,10 +90,10 @@ RUN pnpm turbo run build --filter='@mfa/host^...' \
 
 지금은 태스크 이름을 나눈다. 같은 산출물, 게이트만 다르다.
 
-| 태스크 | remote 게이트 | 쓰는 곳 |
-| --- | --- | --- |
-| `@mfa/host#build` | 있음 | 로컬 (`pnpm build`, `pnpm start`) |
-| `@mfa/host#docker:build` | 없음 (`^build` 만) | `apps/host/Dockerfile` |
+| 태스크                   | remote 게이트      | 쓰는 곳                           |
+| ------------------------ | ------------------ | --------------------------------- |
+| `@mfa/host#build`        | 있음               | 로컬 (`pnpm build`, `pnpm start`) |
+| `@mfa/host#docker:build` | 없음 (`^build` 만) | `apps/host/Dockerfile`            |
 
 ```dockerfile
 RUN pnpm turbo run docker:build --filter=@mfa/host
@@ -136,7 +136,7 @@ Error: remote 'catalog' 매니페스트에 무결성 값이 없습니다.
 `REMOTE_*_SSR_ENTRY` 를 Dockerfile `ARG` 로 받게 하면서 드러났다.
 
 ```ts
-process.env.REMOTE_CATALOG_SSR_ENTRY ?? "http://localhost:3001/mf-server.cjs"
+process.env.REMOTE_CATALOG_SSR_ENTRY ?? 'http://localhost:3001/mf-server.cjs';
 ```
 
 값 없는 `ARG` 는 `ENV VAR=""` 로 도착하고, `??` 는 빈 문자열을 유효한 값으로 받는다.
@@ -329,7 +329,7 @@ node 타깃 빌드에서 react 계열을 반드시 external 로 빼야 한다.
 
 ```ts
 // vite.config.server.ts
-external: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"]
+external: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'];
 ```
 
 ```ts
@@ -349,7 +349,7 @@ Vite 는 `configureServer`, Rsbuild 는 `dev.setupMiddlewares` 로 `/mf-server.c
 또한 dev 에서는 서버 로더 캐시를 끈다. 안 그러면 remote 를 고쳐도 host 가 옛 번들을 계속 쓴다.
 
 ```ts
-if (process.env.NODE_ENV !== "production") return loadServerBundle(remote);
+if (process.env.NODE_ENV !== 'production') return loadServerBundle(remote);
 ```
 
 ### 0-4b. `[ dynamic-remote-type-hints-plugin ] err: [object Event]`
@@ -370,7 +370,9 @@ Console Error
 function createWebsocket() {
   return new WebSocket(`ws://127.0.0.1:${DEFAULT_WEB_SOCKET_PORT}?...`);
 }
-ws.onerror = (err) => { console.error(`[ ${PLUGIN_NAME} ] err`, err); };
+ws.onerror = (err) => {
+  console.error(`[ ${PLUGIN_NAME} ] err`, err);
+};
 ```
 
 주입 주체는 `DtsPlugin` 이 아니라 그 안의 **`DevPlugin`** 이다.
@@ -392,11 +394,11 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 
 정리하면:
 
-| 사실 | 근거 |
-| --- | --- |
-| **dev 빌드에서만** 주입된다 | `isDev()` = `NODE_ENV === 'development'` |
-| 스위치는 `dev.disableDynamicRemoteTypeHints` 다 | 위 코드 |
-| `dts: false` 로도 사라지긴 한다 | `DtsPlugin.apply()` 가 조기 return 하면서 그 안의 `DevPlugin` 도 같이 빠지기 때문. **간접 효과다** |
+| 사실                                            | 근거                                                                                               |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **dev 빌드에서만** 주입된다                     | `isDev()` = `NODE_ENV === 'development'`                                                           |
+| 스위치는 `dev.disableDynamicRemoteTypeHints` 다 | 위 코드                                                                                            |
+| `dts: false` 로도 사라지긴 한다                 | `DtsPlugin.apply()` 가 조기 return 하면서 그 안의 `DevPlugin` 도 같이 빠지기 때문. **간접 효과다** |
 
 연결 실패 조건:
 
@@ -424,11 +426,11 @@ dts: false,
 
 **실측 (catalog remote, dev 서버가 실제로 내려주는 모듈 그래프를 스캔)**
 
-| 설정 | `dynamic-remote-type-hints` 주입 | DTS 생성 |
-| --- | --- | --- |
-| `dts: true` (기본) | **있음** (`remoteEntry.js` + 플러그인 모듈) | 동작 |
-| `dts: true` + `dev.disableDynamicRemoteTypeHints: true` | **없음** | 동작 (`Federated types created correctly`) |
-| `dts: false` (현재) | 없음 | 안 함 |
+| 설정                                                    | `dynamic-remote-type-hints` 주입            | DTS 생성                                   |
+| ------------------------------------------------------- | ------------------------------------------- | ------------------------------------------ |
+| `dts: true` (기본)                                      | **있음** (`remoteEntry.js` + 플러그인 모듈) | 동작                                       |
+| `dts: true` + `dev.disableDynamicRemoteTypeHints: true` | **없음**                                    | 동작 (`Federated types created correctly`) |
+| `dts: false` (현재)                                     | 없음                                        | 안 함                                      |
 
 > ⚠️ 최초 진단에서 근거로 든 `grep -c 'dynamic-remote-type-hints' apps/*/dist/remoteEntry.js → 0` 은
 > **무효한 검증이었다.** `dist/` 는 프로덕션 빌드 산출물이고, 이 플러그인은 `isDev()` 때문에
@@ -502,9 +504,9 @@ react,react-dom,react/jsx-runtime,react-dom/client
 // apps/host/src/mf/interop.ts
 export function normalizeModule<T>(mod: T, probe: string): T {
   const ns = mod as Record<string, unknown> | undefined;
-  if (ns && typeof ns[probe] === "function") return mod;
+  if (ns && typeof ns[probe] === 'function') return mod;
   const inner = ns?.default as Record<string, unknown> | undefined;
-  if (inner && typeof inner[probe] === "function") return inner as T;
+  if (inner && typeof inner[probe] === 'function') return inner as T;
   return mod; // dev 에서는 경고 출력
 }
 ```
@@ -561,7 +563,7 @@ Error: Module Federation 런타임은 브라우저에서만 초기화할 수 있
 대신 프리렌더로 굳으면 안 되므로 해당 라우트는 전부 dynamic 이다.
 
 ```ts
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 ```
 
 ## 2. Turbopack 이 상대경로 `.js` 확장자를 못 찾음
@@ -577,7 +579,7 @@ Error: Module not found: Can't resolve './runtime.js'
 **해결**: Next.js 앱 내부 상대 import 는 확장자를 빼고 쓴다.
 
 ```ts
-import { loadRemoteModule } from "./runtime";   // ✅
+import { loadRemoteModule } from './runtime'; // ✅
 ```
 
 Vite / Rsbuild remote 쪽은 `.js` 확장자가 있어도 정상 동작한다(둘 다 빌드 성공 확인).
@@ -594,9 +596,9 @@ at (./packages/ui/dist/use-cart.js:1:10)
 **해결**: 훅 파일 최상단에 `"use client"` 디렉티브.
 
 ```ts
-"use client";
+'use client';
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 ```
 
 TypeScript 는 컴파일 출력에도 디렉티브 프롤로그를 보존한다(`dist/use-cart.js` 확인 완료).
@@ -634,12 +636,17 @@ error  Error: Cannot create components during render
 **해결**: 모듈 스코프 캐시로 옮긴다.
 
 ```ts
-const lazyCache = new Map<RemoteModuleId, ComponentType<Record<string, unknown>>>();
+const lazyCache = new Map<
+  RemoteModuleId,
+  ComponentType<Record<string, unknown>>
+>();
 
 function getLazyRemote(id: RemoteModuleId) {
   const cached = lazyCache.get(id);
   if (cached) return cached;
-  const C = lazy(() => loadRemoteModule(id) as Promise<{ default: ComponentType }>);
+  const C = lazy(
+    () => loadRemoteModule(id) as Promise<{ default: ComponentType }>,
+  );
   lazyCache.set(id, C);
   return C;
 }

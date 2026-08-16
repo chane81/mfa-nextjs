@@ -22,7 +22,7 @@ export function Panel({
   title,
   actions,
   children,
-  style
+  style,
 }: PanelProps) {
   return (
     <section
@@ -34,7 +34,7 @@ export function Panel({
         display: 'flex',
         flexDirection: 'column',
         gap: tokens.space(4),
-        ...style
+        ...style,
       }}
     >
       <header
@@ -42,14 +42,14 @@ export function Panel({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: tokens.space(3)
+          gap: tokens.space(3),
         }}
       >
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: tokens.space(2)
+            gap: tokens.space(2),
           }}
         >
           {title ? (
@@ -65,7 +65,7 @@ export function Panel({
               color: `hsl(${originHue} 70% 72%)`,
               border: `1px solid hsl(${originHue} 70% 62% / 0.45)`,
               borderRadius: tokens.radius.sm,
-              padding: '2px 6px'
+              padding: '2px 6px',
             }}
           >
             {origin}
@@ -91,24 +91,24 @@ export function Button({
   children,
   variant = 'primary',
   disabled = false,
-  type = 'button'
+  type = 'button',
 }: ButtonProps) {
   const palette: Record<NonNullable<ButtonProps['variant']>, CSSProperties> = {
     primary: {
       background: tokens.color.accent,
       color: tokens.color.accentText,
-      border: 'none'
+      border: 'none',
     },
     ghost: {
       background: 'transparent',
       color: tokens.color.text,
-      border: `1px solid ${tokens.color.border}`
+      border: `1px solid ${tokens.color.border}`,
     },
     danger: {
       background: 'transparent',
       color: tokens.color.danger,
-      border: `1px solid ${tokens.color.danger}55`
-    }
+      border: `1px solid ${tokens.color.danger}55`,
+    },
   };
 
   return (
@@ -124,7 +124,7 @@ export function Button({
         fontWeight: 600,
         fontFamily: tokens.font.body,
         cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.45 : 1
+        opacity: disabled ? 0.45 : 1,
       }}
     >
       {children}
@@ -134,7 +134,7 @@ export function Button({
 
 export function Badge({
   children,
-  hue = 210
+  hue = 210,
 }: {
   children: ReactNode;
   hue?: number;
@@ -147,7 +147,7 @@ export function Badge({
         borderRadius: 999,
         padding: '2px 10px',
         fontSize: 12,
-        fontFamily: tokens.font.mono
+        fontFamily: tokens.font.mono,
       }}
     >
       {children}
@@ -165,7 +165,7 @@ export function Skeleton({ label }: { label: string }) {
         color: tokens.color.textMuted,
         fontFamily: tokens.font.mono,
         fontSize: 13,
-        textAlign: 'center'
+        textAlign: 'center',
       }}
     >
       {label}
@@ -175,7 +175,7 @@ export function Skeleton({ label }: { label: string }) {
 
 export function ErrorBox({
   title,
-  detail
+  detail,
 }: {
   title: string;
   detail?: string;
@@ -190,7 +190,7 @@ export function ErrorBox({
         color: tokens.color.text,
         display: 'flex',
         flexDirection: 'column',
-        gap: tokens.space(2)
+        gap: tokens.space(2),
       }}
     >
       <strong style={{ color: tokens.color.danger, fontSize: 14 }}>
@@ -202,7 +202,7 @@ export function ErrorBox({
             fontFamily: tokens.font.mono,
             fontSize: 12,
             color: tokens.color.textMuted,
-            whiteSpace: 'pre-wrap'
+            whiteSpace: 'pre-wrap',
           }}
         >
           {detail}

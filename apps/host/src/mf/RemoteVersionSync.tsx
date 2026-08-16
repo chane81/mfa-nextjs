@@ -1,8 +1,12 @@
-import { cacheLife, cacheTag } from "next/cache";
+import { cacheLife, cacheTag } from 'next/cache';
 
-import { REMOTE_NAMES } from "@mfa/contracts";
+import { REMOTE_NAMES } from '@mfa/contracts';
 
-import { fetchRemoteVersion, remoteOrigin, remoteVersionTag } from "./remote-version";
+import {
+  fetchRemoteVersion,
+  remoteOrigin,
+  remoteVersionTag,
+} from './remote-version';
 
 /**
  * remote 버전을 새로 읽어 globalThis 에 반영하고, 브라우저에도 같은 값을 넘긴다.
@@ -33,8 +37,8 @@ import { fetchRemoteVersion, remoteOrigin, remoteVersionTag } from "./remote-ver
  * `/v<version>/` 불변 경로로 배포하므로, 이 URL 은 다른 코드를 가리키게 되지 않는다.
  */
 export async function RemoteVersionSync() {
-  "use cache";
-  cacheLife("minutes");
+  'use cache';
+  cacheLife('minutes');
   for (const remote of REMOTE_NAMES) cacheTag(remoteVersionTag(remote));
 
   const resolved = await Promise.all(
@@ -42,7 +46,12 @@ export async function RemoteVersionSync() {
       const info = await fetchRemoteVersion(remote);
       return [
         remote,
-        info ? { version: info.version, entry: `${remoteOrigin(remote)}${info.webEntry}` } : null,
+        info
+          ? {
+              version: info.version,
+              entry: `${remoteOrigin(remote)}${info.webEntry}`,
+            }
+          : null,
       ] as const;
     }),
   );

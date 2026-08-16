@@ -1,8 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-import { defineConfig } from "@rsbuild/core";
-import { pluginReact } from "@rsbuild/plugin-react";
+import { defineConfig } from '@rsbuild/core';
+import { pluginReact } from '@rsbuild/plugin-react';
 
 /**
  * 빌드 버전. 웹 빌드와 **같은 값**이어야 한다 — 둘이 한 배포 단위다.
@@ -12,11 +12,11 @@ import { pluginReact } from "@rsbuild/plugin-react";
  * `dist/v` 라는 버전 없는 버전 경로가 만들어져, 웹 빌드(빈 값을 falsy 로 거르는)와
  * 출력 경로가 어긋난다.
  */
-const VERSION_FILE = resolve(process.cwd(), ".mf-version");
+const VERSION_FILE = resolve(process.cwd(), '.mf-version');
 const VERSION = existsSync(VERSION_FILE)
-  ? readFileSync(VERSION_FILE, "utf8").trim()
-  : "";
-const DIST_ROOT = VERSION ? `dist/v${VERSION}` : "dist";
+  ? readFileSync(VERSION_FILE, 'utf8').trim()
+  : '';
+const DIST_ROOT = VERSION ? `dist/v${VERSION}` : 'dist';
 
 /**
  * cart remote 의 SSR(node) 번들 빌드 설정.
@@ -29,26 +29,26 @@ const DIST_ROOT = VERSION ? `dist/v${VERSION}` : "dist";
 export default defineConfig({
   plugins: [pluginReact()],
   source: {
-    entry: { "mf-server": "./src/server-entry.ts" },
+    entry: { 'mf-server': './src/server-entry.ts' },
   },
   output: {
-    target: "node",
+    target: 'node',
     // 웹 번들과 같은 버전 디렉터리에 넣는다. 웹 빌드 다음에 돌기 때문에 정리는 하지 않는다.
-    distPath: { root: DIST_ROOT, js: "" },
-    filename: { js: "[name].cjs" },
+    distPath: { root: DIST_ROOT, js: '' },
+    filename: { js: '[name].cjs' },
     cleanDistPath: false,
     minify: false,
     externals: {
-      react: "commonjs react",
-      "react-dom": "commonjs react-dom",
-      "react/jsx-runtime": "commonjs react/jsx-runtime",
-      "react/jsx-dev-runtime": "commonjs react/jsx-dev-runtime",
+      react: 'commonjs react',
+      'react-dom': 'commonjs react-dom',
+      'react/jsx-runtime': 'commonjs react/jsx-runtime',
+      'react/jsx-dev-runtime': 'commonjs react/jsx-dev-runtime',
     },
   },
   tools: {
     rspack: {
       output: {
-        library: { type: "commonjs2" },
+        library: { type: 'commonjs2' },
       },
     },
   },

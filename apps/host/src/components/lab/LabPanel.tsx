@@ -1,11 +1,11 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react';
 
-import { tokens } from "@mfa/ui";
+import { tokens } from '@mfa/ui';
 
-import { CatalogSection } from "@/components/CatalogSection";
+import { CatalogSection } from '@/components/CatalogSection';
 
-import { HydrationStamp } from "./HydrationStamp";
-import { LAB_MODES, type LabMode } from "./modes";
+import { HydrationStamp } from './HydrationStamp';
+import { LAB_MODES, type LabMode } from './modes';
 
 interface LabPanelProps {
   mode: LabMode;
@@ -31,14 +31,22 @@ export function LabPanel({ mode, renderedAt, children }: LabPanelProps) {
           borderRadius: tokens.radius.lg,
           padding: tokens.space(6),
           background: `hsl(${spec.hue} 60% 45% / 0.08)`,
-          display: "flex",
-          flexDirection: "column",
+          display: 'flex',
+          flexDirection: 'column',
           gap: tokens.space(3),
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: tokens.space(3) }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: tokens.space(3),
+          }}
+        >
           <h1 style={{ margin: 0, fontSize: 20 }}>{spec.label}</h1>
-          <code style={{ fontSize: 12, color: tokens.color.textMuted }}>/lab/{mode}</code>
+          <code style={{ fontSize: 12, color: tokens.color.textMuted }}>
+            /lab/{mode}
+          </code>
         </div>
 
         <pre
@@ -48,7 +56,7 @@ export function LabPanel({ mode, renderedAt, children }: LabPanelProps) {
             background: tokens.color.bg,
             borderRadius: tokens.radius.md,
             fontSize: 12,
-            overflowX: "auto",
+            overflowX: 'auto',
           }}
         >
           {spec.segmentConfig}
@@ -57,15 +65,18 @@ export function LabPanel({ mode, renderedAt, children }: LabPanelProps) {
         <dl
           style={{
             margin: 0,
-            display: "grid",
-            gridTemplateColumns: "auto 1fr",
+            display: 'grid',
+            gridTemplateColumns: 'auto 1fr',
             gap: `${tokens.space(2)} ${tokens.space(4)}`,
             fontSize: 13,
           }}
         >
           <dt style={{ color: tokens.color.textMuted }}>서버 렌더 시각</dt>
           <dd style={{ margin: 0 }}>
-            <strong data-testid="rendered-at" style={{ fontFamily: tokens.font.mono }}>
+            <strong
+              data-testid="rendered-at"
+              style={{ fontFamily: tokens.font.mono }}
+            >
               {renderedAt}
             </strong>
           </dd>
@@ -76,7 +87,14 @@ export function LabPanel({ mode, renderedAt, children }: LabPanelProps) {
           </dd>
         </dl>
 
-        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: tokens.color.textMuted }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 13,
+            lineHeight: 1.7,
+            color: tokens.color.textMuted,
+          }}
+        >
           {spec.expect}
         </p>
       </section>

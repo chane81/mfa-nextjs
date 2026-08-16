@@ -1,4 +1,4 @@
-import { formatKRW, type Product } from "./product.js";
+import { formatKRW, type Product } from './product.js';
 
 /**
  * host 와 각 remote 는 서로 다른 번들에 들어간다.
@@ -30,8 +30,8 @@ export interface CartStore {
   clear(): void;
 }
 
-const STORE_KEY = "__MFA_CART_STORE__" as const;
-const STORAGE_KEY = "mfa-nextjs:cart";
+const STORE_KEY = '__MFA_CART_STORE__' as const;
+const STORAGE_KEY = 'mfa-nextjs:cart';
 
 type GlobalWithStore = typeof globalThis & {
   [STORE_KEY]?: CartStore;
@@ -39,7 +39,10 @@ type GlobalWithStore = typeof globalThis & {
 
 function buildSnapshot(lines: readonly CartLine[]): CartSnapshot {
   const totalQuantity = lines.reduce((sum, line) => sum + line.quantity, 0);
-  const totalPrice = lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
+  const totalPrice = lines.reduce(
+    (sum, line) => sum + line.unitPrice * line.quantity,
+    0,
+  );
   return {
     lines,
     totalQuantity,
@@ -49,7 +52,7 @@ function buildSnapshot(lines: readonly CartLine[]): CartSnapshot {
 }
 
 function readPersisted(): readonly CartLine[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
@@ -61,7 +64,7 @@ function readPersisted(): readonly CartLine[] {
 }
 
 function persist(lines: readonly CartLine[]): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(lines));
   } catch {
@@ -88,7 +91,9 @@ function createCartStore(): CartStore {
       };
     },
     add(product, quantity = 1) {
-      const existing = snapshot.lines.find((line) => line.productId === product.id);
+      const existing = snapshot.lines.find(
+        (line) => line.productId === product.id,
+      );
       const next = existing
         ? snapshot.lines.map((line) =>
             line.productId === product.id

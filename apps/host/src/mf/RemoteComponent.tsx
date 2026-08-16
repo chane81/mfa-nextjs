@@ -1,16 +1,20 @@
-"use client";
+'use client';
 
-import { Suspense, lazy, type ComponentType } from "react";
+import { Suspense, lazy, type ComponentType } from 'react';
 
-import type { RemoteModuleId, RemoteModuleMap, RemoteName } from "@mfa/contracts";
-import { Skeleton } from "@mfa/ui";
+import type {
+  RemoteModuleId,
+  RemoteModuleMap,
+  RemoteName,
+} from '@mfa/contracts';
+import { Skeleton } from '@mfa/ui';
 
-import { REMOTE_ENTRIES, loadRemoteModule } from "./runtime";
-import { knownVersion } from "./remote-version";
-import { RemoteBoundary } from "./RemoteBoundary";
+import { REMOTE_ENTRIES, loadRemoteModule } from './runtime';
+import { knownVersion } from './remote-version';
+import { RemoteBoundary } from './RemoteBoundary';
 
 type PropsOf<K extends RemoteModuleId> =
-  RemoteModuleMap[K]["default"] extends ComponentType<infer P> ? P : never;
+  RemoteModuleMap[K]['default'] extends ComponentType<infer P> ? P : never;
 
 /**
  * lazy() 는 반드시 렌더 바깥에서 한 번만 만들어야 한다.
@@ -30,15 +34,18 @@ function getLazyRemote(
   id: RemoteModuleId,
   reloadKey?: string,
 ): ComponentType<Record<string, unknown>> {
-  const remote = id.split("/")[0] as RemoteName;
+  const remote = id.split('/')[0] as RemoteName;
   // 브라우저에는 서버가 심어준 버전이 있고(RemoteVersionSync), 없으면 unversioned 로 고정된다
-  const key = `${id}@${knownVersion(remote)?.version ?? "unversioned"}${reloadKey ? `#${reloadKey}` : ""}`;
+  const key = `${id}@${knownVersion(remote)?.version ?? 'unversioned'}${reloadKey ? `#${reloadKey}` : ''}`;
 
   const cached = lazyCache.get(key);
   if (cached) return cached;
 
   const Component = lazy(
-    () => loadRemoteModule(id) as Promise<{ default: ComponentType<Record<string, unknown>> }>,
+    () =>
+      loadRemoteModule(id) as Promise<{
+        default: ComponentType<Record<string, unknown>>;
+      }>,
   );
   lazyCache.set(key, Component);
   return Component;
@@ -73,8 +80,10 @@ export function RemoteComponent<K extends RemoteModuleId>({
   fallbackLabel,
   reloadKey,
 }: RemoteComponentProps<K>) {
-  const remoteName = moduleId.split("/")[0] as keyof typeof REMOTE_ENTRIES;
-  const placeholder = <Skeleton label={fallbackLabel ?? `${moduleId} 불러오는 중…`} />;
+  const remoteName = moduleId.split('/')[0] as keyof typeof REMOTE_ENTRIES;
+  const placeholder = (
+    <Skeleton label={fallbackLabel ?? `${moduleId} 불러오는 중…`} />
+  );
 
   // lazyCache 덕분에 moduleId 당 컴포넌트 정체성이 고정된다.
   // 린터는 "렌더 중 컴포넌트 생성"으로 보지만 실제로는 모듈 스코프 캐시에서 꺼내 쓴다.

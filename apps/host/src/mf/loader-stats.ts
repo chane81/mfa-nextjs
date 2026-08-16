@@ -28,11 +28,16 @@ export interface LoaderStats {
   loads: Record<string, number>;
 }
 
-const KEY = "__mfaLoaderStats";
+const KEY = '__mfaLoaderStats';
 
 type Holder = typeof globalThis & { [KEY]?: LoaderStats };
 
-const empty = (): LoaderStats => ({ fetches: 0, evals: 0, byRemote: {}, loads: {} });
+const empty = (): LoaderStats => ({
+  fetches: 0,
+  evals: 0,
+  byRemote: {},
+  loads: {},
+});
 
 function holder(): LoaderStats {
   const g = globalThis as Holder;
@@ -63,7 +68,11 @@ export function loadCount(remote: string): number {
 
 export function getLoaderStats(): LoaderStats {
   const stats = holder();
-  return { ...stats, byRemote: { ...stats.byRemote }, loads: { ...stats.loads } };
+  return {
+    ...stats,
+    byRemote: { ...stats.byRemote },
+    loads: { ...stats.loads },
+  };
 }
 
 export function resetLoaderStats(): void {

@@ -22,11 +22,13 @@ function constantTimeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-export function checkMfSecret(headers: { get(name: string): string | null }): boolean {
+export function checkMfSecret(headers: {
+  get(name: string): string | null;
+}): boolean {
   const expected = process.env.MF_REVALIDATE_SECRET;
   if (!expected) return false;
 
-  const provided = headers.get("x-mf-secret");
+  const provided = headers.get('x-mf-secret');
   if (!provided) return false;
 
   return constantTimeEqual(provided, expected);
@@ -34,5 +36,5 @@ export function checkMfSecret(headers: { get(name: string): string | null }): bo
 
 /** warm 요청이 자기 자신을 부를 때 붙이는 헤더 */
 export function mfSecretHeader(): Record<string, string> {
-  return { "x-mf-secret": process.env.MF_REVALIDATE_SECRET ?? "" };
+  return { 'x-mf-secret': process.env.MF_REVALIDATE_SECRET ?? '' };
 }

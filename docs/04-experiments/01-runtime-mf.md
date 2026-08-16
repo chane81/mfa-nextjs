@@ -15,17 +15,17 @@ Next.js 16(Turbopack) host 에 **번들러 플러그인 없이** `@module-federa
 
 ```ts
 init({
-  name: "host",
+  name: 'host',
   remotes: [
-    { name: "catalog", entry: CATALOG_ENTRY },
-    { name: "cart", entry: CART_ENTRY },
+    { name: 'catalog', entry: CATALOG_ENTRY },
+    { name: 'cart', entry: CART_ENTRY },
   ],
   shared: {
     react: {
-      version: "19.2.8",
-      scope: "default",
-      lib: () => React,                                  // host 인스턴스를 직접 주입
-      shareConfig: { singleton: true, requiredVersion: "^19.0.0" },
+      version: '19.2.8',
+      scope: 'default',
+      lib: () => React, // host 인스턴스를 직접 주입
+      shareConfig: { singleton: true, requiredVersion: '^19.0.0' },
     },
     // react-dom, react-dom/client, react/jsx-runtime, react/jsx-dev-runtime 동일
   },
@@ -66,16 +66,16 @@ pluginModuleFederation({
 
 Playwright(Chromium) 실측:
 
-| 항목 | 결과 |
-| --- | --- |
-| `/` 에서 catalog remote 렌더링 | ✅ 상품 카드 8개 |
-| `/` 에서 cart remote 배지 렌더링 | ✅ |
-| remote 청크 요청 수 | 33건 (3001/3002 합산) |
-| 콘솔 에러 | **0건** (`Invalid hook call` 없음) |
-| `window.__FEDERATION__.__SHARE__` | 스코프 3개 |
-| catalog 에서 "담기" → cart 배지 | `🛒 0 / 0원` → `🛒 1 / 189,000원` ✅ |
-| `/products/kb-001` 상세 remote | ✅ `h3 = "Aurora 75 기계식 키보드"` |
-| `/debug` manifest 프로브 | catalog `ok`, cart `ok` |
+| 항목                              | 결과                                 |
+| --------------------------------- | ------------------------------------ |
+| `/` 에서 catalog remote 렌더링    | ✅ 상품 카드 8개                     |
+| `/` 에서 cart remote 배지 렌더링  | ✅                                   |
+| remote 청크 요청 수               | 33건 (3001/3002 합산)                |
+| 콘솔 에러                         | **0건** (`Invalid hook call` 없음)   |
+| `window.__FEDERATION__.__SHARE__` | 스코프 3개                           |
+| catalog 에서 "담기" → cart 배지   | `🛒 0 / 0원` → `🛒 1 / 189,000원` ✅ |
+| `/products/kb-001` 상세 remote    | ✅ `h3 = "Aurora 75 기계식 키보드"`  |
+| `/debug` manifest 프로브          | catalog `ok`, cart `ok`              |
 
 **서로 다른 번들러(Vite ↔ Rspack)로 빌드된 두 remote 가 host 의 React 하나를 공유하고,
 전역 스토어로 상태까지 주고받는다.**
@@ -111,7 +111,11 @@ Error: Module Federation 런타임은 브라우저에서만 초기화할 수 있
 ```tsx
 const noopSubscribe = () => () => {};
 function useIsClient() {
-  return useSyncExternalStore(noopSubscribe, () => true, () => false);
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
 }
 ```
 
@@ -125,26 +129,29 @@ function useIsClient() {
 `react-hooks/static-components` 룰이 이걸 잡아준다.
 
 ```ts
-const lazyCache = new Map<RemoteModuleId, ComponentType<Record<string, unknown>>>();
+const lazyCache = new Map<
+  RemoteModuleId,
+  ComponentType<Record<string, unknown>>
+>();
 ```
 
 ## 성능 관찰
 
-| 앱 | 빌드 시간 | 산출물 |
-| --- | --- | --- |
-| remote-catalog (Vite 8) | ~1.4s | remoteEntry 0.17 kB + 청크 분리 |
-| remote-cart (Rsbuild 2) | ~1.3s | remoteEntry 115.7 kB (32.5 kB gzip) |
-| host (Next 16 Turbopack) | ~0.4s 컴파일 | 5 라우트 |
+| 앱                       | 빌드 시간    | 산출물                              |
+| ------------------------ | ------------ | ----------------------------------- |
+| remote-catalog (Vite 8)  | ~1.4s        | remoteEntry 0.17 kB + 청크 분리     |
+| remote-cart (Rsbuild 2)  | ~1.3s        | remoteEntry 115.7 kB (32.5 kB gzip) |
+| host (Next 16 Turbopack) | ~0.4s 컴파일 | 5 라우트                            |
 
 Vite 쪽 `remoteEntry.js` 가 0.17 kB 로 작은 건 ESM 동적 import 로 잘게 쪼개기 때문이고,
 Rsbuild 쪽은 런타임을 remoteEntry 에 인라인하기 때문이다. 둘 다 정상.
 
 ## 언제 이 방식을 쓰나
 
-| 쓸 만한 경우 | 피해야 할 경우 |
-| --- | --- |
-| 위젯 단위로 팀이 갈리는 화면 | RSC 로 서버 데이터를 흘려야 하는 영역 |
-| 프레임워크/번들러가 섞인 조직 | Edge 런타임에서 돌려야 하는 라우트 |
+| 쓸 만한 경우                         | 피해야 할 경우                                     |
+| ------------------------------------ | -------------------------------------------------- |
+| 위젯 단위로 팀이 갈리는 화면         | RSC 로 서버 데이터를 흘려야 하는 영역              |
+| 프레임워크/번들러가 섞인 조직        | Edge 런타임에서 돌려야 하는 라우트                 |
 | 소프트 내비게이션이 필수인 SPA 성 UX | remote 를 신뢰할 수 없는 외부 조직이 배포하는 경우 |
 
 CSR-only 로 둘지, node 번들까지 만들어 SSR 할지는 페이지 단위로 고를 수 있다.

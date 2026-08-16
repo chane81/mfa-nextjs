@@ -1,4 +1,4 @@
-import { MfDiagnostics } from "@/components/MfDiagnostics";
+import { MfDiagnostics } from '@/components/MfDiagnostics';
 
 export default function DebugPage() {
   return <MfDiagnostics />;

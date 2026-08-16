@@ -1,6 +1,6 @@
 packages:
-  - "apps/*"
-  - "packages/*"
+  - 'apps/*'
+  - 'packages/*'
 
 minimumReleaseAgeExclude:
   - '@module-federation/vite@1.20.7'
@@ -35,7 +35,7 @@ minimumReleaseAgeExclude:
 
 # Next.js / Vite / Rsbuild 가 각자 네이티브 바이너리를 빌드하므로 승인 목록에 등록
 onlyBuiltDependencies:
-  - "@tailwindcss/oxide"
+  - '@tailwindcss/oxide'
   - esbuild
   - sharp
   - unrs-resolver

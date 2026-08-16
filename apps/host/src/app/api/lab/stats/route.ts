@@ -1,8 +1,8 @@
-import { REMOTE_NAMES } from "@mfa/contracts";
+import { REMOTE_NAMES } from '@mfa/contracts';
 
-import { getLoaderStats, resetLoaderStats } from "@/mf/loader-stats";
-import { fetchRemoteVersion, knownVersions } from "@/mf/remote-version";
-import { ssrEntrySnapshot } from "@/mf/server-loader";
+import { getLoaderStats, resetLoaderStats } from '@/mf/loader-stats';
+import { fetchRemoteVersion, knownVersions } from '@/mf/remote-version';
+import { ssrEntrySnapshot } from '@/mf/server-loader';
 
 /**
  * 로더 계측과 이 인스턴스가 보고 있는 remote 버전을 읽는다.
@@ -18,8 +18,9 @@ import { ssrEntrySnapshot } from "@/mf/server-loader";
  * TTL 이 지나면 같은 버전으로 따라와야 한다. `?refresh=1` 은 그 조회를 지금 강제한다.
  */
 export async function GET(req: Request) {
-  const refresh = new URL(req.url).searchParams.get("refresh") === "1";
-  if (refresh) await Promise.all(REMOTE_NAMES.map((remote) => fetchRemoteVersion(remote)));
+  const refresh = new URL(req.url).searchParams.get('refresh') === '1';
+  if (refresh)
+    await Promise.all(REMOTE_NAMES.map((remote) => fetchRemoteVersion(remote)));
 
   return Response.json({
     at: new Date().toISOString(),

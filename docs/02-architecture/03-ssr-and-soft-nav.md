@@ -7,11 +7,11 @@
 
 이 둘을 동시에 만족하는 조합은 하나뿐이다.
 
-| 방식 | remote SSR | 소프트 내비게이션 | 판정 |
-| --- | --- | --- | --- |
-| Multi-Zones | ⭕ | ❌ zone 경계에서 강제 하드 내비 | **탈락** |
-| 런타임 MF (CSR only) | ❌ | ⭕ | **탈락** |
-| **런타임 MF + 서버 사이드 remote 로딩** | **⭕** | **⭕** | **채택** |
+| 방식                                    | remote SSR | 소프트 내비게이션               | 판정     |
+| --------------------------------------- | ---------- | ------------------------------- | -------- |
+| Multi-Zones                             | ⭕         | ❌ zone 경계에서 강제 하드 내비 | **탈락** |
+| 런타임 MF (CSR only)                    | ❌         | ⭕                              | **탈락** |
+| **런타임 MF + 서버 사이드 remote 로딩** | **⭕**     | **⭕**                          | **채택** |
 
 ## 1. 소프트 내비게이션은 "라우팅 소유권" 문제다
 
@@ -40,17 +40,17 @@ remote 는 여전히 라우터를 모른다. 이동은 콜백으로 host 에 위
 // host
 <RemoteComponent
   module="cart/CheckoutFlow"
-  props={{ onDone: () => router.push("/") }}   // 소프트
+  props={{ onDone: () => router.push('/') }} // 소프트
 />
 ```
 
 ### 측정값 (Playwright, 프로덕션 빌드)
 
-| 이동 | document 요청 증가 | 판정 |
-| --- | --- | --- |
-| `/` → `/checkout` (remote) | **0** | 소프트 ✅ |
-| `/` → `/products/:id` (remote) | **0** | 소프트 ✅ |
-| `/` → `/legacy-checkout` (zone·삭제됨) | **1** | 하드 ❌ |
+| 이동                                   | document 요청 증가 | 판정      |
+| -------------------------------------- | ------------------ | --------- |
+| `/` → `/checkout` (remote)             | **0**              | 소프트 ✅ |
+| `/` → `/products/:id` (remote)         | **0**              | 소프트 ✅ |
+| `/` → `/legacy-checkout` (zone·삭제됨) | **1**              | 하드 ❌   |
 
 ## 2. remote SSR — host 서버가 remote 의 node 번들을 실행한다
 
@@ -71,8 +71,8 @@ host 의 `loadRemoteModule(id)` 하나가 실행 환경에 따라 갈린다.
 
 ```ts
 export function loadRemoteModule(id) {
-  if (typeof window === "undefined") return loadRemoteModuleOnServer(id); // mf-server.cjs
-  return loadOnClient(id);                                                // remoteEntry
+  if (typeof window === 'undefined') return loadRemoteModuleOnServer(id); // mf-server.cjs
+  return loadOnClient(id); // remoteEntry
 }
 ```
 
@@ -83,7 +83,7 @@ export function loadRemoteModule(id) {
 3. expose 키 → 컴포넌트 맵을 돌려준다
 
 ```ts
-const factory = new Function("module", "exports", "require", code);
+const factory = new Function('module', 'exports', 'require', code);
 factory(moduleObj, moduleObj.exports, (id) => INJECTED[id]);
 ```
 
@@ -110,12 +110,12 @@ $ curl -s localhost:3000/checkout | grep -c "주문서"
 1
 ```
 
-| 경로 | remote 마크업 in HTML | 렌더 형태 |
-| --- | --- | --- |
-| `/products/:id` | ✅ | 셸에 인라인 |
-| `/cart` | ✅ | 셸에 인라인 |
-| `/checkout` | ✅ | 셸에 인라인 |
-| `/` | ✅ | 큰 경계는 React 스트리밍으로 뒤 청크에 |
+| 경로            | remote 마크업 in HTML | 렌더 형태                              |
+| --------------- | --------------------- | -------------------------------------- |
+| `/products/:id` | ✅                    | 셸에 인라인                            |
+| `/cart`         | ✅                    | 셸에 인라인                            |
+| `/checkout`     | ✅                    | 셸에 인라인                            |
+| `/`             | ✅                    | 큰 경계는 React 스트리밍으로 뒤 청크에 |
 
 `/` 의 상품 그리드는 React Fizz 가 Suspense 경계를 별도 청크로 흘려보낸다.
 **같은 HTTP 응답 안에 마크업이 그대로 들어있으므로 SSR 은 성립한다.**
@@ -134,7 +134,7 @@ SSR/CSR 불일치를 원천 차단했다.
 remote 를 SSR 하는 페이지는 전부 `force-dynamic` 이다.
 
 ```ts
-export const dynamic = "force-dynamic";
+export const dynamic = 'force-dynamic';
 ```
 
 빌드 시점에 굳히면 remote 를 재배포해도 host 가 옛 마크업을 계속 내보낸다.
@@ -142,13 +142,13 @@ export const dynamic = "force-dynamic";
 
 ## 4. 남은 트레이드오프
 
-| 항목 | 내용 |
-| --- | --- |
-| 빌드 2벌 | remote 마다 웹/노드 타깃을 둘 다 빌드해야 한다 |
-| 신뢰 경계 | host **서버**가 remote 코드를 실행한다. origin 허용목록 + 무결성 검증 필요 |
-| 서버 지연 | 콜드 스타트 시 remote 번들 fetch 1회. 이후 프로세스 캐시(prod) |
-| RSC 불가 | remote 는 여전히 클라이언트 컴포넌트다. 서버 컴포넌트를 federate 할 수는 없다 |
-| Edge 런타임 불가 | `new Function` 평가가 필요해 Node 런타임 전용 |
+| 항목             | 내용                                                                          |
+| ---------------- | ----------------------------------------------------------------------------- |
+| 빌드 2벌         | remote 마다 웹/노드 타깃을 둘 다 빌드해야 한다                                |
+| 신뢰 경계        | host **서버**가 remote 코드를 실행한다. origin 허용목록 + 무결성 검증 필요    |
+| 서버 지연        | 콜드 스타트 시 remote 번들 fetch 1회. 이후 프로세스 캐시(prod)                |
+| RSC 불가         | remote 는 여전히 클라이언트 컴포넌트다. 서버 컴포넌트를 federate 할 수는 없다 |
+| Edge 런타임 불가 | `new Function` 평가가 필요해 Node 런타임 전용                                 |
 
 ## 5. Multi-Zone 앱은 어떻게 됐나
 

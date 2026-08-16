@@ -1,7 +1,7 @@
-import { cacheLife, cacheTag } from "next/cache";
+import { cacheLife, cacheTag } from 'next/cache';
 
-import { LabPanel } from "@/components/lab/LabPanel";
-import { remoteCacheTag } from "@/mf/server-loader";
+import { LabPanel } from '@/components/lab/LabPanel';
+import { remoteCacheTag } from '@/mf/server-loader';
 
 /**
  * 실험 C — 이벤트 기반 무효화.
@@ -15,9 +15,9 @@ import { remoteCacheTag } from "@/mf/server-loader";
  * (실측: docs/04-experiments/03-cache-modes.md)
  */
 async function CachedShell() {
-  "use cache";
-  cacheLife("minutes");
-  cacheTag(remoteCacheTag("catalog"));
+  'use cache';
+  cacheLife('minutes');
+  cacheTag(remoteCacheTag('catalog'));
 
   return <LabPanel mode="cache" renderedAt={new Date().toISOString()} />;
 }

@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useRouter } from "next/navigation";
+import { useRouter } from 'next/navigation';
 
-import { RemoteComponent } from "@/mf/RemoteComponent";
+import { RemoteComponent } from '@/mf/RemoteComponent';
 
 /**
  * 결제 화면. Multi-Zone 이 아니라 **remote** 다.
@@ -16,8 +16,8 @@ export function CheckoutSection() {
       module="cart/CheckoutFlow"
       fallbackLabel="cart remote 에서 주문서 불러오는 중…"
       props={{
-        onDone: () => router.push("/"),
-        onContinueShopping: () => router.push("/"),
+        onDone: () => router.push('/'),
+        onContinueShopping: () => router.push('/'),
       }}
     />
   );

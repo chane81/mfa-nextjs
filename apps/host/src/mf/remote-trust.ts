@@ -1,4 +1,4 @@
-import type { RemoteName } from "@mfa/contracts";
+import type { RemoteName } from '@mfa/contracts';
 
 /**
  * remote 신뢰 경계.
@@ -32,13 +32,17 @@ export function allowedOrigins(defaults: string[]): string[] {
   if (!configured) return defaults;
 
   return configured
-    .split(",")
+    .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean)
     .map((origin) => new URL(origin).origin);
 }
 
-export function assertAllowedOrigin(remote: RemoteName, url: string, allowed: string[]): void {
+export function assertAllowedOrigin(
+  remote: RemoteName,
+  url: string,
+  allowed: string[],
+): void {
   let origin: string;
   try {
     origin = new URL(url).origin;
@@ -48,7 +52,7 @@ export function assertAllowedOrigin(remote: RemoteName, url: string, allowed: st
 
   if (!allowed.includes(origin)) {
     throw new Error(
-      `remote '${remote}' 의 오리진이 허용 목록에 없습니다: ${origin} (허용: ${allowed.join(", ")})`,
+      `remote '${remote}' 의 오리진이 허용 목록에 없습니다: ${origin} (허용: ${allowed.join(', ')})`,
     );
   }
 }
@@ -60,23 +64,31 @@ export function assertAllowedOrigin(remote: RemoteName, url: string, allowed: st
  * 막는 것: 절대 URL(`https://evil/...`), 프로토콜 상대(`//evil/...`), 상위 경로(`..`),
  * 버전 불일치(공표한 버전과 다른 디렉터리), 쿼리·프래그먼트.
  */
-export function assertSafeEntryPath(remote: RemoteName, path: string, version: string): void {
+export function assertSafeEntryPath(
+  remote: RemoteName,
+  path: string,
+  version: string,
+): void {
   const expected = `/v${version}/`;
 
-  if (!path.startsWith(expected) || path.includes("..") || /[?#]/.test(path)) {
-    throw new Error(`remote '${remote}' 의 엔트리 경로가 허용되지 않습니다: ${path}`);
+  if (!path.startsWith(expected) || path.includes('..') || /[?#]/.test(path)) {
+    throw new Error(
+      `remote '${remote}' 의 엔트리 경로가 허용되지 않습니다: ${path}`,
+    );
   }
 
   const file = path.slice(expected.length);
   if (!/^[\w.-]+$/.test(file)) {
-    throw new Error(`remote '${remote}' 의 엔트리 파일명이 허용되지 않습니다: ${file}`);
+    throw new Error(
+      `remote '${remote}' 의 엔트리 파일명이 허용되지 않습니다: ${file}`,
+    );
   }
 }
 
 const encoder = new TextEncoder();
 
 function toBase64(bytes: Uint8Array): string {
-  let binary = "";
+  let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
 }
@@ -90,7 +102,7 @@ function fromBase64(value: string): Uint8Array {
 
 /** SRI 형식(`sha384-<base64>`) 무결성 값을 만든다 */
 export async function computeIntegrity(bytes: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-384", bytes);
+  const digest = await crypto.subtle.digest('SHA-384', bytes);
   return `sha384-${toBase64(new Uint8Array(digest))}`;
 }
 
@@ -130,13 +142,13 @@ export async function assertIntegrity(
 
 /** 무결성 값이 없는 매니페스트를 거부할지 (기본: 프로덕션에서 거부) */
 export function integrityRequired(): boolean {
-  if (process.env.MF_REQUIRE_INTEGRITY === "0") return false;
-  return process.env.NODE_ENV === "production";
+  if (process.env.MF_REQUIRE_INTEGRITY === '0') return false;
+  return process.env.NODE_ENV === 'production';
 }
 
 /** 서명 검증을 강제할지. 키 배포가 필요하므로 명시적으로 켠다. */
 export function signatureRequired(): boolean {
-  return process.env.MF_REQUIRE_SIGNATURE === "1";
+  return process.env.MF_REQUIRE_SIGNATURE === '1';
 }
 
 /**
@@ -159,8 +171,8 @@ export function signedPayload(fields: {
     fields.version,
     fields.ssrEntry,
     fields.webEntry,
-    fields.ssrIntegrity ?? "",
-    fields.webIntegrity ?? "",
+    fields.ssrIntegrity ?? '',
+    fields.webIntegrity ?? '',
   ]);
 }
 
@@ -195,15 +207,15 @@ export async function assertManifestSignature(
   }
 
   const key = await crypto.subtle.importKey(
-    "spki",
+    'spki',
     fromBase64(encoded) as BufferSource,
-    { name: "Ed25519" },
+    { name: 'Ed25519' },
     false,
-    ["verify"],
+    ['verify'],
   );
 
   const ok = await crypto.subtle.verify(
-    "Ed25519",
+    'Ed25519',
     key,
     fromBase64(signature) as BufferSource,
     encoder.encode(payload) as BufferSource,

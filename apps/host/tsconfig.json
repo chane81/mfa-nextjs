@@ -5,6 +5,11 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "src/**/*", "next.config.ts", ".next/types/**/*"],
+  "include": [
+    "next-env.d.ts",
+    "src/**/*",
+    "next.config.ts",
+    ".next/types/**/*"
+  ],
   "exclude": ["node_modules", ".next"]
 }

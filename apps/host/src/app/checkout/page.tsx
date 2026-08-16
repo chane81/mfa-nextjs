@@ -1,4 +1,4 @@
-import { CheckoutSection } from "@/components/CheckoutSection";
+import { CheckoutSection } from '@/components/CheckoutSection';
 
 /**
  * remote 를 SSR 하므로 요청 시점에 remote 번들을 가져와야 한다.

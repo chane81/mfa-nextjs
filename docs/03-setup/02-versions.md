@@ -4,23 +4,23 @@
 
 ## 채택 버전
 
-| 패키지 | 최신 | 채택 | 비고 |
-| --- | --- | --- | --- |
-| `next` | 16.3.1 | **16.3.1** | Turbopack 기본 |
-| `react` / `react-dom` | 19.2.8 | **19.2.8** | |
-| `turbo` | 2.10.9 | **2.10.9** | |
-| `typescript` | 7.0.2 | **6.0.3** ⚠️ | 아래 참고 |
-| `eslint` | 10.8.1 | **10.8.1** | flat config |
-| `typescript-eslint` | 8.67.0 | **8.67.0** | eslint 10 지원 |
-| `vite` | 8.2.1 | **8.2.1** | |
-| `@vitejs/plugin-react` | 6.0.5 | **6.0.5** | |
-| `@module-federation/vite` | 1.20.7 | **1.20.7** | peer `vite ^5~^8` |
-| `@rsbuild/core` | 2.1.13 | **2.1.13** | |
-| `@rsbuild/plugin-react` | 2.1.0 | **2.1.0** | |
-| `@module-federation/rsbuild-plugin` | 2.8.2 | **2.8.2** | |
-| `@module-federation/runtime` | 2.8.2 | **2.8.2** | host 가 쓰는 유일한 MF 패키지 |
-| `eslint-plugin-react` | 7.37.5 | **7.37.5** | ⚠️ 아래 참고 |
-| `eslint-plugin-react-hooks` | 7.1.1 | **7.1.1** | eslint 10 OK |
+| 패키지                              | 최신   | 채택         | 비고                          |
+| ----------------------------------- | ------ | ------------ | ----------------------------- |
+| `next`                              | 16.3.1 | **16.3.1**   | Turbopack 기본                |
+| `react` / `react-dom`               | 19.2.8 | **19.2.8**   |                               |
+| `turbo`                             | 2.10.9 | **2.10.9**   |                               |
+| `typescript`                        | 7.0.2  | **6.0.3** ⚠️ | 아래 참고                     |
+| `eslint`                            | 10.8.1 | **10.8.1**   | flat config                   |
+| `typescript-eslint`                 | 8.67.0 | **8.67.0**   | eslint 10 지원                |
+| `vite`                              | 8.2.1  | **8.2.1**    |                               |
+| `@vitejs/plugin-react`              | 6.0.5  | **6.0.5**    |                               |
+| `@module-federation/vite`           | 1.20.7 | **1.20.7**   | peer `vite ^5~^8`             |
+| `@rsbuild/core`                     | 2.1.13 | **2.1.13**   |                               |
+| `@rsbuild/plugin-react`             | 2.1.0  | **2.1.0**    |                               |
+| `@module-federation/rsbuild-plugin` | 2.8.2  | **2.8.2**    |                               |
+| `@module-federation/runtime`        | 2.8.2  | **2.8.2**    | host 가 쓰는 유일한 MF 패키지 |
+| `eslint-plugin-react`               | 7.37.5 | **7.37.5**   | ⚠️ 아래 참고                  |
+| `eslint-plugin-react-hooks`         | 7.1.1  | **7.1.1**    | eslint 10 OK                  |
 
 ## ⚠️ TypeScript 7 을 안 쓴 이유
 

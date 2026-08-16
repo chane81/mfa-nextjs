@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { useRouter } from "next/navigation";
+import { useRouter } from 'next/navigation';
 
-import type { Product } from "@mfa/contracts";
+import type { Product } from '@mfa/contracts';
 
-import { RemoteComponent } from "@/mf/RemoteComponent";
+import { RemoteComponent } from '@/mf/RemoteComponent';
 
 /**
  * 라우팅은 host 소유, 렌더링은 remote 소유.
@@ -18,7 +18,7 @@ export function CatalogSection() {
       module="catalog/ProductGrid"
       fallbackLabel="catalog remote 에서 상품 목록 불러오는 중…"
       props={{
-        category: "all",
+        category: 'all',
         onSelect: (product: Product) => router.push(`/products/${product.id}`),
       }}
     />

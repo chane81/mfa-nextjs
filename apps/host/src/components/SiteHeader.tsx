@@ -1,20 +1,20 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
-import { tokens } from "@mfa/ui";
+import { tokens } from '@mfa/ui';
 
-import { RemoteComponent } from "@/mf/RemoteComponent";
+import { RemoteComponent } from '@/mf/RemoteComponent';
 
 const NAV = [
-  { href: "/", label: "홈" },
-  { href: "/cart", label: "장바구니" },
+  { href: '/', label: '홈' },
+  { href: '/cart', label: '장바구니' },
   // /checkout 은 host 라우트 + cart remote → 소프트 내비게이션
-  { href: "/checkout", label: "결제" },
-  { href: "/debug", label: "MF 진단" },
+  { href: '/checkout', label: '결제' },
+  { href: '/debug', label: 'MF 진단' },
   // SSR / ISR / Cache Components 비교 실험
-  { href: "/lab", label: "캐시 실험" },
+  { href: '/lab', label: '캐시 실험' },
 ] as const;
 
 export function SiteHeader() {
@@ -25,7 +25,7 @@ export function SiteHeader() {
       style={{
         borderBottom: `1px solid ${tokens.color.border}`,
         background: tokens.color.surface,
-        position: "sticky",
+        position: 'sticky',
         top: 0,
         zIndex: 10,
       }}
@@ -33,17 +33,21 @@ export function SiteHeader() {
       <div
         style={{
           maxWidth: 1120,
-          margin: "0 auto",
+          margin: '0 auto',
           padding: `${tokens.space(4)} ${tokens.space(6)}`,
-          display: "flex",
-          alignItems: "center",
+          display: 'flex',
+          alignItems: 'center',
           gap: tokens.space(6),
-          flexWrap: "wrap",
+          flexWrap: 'wrap',
         }}
       >
         <Link
           href="/"
-          style={{ color: tokens.color.text, textDecoration: "none", fontWeight: 700 }}
+          style={{
+            color: tokens.color.text,
+            textDecoration: 'none',
+            fontWeight: 700,
+          }}
         >
           🛍️ MFA Shop
           <span
@@ -58,14 +62,17 @@ export function SiteHeader() {
           </span>
         </Link>
 
-        <nav style={{ display: "flex", gap: tokens.space(4), flex: 1 }}>
+        <nav style={{ display: 'flex', gap: tokens.space(4), flex: 1 }}>
           {NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               style={{
-                color: pathname === item.href ? tokens.color.accent : tokens.color.textMuted,
-                textDecoration: "none",
+                color:
+                  pathname === item.href
+                    ? tokens.color.accent
+                    : tokens.color.textMuted,
+                textDecoration: 'none',
                 fontSize: 14,
               }}
             >

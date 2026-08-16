@@ -1,7 +1,7 @@
-import { cacheLife, cacheTag } from "next/cache";
+import { cacheLife, cacheTag } from 'next/cache';
 
-import { LabPanel } from "@/components/lab/LabPanel";
-import { remoteCacheTag } from "@/mf/server-loader";
+import { LabPanel } from '@/components/lab/LabPanel';
+import { remoteCacheTag } from '@/mf/server-loader';
 
 /**
  * 실험 B — ISR 등가.
@@ -13,11 +13,11 @@ import { remoteCacheTag } from "@/mf/server-loader";
  * 팀 컨벤션이 생기면 next.config 에 커스텀 프로필로 등록하는 편이 낫다.
  */
 async function IsrEquivalent() {
-  "use cache";
+  'use cache';
   cacheLife({ stale: 60, revalidate: 60, expire: 3600 });
   // 이 캐시 스코프가 어떤 remote 에 의존하는지 스스로 선언한다.
   // remote 재배포 웹훅은 이 태그만 만료시키면 되고, 라우트 목록을 알 필요가 없다.
-  cacheTag(remoteCacheTag("catalog"));
+  cacheTag(remoteCacheTag('catalog'));
 
   return <LabPanel mode="isr" renderedAt={new Date().toISOString()} />;
 }

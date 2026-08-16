@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import type { RemoteName } from "@mfa/contracts";
+import type { RemoteName } from '@mfa/contracts';
 
-import { RemoteComponent } from "@/mf/RemoteComponent";
+import { RemoteComponent } from '@/mf/RemoteComponent';
 
 /**
  * remote 를 **SSR 레이어에서** 한 번 렌더해 번들 캐시를 데운다.
@@ -17,18 +17,24 @@ import { RemoteComponent } from "@/mf/RemoteComponent";
  * `nonce` 는 `lazy()` 캐시를 우회해 로더를 반드시 한 번 태우기 위한 값이다.
  * 없으면 롤백처럼 "이미 본 적 있는 버전"으로 갈 때 로더가 아예 호출되지 않는다.
  */
-export function MfWarmup({ remotes, nonce }: { remotes: RemoteName[]; nonce: string }) {
+export function MfWarmup({
+  remotes,
+  nonce,
+}: {
+  remotes: RemoteName[];
+  nonce: string;
+}) {
   return (
     <div hidden aria-hidden>
-      {remotes.includes("catalog") ? (
+      {remotes.includes('catalog') ? (
         <RemoteComponent
           module="catalog/ProductGrid"
           fallbackLabel="warm: catalog"
           reloadKey={nonce}
-          props={{ category: "all", onSelect: () => {} }}
+          props={{ category: 'all', onSelect: () => {} }}
         />
       ) : null}
-      {remotes.includes("cart") ? (
+      {remotes.includes('cart') ? (
         <RemoteComponent
           module="cart/CartBadge"
           fallbackLabel="warm: cart"

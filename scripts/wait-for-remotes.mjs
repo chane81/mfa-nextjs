@@ -50,22 +50,22 @@ const FETCH_TIMEOUT_MS = 5000;
  */
 const REMOTES = [
   {
-    name: "catalog",
+    name: 'catalog',
     web:
       process.env.NEXT_PUBLIC_REMOTE_CATALOG_ENTRY ||
-      "http://localhost:3001/mf-manifest.json",
+      'http://localhost:3001/mf-manifest.json',
     ssr:
       process.env.REMOTE_CATALOG_SSR_ENTRY ||
-      "http://localhost:3001/mf-server.cjs",
+      'http://localhost:3001/mf-server.cjs',
   },
   {
-    name: "cart",
+    name: 'cart',
     web:
       process.env.NEXT_PUBLIC_REMOTE_CART_ENTRY ||
-      "http://localhost:3002/mf-manifest.json",
+      'http://localhost:3002/mf-manifest.json',
     ssr:
       process.env.REMOTE_CART_SSR_ENTRY ||
-      "http://localhost:3002/mf-server.cjs",
+      'http://localhost:3002/mf-server.cjs',
   },
 ];
 
@@ -95,12 +95,12 @@ function remoteEntryUrl(manifest, manifestUrl) {
   const { publicPath, remoteEntry } = manifest?.metaData ?? {};
   if (!remoteEntry?.name) return null;
 
-  const base = /^https?:\/\//.test(publicPath ?? "")
+  const base = /^https?:\/\//.test(publicPath ?? '')
     ? publicPath
-    : new URL(".", manifestUrl).href;
+    : new URL('.', manifestUrl).href;
   const dir = remoteEntry.path
-    ? `${remoteEntry.path.replace(/^\/+|\/+$/g, "")}/`
-    : "";
+    ? `${remoteEntry.path.replace(/^\/+|\/+$/g, '')}/`
+    : '';
   return new URL(`${dir}${remoteEntry.name}`, base).href;
 }
 

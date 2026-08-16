@@ -1,8 +1,8 @@
-import js from "@eslint/js";
-import { defineConfig, globalIgnores } from "eslint/config";
-import turbo from "eslint-plugin-turbo";
-import prettier from "eslint-config-prettier";
-import tseslint from "typescript-eslint";
+import js from '@eslint/js';
+import { defineConfig, globalIgnores } from 'eslint/config';
+import turbo from 'eslint-plugin-turbo';
+import prettier from 'eslint-config-prettier';
+import tseslint from 'typescript-eslint';
 
 /**
  * 모든 워크스페이스가 공유하는 기본 ESLint 설정.
@@ -10,11 +10,11 @@ import tseslint from "typescript-eslint";
  */
 export const baseConfig = defineConfig([
   globalIgnores([
-    "**/node_modules/**",
-    "**/dist/**",
-    "**/.next/**",
-    "**/.turbo/**",
-    "**/@mf-types/**",
+    '**/node_modules/**',
+    '**/dist/**',
+    '**/.next/**',
+    '**/.turbo/**',
+    '**/@mf-types/**',
   ]),
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -22,14 +22,14 @@ export const baseConfig = defineConfig([
     plugins: { turbo },
     rules: {
       // turbo.json 에 선언되지 않은 환경변수 사용을 잡아냄
-      "turbo/no-undeclared-env-vars": "warn",
-      "@typescript-eslint/consistent-type-imports": [
-        "error",
-        { prefer: "type-imports", fixStyle: "inline-type-imports" },
+      'turbo/no-undeclared-env-vars': 'warn',
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
       ],
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
     },
   },

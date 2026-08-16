@@ -1,12 +1,17 @@
-import * as React from "react";
-import * as ReactJSXDevRuntime from "react/jsx-dev-runtime";
-import * as ReactJSXRuntime from "react/jsx-runtime";
-import * as ReactDOM from "react-dom";
+import * as React from 'react';
+import * as ReactJSXDevRuntime from 'react/jsx-dev-runtime';
+import * as ReactJSXRuntime from 'react/jsx-runtime';
+import * as ReactDOM from 'react-dom';
 
-import { REMOTE_NAMES, type RemoteModuleId, type RemoteModuleMap, type RemoteName } from "@mfa/contracts";
+import {
+  REMOTE_NAMES,
+  type RemoteModuleId,
+  type RemoteModuleMap,
+  type RemoteName,
+} from '@mfa/contracts';
 
-import { normalizeModule } from "./interop";
-import { recordEval, recordFetch, recordLoad } from "./loader-stats";
+import { normalizeModule } from './interop';
+import { recordEval, recordFetch, recordLoad } from './loader-stats';
 import {
   fallbackSsrEntry,
   fetchRemoteVersion,
@@ -15,8 +20,8 @@ import {
   remoteOrigin,
   trustedOrigins,
   warmEpoch,
-} from "./remote-version";
-import { assertAllowedOrigin, assertIntegrity } from "./remote-trust";
+} from './remote-version';
+import { assertAllowedOrigin, assertIntegrity } from './remote-trust';
 
 /**
  * remote 를 **서버에서** 로드하는 로더.
@@ -47,10 +52,10 @@ import { assertAllowedOrigin, assertIntegrity } from "./remote-trust";
  * 네임스페이스 모양이 `{ default: {...} }` 로 올 수 있어 프로브로 정규화한다.
  */
 const INJECTED: Record<string, unknown> = {
-  react: normalizeModule(React, "useState"),
-  "react-dom": normalizeModule(ReactDOM, "createPortal"),
-  "react/jsx-runtime": normalizeModule(ReactJSXRuntime, "jsx"),
-  "react/jsx-dev-runtime": normalizeModule(ReactJSXDevRuntime, "jsxDEV"),
+  react: normalizeModule(React, 'useState'),
+  'react-dom': normalizeModule(ReactDOM, 'createPortal'),
+  'react/jsx-runtime': normalizeModule(ReactJSXRuntime, 'jsx'),
+  'react/jsx-dev-runtime': normalizeModule(ReactJSXDevRuntime, 'jsxDEV'),
 };
 
 type ExposeMap = Record<string, unknown>;
@@ -66,7 +71,7 @@ interface CacheEntry {
 const bundleCache = new Map<RemoteName, CacheEntry>();
 
 /** 버전을 모를 때 쓰는 캐시 키 (dev, 또는 stamp 안 한 remote) */
-const UNVERSIONED = "unversioned";
+const UNVERSIONED = 'unversioned';
 
 /**
  * remote 하나에 태그가 **두 개**인 이유.
@@ -120,9 +125,9 @@ export function remoteCacheTag(remote: RemoteName): string {
  * 실측: docs/04-experiments/03-cache-modes.md
  */
 function bundleFetchInit(remote: RemoteName): RequestInit {
-  if (process.env.NODE_ENV !== "production") return { cache: "no-store" };
+  if (process.env.NODE_ENV !== 'production') return { cache: 'no-store' };
   return {
-    cache: "force-cache",
+    cache: 'force-cache',
     next: { tags: [remoteBundleTag(remote)] },
   } as RequestInit;
 }
@@ -188,7 +193,7 @@ async function loadServerBundle(
 
   const moduleObj: { exports: ExposeMap } = { exports: {} };
   // remote 번들은 CommonJS 다. host 의 React 를 주입하며 평가한다.
-  const factory = new Function("module", "exports", "require", code) as (
+  const factory = new Function('module', 'exports', 'require', code) as (
     m: typeof moduleObj,
     e: ExposeMap,
     r: (id: string) => unknown,
@@ -199,8 +204,10 @@ async function loadServerBundle(
   const raw = moduleObj.exports;
   // 번들러에 따라 `module.exports.default` 또는 `module.exports` 자체가 맵이다
   const exposes = (raw.default ?? raw) as ExposeMap;
-  if (!exposes || typeof exposes !== "object") {
-    throw new Error(`remote '${remote}' SSR 번들이 expose 맵을 내보내지 않았습니다`);
+  if (!exposes || typeof exposes !== 'object') {
+    throw new Error(
+      `remote '${remote}' SSR 번들이 expose 맵을 내보내지 않았습니다`,
+    );
   }
   recordLoad(remote);
   return exposes;
@@ -210,11 +217,13 @@ async function getServerBundle(remote: RemoteName): Promise<ExposeMap> {
   const { url, version, integrity } = await resolveEntry(remote);
 
   // dev 에서는 remote 의 watch 빌드가 계속 번들을 갱신하므로 캐시하지 않는다
-  if (process.env.NODE_ENV !== "production") return loadServerBundle(remote, url, integrity);
+  if (process.env.NODE_ENV !== 'production')
+    return loadServerBundle(remote, url, integrity);
 
   const epoch = warmEpoch();
   const cached = bundleCache.get(remote);
-  if (cached && cached.version === version && cached.epoch === epoch) return cached.exposes;
+  if (cached && cached.version === version && cached.epoch === epoch)
+    return cached.exposes;
 
   const exposes = loadServerBundle(remote, url, integrity)
     .then((loaded) => {
@@ -224,7 +233,8 @@ async function getServerBundle(remote: RemoteName): Promise<ExposeMap> {
     })
     .catch((error: unknown) => {
       // 실패한 promise 를 캐시에 남기면 서버가 살아있는 동안 계속 실패한다
-      if (bundleCache.get(remote)?.exposes === exposes) bundleCache.delete(remote);
+      if (bundleCache.get(remote)?.exposes === exposes)
+        bundleCache.delete(remote);
       throw error;
     });
   bundleCache.set(remote, { version, epoch, exposes });
@@ -250,15 +260,15 @@ export async function warmServerBundle(remote: RemoteName): Promise<number> {
 export async function loadRemoteModuleOnServer<K extends RemoteModuleId>(
   id: K,
 ): Promise<RemoteModuleMap[K]> {
-  const [remote, ...rest] = id.split("/");
-  const exposeKey = `./${rest.join("/")}`;
+  const [remote, ...rest] = id.split('/');
+  const exposeKey = `./${rest.join('/')}`;
   const exposes = await getServerBundle(remote as RemoteName);
 
   const Component = exposes[exposeKey];
   if (!Component) {
     throw new Error(
       `remote '${remote}' 에 '${exposeKey}' 가 없습니다. ` +
-        `사용 가능: ${Object.keys(exposes).join(", ") || "(없음)"}`,
+        `사용 가능: ${Object.keys(exposes).join(', ') || '(없음)'}`,
     );
   }
   return { default: Component } as RemoteModuleMap[K];
@@ -269,7 +279,9 @@ export function ssrEntrySnapshot(): Record<RemoteName, string> {
   return REMOTE_NAMES.reduce(
     (acc, remote) => {
       const info = knownVersion(remote);
-      acc[remote] = info ? `${remoteOrigin(remote)}${info.ssrEntry}` : fallbackSsrEntry(remote);
+      acc[remote] = info
+        ? `${remoteOrigin(remote)}${info.ssrEntry}`
+        : fallbackSsrEntry(remote);
       return acc;
     },
     {} as Record<RemoteName, string>,

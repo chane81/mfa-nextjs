@@ -1,4 +1,4 @@
-import { REMOTE_NAMES, type RemoteName } from "@mfa/contracts";
+import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
 
 import {
   assertAllowedOrigin,
@@ -6,7 +6,7 @@ import {
   assertSafeEntryPath,
   allowedOrigins,
   signedPayload,
-} from "./remote-trust";
+} from './remote-trust';
 
 /**
  * remote 버전 해석.
@@ -30,8 +30,11 @@ import {
  * (같은 함정 기록: docs/03-setup/04-dokploy.md)
  */
 const SSR_ENTRIES: Record<RemoteName, string> = {
-  catalog: process.env.REMOTE_CATALOG_SSR_ENTRY || "http://localhost:3001/mf-server.cjs",
-  cart: process.env.REMOTE_CART_SSR_ENTRY || "http://localhost:3002/mf-server.cjs",
+  catalog:
+    process.env.REMOTE_CATALOG_SSR_ENTRY ||
+    'http://localhost:3001/mf-server.cjs',
+  cart:
+    process.env.REMOTE_CART_SSR_ENTRY || 'http://localhost:3002/mf-server.cjs',
 };
 
 /** remote 오리진. 버전 매니페스트와 버전 경로를 여기에 붙인다. */
@@ -61,7 +64,9 @@ export interface RemoteVersion {
 
 /** 허용 오리진. 기본값은 설정된 remote 오리진들뿐이라 이미 닫혀 있다. */
 export function trustedOrigins(): string[] {
-  return allowedOrigins(REMOTE_NAMES.map((remote) => new URL(SSR_ENTRIES[remote]).origin));
+  return allowedOrigins(
+    REMOTE_NAMES.map((remote) => new URL(SSR_ENTRIES[remote]).origin),
+  );
 }
 
 /**
@@ -71,9 +76,11 @@ export function trustedOrigins(): string[] {
  * 버전을 **조회**하는 쪽(RSC: 레이아웃)과 그걸로 캐시 키를 만드는 쪽(SSR: 클라이언트
  * 컴포넌트 렌더)이 서로 다른 레이어라 이 값만 전역으로 공유한다.
  */
-const KEY = "__mfaRemoteVersions";
+const KEY = '__mfaRemoteVersions';
 
-type Holder = typeof globalThis & { [KEY]?: Partial<Record<RemoteName, RemoteVersion>> };
+type Holder = typeof globalThis & {
+  [KEY]?: Partial<Record<RemoteName, RemoteVersion>>;
+};
 
 function store(): Partial<Record<RemoteName, RemoteVersion>> {
   const g = globalThis as Holder;
@@ -98,7 +105,7 @@ export function rememberVersion(remote: RemoteName, info: RemoteVersion): void {
  *
  * 로드는 SSR 레이어에서 일어나고 판정은 RSC 레이어(Route Handler)에서 하므로 globalThis 다.
  */
-const READY_KEY = "__mfaReadyVersions";
+const READY_KEY = '__mfaReadyVersions';
 
 interface ReadyState {
   version: string;
@@ -106,7 +113,9 @@ interface ReadyState {
   epoch: number;
 }
 
-type ReadyHolder = typeof globalThis & { [READY_KEY]?: Partial<Record<RemoteName, ReadyState>> };
+type ReadyHolder = typeof globalThis & {
+  [READY_KEY]?: Partial<Record<RemoteName, ReadyState>>;
+};
 
 function ready(): Partial<Record<RemoteName, ReadyState>> {
   const g = globalThis as ReadyHolder;
@@ -114,7 +123,11 @@ function ready(): Partial<Record<RemoteName, ReadyState>> {
   return g[READY_KEY];
 }
 
-export function markBundleReady(remote: RemoteName, version: string, epoch: number): void {
+export function markBundleReady(
+  remote: RemoteName,
+  version: string,
+  epoch: number,
+): void {
   ready()[remote] = { version, epoch };
 }
 
@@ -128,7 +141,11 @@ export function readyVersion(remote: RemoteName): string | null {
  * 버전만 비교하면 예전에 같은 버전을 적재해 둔 상태를 성공으로 오인한다.
  * 실제로 번들이 변조된 배포가 그 구멍으로 통과했다(무결성 검사는 막았는데 웹훅은 200).
  */
-export function isBundleReady(remote: RemoteName, version: string, epoch: number): boolean {
+export function isBundleReady(
+  remote: RemoteName,
+  version: string,
+  epoch: number,
+): boolean {
   const state = ready()[remote];
   return state?.version === version && state.epoch === epoch;
 }
@@ -140,7 +157,7 @@ export function isBundleReady(remote: RemoteName, version: string, epoch: number
  * 정상 배포에서는 버전이 늘 바뀌므로 그런 상황은 변조이거나 깨진 파이프라인이고,
  * warm 은 그걸 잡아내야 의미가 있다. 그래서 warm 은 캐시를 믿지 않는다.
  */
-const EPOCH_KEY = "__mfaWarmEpoch";
+const EPOCH_KEY = '__mfaWarmEpoch';
 
 type EpochHolder = typeof globalThis & { [EPOCH_KEY]?: number };
 
@@ -178,14 +195,21 @@ export function webEntryUrl(remote: RemoteName): string | null {
  * remote 를 못 읽는 상황과 "아직 stamp 안 한 remote" 를 구분하지 않는다.
  * 둘 다 "버전을 모른다"이고, 그때 할 일은 같다.
  */
-export async function fetchRemoteVersion(remote: RemoteName): Promise<RemoteVersion | null> {
+export async function fetchRemoteVersion(
+  remote: RemoteName,
+): Promise<RemoteVersion | null> {
   const url = `${remoteOrigin(remote)}/mf-version.json`;
   const init: RequestInit =
-    process.env.NODE_ENV === "production"
-      ? ({ next: { revalidate: 30, tags: [remoteVersionTag(remote)] } } as RequestInit)
-      : { cache: "no-store" };
+    process.env.NODE_ENV === 'production'
+      ? ({
+          next: { revalidate: 30, tags: [remoteVersionTag(remote)] },
+        } as RequestInit)
+      : { cache: 'no-store' };
 
-  type Manifest = Partial<RemoteVersion> & { signature?: string; webIntegrity?: string };
+  type Manifest = Partial<RemoteVersion> & {
+    signature?: string;
+    webIntegrity?: string;
+  };
 
   // 네트워크 실패는 조용히 넘긴다 — remote 가 잠깐 안 뜬 것과 거부는 다른 사건이다
   const body = await (async (): Promise<Manifest | null> => {
@@ -200,7 +224,8 @@ export async function fetchRemoteVersion(remote: RemoteName): Promise<RemoteVers
   })();
 
   if (!body?.version || !body.ssrEntry || !body.webEntry) return null;
-  const { version, ssrEntry, webEntry, ssrIntegrity, webIntegrity, signature } = body;
+  const { version, ssrEntry, webEntry, ssrIntegrity, webIntegrity, signature } =
+    body;
 
   /**
    * 이 매니페스트는 **remote 가 주는 값**이다. 그대로 믿으면
@@ -214,7 +239,14 @@ export async function fetchRemoteVersion(remote: RemoteName): Promise<RemoteVers
     assertSafeEntryPath(remote, webEntry, version);
     await assertManifestSignature(
       remote,
-      signedPayload({ remote, version, ssrEntry, webEntry, ssrIntegrity, webIntegrity }),
+      signedPayload({
+        remote,
+        version,
+        ssrEntry,
+        webEntry,
+        ssrIntegrity,
+        webIntegrity,
+      }),
       signature,
     );
   } catch (error) {

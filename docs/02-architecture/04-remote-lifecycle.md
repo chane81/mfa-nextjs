@@ -11,15 +11,15 @@ remote 는 host 와 **따로 배포된다.** 그래서 단일 앱이라면 빌�
 
 ## 소유권
 
-| 대상 | 소유 | 비고 |
-| --- | --- | --- |
-| 버전 결정 | remote 빌드 | 빌드 ID(git SHA). `.mf-version` → 자산 경로에 반영 |
-| 버전 공표 | remote 배포 | `dist/mf-version.json` |
-| 자산 서빙 | remote 배포 | `/v<version>/…` immutable, 매니페스트는 no-store |
-| 서명 | remote CI | 개인키는 여기에만 |
-| 캐시 정책 | host | `"use cache"` + `cacheLife` + `cacheTag` |
-| 무효화 시점 | host (웹훅으로 통보받음) | warm 성공 후에만 |
-| 서명 검증 | host | 공개키는 여기에만 |
+| 대상        | 소유                     | 비고                                               |
+| ----------- | ------------------------ | -------------------------------------------------- |
+| 버전 결정   | remote 빌드              | 빌드 ID(git SHA). `.mf-version` → 자산 경로에 반영 |
+| 버전 공표   | remote 배포              | `dist/mf-version.json`                             |
+| 자산 서빙   | remote 배포              | `/v<version>/…` immutable, 매니페스트는 no-store   |
+| 서명        | remote CI                | 개인키는 여기에만                                  |
+| 캐시 정책   | host                     | `"use cache"` + `cacheLife` + `cacheTag`           |
+| 무효화 시점 | host (웹훅으로 통보받음) | warm 성공 후에만                                   |
+| 서명 검증   | host                     | 공개키는 여기에만                                  |
 
 **remote 는 캐시를 모른다.** 순수 렌더 함수로 두고 캐시 정책은 100% host 가 쥔다.
 이 계약이 유지되는 한 remote 를 늘려도 캐시 설계는 그대로다.
@@ -71,12 +71,12 @@ apps/remote-catalog/dist/
 
 host 안에서 remote 와 관련된 캐시는 네 겹이고, 무효화 수단이 각각 다르다.
 
-| # | 층 | 담는 것 | 무효화 |
-| --- | --- | --- | --- |
-| 1 | 버전 매니페스트 (Data Cache) | `mf-version.json` 응답 | `revalidateTag(mf-remote-version:<r>, {expire:0})` · TTL 30초 |
-| 2 | 번들 응답 (Data Cache) | `mf-server.cjs` 바이트 | `revalidateTag(mf-remote-bundle:<r>, {expire:0})` |
-| 3 | 평가된 모듈 (프로세스) | `new Function` 결과 | 버전 변경 · warm 세대 증가 |
-| 4 | 페이지 (`"use cache"`) | remote 마크업이 든 HTML/RSC | `revalidateTag(mf-remote:<r>, "max")` |
+| #   | 층                           | 담는 것                     | 무효화                                                        |
+| --- | ---------------------------- | --------------------------- | ------------------------------------------------------------- |
+| 1   | 버전 매니페스트 (Data Cache) | `mf-version.json` 응답      | `revalidateTag(mf-remote-version:<r>, {expire:0})` · TTL 30초 |
+| 2   | 번들 응답 (Data Cache)       | `mf-server.cjs` 바이트      | `revalidateTag(mf-remote-bundle:<r>, {expire:0})`             |
+| 3   | 평가된 모듈 (프로세스)       | `new Function` 결과         | 버전 변경 · warm 세대 증가                                    |
+| 4   | 페이지 (`"use cache"`)       | remote 마크업이 든 HTML/RSC | `revalidateTag(mf-remote:<r>, "max")`                         |
 
 **태그가 왜 세 개인가.** 하나로 묶으면 순서를 못 만든다. 번들을 깨는 순간 페이지도 같이 깨져서
 재생성이 warm 보다 먼저 일어난다. 그러면 재생성 렌더가 remote 를 기다리다
@@ -135,10 +135,10 @@ remote CI                          host (인스턴스 N개)
 
 콜드 프로세스 + 느린 remote(+800ms) 조건에서 결정적으로 재현된다.
 
-| 4라운드 | 스켈레톤이 캐시됨 |
-| --- | --- |
-| 무효화만 | **4 / 4** |
-| warm-then-revalidate | **0 / 4** |
+| 4라운드              | 스켈레톤이 캐시됨 |
+| -------------------- | ----------------- |
+| 무효화만             | **4 / 4**         |
+| warm-then-revalidate | **0 / 4**         |
 
 warm 이 실패하면 페이지 캐시를 건드리지 않고 502 로 중단한다.
 **옛 화면이 스켈레톤보다 낫다.**
@@ -159,12 +159,12 @@ host 서버가 remote 코드를 `new Function` 으로 실행한다. 브라우저
 `mf-version.json` 은 **remote 가 주는 값**이다. 그대로 믿으면 "다른 오리진에서 받아 실행하라"는
 지시를 그대로 따르게 된다.
 
-| 겹 | 막는 것 | 기본값 |
-| --- | --- | --- |
-| 오리진 허용 목록 | 아무 데서나 받아 실행 | 설정된 remote 오리진만 |
-| 경로 형태 검증 | 절대 URL · 경로 탈출 · 버전 불일치 | 항상 |
-| SRI 무결성 (SHA-384) | 잘린 파일, 번들만 오염된 캐시 | 프로덕션 필수 |
-| Ed25519 서명 | **오리진이 통째로 털린 경우** | `MF_REQUIRE_SIGNATURE=1` |
+| 겹                   | 막는 것                            | 기본값                   |
+| -------------------- | ---------------------------------- | ------------------------ |
+| 오리진 허용 목록     | 아무 데서나 받아 실행              | 설정된 remote 오리진만   |
+| 경로 형태 검증       | 절대 URL · 경로 탈출 · 버전 불일치 | 항상                     |
+| SRI 무결성 (SHA-384) | 잘린 파일, 번들만 오염된 캐시      | 프로덕션 필수            |
+| Ed25519 서명         | **오리진이 통째로 털린 경우**      | `MF_REQUIRE_SIGNATURE=1` |
 
 무결성만으로는 "같은 출처가 준 값끼리의 대조"라 자기 증명에 가깝다. 서명이 그 고리를 끊는다.
 그래서 **개인키는 remote CI, 공개키는 host** — 둘이 같은 곳에 있으면 막으려던 걸 못 막는다.
@@ -173,14 +173,14 @@ host 서버가 remote 코드를 `new Function` 으로 실행한다. 브라우저
 
 ### 실측 (변조 후 배포 시도)
 
-| 시나리오 | 결과 | 서비스 |
-| --- | --- | --- |
-| 정상 배포 | 200 | 정상 |
-| 번들 바이트 변조 | 502 | 마지막 정상 remote 유지 |
-| 매니페스트가 외부 오리진 지정 | 502 | 유지 |
-| 경로 탈출 | 502 | 유지 |
-| 서명 없이 매니페스트 교체 | 502 | 유지 |
-| 서명 두고 무결성 값만 교체 | 502 | 유지 |
+| 시나리오                      | 결과 | 서비스                  |
+| ----------------------------- | ---- | ----------------------- |
+| 정상 배포                     | 200  | 정상                    |
+| 번들 바이트 변조              | 502  | 마지막 정상 remote 유지 |
+| 매니페스트가 외부 오리진 지정 | 502  | 유지                    |
+| 경로 탈출                     | 502  | 유지                    |
+| 서명 없이 매니페스트 교체     | 502  | 유지                    |
+| 서명 두고 무결성 값만 교체    | 502  | 유지                    |
 
 거부하면서도 서비스는 계속 뜬다. 나쁜 배포를 안 받아들일 뿐이다.
 
@@ -188,17 +188,17 @@ host 서버가 remote 코드를 `new Function` 으로 실행한다. 브라우저
 
 ### 환경변수
 
-| 변수 | 어디에 | 없으면 |
-| --- | --- | --- |
-| `REMOTE_CATALOG_SSR_ENTRY` / `REMOTE_CART_SSR_ENTRY` | host | localhost 기본값. 오리진 허용 목록의 기본값도 여기서 나온다 |
-| `NEXT_PUBLIC_REMOTE_*_ENTRY` | host | 버전 정보가 없을 때의 브라우저 폴백 |
-| `REMOTE_ALLOWED_ORIGINS` | host | remote 오리진만 허용(이미 닫힘). 프록시·CDN 을 끼울 때만 넓힌다 |
-| `MF_REVALIDATE_SECRET` | host + remote CI | **모든 무효화·warm 요청 거부** (미설정 = 인증 없음이 아니다) |
-| `MF_REMOTE_PUBLIC_KEY` | host | 서명 검증 생략 |
-| `MF_REQUIRE_SIGNATURE=1` | host | 서명이 없어도 통과 |
-| `MF_REQUIRE_INTEGRITY=0` | host | (프로덕션 기본은 무결성 필수) |
-| `MF_SIGNING_KEY` | **remote CI 전용** | 서명 없이 배포 |
-| `MF_BUILD_VERSION` | remote CI | git SHA → 타임스탬프 순으로 폴백 |
+| 변수                                                 | 어디에             | 없으면                                                          |
+| ---------------------------------------------------- | ------------------ | --------------------------------------------------------------- |
+| `REMOTE_CATALOG_SSR_ENTRY` / `REMOTE_CART_SSR_ENTRY` | host               | localhost 기본값. 오리진 허용 목록의 기본값도 여기서 나온다     |
+| `NEXT_PUBLIC_REMOTE_*_ENTRY`                         | host               | 버전 정보가 없을 때의 브라우저 폴백                             |
+| `REMOTE_ALLOWED_ORIGINS`                             | host               | remote 오리진만 허용(이미 닫힘). 프록시·CDN 을 끼울 때만 넓힌다 |
+| `MF_REVALIDATE_SECRET`                               | host + remote CI   | **모든 무효화·warm 요청 거부** (미설정 = 인증 없음이 아니다)    |
+| `MF_REMOTE_PUBLIC_KEY`                               | host               | 서명 검증 생략                                                  |
+| `MF_REQUIRE_SIGNATURE=1`                             | host               | 서명이 없어도 통과                                              |
+| `MF_REQUIRE_INTEGRITY=0`                             | host               | (프로덕션 기본은 무결성 필수)                                   |
+| `MF_SIGNING_KEY`                                     | **remote CI 전용** | 서명 없이 배포                                                  |
+| `MF_BUILD_VERSION`                                   | remote CI          | git SHA → 타임스탬프 순으로 폴백                                |
 
 turbo 는 strict env 라 새 변수는 `turbo.json` 의 `globalEnv` 에도 등록해야 태스크에 전달된다.
 
@@ -211,12 +211,12 @@ curl -XPOST "$HOST_URL/api/mf-revalidate" \
   -d '{"remote":"catalog"}'
 ```
 
-| 상태 | 뜻 | 페이지 캐시 |
-| --- | --- | --- |
-| 200 | warm 성공 → 무효화함 | 갱신됨 |
-| 401 | 시크릿 불일치(또는 미설정) | 그대로 |
-| 400 | 알 수 없는 remote 이름 | 그대로 |
-| 502 | remote 도달 실패 · 검증 거부 · 적재 실패 | **그대로** |
+| 상태 | 뜻                                       | 페이지 캐시 |
+| ---- | ---------------------------------------- | ----------- |
+| 200  | warm 성공 → 무효화함                     | 갱신됨      |
+| 401  | 시크릿 불일치(또는 미설정)               | 그대로      |
+| 400  | 알 수 없는 remote 이름                   | 그대로      |
+| 502  | remote 도달 실패 · 검증 거부 · 적재 실패 | **그대로**  |
 
 쿼리: `?paths=1` 캐시 스코프 없는 정적 라우트까지 무효화 · `?warm=0` warm 생략(실험용).
 

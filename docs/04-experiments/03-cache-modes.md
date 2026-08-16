@@ -14,16 +14,16 @@
 먼저 바로잡을 것. `export const dynamic = "force-dynamic"` 은 **Next 16 에서 더 이상 쓰지 않는다.**
 [공식 이행 가이드](https://nextjs.org/docs/app/guides/migrating-to-cache-components) 기준 매핑:
 
-| 옛 방식 | Next 16 (Cache Components) |
-| --- | --- |
-| `dynamic = "force-dynamic"` | **삭제.** 캐시하지 않으면 기본이 동적. 요청 시점 실행이 꼭 필요하면 `connection()` + `<Suspense>` |
-| `dynamic = "force-static"` (Route Handler) | `"use cache"` 헬퍼 함수로 분리 |
-| `revalidate = N` | `"use cache"` + `cacheLife(...)` |
-| `fetchCache` | 삭제 |
-| `experimental_ppr` | 삭제. PPR 이 Cache Components 에 흡수 |
-| `dynamicParams` | 미지원. 삭제 |
-| `unstable_noStore()` | 삭제. 기본이 uncached |
-| `unstable_cache(fn, keys, opts)` | `"use cache"` + `cacheLife` + `cacheTag` |
+| 옛 방식                                    | Next 16 (Cache Components)                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `dynamic = "force-dynamic"`                | **삭제.** 캐시하지 않으면 기본이 동적. 요청 시점 실행이 꼭 필요하면 `connection()` + `<Suspense>` |
+| `dynamic = "force-static"` (Route Handler) | `"use cache"` 헬퍼 함수로 분리                                                                    |
+| `revalidate = N`                           | `"use cache"` + `cacheLife(...)`                                                                  |
+| `fetchCache`                               | 삭제                                                                                              |
+| `experimental_ppr`                         | 삭제. PPR 이 Cache Components 에 흡수                                                             |
+| `dynamicParams`                            | 미지원. 삭제                                                                                      |
+| `unstable_noStore()`                       | 삭제. 기본이 uncached                                                                             |
+| `unstable_cache(fn, keys, opts)`           | `"use cache"` + `cacheLife` + `cacheTag`                                                          |
 
 그래서 이 저장소는 **`cacheComponents: true` 를 기본**으로 삼는다.
 `dynamic`/`revalidate` 를 남긴 채 켜면 컴파일 에러다:
@@ -41,11 +41,11 @@ Error: Route segment config "revalidate" is not compatible with
 세 라우트가 **완전히 같은 트리**를 렌더한다 — 같은 remote(`catalog/ProductGrid`), 같은 패널.
 다른 것은 캐시 선언 한 줄뿐이다.
 
-| 라우트 | 캐시 선언 | 옛 표현 |
-| --- | --- | --- |
-| `/lab/ssr` | `await connection()` + `<Suspense>` | `dynamic = "force-dynamic"` |
-| `/lab/isr` | `"use cache"` + `cacheLife({revalidate:60})` | `revalidate = 60` |
-| `/lab/cache` | `"use cache"` + `cacheLife("minutes")` + `cacheTag()` | (없음) |
+| 라우트       | 캐시 선언                                             | 옛 표현                     |
+| ------------ | ----------------------------------------------------- | --------------------------- |
+| `/lab/ssr`   | `await connection()` + `<Suspense>`                   | `dynamic = "force-dynamic"` |
+| `/lab/isr`   | `"use cache"` + `cacheLife({revalidate:60})`          | `revalidate = 60`           |
+| `/lab/cache` | `"use cache"` + `cacheLife("minutes")` + `cacheTag()` | (없음)                      |
 
 판정 지표 3개: **렌더 시각이 얼어붙는가** · **HTML 에 remote 마크업이 있는가** ·
 **요청당 remote 번들 fetch/eval 이 몇 번인가**(`/api/lab/stats` 계측).
@@ -64,20 +64,20 @@ Error: Route segment config "revalidate" is not compatible with
 
 프리렌더 HTML 안의 remote 마크업(`Aurora 75`):
 
-| 파일 | remote 마크업 |
-| --- | --- |
-| `lab/cache.html` | **있음** |
-| `lab/isr.html` | **있음** |
-| `index.html` | **있음** |
-| `lab/ssr.html` | 없음 (의도된 동적 구멍) |
+| 파일             | remote 마크업           |
+| ---------------- | ----------------------- |
+| `lab/cache.html` | **있음**                |
+| `lab/isr.html`   | **있음**                |
+| `index.html`     | **있음**                |
+| `lab/ssr.html`   | 없음 (의도된 동적 구멍) |
 
 3회 연속 요청:
 
-| 라우트 | `x-nextjs-cache` | 서버 렌더 시각 | remote 마크업 | TTFB | 번들 fetch/eval |
-| --- | --- | --- | --- | --- | --- |
-| `/lab/ssr` | – | 매 요청 갱신 | 있음 | 74 → 10 → 9 ms | 1 / 1 |
-| `/lab/isr` | HIT ×3 | **고정** | **있음** | 5 → 2 → 2 ms | **0 / 0** |
-| `/lab/cache` | HIT ×3 | **고정** | **있음** | 6 → 4 → 3 ms | **0 / 0** |
+| 라우트       | `x-nextjs-cache` | 서버 렌더 시각 | remote 마크업 | TTFB           | 번들 fetch/eval |
+| ------------ | ---------------- | -------------- | ------------- | -------------- | --------------- |
+| `/lab/ssr`   | –                | 매 요청 갱신   | 있음          | 74 → 10 → 9 ms | 1 / 1           |
+| `/lab/isr`   | HIT ×3           | **고정**       | **있음**      | 5 → 2 → 2 ms   | **0 / 0**       |
+| `/lab/cache` | HIT ×3           | **고정**       | **있음**      | 6 → 4 → 3 ms   | **0 / 0**       |
 
 참고로 이행 전(구 모델, `revalidate = 60`)에도 동일하게 나왔다:
 `/lab/isr` HIT ×3, 렌더 시각 고정, remote 마크업 있음, fetch/eval 0/0.
@@ -117,7 +117,7 @@ remote 마크업이 캐시 대상 HTML 안으로 들어간다.
 처음엔 remote 번들 fetch 에 `next: { tags: [...] }` 를 달고 "태그가 안 먹는다"고 결론냈다.
 **틀렸다.** Cache Components 모델에서는 `fetch` 의 `next.tags` 가 Data Cache 계층에만 붙고
 `"use cache"` 엔트리에는 붙지 않는다. 가이드가 명시한다 —
-*"Tag data with `cacheTag` inside a `use cache` function instead of the `fetch` `next.tags` option."*
+_"Tag data with `cacheTag` inside a `use cache` function instead of the `fetch` `next.tags` option."_
 
 고친 형태:
 
@@ -131,7 +131,7 @@ async function CachedShell() {
 ```
 
 **의미가 크다.** 각 캐시 스코프가 "나는 catalog remote 에 의존한다"고 스스로 선언하므로
-host 는 *어느 라우트가 어느 remote 를 쓰는지* 맵을 관리할 필요가 없다.
+host 는 _어느 라우트가 어느 remote 를 쓰는지_ 맵을 관리할 필요가 없다.
 remote CI 는 태그 하나만 만료시키면 된다.
 
 예외: 캐시 스코프 없이 통째로 프리렌더된 정적 라우트(`/` 등)는 태그가 없다.
@@ -176,9 +176,9 @@ Data Cache 가 모두 콜드인 상태에서 페이지 캐시가 무효화될 �
 그 엔트리가 이후 `HIT` 로 계속 서빙된다.
 
 | 라운드 4회 (콜드 프로세스, remote +800ms) | 스켈레톤이 캐시됨 |
-| --- | --- |
-| A. 무효화만 (`?warm=0`) | **4 / 4** |
-| B. warm-then-revalidate | **0 / 4** |
+| ----------------------------------------- | ----------------- |
+| A. 무효화만 (`?warm=0`)                   | **4 / 4**         |
+| B. warm-then-revalidate                   | **0 / 4**         |
 
 #### 고친 방식 — warm-then-revalidate
 
@@ -237,11 +237,11 @@ warm#2  → fetches 1 → 2   ✅
 **200 으로 나간다** — 그 시점엔 루트 레이아웃이 이미 flush 되기 시작해 헤더가 확정된 뒤다.
 `instant = false` 로 PPR 셸을 없애도 결과는 같았다.
 
-| 막는 위치 | 미인증 요청 결과 |
-| --- | --- |
-| 페이지 안 `notFound()` (PPR) | `200` + 본문만 404 화면 |
-| 페이지 안 `notFound()` + `instant = false` | `200` |
-| **proxy** | **`404`** |
+| 막는 위치                                  | 미인증 요청 결과        |
+| ------------------------------------------ | ----------------------- |
+| 페이지 안 `notFound()` (PPR)               | `200` + 본문만 404 화면 |
+| 페이지 안 `notFound()` + `instant = false` | `200`                   |
+| **proxy**                                  | **`404`**               |
 
 proxy 는 렌더 파이프라인 진입 전에 돌아 진짜 404 를 낸다. 페이지 안 검사도 그대로
 남겨뒀다 — matcher 가 틀어져도 뚫리지 않도록.
@@ -282,14 +282,14 @@ remote 빌드
 
 #### 실측
 
-| 확인 | 결과 |
-| --- | --- |
-| 서버 엔트리 | `http://localhost:3001/v<version>/mf-server.cjs` |
-| 브라우저 엔트리 | `http://localhost:3001/v<version>/mf-manifest.json` |
-| 매니페스트 안 `publicPath` | `http://localhost:3001/v<version>/` |
-| 브라우저 remote 요청 17건 중 버전 경로 | **17건** (버전 없음 0건) |
-| 콘솔 에러/경고 | **0건** |
-| 페이지 10회 요청 중 `mf-version.json` 조회 | **1회** |
+| 확인                                       | 결과                                                |
+| ------------------------------------------ | --------------------------------------------------- |
+| 서버 엔트리                                | `http://localhost:3001/v<version>/mf-server.cjs`    |
+| 브라우저 엔트리                            | `http://localhost:3001/v<version>/mf-manifest.json` |
+| 매니페스트 안 `publicPath`                 | `http://localhost:3001/v<version>/`                 |
+| 브라우저 remote 요청 17건 중 버전 경로     | **17건** (버전 없음 0건)                            |
+| 콘솔 에러/경고                             | **0건**                                             |
+| 페이지 10회 요청 중 `mf-version.json` 조회 | **1회**                                             |
 
 #### 웹훅 없이 수렴하는가
 
@@ -336,12 +336,12 @@ host **서버**가 remote 코드를 받아 `new Function` 으로 실행한다. �
 
 세 겹으로 막는다. 뒤로 갈수록 강하고, 앞의 것 없이는 뒤의 것도 의미가 없다.
 
-| 겹 | 막는 것 | 기본값 |
-| --- | --- | --- |
-| 오리진 허용 목록 | 아무 데서나 받아 실행하는 것 | 설정된 remote 오리진만 (이미 닫힘) |
-| 경로 형태 검증 | 절대 URL·경로 탈출·버전 불일치 | 항상 |
-| 무결성(SRI) | 배포 중 잘린 파일, 번들만 오염된 캐시 | 프로덕션에서 필수 |
-| 서명(Ed25519) | **remote 오리진이 통째로 털린 경우** | `MF_REQUIRE_SIGNATURE=1` 로 강제 |
+| 겹               | 막는 것                               | 기본값                             |
+| ---------------- | ------------------------------------- | ---------------------------------- |
+| 오리진 허용 목록 | 아무 데서나 받아 실행하는 것          | 설정된 remote 오리진만 (이미 닫힘) |
+| 경로 형태 검증   | 절대 URL·경로 탈출·버전 불일치        | 항상                               |
+| 무결성(SRI)      | 배포 중 잘린 파일, 번들만 오염된 캐시 | 프로덕션에서 필수                  |
+| 서명(Ed25519)    | **remote 오리진이 통째로 털린 경우**  | `MF_REQUIRE_SIGNATURE=1` 로 강제   |
 
 `mf-version.json` 은 **remote 가 주는 값**이다. 그대로 믿으면 "다른 오리진에서 받아 실행하라"는
 지시를 그대로 따르게 된다. 그래서 경로를 먼저 좁히고, 서명으로 출처를 확인하고,
@@ -361,14 +361,14 @@ node scripts/gen-signing-key.mjs      # 키쌍 생성
 
 remote 산출물을 진짜로 고치고 배포 웹훅을 때렸다. 502 = "host 가 이 배포를 거부했다".
 
-| 시나리오 | 결과 | 페이지 |
-| --- | --- | --- |
-| 정상 배포 (대조군) | 200 | 정상 |
-| 번들 바이트 변조 | **502** 적재 실패 | 마지막 정상 remote 유지 |
-| 매니페스트가 외부 오리진 지정 | **502** 매니페스트 거부 | 유지 |
-| 경로 탈출(`/v…/../../etc/passwd`) | **502** 매니페스트 거부 | 유지 |
-| 서명 없이 매니페스트 교체 | **502** 매니페스트 거부 | 유지 |
-| 서명 그대로 두고 무결성 값만 교체 | **502** 매니페스트 거부 | 유지 |
+| 시나리오                          | 결과                    | 페이지                  |
+| --------------------------------- | ----------------------- | ----------------------- |
+| 정상 배포 (대조군)                | 200                     | 정상                    |
+| 번들 바이트 변조                  | **502** 적재 실패       | 마지막 정상 remote 유지 |
+| 매니페스트가 외부 오리진 지정     | **502** 매니페스트 거부 | 유지                    |
+| 경로 탈출(`/v…/../../etc/passwd`) | **502** 매니페스트 거부 | 유지                    |
+| 서명 없이 매니페스트 교체         | **502** 매니페스트 거부 | 유지                    |
+| 서명 그대로 두고 무결성 값만 교체 | **502** 매니페스트 거부 | 유지                    |
 
 중요한 건 마지막 열이다. **거부하면서도 서비스는 계속 뜬다.** 나쁜 배포를 안 받아들일 뿐,
 마지막 정상 remote 로 계속 렌더한다.

@@ -1,10 +1,10 @@
-import Link from "next/link";
-import { Suspense } from "react";
+import Link from 'next/link';
+import { Suspense } from 'react';
 
-import { tokens } from "@mfa/ui";
-import { Skeleton } from "@mfa/ui";
+import { tokens } from '@mfa/ui';
+import { Skeleton } from '@mfa/ui';
 
-import { ProductDetailSection } from "@/components/ProductDetailSection";
+import { ProductDetailSection } from '@/components/ProductDetailSection';
 
 /**
  * cacheComponents 를 켜면 `params` 접근도 런타임 데이터로 취급된다.
@@ -16,7 +16,11 @@ async function ProductDetail({ params }: { params: Promise<{ id: string }> }) {
   return <ProductDetailSection productId={id} />;
 }
 
-export default function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+export default function ProductPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   return (
     <>
       <Link href="/" style={{ color: tokens.color.accent, fontSize: 13 }}>

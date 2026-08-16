@@ -53,14 +53,14 @@ async rewrites() {
 
 ## 결과 — 검증됨 ✅
 
-| 항목 | 결과 |
-| --- | --- |
-| `http://localhost:3000/checkout` HTTP | 200 |
-| 응답 주체 | zone-checkout (`zone: checkout` 라벨 확인) |
-| `http://localhost:3003/checkout` 직접 접근 | 200, 동일 바이트 수 (13500) |
-| SSR | ✅ 초기 HTML 에 주문서 내용 포함 |
-| 장바구니 상태 인계 | ✅ `localStorage` 로 복원 — host 에서 담은 상품이 그대로 보임 |
-| remote 청크 요청 | **0건** (MF 를 안 쓰므로 당연) |
+| 항목                                       | 결과                                                          |
+| ------------------------------------------ | ------------------------------------------------------------- |
+| `http://localhost:3000/checkout` HTTP      | 200                                                           |
+| 응답 주체                                  | zone-checkout (`zone: checkout` 라벨 확인)                    |
+| `http://localhost:3003/checkout` 직접 접근 | 200, 동일 바이트 수 (13500)                                   |
+| SSR                                        | ✅ 초기 HTML 에 주문서 내용 포함                              |
+| 장바구니 상태 인계                         | ✅ `localStorage` 로 복원 — host 에서 담은 상품이 그대로 보임 |
+| remote 청크 요청                           | **0건** (MF 를 안 쓰므로 당연)                                |
 
 브라우저 실측 본문:
 
@@ -71,20 +71,20 @@ async rewrites() {
 
 ## 실험 A 와의 직접 비교
 
-| | 실험 A (런타임 MF + 서버 로딩) | 실험 B (Multi-Zones) |
-| --- | --- | --- |
-| Next.js 16 / Turbopack | ⭕ | ⭕ |
-| App Router | ⭕ | ⭕ |
-| RSC | host 만 | 양쪽 다 |
-| remote/zone SSR | **⭕** (node 번들 추가 빌드) | ⭕ (기본) |
-| **경계 이동** | **소프트 (document 요청 0)** | **하드 (document 요청 1)** |
-| 화면 안 조각 단위 합성 | **⭕** | ❌ (경로 단위) |
-| 런타임 코드 공유 | **⭕** (React 1개) | ❌ (각자 번들) |
-| 상태 공유 | **⭕** 즉시 (globalThis) | ⚠️ localStorage/쿠키 |
-| 번들러 자유도 | **⭕** (Vite/Rspack 혼용) | ❌ (Next.js 고정) |
-| 장애 격리 | remote 단위 (ErrorBoundary) | zone 단위 (프로세스 분리, 더 강함) |
-| 빌드 복잡도 | 높음 (remote 당 2타깃) | **낮음** |
-| 운영 난이도 | 높음 (버전 정합성, shared scope, 서버 신뢰 경계) | **낮음** |
+|                        | 실험 A (런타임 MF + 서버 로딩)                   | 실험 B (Multi-Zones)               |
+| ---------------------- | ------------------------------------------------ | ---------------------------------- |
+| Next.js 16 / Turbopack | ⭕                                               | ⭕                                 |
+| App Router             | ⭕                                               | ⭕                                 |
+| RSC                    | host 만                                          | 양쪽 다                            |
+| remote/zone SSR        | **⭕** (node 번들 추가 빌드)                     | ⭕ (기본)                          |
+| **경계 이동**          | **소프트 (document 요청 0)**                     | **하드 (document 요청 1)**         |
+| 화면 안 조각 단위 합성 | **⭕**                                           | ❌ (경로 단위)                     |
+| 런타임 코드 공유       | **⭕** (React 1개)                               | ❌ (각자 번들)                     |
+| 상태 공유              | **⭕** 즉시 (globalThis)                         | ⚠️ localStorage/쿠키               |
+| 번들러 자유도          | **⭕** (Vite/Rspack 혼용)                        | ❌ (Next.js 고정)                  |
+| 장애 격리              | remote 단위 (ErrorBoundary)                      | zone 단위 (프로세스 분리, 더 강함) |
+| 빌드 복잡도            | 높음 (remote 당 2타깃)                           | **낮음**                           |
+| 운영 난이도            | 높음 (버전 정합성, shared scope, 서버 신뢰 경계) | **낮음**                           |
 
 ## 기각 사유 — 소프트 내비게이션이 불가능하다
 
@@ -93,11 +93,11 @@ zone 마다 Next 라우터가 따로 있으므로 경계를 넘을 때 `next/lin
 
 Playwright 로 document 요청 수를 센 실측:
 
-| 이동 | document 요청 | 판정 |
-| --- | --- | --- |
-| `/` → `/checkout` (cart remote) | **0** | 소프트 ✅ |
-| `/` → `/products/:id` (catalog remote) | **0** | 소프트 ✅ |
-| `/` → `/legacy-checkout` (zone) | **1** | 하드 ❌ |
+| 이동                                   | document 요청 | 판정      |
+| -------------------------------------- | ------------- | --------- |
+| `/` → `/checkout` (cart remote)        | **0**         | 소프트 ✅ |
+| `/` → `/products/:id` (catalog remote) | **0**         | 소프트 ✅ |
+| `/` → `/legacy-checkout` (zone)        | **1**         | 하드 ❌   |
 
 따라오는 손실:
 

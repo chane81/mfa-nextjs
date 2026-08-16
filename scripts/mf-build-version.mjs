@@ -12,19 +12,19 @@
  *
  * 우선순위: MF_BUILD_VERSION → git short SHA(+dirty) → 타임스탬프
  */
-import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 function gitVersion() {
   try {
-    const sha = execFileSync("git", ["rev-parse", "--short=10", "HEAD"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
+    const sha = execFileSync('git', ['rev-parse', '--short=10', 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
-    const dirty = execFileSync("git", ["status", "--porcelain"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
+    const dirty = execFileSync('git', ['status', '--porcelain'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
     // 커밋되지 않은 변경이 있으면 같은 SHA 로 다른 산출물이 나온다. 구분자를 붙인다.
     return dirty ? `${sha}-${Date.now().toString(36)}` : sha;
@@ -41,10 +41,12 @@ function gitVersion() {
  * 자산이 `dist/v<ver>/` 가 아니라 `dist/` 로 나가고 stamp 가 산출물을 못 찾는다.
  */
 const version =
-  process.env.MF_BUILD_VERSION?.trim() || gitVersion() || `t${Date.now().toString(36)}`;
+  process.env.MF_BUILD_VERSION?.trim() ||
+  gitVersion() ||
+  `t${Date.now().toString(36)}`;
 
 /** 자산 경로에 들어가므로 안전한 문자만 남긴다 */
-const safe = version.replace(/[^a-zA-Z0-9._-]/g, "-");
+const safe = version.replace(/[^a-zA-Z0-9._-]/g, '-');
 
-writeFileSync(resolve(process.cwd(), ".mf-version"), `${safe}\n`);
+writeFileSync(resolve(process.cwd(), '.mf-version'), `${safe}\n`);
 console.log(`[version] ${safe}`);

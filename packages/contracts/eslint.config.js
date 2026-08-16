@@ -1,3 +1,3 @@
-import { baseConfig } from "@mfa/eslint-config/base";
+import { baseConfig } from '@mfa/eslint-config/base';
 
 export default baseConfig;

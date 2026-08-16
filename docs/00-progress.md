@@ -22,15 +22,15 @@
 
 ### 배포 환경 실측
 
-| 검증 | 결과 |
-| --- | --- |
-| remote SSR (`/checkout` 초기 HTML) | ✅ `주문서` 포함 |
-| 서명 강제(`MF_REQUIRE_SIGNATURE=1`)에서 remote 로드 | ✅ 통과 |
-| 서버가 remote 버전 핀 주입 | ✅ `/v<ver>/mf-manifest.json` 절대 URL |
-| 불변 경로 캐시 헤더 | ✅ `max-age=31536000, immutable` |
-| 소프트 내비 (`/` → `/checkout`) | ✅ document 요청 0 |
-| 크로스 remote 상태 공유 (Vite → Rsbuild) | ✅ `0원` → `189,000원` |
-| zone 프록시 (`/legacy-checkout`) | ✅ 별도 앱 응답 — 확인 후 앱 삭제(아래) |
+| 검증                                                | 결과                                    |
+| --------------------------------------------------- | --------------------------------------- |
+| remote SSR (`/checkout` 초기 HTML)                  | ✅ `주문서` 포함                        |
+| 서명 강제(`MF_REQUIRE_SIGNATURE=1`)에서 remote 로드 | ✅ 통과                                 |
+| 서버가 remote 버전 핀 주입                          | ✅ `/v<ver>/mf-manifest.json` 절대 URL  |
+| 불변 경로 캐시 헤더                                 | ✅ `max-age=31536000, immutable`        |
+| 소프트 내비 (`/` → `/checkout`)                     | ✅ document 요청 0                      |
+| 크로스 remote 상태 공유 (Vite → Rsbuild)            | ✅ `0원` → `189,000원`                  |
+| zone 프록시 (`/legacy-checkout`)                    | ✅ 별도 앱 응답 — 확인 후 앱 삭제(아래) |
 
 ### Multi-Zones 폐기
 
@@ -67,9 +67,9 @@ turbo 로 순서를 주면 될 것 같지만 아니다. 필요한 건 "먼저 �
 turbo 공식 패턴(`with` 사이드카 + 유한 readiness 프로브)을 실제로 넣어보면 순서도 준비
 대기도 정확히 동작하는데, 사이드카가 `persistent` 라 **`turbo run build` 가 끝나지 않는다.**
 
-| 조각 | 담당 |
-| --- | --- |
-| remote 를 먼저 빌드 | turbo (`@mfa/host#build.dependsOn`) |
+| 조각                                  | 담당                                                                 |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| remote 를 먼저 빌드                   | turbo (`@mfa/host#build.dependsOn`)                                  |
 | 빌드 동안 `dist` 서빙 · 끝나면 내리기 | host `build` 스크립트의 `concurrently --kill-others --success first` |
 
 처음엔 전용 래퍼(`scripts/with-remote-dist.mjs`, 221줄)를 썼다가 `concurrently` 한 줄로 접었다.
@@ -78,18 +78,18 @@ turbo 공식 패턴(`with` 사이드카 + 유한 readiness 프로브)을 실제�
 
 - [x] `pnpm build` / `pnpm start` 콜드 상태에서 동작 (15/15 태스크, `/checkout` 에 `주문서`)
 - [x] host 이미지는 이 게이트를 타지 않는다 — 태스크 이름을 나눴다(`build` / `docker:build`).
-  Dockerfile 이 플래그로 turbo.json 을 되돌리는 모양은 의도가 두 파일에 흩어져서 접었다
+      Dockerfile 이 플래그로 turbo.json 을 되돌리는 모양은 의도가 두 파일에 흩어져서 접었다
 - [x] `REMOTE_*_SSR_ENTRY` 를 host Dockerfile `ARG` 로 명시 (빌드 시점에도 필요한 값이다)
 - [x] `remote-version.ts` 의 `??` → `||` (빈 `ARG` 가 `new URL("")` 로 터질 자리였다)
 - [x] compose 를 2단계로 분리 — 빌드 컨테이너는 compose 네트워크 밖이라 `host.docker.internal`
 - [x] `.env.local` 이 캐시를 깨게 했다 (`inputs: ["$TURBO_DEFAULT$", ".env*"]`).
-  gitignore 된 파일이 기본 입력에서 빠지는데, 그 파일이 프리렌더 결과를 정하고 있었다
+      gitignore 된 파일이 기본 입력에서 빠지는데, 그 파일이 프리렌더 결과를 정하고 있었다
 - [x] 이어서 `apps/host/.env.local` 자체를 삭제 — 코드 기본값의 복사본이었다.
-  로컬은 이제 환경변수 설정 없이 그냥 돈다
+      로컬은 이제 환경변수 설정 없이 그냥 돈다
 - [x] `pnpm start` 를 `pnpm build && turbo run start` 로 — 빌드 중 임시 서버와
-  remote `start` 가 같은 포트를 동시에 잡으려다 둘 다 죽었다
+      remote `start` 가 같은 포트를 동시에 잡으려다 둘 다 죽었다
 - [x] `WAIT_FOR_REMOTES_TIMEOUT` 을 `globalEnv` 에 등록 — A-10 을 그대로 다시 밟았다.
-  `=1` 을 줬는데 60초를 기다렸고, 등록 후 1.17초
+      `=1` 을 줬는데 60초를 기다렸고, 등록 후 1.17초
 
 부작용으로 진단이 하나 좋아졌다. dev 서버가 떠 있는 채로 빌드하면 정적 서버가 `::` 에
 붙는 데 **성공해서** 15초를 버리고 엉뚱한 결론이 났는데, 띄우기 전에 TCP 로 포트 점유를
@@ -130,16 +130,16 @@ turbo 공식 패턴(`with` 사이드카 + 유한 readiness 프로브)을 실제�
 
 ### 결과
 
-| 판정 | 결과 |
-| --- | --- |
-| 캐시된 HTML 에 remote 마크업 | ✅ 있음 (빌드 프리렌더 · 런타임 재생성 모두) |
-| 캐시 HIT 구간의 remote 번들 fetch/eval | ✅ **0 / 0** (동적 라우트는 1회차 1/1) |
-| TTFB | 동적 74→9ms vs 캐시 5→2ms |
-| 태그만으로 무효화 | ✅ 됨 — 단 `cacheTag()` 로 달아야 함. `fetch` 의 `next.tags` 로는 안 됨 |
-| `revalidateTag` 동작 | SWR — 1회 `STALE` 후 백그라운드 갱신 → 새 렌더 |
-| cacheComponents 이행 비용 | 대부분 MFA 무관 (`usePathname`·`params` → Suspense) |
-| `generateStaticParams` 빈 배열 | ❌ 금지 → host 빌드는 remote 기동에 의존 |
-| 재생성 중 스켈레톤 캐싱 | ✅ 결정적 재현(4/4) 후 warm-then-revalidate 로 해결(0/4) |
+| 판정                                   | 결과                                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| 캐시된 HTML 에 remote 마크업           | ✅ 있음 (빌드 프리렌더 · 런타임 재생성 모두)                            |
+| 캐시 HIT 구간의 remote 번들 fetch/eval | ✅ **0 / 0** (동적 라우트는 1회차 1/1)                                  |
+| TTFB                                   | 동적 74→9ms vs 캐시 5→2ms                                               |
+| 태그만으로 무효화                      | ✅ 됨 — 단 `cacheTag()` 로 달아야 함. `fetch` 의 `next.tags` 로는 안 됨 |
+| `revalidateTag` 동작                   | SWR — 1회 `STALE` 후 백그라운드 갱신 → 새 렌더                          |
+| cacheComponents 이행 비용              | 대부분 MFA 무관 (`usePathname`·`params` → Suspense)                     |
+| `generateStaticParams` 빈 배열         | ❌ 금지 → host 빌드는 remote 기동에 의존                                |
+| 재생성 중 스켈레톤 캐싱                | ✅ 결정적 재현(4/4) 후 warm-then-revalidate 로 해결(0/4)                |
 
 전문: [04-experiments/03-cache-modes.md](./04-experiments/03-cache-modes.md)
 
@@ -152,7 +152,7 @@ turbo 공식 패턴(`with` 사이드카 + 유한 readiness 프로브)을 실제�
 
 ```js
 // dts-plugin/dist/index.js — DevPlugin.apply()
-if (!isDev() || normalizedDev === false) return;            // dev 빌드에서만
+if (!isDev() || normalizedDev === false) return; // dev 빌드에서만
 if (!normalizedDev.disableDynamicRemoteTypeHints) {
   runtimePlugins.push('.../dynamic-remote-type-hints-plugin.js');
 }
@@ -167,11 +167,11 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 
 ### 실측 (catalog dev 서버가 서빙하는 모듈 그래프 스캔)
 
-| 설정 | WS 플러그인 주입 | DTS 생성 |
-| --- | --- | --- |
-| `dts: true` (기본) | **있음** | 동작 |
-| `dts: true` + `dev: { disableDynamicRemoteTypeHints: true }` | **없음** | 동작 |
-| `dts: false` (현재) | 없음 | 안 함 |
+| 설정                                                         | WS 플러그인 주입 | DTS 생성 |
+| ------------------------------------------------------------ | ---------------- | -------- |
+| `dts: true` (기본)                                           | **있음**         | 동작     |
+| `dts: true` + `dev: { disableDynamicRemoteTypeHints: true }` | **없음**         | 동작     |
+| `dts: false` (현재)                                          | 없음             | 안 함    |
 
 **즉 "DTS 를 쓰려면 콘솔 에러를 감수해야 한다"는 전제가 틀렸다.**
 
@@ -203,10 +203,10 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 
 ### 원인과 조치
 
-| # | 증상 | 원인 | 조치 |
-| --- | --- | --- | --- |
-| 1 | `[ dynamic-remote-type-hints-plugin ] err: [object Event]` | MF 의 `DevPlugin` 이 dev 빌드에서 주입하는 런타임 플러그인이 `ws://127.0.0.1:<port>` 연결 실패 시 콘솔 에러 | 두 remote 모두 `dts: false` (⚠️ 원인 진단은 4차에서 정정) |
-| 2 | `_jsxDEV is not a function` (catalog 첫 로드 페이지에서만) | Vite dev 의 지연 optimizeDeps. remote 는 host 페이지 안에서 돌아 Vite 의 자동 새로고침이 오지 않음 | catalog 에 `optimizeDeps.entries` + `include` 지정해 기동 시 사전 번들링 |
+| #   | 증상                                                       | 원인                                                                                                        | 조치                                                                     |
+| --- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1   | `[ dynamic-remote-type-hints-plugin ] err: [object Event]` | MF 의 `DevPlugin` 이 dev 빌드에서 주입하는 런타임 플러그인이 `ws://127.0.0.1:<port>` 연결 실패 시 콘솔 에러 | 두 remote 모두 `dts: false` (⚠️ 원인 진단은 4차에서 정정)                |
+| 2   | `_jsxDEV is not a function` (catalog 첫 로드 페이지에서만) | Vite dev 의 지연 optimizeDeps. remote 는 host 페이지 안에서 돌아 Vite 의 자동 새로고침이 오지 않음          | catalog 에 `optimizeDeps.entries` + `include` 지정해 기동 시 사전 번들링 |
 
 과정에서 오진으로 서브엔트리 공유를 제거했다가
 `Failed to bridge external shared module "react-dom/client"` 를 만났다.
@@ -216,14 +216,14 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 
 ### 검증
 
-| 검증 | 결과 |
-| --- | --- |
-| `/debug` → zone(하드) → 뒤로 → `/` → 뒤로 (dev) | ✅ 콘솔 에러 0 |
-| 동일 시나리오 (prod) | ✅ 콘솔 에러 0 |
-| catalog 첫 로드 순서 `/debug` → `/` | ✅ 상품카드 8, 에러 0 |
-| SSR + 소프트 내비 전체 재검증 (dev/prod) | ✅ 이전과 동일 |
-| `grep -c dynamic-remote-type-hints dist/remoteEntry.js` | ✅ 0, 0 |
-| build / lint / typecheck | ✅ 18/18 |
+| 검증                                                    | 결과                  |
+| ------------------------------------------------------- | --------------------- |
+| `/debug` → zone(하드) → 뒤로 → `/` → 뒤로 (dev)         | ✅ 콘솔 에러 0        |
+| 동일 시나리오 (prod)                                    | ✅ 콘솔 에러 0        |
+| catalog 첫 로드 순서 `/debug` → `/`                     | ✅ 상품카드 8, 에러 0 |
+| SSR + 소프트 내비 전체 재검증 (dev/prod)                | ✅ 이전과 동일        |
+| `grep -c dynamic-remote-type-hints dist/remoteEntry.js` | ✅ 0, 0               |
+| build / lint / typecheck                                | ✅ 18/18              |
 
 ---
 
@@ -251,18 +251,18 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 
 ### 검증 결과
 
-| 검증 | 방법 | 결과 |
-| --- | --- | --- |
-| remote SSR — 상세 | `curl /products/kb-001` | ✅ `Aurora 75` 초기 HTML 포함 |
-| remote SSR — 결제 | `curl /checkout` | ✅ `주문서` 초기 HTML 포함 |
-| remote SSR — 장바구니 | `curl /cart` | ✅ 셸 인라인 |
-| remote SSR — 홈 | `curl /` | ✅ 동일 응답 내 포함(React 스트리밍) |
-| 소프트 내비 `/`→`/checkout` | Playwright document 요청 수 | ✅ **0건** |
-| 소프트 내비 `/`→`/products/:id` | 동일 | ✅ **0건** |
-| 하드 내비 `/`→`/legacy-checkout` | 동일 | ✅ **1건** (대조군) |
-| hydration | 브라우저 콘솔 | ✅ 에러/경고 **0건** |
-| 크로스 remote 상태 | 담기 → 헤더 배지 | ✅ `0/0원` → `1/189,000원` |
-| build / lint / typecheck | `turbo run` | ✅ 14/14 통과 |
+| 검증                             | 방법                        | 결과                                 |
+| -------------------------------- | --------------------------- | ------------------------------------ |
+| remote SSR — 상세                | `curl /products/kb-001`     | ✅ `Aurora 75` 초기 HTML 포함        |
+| remote SSR — 결제                | `curl /checkout`            | ✅ `주문서` 초기 HTML 포함           |
+| remote SSR — 장바구니            | `curl /cart`                | ✅ 셸 인라인                         |
+| remote SSR — 홈                  | `curl /`                    | ✅ 동일 응답 내 포함(React 스트리밍) |
+| 소프트 내비 `/`→`/checkout`      | Playwright document 요청 수 | ✅ **0건**                           |
+| 소프트 내비 `/`→`/products/:id`  | 동일                        | ✅ **0건**                           |
+| 하드 내비 `/`→`/legacy-checkout` | 동일                        | ✅ **1건** (대조군)                  |
+| hydration                        | 브라우저 콘솔               | ✅ 에러/경고 **0건**                 |
+| 크로스 remote 상태               | 담기 → 헤더 배지            | ✅ `0/0원` → `1/189,000원`           |
+| build / lint / typecheck         | `turbo run`                 | ✅ 14/14 통과                        |
 
 ### 새로 생긴 비용
 
@@ -293,15 +293,15 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 
 ### 검증 결과 요약
 
-| 검증 | 결과 |
-| --- | --- |
-| host 가 Vite remote 소비 | ✅ 상품 카드 8개 렌더 |
-| host 가 Rsbuild remote 소비 | ✅ 배지 + 패널 렌더 |
-| React 단일 인스턴스 공유 | ✅ 콘솔 에러 0, share scope 3 |
-| 번들러가 다른 두 remote 간 상태 공유 | ✅ `0/0원` → `1/189,000원` |
-| Multi-Zone rewrite | ✅ `:3000/checkout` 이 zone 응답 |
-| zone 으로 장바구니 인계 | ✅ localStorage 복원 |
-| `next build` 프로덕션 빌드 | ✅ host 5라우트 / zone 2라우트 |
+| 검증                                 | 결과                             |
+| ------------------------------------ | -------------------------------- |
+| host 가 Vite remote 소비             | ✅ 상품 카드 8개 렌더            |
+| host 가 Rsbuild remote 소비          | ✅ 배지 + 패널 렌더              |
+| React 단일 인스턴스 공유             | ✅ 콘솔 에러 0, share scope 3    |
+| 번들러가 다른 두 remote 간 상태 공유 | ✅ `0/0원` → `1/189,000원`       |
+| Multi-Zone rewrite                   | ✅ `:3000/checkout` 이 zone 응답 |
+| zone 으로 장바구니 인계              | ✅ localStorage 복원             |
+| `next build` 프로덕션 빌드           | ✅ host 5라우트 / zone 2라우트   |
 
 ### 당시 확인된 제약
 

@@ -30,20 +30,20 @@
 
 ## 앱 목록
 
-| 앱 | 포트 | 번들러 | 역할 | 산출물 |
-| --- | --- | --- | --- | --- |
-| `apps/host` | 3000 | Next.js 16 / Turbopack | 셸 · 라우팅 · remote 소비(브라우저+서버) | `.next` |
-| `apps/remote-catalog` | 3001 | Vite 8 | 상품 목록 / 상세 | `remoteEntry.js` + `mf-server.cjs` |
-| `apps/remote-cart` | 3002 | Rsbuild 2 (Rspack) | 장바구니 / 배지 / **결제** | `remoteEntry.js` + `mf-server.cjs` |
+| 앱                    | 포트 | 번들러                 | 역할                                     | 산출물                             |
+| --------------------- | ---- | ---------------------- | ---------------------------------------- | ---------------------------------- |
+| `apps/host`           | 3000 | Next.js 16 / Turbopack | 셸 · 라우팅 · remote 소비(브라우저+서버) | `.next`                            |
+| `apps/remote-catalog` | 3001 | Vite 8                 | 상품 목록 / 상세                         | `remoteEntry.js` + `mf-server.cjs` |
+| `apps/remote-cart`    | 3002 | Rsbuild 2 (Rspack)     | 장바구니 / 배지 / **결제**               | `remoteEntry.js` + `mf-server.cjs` |
 
 ## 공유 패키지
 
-| 패키지 | 역할 |
-| --- | --- |
-| `@mfa/contracts` | 도메인 타입 · 목 데이터 · 장바구니 싱글턴 · **remote 모듈 타입 계약** |
-| `@mfa/ui` | 디자인 토큰 + 공용 컴포넌트(인라인 스타일 — CSS 파이프라인 차이 회피) |
-| `@mfa/eslint-config` | ESLint 10 flat config (base / react / next) |
-| `@mfa/typescript-config` | tsconfig 프리셋 (base / nextjs / react-library / vite) |
+| 패키지                   | 역할                                                                  |
+| ------------------------ | --------------------------------------------------------------------- |
+| `@mfa/contracts`         | 도메인 타입 · 목 데이터 · 장바구니 싱글턴 · **remote 모듈 타입 계약** |
+| `@mfa/ui`                | 디자인 토큰 + 공용 컴포넌트(인라인 스타일 — CSS 파이프라인 차이 회피) |
+| `@mfa/eslint-config`     | ESLint 10 flat config (base / react / next)                           |
+| `@mfa/typescript-config` | tsconfig 프리셋 (base / nextjs / react-library / vite)                |
 
 ## 노출 모듈 계약
 
@@ -51,21 +51,21 @@
 
 ```ts
 export interface RemoteModuleMap {
-  "catalog/ProductGrid":   { default: ComponentType<ProductGridProps> };
-  "catalog/ProductDetail": { default: ComponentType<ProductDetailProps> };
-  "cart/CartPanel":        { default: ComponentType<CartPanelProps> };
-  "cart/CartBadge":        { default: ComponentType<CartBadgeProps> };
-  "cart/CheckoutFlow":     { default: ComponentType<CheckoutFlowProps> };
+  'catalog/ProductGrid': { default: ComponentType<ProductGridProps> };
+  'catalog/ProductDetail': { default: ComponentType<ProductDetailProps> };
+  'cart/CartPanel': { default: ComponentType<CartPanelProps> };
+  'cart/CartBadge': { default: ComponentType<CartBadgeProps> };
+  'cart/CheckoutFlow': { default: ComponentType<CheckoutFlowProps> };
 }
 ```
 
 같은 키가 **세 곳**에서 1:1 로 맞아야 한다.
 
-| 위치 | 형태 |
-| --- | --- |
+| 위치                     | 형태                                                 |
+| ------------------------ | ---------------------------------------------------- |
 | remote 웹 빌드 `exposes` | `"./CheckoutFlow": "./src/exposes/CheckoutFlow.tsx"` |
-| remote 서버 진입점 맵 | `"./CheckoutFlow": CheckoutFlow` |
-| host 타입 계약 | `"cart/CheckoutFlow"` |
+| remote 서버 진입점 맵    | `"./CheckoutFlow": CheckoutFlow`                     |
+| host 타입 계약           | `"cart/CheckoutFlow"`                                |
 
 어긋나면 런타임에야 발견된다. `/debug` 가 manifest 의 실제 `exposes` 를 보여주는 이유다.
 
@@ -89,13 +89,13 @@ loadRemoteModule("cart/CheckoutFlow")
 host 는 브라우저 쪽에 5개를 공유한다. 루트만으로 충분해 보이지만
 `@module-federation/vite` 가 서브엔트리를 shared 목록에 자동으로 올리므로 전부 제공해야 한다.
 
-| 모듈 | 프로브 | 비고 |
-| --- | --- | --- |
-| `react` | `useState` | 싱글턴 필수 — 어기면 `Invalid hook call` |
-| `react-dom` | `createPortal` | |
-| `react-dom/client` | `createRoot` | 빠지면 `Failed to bridge external shared module` |
-| `react/jsx-runtime` | `jsx` | |
-| `react/jsx-dev-runtime` | `jsxDEV` | dev 전용 경로 |
+| 모듈                    | 프로브         | 비고                                             |
+| ----------------------- | -------------- | ------------------------------------------------ |
+| `react`                 | `useState`     | 싱글턴 필수 — 어기면 `Invalid hook call`         |
+| `react-dom`             | `createPortal` |                                                  |
+| `react-dom/client`      | `createRoot`   | 빠지면 `Failed to bridge external shared module` |
+| `react/jsx-runtime`     | `jsx`          |                                                  |
+| `react/jsx-dev-runtime` | `jsxDEV`       | dev 전용 경로                                    |
 
 넘기는 값은 `apps/host/src/mf/interop.ts` 의 `normalizeModule(mod, probe)` 로 정규화한다.
 `import * as X` 결과가 `{ default: {...} }` 로 오는 경우가 있어서다.

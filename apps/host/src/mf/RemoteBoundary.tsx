@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
-import { ErrorBox } from "@mfa/ui";
+import { ErrorBox } from '@mfa/ui';
 
 interface Props {
   remoteName: string;
@@ -27,7 +27,11 @@ export class RemoteBoundary extends Component<Props, State> {
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     // 실제 서비스라면 여기서 remote 이름과 함께 에러 트래커로 보낸다
-    console.error(`[mfa] remote '${this.props.remoteName}' 로드 실패`, error, info);
+    console.error(
+      `[mfa] remote '${this.props.remoteName}' 로드 실패`,
+      error,
+      info,
+    );
   }
 
   override render(): ReactNode {

@@ -1,8 +1,8 @@
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from 'next/cache';
 
-import { REMOTE_NAMES, type RemoteName } from "@mfa/contracts";
+import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
 
-import { checkMfSecret, mfSecretHeader } from "@/lib/mf-secret";
+import { checkMfSecret, mfSecretHeader } from '@/lib/mf-secret';
 import {
   fetchRemoteVersion,
   isBundleReady,
@@ -10,8 +10,8 @@ import {
   readyVersion,
   remoteVersionTag,
   warmEpoch,
-} from "@/mf/remote-version";
-import { remoteBundleTag, remoteCacheTag } from "@/mf/server-loader";
+} from '@/mf/remote-version';
+import { remoteBundleTag, remoteCacheTag } from '@/mf/server-loader';
 
 /**
  * remote 배포 파이프라인이 host 캐시를 깨우는 엔드포인트.
@@ -38,25 +38,25 @@ import { remoteBundleTag, remoteCacheTag } from "@/mf/server-loader";
  */
 export async function POST(req: Request) {
   if (!checkMfSecret(req.headers)) {
-    return Response.json({ error: "unauthorized" }, { status: 401 });
+    return Response.json({ error: 'unauthorized' }, { status: 401 });
   }
 
   const body = (await req.json().catch(() => ({}))) as { remote?: string };
   const remote = body.remote as RemoteName | undefined;
   if (!remote || !REMOTE_NAMES.includes(remote)) {
     return Response.json(
-      { error: `remote 는 ${REMOTE_NAMES.join(" | ")} 중 하나여야 합니다` },
+      { error: `remote 는 ${REMOTE_NAMES.join(' | ')} 중 하나여야 합니다` },
       { status: 400 },
     );
   }
 
   const url = new URL(req.url);
-  const skipWarm = url.searchParams.get("warm") === "0";
+  const skipWarm = url.searchParams.get('warm') === '0';
   /**
    * 캐시 스코프 없이 통째로 프리렌더된 정적 라우트(`/` 등)는 `cacheTag` 가 없어서
    * 태그로 깰 수 없다. 그런 라우트까지 깨야 하면 `?paths=1`.
    */
-  const alsoPaths = url.searchParams.get("paths") === "1";
+  const alsoPaths = url.searchParams.get('paths') === '1';
 
   /**
    * 1. 버전 조회와 번들 계층만 무효화 — 페이지 캐시는 아직 건드리지 않는다.
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     // 무효화하지 않고 중단한다. 옛 캐시가 스켈레톤보다 낫다.
     Response.json(
       {
-        error: "warm 실패 — 페이지 캐시를 건드리지 않고 중단했습니다",
+        error: 'warm 실패 — 페이지 캐시를 건드리지 않고 중단했습니다',
         detail,
         remote,
         version: knownVersion(remote)?.version ?? null,
@@ -94,7 +94,9 @@ export async function POST(req: Request) {
    * 더 진행하지 않는다. 아래 warm 은 캐시 히트로 끝날 수도 있어서(같은 버전 재배포)
    * "remote 에 닿았는지"를 증명하지 못한다 — 그 역할은 이 단계가 맡는다.
    */
-  const published = skipWarm ? knownVersion(remote) : await fetchRemoteVersion(remote);
+  const published = skipWarm
+    ? knownVersion(remote)
+    : await fetchRemoteVersion(remote);
   if (!skipWarm && !published) {
     return abort(`remote '${remote}' 의 버전 매니페스트를 읽지 못했습니다`);
   }
@@ -108,7 +110,10 @@ export async function POST(req: Request) {
       url.origin,
     );
     try {
-      const res = await fetch(warmUrl, { cache: "no-store", headers: mfSecretHeader() });
+      const res = await fetch(warmUrl, {
+        cache: 'no-store',
+        headers: mfSecretHeader(),
+      });
       await res.text();
       if (!res.ok) throw new Error(`warm 응답 ${res.status}`);
     } catch (error) {
@@ -124,24 +129,26 @@ export async function POST(req: Request) {
      */
     if (!isBundleReady(remote, published.version, warmEpoch())) {
       return abort(
-        `warm 이 이 버전을 적재하지 못했습니다 (공표=${published.version}, 적재=${readyVersion(remote) ?? "없음"}). ` +
+        `warm 이 이 버전을 적재하지 못했습니다 (공표=${published.version}, 적재=${readyVersion(remote) ?? '없음'}). ` +
           `무결성·서명 검증에서 거부됐을 수 있습니다 — 서버 로그를 확인하세요.`,
       );
     }
-    warmed = "ok";
+    warmed = 'ok';
   }
 
   // 4. 페이지 캐시 무효화 — 여기서부터 재생성 렌더는 데워진 번들을 쓴다
-  revalidateTag(remoteCacheTag(remote), "max");
+  revalidateTag(remoteCacheTag(remote), 'max');
 
-  const paths = alsoPaths ? ["/", "/lab/isr", "/lab/cache", "/products/[id]"] : [];
-  for (const path of paths) revalidatePath(path, "page");
+  const paths = alsoPaths
+    ? ['/', '/lab/isr', '/lab/cache', '/products/[id]']
+    : [];
+  for (const path of paths) revalidatePath(path, 'page');
 
   return Response.json({
     ok: true,
     remote,
     version: knownVersion(remote)?.version ?? null,
-    warmed: warmed ?? "skipped",
+    warmed: warmed ?? 'skipped',
     tag: remoteCacheTag(remote),
     revalidated: paths,
   });

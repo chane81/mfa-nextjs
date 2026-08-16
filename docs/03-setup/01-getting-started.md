@@ -23,17 +23,17 @@ pnpm dev
 
 remote 는 앱마다 **프로세스가 둘**이다(`concurrently`).
 
-| 프로세스 | 하는 일 |
-| --- | --- |
-| `web` | 브라우저용 dev 서버 (`remoteEntry.js` / HMR) |
-| `ssr` | **node 타깃 CJS 번들 watch 빌드** (`dist/mf-server.cjs`) — host 서버가 SSR 에 쓴다 |
+| 프로세스 | 하는 일                                                                            |
+| -------- | ---------------------------------------------------------------------------------- |
+| `web`    | 브라우저용 dev 서버 (`remoteEntry.js` / HMR)                                       |
+| `ssr`    | **node 타깃 CJS 번들 watch 빌드** (`dist/mf-server.cjs`) — host 서버가 SSR 에 쓴다 |
 
-| URL | 앱 |
-| --- | --- |
-| http://localhost:3000 | host (여기서 시작) |
-| http://localhost:3001 | catalog remote 단독 실행 |
-| http://localhost:3002 | cart remote 단독 실행 |
-| http://localhost:3000/debug | **MF 진단 화면** |
+| URL                         | 앱                       |
+| --------------------------- | ------------------------ |
+| http://localhost:3000       | host (여기서 시작)       |
+| http://localhost:3001       | catalog remote 단독 실행 |
+| http://localhost:3002       | cart remote 단독 실행    |
+| http://localhost:3000/debug | **MF 진단 화면**         |
 
 ## 확인 순서
 
@@ -80,10 +80,10 @@ TypeError: fetch failed ... ECONNREFUSED
 `RemoteBoundary` 는 이걸 못 막는다. 런타임 장애는 에러 박스로 격리되지만 **프리렌더 실패는
 빌드 실패**다. 그래서 `pnpm build` 한 번으로 끝나도록 두 조각이 맞물려 있다.
 
-| 조각 | 담당 |
-| --- | --- |
-| remote 를 먼저 빌드한다 | turbo — `turbo.json` 의 `@mfa/host#build.dependsOn` |
-| 빌드하는 동안 `dist` 를 서빙한다 | host 의 `build` 스크립트 (`concurrently`) |
+| 조각                             | 담당                                                |
+| -------------------------------- | --------------------------------------------------- |
+| remote 를 먼저 빌드한다          | turbo — `turbo.json` 의 `@mfa/host#build.dependsOn` |
+| 빌드하는 동안 `dist` 를 서빙한다 | host 의 `build` 스크립트 (`concurrently`)           |
 
 ```jsonc
 // apps/host/package.json
@@ -119,12 +119,12 @@ remote 의 `build` 는 **네 단계**다. 버전을 빌드 전에 정해야 자�
 "stamp":     "node ../../scripts/stamp-remote-version.mjs catalog"
 ```
 
-| 단계 | 하는 일 |
-| --- | --- |
-| `mf-build-version` | 버전 결정(git SHA → 타임스탬프) → `.mf-version` |
-| 웹 빌드 | `base`/`assetPrefix` = `/v<version>/`, 출력도 `dist/v<version>/` |
-| SSR 빌드 | 같은 버전 디렉터리에 `mf-server.cjs` |
-| `stamp` | 무결성·서명 계산 → `dist/mf-version.json` 공표, 옛 버전 3개까지 정리 |
+| 단계               | 하는 일                                                              |
+| ------------------ | -------------------------------------------------------------------- |
+| `mf-build-version` | 버전 결정(git SHA → 타임스탬프) → `.mf-version`                      |
+| 웹 빌드            | `base`/`assetPrefix` = `/v<version>/`, 출력도 `dist/v<version>/`     |
+| SSR 빌드           | 같은 버전 디렉터리에 `mf-server.cjs`                                 |
+| `stamp`            | 무결성·서명 계산 → `dist/mf-version.json` 공표, 옛 버전 3개까지 정리 |
 
 산출물 배치와 각 필드의 의미는
 [02-architecture/04-remote-lifecycle.md](../02-architecture/04-remote-lifecycle.md) 참고.
@@ -182,12 +182,12 @@ node scripts/gen-signing-key.mjs
 
 **로컬은 아무것도 설정하지 않아도 된다.** 기본값이 코드에 있다.
 
-| 이름 | 기본값 | 읽는 곳 |
-| --- | --- | --- |
-| `NEXT_PUBLIC_REMOTE_CATALOG_ENTRY` | `http://localhost:3001/mf-manifest.json` | `src/mf/runtime.ts` |
-| `NEXT_PUBLIC_REMOTE_CART_ENTRY` | `http://localhost:3002/mf-manifest.json` | 〃 |
-| `REMOTE_CATALOG_SSR_ENTRY` | `http://localhost:3001/mf-server.cjs` | `src/mf/remote-version.ts` |
-| `REMOTE_CART_SSR_ENTRY` | `http://localhost:3002/mf-server.cjs` | 〃 |
+| 이름                               | 기본값                                   | 읽는 곳                    |
+| ---------------------------------- | ---------------------------------------- | -------------------------- |
+| `NEXT_PUBLIC_REMOTE_CATALOG_ENTRY` | `http://localhost:3001/mf-manifest.json` | `src/mf/runtime.ts`        |
+| `NEXT_PUBLIC_REMOTE_CART_ENTRY`    | `http://localhost:3002/mf-manifest.json` | 〃                         |
+| `REMOTE_CATALOG_SSR_ENTRY`         | `http://localhost:3001/mf-server.cjs`    | `src/mf/remote-version.ts` |
+| `REMOTE_CART_SSR_ENTRY`            | `http://localhost:3002/mf-server.cjs`    | 〃                         |
 
 한때 `apps/host/.env.local` 로 이 값들을 그대로 다시 적어뒀다가 지웠다. 기본값과 한 글자도
 다르지 않은 파일이었고, gitignore 라 **turbo 캐시 입력에서 빠져** 값을 바꿔도 캐시된 옛

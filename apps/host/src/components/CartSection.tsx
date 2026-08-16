@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useRouter } from "next/navigation";
+import { useRouter } from 'next/navigation';
 
-import { RemoteComponent } from "@/mf/RemoteComponent";
+import { RemoteComponent } from '@/mf/RemoteComponent';
 
 export function CartSection({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
@@ -14,7 +14,7 @@ export function CartSection({ compact = false }: { compact?: boolean }) {
       props={{
         compact,
         // /checkout 도 host 라우트(remote 렌더링)라서 소프트 내비게이션이다.
-        onCheckout: () => router.push("/checkout"),
+        onCheckout: () => router.push('/checkout'),
       }}
     />
   );

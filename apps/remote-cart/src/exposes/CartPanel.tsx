@@ -1,8 +1,11 @@
-import { formatKRW, type CartPanelProps } from "@mfa/contracts";
-import { Button, Panel, tokens, useCart } from "@mfa/ui";
+import { formatKRW, type CartPanelProps } from '@mfa/contracts';
+import { Button, Panel, tokens, useCart } from '@mfa/ui';
 
 /** host 에 노출되는 모듈: `cart/CartPanel` */
-export default function CartPanel({ onCheckout, compact = false }: CartPanelProps) {
+export default function CartPanel({
+  onCheckout,
+  compact = false,
+}: CartPanelProps) {
   const { lines, totalQuantity, totalPriceLabel, store } = useCart();
 
   return (
@@ -25,11 +28,11 @@ export default function CartPanel({ onCheckout, compact = false }: CartPanelProp
       ) : (
         <ul
           style={{
-            listStyle: "none",
+            listStyle: 'none',
             margin: 0,
             padding: 0,
-            display: "flex",
-            flexDirection: "column",
+            display: 'flex',
+            flexDirection: 'column',
             gap: tokens.space(2),
           }}
         >
@@ -37,8 +40,8 @@ export default function CartPanel({ onCheckout, compact = false }: CartPanelProp
             <li
               key={line.productId}
               style={{
-                display: "flex",
-                alignItems: "center",
+                display: 'flex',
+                alignItems: 'center',
                 gap: tokens.space(3),
                 background: tokens.color.surfaceAlt,
                 border: `1px solid ${tokens.color.border}`,
@@ -53,9 +56,9 @@ export default function CartPanel({ onCheckout, compact = false }: CartPanelProp
                     color: tokens.color.text,
                     fontSize: 13,
                     fontWeight: 600,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {line.name}
@@ -66,10 +69,18 @@ export default function CartPanel({ onCheckout, compact = false }: CartPanelProp
                   </div>
                 ) : null}
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: tokens.space(2) }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: tokens.space(2),
+                }}
+              >
                 <Button
                   variant="ghost"
-                  onClick={() => store.setQuantity(line.productId, line.quantity - 1)}
+                  onClick={() =>
+                    store.setQuantity(line.productId, line.quantity - 1)
+                  }
                 >
                   −
                 </Button>
@@ -78,14 +89,16 @@ export default function CartPanel({ onCheckout, compact = false }: CartPanelProp
                     fontFamily: tokens.font.mono,
                     color: tokens.color.text,
                     minWidth: 20,
-                    textAlign: "center",
+                    textAlign: 'center',
                   }}
                 >
                   {line.quantity}
                 </span>
                 <Button
                   variant="ghost"
-                  onClick={() => store.setQuantity(line.productId, line.quantity + 1)}
+                  onClick={() =>
+                    store.setQuantity(line.productId, line.quantity + 1)
+                  }
                 >
                   +
                 </Button>
@@ -97,16 +110,18 @@ export default function CartPanel({ onCheckout, compact = false }: CartPanelProp
 
       <footer
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           borderTop: `1px solid ${tokens.color.border}`,
           paddingTop: tokens.space(3),
         }}
       >
         <span style={{ color: tokens.color.textMuted, fontSize: 13 }}>
-          {totalQuantity}개 · 합계{" "}
-          <strong style={{ color: tokens.color.text }}>{totalPriceLabel}</strong>
+          {totalQuantity}개 · 합계{' '}
+          <strong style={{ color: tokens.color.text }}>
+            {totalPriceLabel}
+          </strong>
         </span>
         <Button disabled={lines.length === 0} onClick={onCheckout}>
           결제하기

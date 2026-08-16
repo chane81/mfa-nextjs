@@ -1,9 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
-import { federation } from "@module-federation/vite";
-import react from "@vitejs/plugin-react";
-import { defineConfig, type Connect, type Plugin } from "vite";
+import { federation } from '@module-federation/vite';
+import react from '@vitejs/plugin-react';
+import { defineConfig, type Connect, type Plugin } from 'vite';
 
 const PORT = 3001;
 
@@ -18,7 +18,7 @@ const PORT = 3001;
  */
 const PUBLIC_URL = (
   process.env.REMOTE_CATALOG_PUBLIC_URL || `http://localhost:${PORT}`
-).replace(/\/+$/, "");
+).replace(/\/+$/, '');
 
 /**
  * 빌드 버전. `scripts/mf-build-version.mjs` 가 빌드 직전에 써 둔다.
@@ -30,9 +30,9 @@ const PUBLIC_URL = (
  * dev 서버는 버전 경로를 쓰지 않는다 — 매 저장마다 경로가 바뀌면 의미가 없다.
  */
 function buildVersion(): string | null {
-  const file = resolve(process.cwd(), ".mf-version");
+  const file = resolve(process.cwd(), '.mf-version');
   if (!existsSync(file)) return null;
-  return readFileSync(file, "utf8").trim();
+  return readFileSync(file, 'utf8').trim();
 }
 
 /**
@@ -75,19 +75,19 @@ const NOT_IN_DEV = /^\/mf-version\.json$/;
  *                          `pnpm dev` 는 `vite dev` 와 `vite build --watch` 를 동시에 돌린다
  *   command === "serve"  — dev 와 preview 가 둘 다 serve 다 (구분 불가)
  */
-type ServerKind = "dev" | "preview";
+type ServerKind = 'dev' | 'preview';
 
 function serveSsrBundle(): Plugin {
   const middlewareFor =
     (kind: ServerKind): Connect.NextHandleFunction =>
     (req, res, next) => {
-      const path = req.url?.split("?")[0] ?? "";
-      const dev = kind === "dev";
+      const path = req.url?.split('?')[0] ?? '';
+      const dev = kind === 'dev';
 
       if (dev && NOT_IN_DEV.test(path)) {
         res.statusCode = 404;
-        res.setHeader("Content-Type", "application/json; charset=utf-8");
-        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
         res.end(
           '{"error":"dev 에는 버전 공표가 없습니다. host 는 버전 없는 엔트리로 폴백합니다."}',
         );
@@ -99,33 +99,33 @@ function serveSsrBundle(): Plugin {
       try {
         const body = readFileSync(
           resolve(process.cwd(), `dist${path}`),
-          "utf8",
+          'utf8',
         );
         res.setHeader(
-          "Content-Type",
-          path.endsWith(".json")
-            ? "application/json; charset=utf-8"
-            : "application/javascript; charset=utf-8",
+          'Content-Type',
+          path.endsWith('.json')
+            ? 'application/json; charset=utf-8'
+            : 'application/javascript; charset=utf-8',
         );
-        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader('Access-Control-Allow-Origin', '*');
         // 버전 경로는 불변이라 오래 캐시해도 되지만, 로컬 실험에서는 혼동만 키운다
-        res.setHeader("Cache-Control", "no-store");
+        res.setHeader('Cache-Control', 'no-store');
         res.end(body);
       } catch {
         res.statusCode = 404;
         res.end(
-          "// 아직 없습니다. `pnpm build` (stamp 포함) 또는 dev watch 빌드를 확인하세요.",
+          '// 아직 없습니다. `pnpm build` (stamp 포함) 또는 dev watch 빌드를 확인하세요.',
         );
       }
     };
 
   return {
-    name: "mfa-serve-ssr-bundle",
+    name: 'mfa-serve-ssr-bundle',
     configureServer: (server) => {
-      server.middlewares.use(middlewareFor("dev"));
+      server.middlewares.use(middlewareFor('dev'));
     },
     configurePreviewServer: (server) => {
-      server.middlewares.use(middlewareFor("preview"));
+      server.middlewares.use(middlewareFor('preview'));
     },
   };
 }
@@ -142,7 +142,7 @@ export default defineConfig(({ command }) => {
    * dev 는 버전 경로를 쓰지 않는다. 매 저장마다 경로가 바뀌면 의미가 없고,
    * dev 서버는 메모리에서 서빙하므로 불변성도 필요 없다.
    */
-  const version = command === "build" ? buildVersion() : null;
+  const version = command === 'build' ? buildVersion() : null;
   const base = version ? `${PUBLIC_URL}/v${version}/` : `${PUBLIC_URL}/`;
 
   return {
@@ -150,8 +150,8 @@ export default defineConfig(({ command }) => {
       react(),
       serveSsrBundle(),
       federation({
-        name: "catalog",
-        filename: "remoteEntry.js",
+        name: 'catalog',
+        filename: 'remoteEntry.js',
         // mf-manifest.json 을 내보내야 host 런타임이 포맷/공유 정보를 자동 판별한다
         manifest: true,
         /**
@@ -172,12 +172,12 @@ export default defineConfig(({ command }) => {
          */
         dts: false,
         exposes: {
-          "./ProductGrid": "./src/exposes/ProductGrid.tsx",
-          "./ProductDetail": "./src/exposes/ProductDetail.tsx",
+          './ProductGrid': './src/exposes/ProductGrid.tsx',
+          './ProductDetail': './src/exposes/ProductDetail.tsx',
         },
         shared: {
-          react: { singleton: true, requiredVersion: "^19.0.0" },
-          "react-dom": { singleton: true, requiredVersion: "^19.0.0" },
+          react: { singleton: true, requiredVersion: '^19.0.0' },
+          'react-dom': { singleton: true, requiredVersion: '^19.0.0' },
         },
       }),
     ],
@@ -206,21 +206,21 @@ export default defineConfig(({ command }) => {
      * dev 서버 기동 시점에 사전 번들링을 끝내면 이 창이 사라진다.
      */
     optimizeDeps: {
-      entries: ["src/exposes/*.tsx", "src/main.tsx"],
+      entries: ['src/exposes/*.tsx', 'src/main.tsx'],
       include: [
-        "react",
-        "react-dom",
-        "react-dom/client",
-        "react/jsx-runtime",
-        "react/jsx-dev-runtime",
+        'react',
+        'react-dom',
+        'react-dom/client',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime',
       ],
     },
     base,
     build: {
       // 웹 자산 전체를 버전 디렉터리로 내보낸다 → 배포된 URL 은 다시 바뀌지 않는다
-      outDir: version ? `dist/v${version}` : "dist",
+      outDir: version ? `dist/v${version}` : 'dist',
       // Module Federation 은 top-level await 를 사용한다
-      target: "chrome89",
+      target: 'chrome89',
       minify: false,
       cssCodeSplit: false,
     },

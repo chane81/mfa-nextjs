@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef } from 'react';
 
-import { tokens } from "@mfa/ui";
+import { tokens } from '@mfa/ui';
 
 /**
  * hydration 이후 브라우저 시각을 찍는다.

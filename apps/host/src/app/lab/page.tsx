@@ -1,8 +1,8 @@
-import Link from "next/link";
+import Link from 'next/link';
 
-import { tokens } from "@mfa/ui";
+import { tokens } from '@mfa/ui';
 
-import { LAB_MODES, LAB_ORDER } from "@/components/lab/modes";
+import { LAB_MODES, LAB_ORDER } from '@/components/lab/modes';
 
 /**
  * 캐시 실험 인덱스.
@@ -21,15 +21,31 @@ export default function LabIndexPage() {
           background: tokens.color.surface,
         }}
       >
-        <h1 style={{ margin: 0, fontSize: 22 }}>캐시 실험 — MFA 에서 ISR 이 되는가</h1>
-        <p style={{ color: tokens.color.textMuted, fontSize: 14, lineHeight: 1.7 }}>
-          런타임 Module Federation 으로 remote 를 소비할 때 Next.js 의 캐시 기능이
-          어디까지 그대로 쓰이는지 실측한다. 세 페이지 모두 <code>catalog/ProductGrid</code> 를
-          렌더하고, 차이는 라우트 세그먼트 설정뿐이다.
+        <h1 style={{ margin: 0, fontSize: 22 }}>
+          캐시 실험 — MFA 에서 ISR 이 되는가
+        </h1>
+        <p
+          style={{
+            color: tokens.color.textMuted,
+            fontSize: 14,
+            lineHeight: 1.7,
+          }}
+        >
+          런타임 Module Federation 으로 remote 를 소비할 때 Next.js 의 캐시
+          기능이 어디까지 그대로 쓰이는지 실측한다. 세 페이지 모두{' '}
+          <code>catalog/ProductGrid</code> 를 렌더하고, 차이는 라우트 세그먼트
+          설정뿐이다.
         </p>
-        <p style={{ color: tokens.color.textMuted, fontSize: 13, lineHeight: 1.7, margin: 0 }}>
-          판정 기준: <strong>서버 렌더 시각이 얼어붙는가</strong> ·{" "}
-          <strong>캐시된 HTML 안에 remote 마크업이 있는가</strong> ·{" "}
+        <p
+          style={{
+            color: tokens.color.textMuted,
+            fontSize: 13,
+            lineHeight: 1.7,
+            margin: 0,
+          }}
+        >
+          판정 기준: <strong>서버 렌더 시각이 얼어붙는가</strong> ·{' '}
+          <strong>캐시된 HTML 안에 remote 마크업이 있는가</strong> ·{' '}
           <strong>요청당 remote 번들 fetch 가 0 인가</strong> (
           <Link href="/api/lab/stats" style={{ color: tokens.color.accent }}>
             /api/lab/stats
@@ -38,7 +54,7 @@ export default function LabIndexPage() {
         </p>
       </section>
 
-      <div style={{ display: "grid", gap: tokens.space(4) }}>
+      <div style={{ display: 'grid', gap: tokens.space(4) }}>
         {LAB_ORDER.map((mode) => {
           const spec = LAB_MODES[mode];
           return (
@@ -46,14 +62,14 @@ export default function LabIndexPage() {
               key={mode}
               href={`/lab/${mode}`}
               style={{
-                textDecoration: "none",
-                color: "inherit",
+                textDecoration: 'none',
+                color: 'inherit',
                 border: `1px solid hsl(${spec.hue} 60% 45% / 0.5)`,
                 background: `hsl(${spec.hue} 60% 45% / 0.08)`,
                 borderRadius: tokens.radius.lg,
                 padding: tokens.space(5),
-                display: "flex",
-                flexDirection: "column",
+                display: 'flex',
+                flexDirection: 'column',
                 gap: tokens.space(2),
               }}
             >
@@ -61,7 +77,13 @@ export default function LabIndexPage() {
               <code style={{ fontSize: 12, color: tokens.color.textMuted }}>
                 {spec.segmentConfig}
               </code>
-              <span style={{ fontSize: 13, lineHeight: 1.6, color: tokens.color.textMuted }}>
+              <span
+                style={{
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: tokens.color.textMuted,
+                }}
+              >
                 {spec.expect}
               </span>
             </Link>

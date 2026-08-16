@@ -1,9 +1,9 @@
-import { connection } from "next/server";
-import { Suspense } from "react";
+import { connection } from 'next/server';
+import { Suspense } from 'react';
 
-import { Skeleton } from "@mfa/ui";
+import { Skeleton } from '@mfa/ui';
 
-import { LabPanel } from "@/components/lab/LabPanel";
+import { LabPanel } from '@/components/lab/LabPanel';
 
 /**
  * 실험 A — 요청마다 렌더 (cacheComponents 브랜치 버전).

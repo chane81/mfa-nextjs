@@ -86,14 +86,14 @@ const nextConfig: NextConfig = {
    */
   outputFileTracingIncludes: {
     '/**/*': [
-      '../../node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/esm/**/*'
-    ]
+      '../../node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/esm/**/*',
+    ],
   },
 
   cacheComponents: true,
 
   // 워크스페이스 패키지는 dist(JS)로 빌드되지만, 소스맵/트리셰이킹을 위해 명시
-  transpilePackages: ['@mfa/ui', '@mfa/contracts']
+  transpilePackages: ['@mfa/ui', '@mfa/contracts'],
 };
 
 export default nextConfig;
