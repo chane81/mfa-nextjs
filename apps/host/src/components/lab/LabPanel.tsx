@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { tokens } from '@mfa/ui';
 
 import { CatalogSection } from '@/components/CatalogSection';
+import { formatKst } from '@/lib/format-time';
 
 import { HydrationStamp } from './HydrationStamp';
 import { LAB_MODES, type LabMode } from './modes';
@@ -71,17 +72,21 @@ export function LabPanel({ mode, renderedAt, children }: LabPanelProps) {
             fontSize: 13,
           }}
         >
-          <dt style={{ color: tokens.color.textMuted }}>서버 렌더 시각</dt>
+          <dt style={{ color: tokens.color.textMuted }}>
+            서버 렌더 시각 (KST)
+          </dt>
           <dd style={{ margin: 0 }}>
-            <strong
+            {/* 화면은 KST, `dateTime` 은 원본 UTC — 값 자체는 ISO 로 남긴다 */}
+            <time
+              dateTime={renderedAt}
               data-testid="rendered-at"
-              style={{ fontFamily: tokens.font.mono }}
+              style={{ fontFamily: tokens.font.mono, fontWeight: 700 }}
             >
-              {renderedAt}
-            </strong>
+              {formatKst(renderedAt)}
+            </time>
           </dd>
 
-          <dt style={{ color: tokens.color.textMuted }}>브라우저 시각</dt>
+          <dt style={{ color: tokens.color.textMuted }}>브라우저 시각 (KST)</dt>
           <dd style={{ margin: 0 }}>
             <HydrationStamp />
           </dd>

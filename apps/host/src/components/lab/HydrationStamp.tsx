@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react';
 
 import { tokens } from '@mfa/ui';
 
+import { formatKst } from '@/lib/format-time';
+
 /**
  * hydration 이후 브라우저 시각을 찍는다.
  *
@@ -19,7 +21,7 @@ export function HydrationStamp() {
   const ref = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    if (ref.current) ref.current.textContent = new Date().toISOString();
+    if (ref.current) ref.current.textContent = formatKst(new Date());
   }, []);
 
   return (
