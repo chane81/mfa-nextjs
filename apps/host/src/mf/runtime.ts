@@ -1,14 +1,17 @@
-import { init, loadRemote as federationLoadRemote } from "@module-federation/runtime";
-import * as React from "react";
-import * as ReactJSXDevRuntime from "react/jsx-dev-runtime";
-import * as ReactJSXRuntime from "react/jsx-runtime";
-import * as ReactDOM from "react-dom";
-import * as ReactDOMClient from "react-dom/client";
+import {
+  init,
+  loadRemote as federationLoadRemote
+} from '@module-federation/runtime';
+import * as React from 'react';
+import * as ReactJSXDevRuntime from 'react/jsx-dev-runtime';
+import * as ReactJSXRuntime from 'react/jsx-runtime';
+import * as ReactDOM from 'react-dom';
+import * as ReactDOMClient from 'react-dom/client';
 
-import type { RemoteModuleId, RemoteModuleMap } from "@mfa/contracts";
+import type { RemoteModuleId, RemoteModuleMap } from '@mfa/contracts';
 
-import { normalizeModule } from "./interop";
-import { loadRemoteModuleOnServer } from "./server-loader";
+import { normalizeModule } from './interop';
+import { loadRemoteModuleOnServer } from './server-loader';
 
 /**
  * Next.js 16(Turbopack) host 의 Module Federation 진입점.
@@ -23,12 +26,14 @@ import { loadRemoteModuleOnServer } from "./server-loader";
  */
 
 const CATALOG_ENTRY =
-  process.env.NEXT_PUBLIC_REMOTE_CATALOG_ENTRY ?? "http://localhost:3001/mf-manifest.json";
+  process.env.NEXT_PUBLIC_REMOTE_CATALOG_ENTRY ??
+  'http://localhost:3001/mf-manifest.json';
 const CART_ENTRY =
-  process.env.NEXT_PUBLIC_REMOTE_CART_ENTRY ?? "http://localhost:3002/mf-manifest.json";
+  process.env.NEXT_PUBLIC_REMOTE_CART_ENTRY ??
+  'http://localhost:3002/mf-manifest.json';
 
 /** host 가 remote 에 내려주는 공유 모듈 버전. React 가 두 번 로드되면 훅이 깨진다. */
-const REACT_VERSION = "19.2.8";
+const REACT_VERSION = '19.2.8';
 
 /**
  * ## 왜 `react` / `react-dom` **루트만** 공유하나
@@ -67,55 +72,55 @@ interface InjectedEntry {
   entry: string;
 }
 
-function pinnedEntry(remote: "catalog" | "cart", fallback: string): string {
-  const injected = (globalThis as { __MFA_REMOTE_VERSIONS__?: Record<string, InjectedEntry> })
-    .__MFA_REMOTE_VERSIONS__;
+function pinnedEntry(remote: 'catalog' | 'cart', fallback: string): string {
+  const injected = (
+    globalThis as { __MFA_REMOTE_VERSIONS__?: Record<string, InjectedEntry> }
+  ).__MFA_REMOTE_VERSIONS__;
   return injected?.[remote]?.entry ?? fallback;
 }
 
 function ensureInit(): void {
   if (initialized) return;
 
-
   init({
-    name: "host",
+    name: 'host',
     remotes: [
-      { name: "catalog", entry: pinnedEntry("catalog", CATALOG_ENTRY) },
-      { name: "cart", entry: pinnedEntry("cart", CART_ENTRY) },
+      { name: 'catalog', entry: pinnedEntry('catalog', CATALOG_ENTRY) },
+      { name: 'cart', entry: pinnedEntry('cart', CART_ENTRY) }
     ],
     // host 가 이미 가진 React 를 remote 에 주입 → remote 번들의 React 는 로드되지 않는다
     shared: {
       react: {
         version: REACT_VERSION,
-        scope: "default",
-        lib: () => normalizeModule(React, "useState"),
-        shareConfig: { singleton: true, requiredVersion: "^19.0.0" },
+        scope: 'default',
+        lib: () => normalizeModule(React, 'useState'),
+        shareConfig: { singleton: true, requiredVersion: '^19.0.0' }
       },
-      "react-dom": {
+      'react-dom': {
         version: REACT_VERSION,
-        scope: "default",
-        lib: () => normalizeModule(ReactDOM, "createPortal"),
-        shareConfig: { singleton: true, requiredVersion: "^19.0.0" },
+        scope: 'default',
+        lib: () => normalizeModule(ReactDOM, 'createPortal'),
+        shareConfig: { singleton: true, requiredVersion: '^19.0.0' }
       },
-      "react-dom/client": {
+      'react-dom/client': {
         version: REACT_VERSION,
-        scope: "default",
-        lib: () => normalizeModule(ReactDOMClient, "createRoot"),
-        shareConfig: { singleton: true, requiredVersion: "^19.0.0" },
+        scope: 'default',
+        lib: () => normalizeModule(ReactDOMClient, 'createRoot'),
+        shareConfig: { singleton: true, requiredVersion: '^19.0.0' }
       },
-      "react/jsx-runtime": {
+      'react/jsx-runtime': {
         version: REACT_VERSION,
-        scope: "default",
-        lib: () => normalizeModule(ReactJSXRuntime, "jsx"),
-        shareConfig: { singleton: true, requiredVersion: "^19.0.0" },
+        scope: 'default',
+        lib: () => normalizeModule(ReactJSXRuntime, 'jsx'),
+        shareConfig: { singleton: true, requiredVersion: '^19.0.0' }
       },
-      "react/jsx-dev-runtime": {
+      'react/jsx-dev-runtime': {
         version: REACT_VERSION,
-        scope: "default",
-        lib: () => normalizeModule(ReactJSXDevRuntime, "jsxDEV"),
-        shareConfig: { singleton: true, requiredVersion: "^19.0.0" },
-      },
-    },
+        scope: 'default',
+        lib: () => normalizeModule(ReactJSXDevRuntime, 'jsxDEV'),
+        shareConfig: { singleton: true, requiredVersion: '^19.0.0' }
+      }
+    }
   });
 
   initialized = true;
@@ -123,12 +128,14 @@ function ensureInit(): void {
 
 const clientCache = new Map<RemoteModuleId, Promise<unknown>>();
 
-function loadOnClient<K extends RemoteModuleId>(id: K): Promise<RemoteModuleMap[K]> {
+function loadOnClient<K extends RemoteModuleId>(
+  id: K
+): Promise<RemoteModuleMap[K]> {
   ensureInit();
   const cached = clientCache.get(id);
   if (cached) return cached as Promise<RemoteModuleMap[K]>;
 
-  const promise = federationLoadRemote(id).then((mod) => {
+  const promise = federationLoadRemote(id).then(mod => {
     if (!mod) throw new Error(`remote 모듈 '${id}' 이(가) 비어 있습니다`);
     return mod as RemoteModuleMap[K];
   });
@@ -142,9 +149,9 @@ function loadOnClient<K extends RemoteModuleId>(id: K): Promise<RemoteModuleMap[
  * 서버/브라우저 어느 쪽에서 호출해도 같은 모양의 `{ default: Component }` 를 돌려준다.
  */
 export function loadRemoteModule<K extends RemoteModuleId>(
-  id: K,
+  id: K
 ): Promise<RemoteModuleMap[K]> {
-  if (typeof window === "undefined") return loadRemoteModuleOnServer(id);
+  if (typeof window === 'undefined') return loadRemoteModuleOnServer(id);
   return loadOnClient(id);
 }
 
@@ -156,5 +163,5 @@ export function invalidateRemoteCache(id?: RemoteModuleId): void {
 
 export const REMOTE_ENTRIES = {
   catalog: CATALOG_ENTRY,
-  cart: CART_ENTRY,
+  cart: CART_ENTRY
 } as const;
