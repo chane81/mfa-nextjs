@@ -111,8 +111,16 @@ curl -X POST https://<host-도메인>/api/mf-revalidate \
   -d '{"remote":"catalog"}'
 ```
 
-Dokploy 의 배포 후 커맨드(Post-deploy)나 GitHub Actions 마지막 단계에 걸어두면 된다.
-웹훅이 닿지 않은 host 인스턴스는 `mf-version.json` 을 짧은 TTL 로 읽어 스스로 수렴한다.
+**Dokploy Application 에는 배포 후 훅이 없다.** 설정 스키마에 `preDeploy`/`postDeploy` 계열
+필드가 존재하지 않고, `command`/`args` 는 컨테이너 실행 명령 override 이며 Schedules 는 cron 이라
+배포 트리거가 아니다. 그래서 이 웹훅을 걸 자리는 remote CI(GitHub Actions) 마지막 스텝뿐이다.
+현재 저장소에는 워크플로가 없어 **아무도 이걸 호출하지 않는다** — remote 재배포 후 host 는
+`mf-version.json` 을 짧은 TTL(30초)로 읽어 스스로 수렴한다. 웹훅은 그걸 앞당기는 최적화다.
+
+warm 자기호출은 요청 오리진이 아니라 **루프백**(`MF_SELF_ORIGIN`, 기본 `http://127.0.0.1:$PORT`)
+으로 나간다. 공개 도메인을 쓰면 Traefik 을 한 바퀴 돌아 자기 자신에게 돌아오는데, 실제 배포에서
+그 자기호출만 `fetch failed` 로 죽었다(같은 컨테이너의 별도 프로세스에서는 같은 주소로 200,
+루프백으로는 정상). 프록시를 탈 이유가 없는 호출이라 아예 루프백으로 고정했다.
 
 ## 실제 배포 구성
 

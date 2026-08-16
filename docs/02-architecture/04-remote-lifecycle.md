@@ -194,6 +194,7 @@ host 서버가 remote 코드를 `new Function` 으로 실행한다. 브라우저
 | `NEXT_PUBLIC_REMOTE_*_ENTRY`                         | host               | 버전 정보가 없을 때의 브라우저 폴백                             |
 | `REMOTE_ALLOWED_ORIGINS`                             | host               | remote 오리진만 허용(이미 닫힘). 프록시·CDN 을 끼울 때만 넓힌다 |
 | `MF_REVALIDATE_SECRET`                               | host + remote CI   | **모든 무효화·warm 요청 거부** (미설정 = 인증 없음이 아니다)    |
+| `MF_SELF_ORIGIN`                                     | host               | `http://127.0.0.1:$PORT` 로 자기호출 (보통 이대로 둔다)         |
 | `MF_REMOTE_PUBLIC_KEY`                               | host               | 서명 검증 생략                                                  |
 | `MF_REQUIRE_SIGNATURE=1`                             | host               | 서명이 없어도 통과                                              |
 | `MF_REQUIRE_INTEGRITY=0`                             | host               | (프로덕션 기본은 무결성 필수)                                   |
