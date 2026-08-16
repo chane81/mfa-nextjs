@@ -15,57 +15,149 @@
  * 수동 새로고침 뒤에는 멀쩡한, 헷갈리는 증상이 된다.
  *
  * ## 무엇을 기다리나
- * 포트가 열렸는지가 아니라 **host 가 실제로 가져갈 모듈**이 200 을 주는지를 본다.
- * 그 요청이 곧 프리번들 완료를 강제한다(Vite 가 최적화가 끝날 때까지 응답을 붙든다).
- * 포트만 확인하면 최적화 중인 서버를 준비됐다고 오판한다.
+ * 포트가 열렸는지가 아니라 **host 가 실제로 가져갈 것**이 200 을 주는지를 본다.
+ * 포트만 확인하면 아직 컴파일 중인 서버를 준비됐다고 오판한다.
+ *
+ * remote 하나가 host 에게 주는 것은 **두 가지**이고, 서로 다른 프로세스가 만든다
+ * (각 remote 의 `dev` 스크립트가 concurrently 로 둘을 같이 띄운다).
+ *
+ *   web — 브라우저가 받는 번들.  `vite dev` / `rsbuild dev` 가 메모리에서 서빙
+ *   ssr — host 서버가 받아 실행하는 CJS 번들.  `--watch` 빌드가 dist 에 쓴 것을
+ *         dev 서버 미들웨어가 `/mf-server.cjs` 로 내려준다
+ *
+ * **둘 다 기다려야 한다.** web 만 보면 SSR 번들이 아직 없는 창이 남고, 그 사이에
+ * 브라우저가 들어오면 host 의 서버 로더가 404 를 만나 페이지가 500 으로 죽는다
+ * (`apps/host/src/mf/server-loader.ts` 의 `loadServerBundle`).
  *
  * 시간 안에 못 뜨면 **막지 않고 경고만 남기고 통과**한다. remote 없이 host 만 띄우는
  * 것도 정당한 작업 방식이고(진단 화면 등), dev 가 영영 안 뜨는 쪽이 더 나쁘다.
  */
 const TIMEOUT_MS = Number(process.env.WAIT_FOR_REMOTES_TIMEOUT ?? 60_000);
 const INTERVAL_MS = 300;
+const FETCH_TIMEOUT_MS = 5000;
 
 /**
- * remote 마다 "이게 200 이면 준비됐다" 는 URL.
+ * remote 마다 기다릴 URL 두 개. **remote 이름 말고는 아무것도 이 파일이 알지 못한다.**
  *
- * catalog(Vite): 노출 모듈 자체를 찌른다 — 이 요청이 프리번들을 완료시킨다.
- * cart(Rsbuild): 번들러가 기동 시 전체를 컴파일하므로 매니페스트면 충분하다.
+ * 노출 컴포넌트를 여기 적지 않는 것이 중요하다. expose 목록은 remote 사정으로 늘고
+ * 줄어드는데, 그때마다 host 쪽 스크립트를 같이 고쳐야 한다면 그건 결합이다.
+ * 필요한 모듈 URL 은 매니페스트에서 읽어낸다(`webReady`).
+ *
+ * 두 URL 모두 **host 가 실제로 설정에 들고 있는 값**을 그대로 쓴다.
+ *   web → `apps/host/src/mf/runtime.ts` 의 remotes[].entry
+ *   ssr → `apps/host/src/mf/remote-version.ts` 의 SSR 엔트리
+ * 기다리는 URL 과 실제로 가져가는 URL 이 어긋나면 게이트가 헛돈다.
  */
 const REMOTES = [
   {
     name: "catalog",
-    url: `${process.env.NEXT_PUBLIC_REMOTE_CATALOG_ENTRY?.replace(/\/mf-manifest\.json$/, "") ?? "http://localhost:3001"}/src/exposes/ProductGrid.tsx`,
+    web:
+      process.env.NEXT_PUBLIC_REMOTE_CATALOG_ENTRY ||
+      "http://localhost:3001/mf-manifest.json",
+    ssr:
+      process.env.REMOTE_CATALOG_SSR_ENTRY ||
+      "http://localhost:3001/mf-server.cjs",
   },
   {
     name: "cart",
-    url: `${process.env.NEXT_PUBLIC_REMOTE_CART_ENTRY?.replace(/\/mf-manifest\.json$/, "") ?? "http://localhost:3002"}/mf-manifest.json`,
+    web:
+      process.env.NEXT_PUBLIC_REMOTE_CART_ENTRY ||
+      "http://localhost:3002/mf-manifest.json",
+    ssr:
+      process.env.REMOTE_CART_SSR_ENTRY ||
+      "http://localhost:3002/mf-server.cjs",
   },
 ];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function ready(url) {
+async function fetchOk(url) {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    return res.ok;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    return res.ok ? res : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-async function waitFor({ name, url }) {
+/**
+ * 매니페스트가 스스로 공표한 remoteEntry 의 절대 URL.
+ *
+ * MF 매니페스트 스펙의 `metaData.publicPath` + `metaData.remoteEntry` 를 조립한다.
+ * catalog(Vite) 와 cart(Rsbuild) 가 서로 다른 번들러인데도 같은 필드를 채운다 —
+ * 그래서 이 조립은 번들러를 몰라도 된다.
+ *
+ * `publicPath` 가 절대 URL 이 아닌 경우(`auto` 등)를 대비해 매니페스트 URL 을 기준으로 푼다.
+ */
+function remoteEntryUrl(manifest, manifestUrl) {
+  const { publicPath, remoteEntry } = manifest?.metaData ?? {};
+  if (!remoteEntry?.name) return null;
+
+  const base = /^https?:\/\//.test(publicPath ?? "")
+    ? publicPath
+    : new URL(".", manifestUrl).href;
+  const dir = remoteEntry.path
+    ? `${remoteEntry.path.replace(/^\/+|\/+$/g, "")}/`
+    : "";
+  return new URL(`${dir}${remoteEntry.name}`, base).href;
+}
+
+/**
+ * web 준비 판정 — 매니페스트만으로는 부족해서 두 단계다.
+ *
+ * ① 매니페스트 200 — 번들러가 MF 산출물을 낼 만큼은 진행됐다
+ * ② 매니페스트가 가리키는 remoteEntry 200 — 실제 코드를 서빙할 수 있다
+ *
+ * ②가 따로 필요한 이유는 매니페스트가 플러그인이 미리 만들어 두는 **정적 산출물**이라,
+ * 모듈 파이프라인이 아직 못 답하는 상태에서도 200 을 줄 수 있기 때문이다. remoteEntry 는
+ * 그 파이프라인을 통과해야 나오므로 "코드를 줄 수 있다"의 증거가 된다.
+ *
+ * ⚠️ 이 저장소 기준으로는 지금 둘의 시차가 없다 — catalog 를 콜드 캐시로 격리 기동해
+ * 실측한 결과 매니페스트 302ms / remoteEntry 325ms / 프리번들 완료 마커
+ * (`node_modules/.vite/deps/_metadata.json`) 301ms 로 사실상 동시였다.
+ * `vite.config.ts` 의 `optimizeDeps.entries` + `include` 가 기동 시점에 프리번들을
+ * 끝내주기 때문이다. ②는 그 설정이 사라지거나 remote 가 늘었을 때를 위한 보험이다.
+ */
+async function webReady(manifestUrl) {
+  const res = await fetchOk(manifestUrl);
+  if (!res) return false;
+
+  let entryUrl = null;
+  try {
+    entryUrl = remoteEntryUrl(await res.json(), manifestUrl);
+  } catch {
+    // 매니페스트가 아직 온전한 JSON 이 아니다 — 다음 폴링에서 다시 본다
+    return false;
+  }
+
+  // 매니페스트가 remoteEntry 를 공표하지 않으면 ①까지로 만족한다
+  if (!entryUrl) return true;
+  return Boolean(await fetchOk(entryUrl));
+}
+
+const ssrReady = async (url) => Boolean(await fetchOk(url));
+
+/** `{ name, web, ssr }` → 실제로 폴링할 프로브 목록 */
+const PROBES = REMOTES.flatMap(({ name, web, ssr }) => [
+  { label: `${name} web`, url: web, isReady: webReady },
+  { label: `${name} ssr`, url: ssr, isReady: ssrReady },
+]);
+
+async function waitFor({ label, url, isReady }) {
   const started = Date.now();
   while (Date.now() - started < TIMEOUT_MS) {
-    if (await ready(url)) {
-      console.log(`[wait-remotes] ${name} 준비됨 (${Date.now() - started}ms)`);
+    if (await isReady(url)) {
+      console.log(`[wait-remotes] ${label} 준비됨 (${Date.now() - started}ms)`);
       return true;
     }
     await sleep(INTERVAL_MS);
   }
   console.warn(
-    `[wait-remotes] ${name} 가 ${TIMEOUT_MS}ms 안에 응답하지 않았습니다. 그대로 진행합니다: ${url}`,
+    `[wait-remotes] ${label} 가 ${TIMEOUT_MS}ms 안에 응답하지 않았습니다. 그대로 진행합니다: ${url}`,
   );
   return false;
 }
 
-await Promise.all(REMOTES.map(waitFor));
+await Promise.all(PROBES.map(waitFor));
