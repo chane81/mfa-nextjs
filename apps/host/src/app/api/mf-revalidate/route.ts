@@ -36,6 +36,25 @@ import { remoteBundleTag, remoteCacheTag } from '@/mf/server-loader';
  *                 그 라우트도 같은 시크릿을 요구하므로 헤더를 그대로 전달한다.
  *   4. 무효화   — 그제서야 페이지 캐시를 깬다. 재생성 렌더는 네트워크를 기다리지 않는다.
  */
+/**
+ * warm 을 부를 자기 자신의 주소.
+ *
+ * 한때 요청 URL 의 오리진(`new URL(req.url).origin`)을 그대로 썼다. 그러면 웹훅을
+ * 공개 도메인으로 때렸을 때 host 가 **리버스 프록시를 한 바퀴 돌아 자기 자신에게**
+ * 되돌아온다. 배포 환경(Dokploy + Traefik)에서 이 자기호출이 `fetch failed` 로 죽었다.
+ * 같은 컨테이너의 별도 프로세스에서는 같은 주소로 200 이 나오므로 DNS·TLS·방화벽
+ * 문제가 아니고, 루프백으로 부르면 그대로 성공한다.
+ *
+ * warm 대상은 정의상 이 프로세스 자신이라 프록시를 탈 이유가 없다. 루프백으로
+ * 고정하면 프록시 설정·인증서·헤어핀 NAT 과 무관해지고 왕복도 짧아진다.
+ * 컨테이너 밖(별도 인스턴스)을 데워야 하는 구성이면 `MF_SELF_ORIGIN` 으로 덮는다.
+ */
+function selfOrigin(): string {
+  return (
+    process.env.MF_SELF_ORIGIN || `http://127.0.0.1:${process.env.PORT || 3000}`
+  );
+}
+
 export async function POST(req: Request) {
   if (!checkMfSecret(req.headers)) {
     return Response.json({ error: 'unauthorized' }, { status: 401 });
@@ -107,7 +126,7 @@ export async function POST(req: Request) {
     // nonce 로 lazy 캐시를 우회해 로더를 반드시 태운다 (롤백 대응)
     const warmUrl = new URL(
       `/internal/mf-warm?remote=${remote}&version=${published.version}&nonce=${published.version}-${Date.now()}`,
-      url.origin,
+      selfOrigin(),
     );
     try {
       const res = await fetch(warmUrl, {
@@ -117,7 +136,17 @@ export async function POST(req: Request) {
       await res.text();
       if (!res.ok) throw new Error(`warm 응답 ${res.status}`);
     } catch (error) {
-      return abort(error instanceof Error ? error.message : String(error));
+      /**
+       * undici 는 모든 하위 에러를 `TypeError: fetch failed` 로 감싸고 원인은 `cause` 에만
+       * 남긴다. 메시지만 돌려주면 "fetch failed" 한 줄이라 진단이 불가능하다.
+       */
+      const cause =
+        error instanceof Error && error.cause instanceof Error
+          ? ` (${error.cause.message})`
+          : '';
+      return abort(
+        `${error instanceof Error ? error.message : String(error)}${cause} — ${warmUrl.origin}`,
+      );
     }
 
     /**

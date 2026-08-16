@@ -29,12 +29,15 @@
     /**
      * MF 운영 변수. remote 개수와 무관한 단일 값들이라 그대로 나열한다.
      *   MF_REVALIDATE_SECRET  재배포 → host 캐시 무효화 웹훅 시크릿
+     *   MF_SELF_ORIGIN        warm 자기호출 주소 (기본 루프백, 보통 미설정)
      *   MF_REMOTE_PUBLIC_KEY  매니페스트 서명 검증용 공개키 (host)
      *   MF_SIGNING_KEY        매니페스트 서명용 개인키 (remote 파이프라인 전용)
      *   MF_REQUIRE_*          서명·무결성 강제 여부
      * 신뢰 경계 배경: docs/04-experiments/03-cache-modes.md 발견 9
      */
     "MF_*",
+    // Next 서버가 실제로 바인딩한 포트. warm 자기호출 주소를 만들 때 읽는다.
+    "PORT",
     // host dev 가 remote 를 기다리는 시간 (scripts/wait-for-remotes.mjs).
     // 등록 전에는 `WAIT_FOR_REMOTES_TIMEOUT=1` 을 줘도 60초를 다 기다렸다 — 실측.
     "WAIT_FOR_REMOTES_TIMEOUT"
