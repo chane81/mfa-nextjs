@@ -43,12 +43,22 @@
 `docker compose up` 전체 기동은 안 돌렸다 — `docker-host-local.sh` 가 같은 경로(빌드 컨테이너
 → 맥 LAN IP → 퍼블리시된 포트)를 이미 통과했고, compose 쪽은 파일 보간까지만 확인했다.
 
-### 남은 것
+### 배포 실측
 
-- Dokploy 의 Build Args / 런타임 env 를 새 이름으로 교체 — **웹 UI 작업이라 저장소 밖이다.**
-  체크리스트는 [03-setup/04-dokploy.md](./03-setup/04-dokploy.md#환경변수) 상단 경고 박스.
-  옛 이름은 에러가 아니라 **기본값 localhost 로 조용히 떨어져** host 빌드가 프리렌더에서
-  실패한다. 바꾸기 전까지 이 저장소의 main 은 배포하면 깨진다.
+Dokploy 의 Build Args · 런타임 env 를 새 이름으로 교체한 뒤(저장소 밖 작업이라 UI 에서 직접
+바꿨다) main 을 push 해 세 서비스가 모두 재빌드됐다. **env 이름 변경과 코드 변경은 같이 가야
+한다** — 한쪽만 바뀐 구간에서는 host 빌드가 기본값 `localhost` 를 보고 프리렌더에서 죽는다.
+
+| 검증                    | 결과                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `/checkout` remote SSR  | ✅ HTTP 200, `주문서` 포함, ErrorBox 없음                                     |
+| `/` 렌더                | ✅ HTTP 200, ErrorBox 없음                                                    |
+| 서버가 심은 버전 엔트리 | ✅ `https://mfa-catalog.lakegreen.net/vtmsxe7mzs/…` (공개 도메인 + 버전 경로) |
+| 빌드 버전 형태          | ✅ `tmsxe7mzs` / `tmsxe82rc` — 타임스탬프                                     |
+| 서명 · 무결성           | ✅ 두 remote 모두 `signature` · `ssrIntegrity` 존재                           |
+
+remote 당 환경변수 하나로 실제 배포가 돈다는 것까지 확인했다. Dokploy 설정 슬롯은 8개에서
+6개로 줄었고, 그 6개가 전부 **같은 문자열**(도메인)이라 슬롯마다 접미사를 틀릴 여지가 없다.
 
 ## 2026-08-15 (6차) — 컨테이너 배포 (Dokploy)
 
