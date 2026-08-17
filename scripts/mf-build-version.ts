@@ -10,45 +10,34 @@
  * host 가 한 번 헛 무효화한다(warm 1회 + 재생성 1회). 실제 CDN 배포가 다 이 방식이고,
  * 내용 해시는 `mf-version.json` 에 메타로 남겨 동일성 판단에 쓸 수 있게 한다.
  *
- * 우선순위: MF_BUILD_VERSION → git short SHA(+dirty) → 타임스탬프
+ * ## 왜 타임스탬프 하나뿐인가
+ *
+ * 이 값에 필요한 성질은 **"빌드마다 달라진다"** 하나다. host 는 `mf-version.json` 의
+ * 버전이 바뀐 걸 보고 갈아타고, 자산은 그 값으로 만든 불변 경로에 담긴다.
+ * 타임스탬프가 그 성질을 이미 만족한다.
+ *
+ * 한때 갈래가 셋이었다(`MF_BUILD_VERSION` → git SHA → 타임스탬프). 둘을 지웠다.
+ *
+ *   `MF_BUILD_VERSION`  넘기는 곳이 어디에도 없었다. Dockerfile `ARG` 가 빈 문자열만
+ *                       흘려보냈고, 그 빈 값을 걸러내는 가드까지 달려 있었다. 버전을
+ *                       고정해 재빌드할 일도 없다 — 롤백은 볼륨의 `mf-version.json` 을
+ *                       되돌리는 것이지 재빌드가 아니다.
+ *   git SHA             **컨테이너에서 애초에 동작하지 않는다.** `.git` 이 빌드 컨텍스트에
+ *                       없고(`.dockerignore`), 베이스 이미지 `node:24-slim` 에 git
+ *                       바이너리도 없다(실측). 로컬에서만 되는 갈래를 남겨두면 로컬과
+ *                       배포의 버전 형태가 갈려서, 로컬에서 확인한 동작이 배포와 다르다.
+ *
+ * 잃는 것은 추적성이다 — `t1a2b3c4` 만 보고 어느 커밋인지 알 수 없다. 되찾으려면
+ * `.git` 을 컨텍스트에 넣고 `.git/HEAD` 를 직접 읽는 경로를 만들어야 한다
+ * (git 바이너리가 없으므로 `git rev-parse` 로는 안 된다). 배경: docs/03-setup/04-dokploy.md
  *
  * 사용: node scripts/mf-build-version.ts
  */
-import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-function gitVersion(): string | null {
-  try {
-    const sha = execFileSync('git', ['rev-parse', '--short=10', 'HEAD'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-    const dirty = execFileSync('git', ['status', '--porcelain'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-    // 커밋되지 않은 변경이 있으면 같은 SHA 로 다른 산출물이 나온다. 구분자를 붙인다.
-    return dirty ? `${sha}-${Date.now().toString(36)}` : sha;
-  } catch {
-    return null;
-  }
-}
+/** base36 이라 짧고, 자산 경로에 그대로 쓸 수 있는 문자만 나온다 */
+const version = `t${Date.now().toString(36)}`;
 
-/**
- * 빈 문자열은 "설정 안 됨"으로 본다.
- *
- * `??` 로 두면 빈 값이 그대로 버전이 된다. Dockerfile 에서 `ARG MF_BUILD_VERSION` 을
- * 값 없이 선언하면 `ENV MF_BUILD_VERSION=""` 이 되는데, 그때 버전이 통째로 사라져
- * 자산이 `dist/v<ver>/` 가 아니라 `dist/` 로 나가고 stamp 가 산출물을 못 찾는다.
- */
-const version =
-  process.env.MF_BUILD_VERSION?.trim() ||
-  gitVersion() ||
-  `t${Date.now().toString(36)}`;
-
-/** 자산 경로에 들어가므로 안전한 문자만 남긴다 */
-const safe = version.replace(/[^a-zA-Z0-9._-]/g, '-');
-
-writeFileSync(resolve(process.cwd(), '.mf-version'), `${safe}\n`);
-console.log(`[version] ${safe}`);
+writeFileSync(resolve(process.cwd(), '.mf-version'), `${version}\n`);
+console.log(`[version] ${version}`);

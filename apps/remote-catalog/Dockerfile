@@ -10,8 +10,10 @@
 #
 # ## 빌드 시점에 굳는 값 (런타임 env 로 못 바꾼다)
 #   REMOTE_CATALOG_PUBLIC_URL — 자산 URL 접두사. host 가 다른 오리진에서 청크를 받으므로 절대 URL.
-#   MF_BUILD_VERSION          — 불변 경로 `/v<ver>/` 를 정한다. 없으면 타임스탬프로 떨어진다.
 #   MF_SIGNING_KEY            — 매니페스트 Ed25519 서명. 개인키라 build secret 으로 받는다.
+#
+# 불변 경로 `/v<ver>/` 의 버전은 인자로 받지 않는다. `.git` 이 컨텍스트에 없어서
+# 여기서는 타임스탬프로 정해진다 — 의도한 것이다(docs/03-setup/04-dokploy.md).
 ARG NODE_VERSION=24-slim
 
 FROM node:${NODE_VERSION} AS base
@@ -56,10 +58,6 @@ COPY . .
 
 ARG REMOTE_CATALOG_PUBLIC_URL
 ENV REMOTE_CATALOG_PUBLIC_URL=${REMOTE_CATALOG_PUBLIC_URL}
-
-# .git 은 빌드 컨텍스트에 없다(.dockerignore). 커밋 SHA 를 버전으로 쓰려면 여기로 넘긴다.
-ARG MF_BUILD_VERSION
-ENV MF_BUILD_VERSION=${MF_BUILD_VERSION}
 
 ENV NODE_ENV=production
 

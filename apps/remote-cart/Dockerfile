@@ -10,8 +10,10 @@
 #
 # ## 빌드 시점에 굳는 값 (런타임 env 로 못 바꾼다)
 #   REMOTE_CART_PUBLIC_URL — 자산 URL 접두사(assetPrefix). 절대 URL 이어야 한다.
-#   MF_BUILD_VERSION       — 불변 경로 `/v<ver>/`.
 #   MF_SIGNING_KEY         — 매니페스트 서명. build secret 으로 받는다.
+#
+# 불변 경로 `/v<ver>/` 의 버전은 인자로 받지 않는다. `.git` 이 컨텍스트에 없어서
+# 여기서는 타임스탬프로 정해진다 — 의도한 것이다(docs/03-setup/04-dokploy.md).
 ARG NODE_VERSION=24-slim
 
 FROM node:${NODE_VERSION} AS base
@@ -56,9 +58,6 @@ COPY . .
 
 ARG REMOTE_CART_PUBLIC_URL
 ENV REMOTE_CART_PUBLIC_URL=${REMOTE_CART_PUBLIC_URL}
-
-ARG MF_BUILD_VERSION
-ENV MF_BUILD_VERSION=${MF_BUILD_VERSION}
 
 ENV NODE_ENV=production
 
