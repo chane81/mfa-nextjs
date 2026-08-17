@@ -71,11 +71,29 @@ interface InjectedEntry {
   entry: string;
 }
 
-function pinnedEntry(remote: RemoteName): string {
+/**
+ * ⚠️ 폴백(`WEB_ENTRIES`)은 **dev 에서만 실재하는 주소**다.
+ *
+ * dev 서버는 `/mf-manifest.json` 을 루트에서 내려주지만, 배포된 remote 의 루트에는
+ * `mf-version.json` 하나뿐이고 나머지는 전부 `/v<version>/` 아래다. 그래서 배포에서
+ * 폴백 URL 을 그대로 부르면 404 다 — 게다가 404 응답에는 CORS 헤더가 없어서 브라우저에는
+ * `Failed to fetch` 라는 네트워크 오류로 보인다(원인이 URL 이라는 힌트가 안 나온다).
+ *
+ * remote 를 부르는 쪽은 전부 이 함수를 거쳐야 한다. 진단 화면도 마찬가지다.
+ */
+export function pinnedEntry(remote: RemoteName): string {
   const injected = (
     globalThis as { __MFA_REMOTE_VERSIONS__?: Record<string, InjectedEntry> }
   ).__MFA_REMOTE_VERSIONS__;
   return injected?.[remote]?.entry ?? WEB_ENTRIES[remote];
+}
+
+/** 버전 핀이 실제로 꽂혔는지. 진단이 "폴백을 보고 있다"를 구분해 보여주는 데 쓴다. */
+export function pinnedVersion(remote: RemoteName): string | null {
+  const injected = (
+    globalThis as { __MFA_REMOTE_VERSIONS__?: Record<string, InjectedEntry> }
+  ).__MFA_REMOTE_VERSIONS__;
+  return injected?.[remote]?.version ?? null;
 }
 
 function ensureInit(): void {
