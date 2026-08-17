@@ -131,6 +131,10 @@ Error: remote 'catalog' 매니페스트에 무결성 값이 없습니다.
   두 번째 turbo 호출에서 host 빌드가 **캐시 히트라 실행되지 않고**, 따라서 임시 서버도
   안 뜬다. remote 만 포트를 잡는다.
 
+> 아래 B-5 ~ B-7 에 나오는 `REMOTE_*_SSR_ENTRY` 는 **이후 `REMOTE_*_PUBLIC_URL` 로 통합됐다**
+> (오리진만 env 로 받고 파일명은 코드가 붙인다 — `docs/03-setup/03-environment.md`).
+> 이름만 바뀌었고 아래 함정은 전부 그대로 유효하다. 당시 기록이라 이름은 그대로 둔다.
+
 ### B-5. 빈 문자열 env 가 `new URL("")` 로 터질 자리가 남아 있었다
 
 `REMOTE_*_SSR_ENTRY` 를 Dockerfile `ARG` 로 받게 하면서 드러났다.

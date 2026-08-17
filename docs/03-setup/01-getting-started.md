@@ -190,12 +190,20 @@ node scripts/gen-signing-key.ts
 
 **로컬은 아무것도 설정하지 않아도 된다.** 기본값이 코드에 있다.
 
-| 이름                               | 기본값                                   |
-| ---------------------------------- | ---------------------------------------- |
-| `NEXT_PUBLIC_REMOTE_CATALOG_ENTRY` | `http://localhost:3001/mf-manifest.json` |
-| `NEXT_PUBLIC_REMOTE_CART_ENTRY`    | `http://localhost:3002/mf-manifest.json` |
-| `REMOTE_CATALOG_SSR_ENTRY`         | `http://localhost:3001/mf-server.cjs`    |
-| `REMOTE_CART_SSR_ENTRY`            | `http://localhost:3002/mf-server.cjs`    |
+> 전체 변수 목록, **어느 `.env` 파일이 실제로 로드되는가**(앱마다 다르다), 새 변수를 추가할 때의
+> 체크리스트는 [03-environment.md](./03-environment.md) 에 따로 정리했다. 여기서는 실행에
+> 필요한 만큼만 다룬다.
+
+**remote 하나당 변수 하나다.**
+
+| 이름                        | 기본값                  |
+| --------------------------- | ----------------------- |
+| `REMOTE_CATALOG_PUBLIC_URL` | `http://localhost:3001` |
+| `REMOTE_CART_PUBLIC_URL`    | `http://localhost:3002` |
+
+이 오리진에서 세 가지가 파생된다 — 브라우저가 읽는 매니페스트 URL(`…/mf-manifest.json`),
+host **서버**가 받아 실행하는 SSR 번들 URL(`…/mf-server.cjs`), remote 자신의 자산 접두사.
+**파일명은 env 로 오지 않는다.** `MF_FILES` 에 있고 코드가 붙인다.
 
 이 표의 원본은 **`packages/remote-config`** 다. remote 이름·포트·env 이름·산출물
 파일명이 전부 거기 있고, 위 기본값은 그 조합에서 파생된다. **remote 를 추가할 때 고칠 곳은
@@ -214,13 +222,13 @@ node scripts/gen-signing-key.ts
 
 ### 브라우저용 값이 전달되는 경로
 
-`NEXT_PUBLIC_*` 은 `process.env.리터럴` 형태만 빌드 타임에 치환된다. 동적 접근은
+Next 는 `process.env.리터럴` 형태만 빌드 타임에 치환한다. 동적 접근(`process.env[키]`)은
 치환되지 않아 브라우저에서 `undefined` 가 되므로, host **코드**에서는 remote 목록을
 순회하며 env 를 읽을 수 없다. 그래서 순회를 한 단계 앞으로 옮겼다.
 
 ```
-packages/remote-config          remote 목록 + env 이름 + 기본값
-  ↓  (node 에서 순회)
+packages/remote-config          remote 목록 + env 이름 + 파일명 + 기본값
+  ↓  (node 에서 순회하며 오리진 + 파일명 조립)
 apps/host/next.config.ts        env: { MFA_REMOTE_WEB_ENTRIES: JSON.stringify(…) }
   ↓  (Next 가 번들에 인라인)
 apps/host/src/mf/remote-endpoints.ts   리터럴 하나만 읽어 JSON.parse
@@ -228,24 +236,22 @@ apps/host/src/mf/remote-endpoints.ts   리터럴 하나만 읽어 JSON.parse
 
 `next.config.ts` 는 node 에서 평가되므로 순회가 가능하고, `env` 로 넘긴 값은
 `NEXT_PUBLIC_` 접두사 없이도 브라우저 번들에 인라인된다(그 접두사는 환경/`.env` 파일로
-들어온 변수에만 적용되는 규칙이다). 결과적으로 host 코드에는 remote 이름이 없다.
+들어온 변수에만 적용되는 규칙이다). 결과적으로 host 코드에는 remote 이름이 없고,
+**환경변수에 `NEXT_PUBLIC_` 접두사를 쓸 이유도 없다.**
 
-SSR 엔트리는 이 경로를 타지 않는다. host **서버**만 쓰는 값이라 브라우저에 노출할 이유가
-없고, 서버에서는 `process.env[이름]` 동적 접근이 그대로 동작한다.
+SSR 번들 URL 은 이 경로를 타지 않는다. 같은 `REMOTE_*_PUBLIC_URL` 에서 파생되지만 host
+**서버**만 쓰는 값이라 브라우저에 노출할 이유가 없고, 서버에서는 `process.env[이름]`
+동적 접근이 그대로 동작한다.
 
 한때 `apps/host/.env.local` 로 이 값들을 그대로 다시 적어뒀다가 지웠다. 기본값과 한 글자도
 다르지 않은 파일이었고, gitignore 라 **turbo 캐시 입력에서 빠져** 값을 바꿔도 캐시된 옛
 빌드가 복원되는 함정만 만들었다(그 자리는 `inputs` 로 막아뒀다).
 
-바꿔야 할 때만 만든다. 예를 들어 remote 를 다른 포트에 띄웠거나 재배포 웹훅을 테스트할 때:
+바꿔야 할 값만 적는다 — 예를 들어 재배포 웹훅을 테스트할 때의
+`MF_REVALIDATE_SECRET`. 파일 위치별 로딩 규칙은
+[03-environment.md](./03-environment.md#env-파일이-실제로-로드되는-자리는-한-곳뿐).
 
-```
-# apps/host/.env.local
-MF_REVALIDATE_SECRET=change-me    # 미설정이면 /api/mf-revalidate 는 전부 거부한다
-```
-
-브라우저용만 `NEXT_PUBLIC_` 이 필요하다. 서버용 SSR 엔트리는 브라우저에 노출할 이유가 없고,
-**오리진 허용 목록의 기본값이 그 값에서 나온다.**
+**오리진 허용 목록의 기본값도 같은 값에서 나온다.**
 
 정상 동작 시 브라우저는 이 폴백이 아니라 **서버가 심어준 버전 경로 엔트리**를 쓴다.
 서버 마크업과 hydrate 하는 코드를 같은 빌드로 맞추기 위해서다.
@@ -256,8 +262,8 @@ MF_REVALIDATE_SECRET=change-me    # 미설정이면 /api/mf-revalidate 는 전�
 
 > 새 환경변수는 `turbo.json` 의 `globalEnv` 에도 등록해야 한다. turbo 는 strict env 라
 > 등록하지 않은 변수를 태스크 환경에서 걸러낸다(모르고 지나가면 설정이 조용히 무시된다).
-> 단 remote 주소 변수는 이미 `NEXT_PUBLIC_REMOTE_*` / `REMOTE_*` 와일드카드로 잡혀 있어
-> remote 를 추가해도 손댈 필요가 없다.
+> 단 remote 주소 변수는 이미 `REMOTE_*` 와일드카드로 잡혀 있어 remote 를 추가해도
+> 손댈 필요가 없다.
 
 ## 개별 앱만 실행
 

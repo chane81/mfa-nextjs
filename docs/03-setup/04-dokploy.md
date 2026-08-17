@@ -36,31 +36,56 @@ remote → host 순서다. 두 가지 이유가 있다.
 
 1. host 빌드는 `cacheComponents` 로 일부 라우트를 프리렌더한다. 그 경로가 remote 를 타면
    빌드 시점에 remote 오리진에 실제로 닿아야 한다.
-2. host 의 `REMOTE_*_SSR_ENTRY` 는 배포된 remote 도메인을 가리켜야 한다.
+2. host 의 `REMOTE_*_PUBLIC_URL` 은 배포된 remote 도메인을 가리켜야 한다.
 
 ## 환경변수
 
+**remote 하나당 이름 하나다.** 값도 도메인 하나 — 슬롯마다 `/mf-manifest.json` 같은
+접미사를 붙이지 않는다. 그 조립은 코드가 한다(`packages/remote-config` 의 `MF_FILES`).
+자세한 규칙: [03-environment.md](./03-environment.md)
+
+> ### ⚠️ 이름 변경 (7차) — 아직 안 바꿨으면 배포 전에 반드시
+>
+> 옛 이름은 코드가 더 이상 읽지 않는다. **에러가 아니라 기본값 `localhost` 로 조용히
+> 떨어져서** host 빌드가 프리렌더에서 remote 에 못 닿아 실패한다.
+>
+> | 지우기                                                         | 넣기                                              |
+> | -------------------------------------------------------------- | ------------------------------------------------- |
+> | `NEXT_PUBLIC_REMOTE_CATALOG_ENTRY`, `REMOTE_CATALOG_SSR_ENTRY` | `REMOTE_CATALOG_PUBLIC_URL` (도메인만, 경로 없음) |
+> | `NEXT_PUBLIC_REMOTE_CART_ENTRY`, `REMOTE_CART_SSR_ENTRY`       | `REMOTE_CART_PUBLIC_URL` (〃)                     |
+>
+> 서비스별로 넣을 자리:
+>
+> | 서비스         | Build Args                                            | 런타임 env                                            |
+> | -------------- | ----------------------------------------------------- | ----------------------------------------------------- |
+> | mfa-host       | `REMOTE_CATALOG_PUBLIC_URL`, `REMOTE_CART_PUBLIC_URL` | `REMOTE_CATALOG_PUBLIC_URL`, `REMOTE_CART_PUBLIC_URL` |
+> | remote-catalog | `REMOTE_CATALOG_PUBLIC_URL`                           | —                                                     |
+> | remote-cart    | `REMOTE_CART_PUBLIC_URL`                              | —                                                     |
+>
+> host 는 **Build Args 와 런타임 env 양쪽에 같은 값**을 넣는다(이유는 아래).
+> 바꾼 뒤 배포 순서는 remote → host. `MF_REVALIDATE_SECRET` 등 나머지는 그대로다.
+
 ### 빌드 시점에 굳는 값 (Build Args — 런타임 env 로 바꿀 수 없다)
 
-| 서비스         | Build Arg                          | 값 예시                                     |
-| -------------- | ---------------------------------- | ------------------------------------------- |
-| host           | `NEXT_PUBLIC_REMOTE_CATALOG_ENTRY` | `https://<catalog-도메인>/mf-manifest.json` |
-| host           | `NEXT_PUBLIC_REMOTE_CART_ENTRY`    | `https://<cart-도메인>/mf-manifest.json`    |
-| host           | `REMOTE_CATALOG_SSR_ENTRY`         | `https://<catalog-도메인>/mf-server.cjs`    |
-| host           | `REMOTE_CART_SSR_ENTRY`            | `https://<cart-도메인>/mf-server.cjs`       |
-| remote-catalog | `REMOTE_CATALOG_PUBLIC_URL`        | `https://<catalog-도메인>`                  |
-| remote-catalog | `MF_BUILD_VERSION`                 | 커밋 SHA (선택, 없으면 타임스탬프)          |
-| remote-cart    | `REMOTE_CART_PUBLIC_URL`           | `https://<cart-도메인>`                     |
-| remote-cart    | `MF_BUILD_VERSION`                 | 커밋 SHA (선택)                             |
+| 서비스         | Build Arg                   | 값 예시                    |
+| -------------- | --------------------------- | -------------------------- |
+| host           | `REMOTE_CATALOG_PUBLIC_URL` | `https://<catalog-도메인>` |
+| host           | `REMOTE_CART_PUBLIC_URL`    | `https://<cart-도메인>`    |
+| remote-catalog | `REMOTE_CATALOG_PUBLIC_URL` | `https://<catalog-도메인>` |
+| remote-cart    | `REMOTE_CART_PUBLIC_URL`    | `https://<cart-도메인>`    |
 
-`NEXT_PUBLIC_*` 은 클라이언트 번들에 문자열로 구워진다. `REMOTE_*_PUBLIC_URL` 은
-청크 URL 접두사(`base` / `assetPrefix`)가 되어 산출물 안에 박힌다. **둘 다 런타임 변경 불가.**
-remote 도메인을 바꾸면 재빌드해야 한다.
+같은 이름이 host 와 remote 양쪽에 들어간다. **같은 개념이라 같은 값이어야 한다** — remote
+쪽에서는 자기 자산의 URL 접두사가 되고, host 쪽에서는 "그 remote 를 어디서 받아오는가"가
+된다. 예전처럼 이름이 갈려 있으면 한쪽만 고치고 넘어갈 수 있었다.
 
-`REMOTE_*_SSR_ENTRY` 는 성격이 다르다. **런타임 값이면서 빌드 시점에도 필요하다.**
-host 빌드가 프리렌더 도중 이 주소에서 remote 의 SSR 번들을 실제로 받아 실행하기 때문이다.
-빌드 인자로 안 넘기면 기본값(localhost)을 보고 아무것도 못 받아 빌드가 실패한다.
-런타임 env 에도 **같은 값을 그대로** 넣는다(아래 표).
+host 에서 이 값으로 굳는 것: 브라우저가 읽는 매니페스트 URL(클라이언트 번들에 문자열로
+구워진다). remote 에서 굳는 것: 청크 URL 접두사(`base` / `assetPrefix`).
+**둘 다 런타임 변경 불가** — remote 도메인을 바꾸면 재빌드해야 한다.
+
+host 에는 성격이 하나 더 붙는다. **런타임 값이면서 빌드 시점에도 필요하다.** host 빌드가
+프리렌더 도중 이 오리진에서 remote 의 SSR 번들(`/mf-server.cjs`)을 실제로 받아 실행하기
+때문이다. 빌드 인자로 안 넘기면 기본값(localhost)을 보고 아무것도 못 받아 빌드가 실패한다.
+그래서 런타임 env 에도 **같은 값을 그대로** 넣는다(아래 표).
 
 > Dokploy 는 `Create Environment File` 이 켜져 있으면 런타임 env 를 `.env` 로 만들어
 > 빌드 컨텍스트에 넣는다. 빌드 로그의 `- Environments: .env` 가 그거고, 빌드 인자를
@@ -68,25 +93,44 @@ host 빌드가 프리렌더 도중 이 주소에서 remote 의 SSR 번들을 실
 > 적히는 우회로라 로컬·compose·다른 PaaS 에서 전부 재현이 안 된다. 필요한 값은 Dockerfile
 > 의 `ARG` 로 드러내고 빌드 인자로 명시해 넘긴다.
 
-`.git` 은 빌드 컨텍스트에서 제외된다(`.dockerignore`). 그래서 `mf-build-version.ts` 의
-git SHA 폴백이 동작하지 않고 타임스탬프 버전이 나온다. 커밋과 배포 버전을 맞추려면
-`MF_BUILD_VERSION` 을 명시적으로 넘긴다.
+### 빌드 버전은 타임스탬프다 (의도한 것)
+
+`/v<ver>/` 의 버전은 `t<base36>` 형태의 타임스탬프다. **로컬이든 컨테이너든 같다** —
+`mf-build-version.ts` 에 갈래가 없다.
+
+이 값에 필요한 성질은 "빌드마다 달라진다" 하나뿐이고, host 는 `mf-version.json` 이 바뀐
+걸 보고 갈아탄다. 타임스탬프가 그걸 이미 만족한다.
+
+한때 갈래가 셋이었다(`MF_BUILD_VERSION` → git SHA → 타임스탬프). 둘 다 지웠다.
+
+- **`MF_BUILD_VERSION`** — 넘기는 곳이 어디에도 없었다. Dockerfile `ARG` 가 빈 문자열만
+  흘려보냈고 그 빈 값을 걸러내는 가드까지 달려 있었다. 버전을 고정해 재빌드할 일도 없다 —
+  롤백은 볼륨의 `mf-version.json` 을 되돌리는 것이지 재빌드가 아니다.
+- **git SHA** — 컨테이너에서 애초에 동작하지 않았다. ① `.git` 이 `.dockerignore` 로 빠지고
+  ② 베이스 이미지 `node:24-slim` 에 git 바이너리가 없다(실측). 로컬에서만 되는 갈래를
+  남겨두면 로컬과 배포의 버전 형태가 갈려서, 로컬에서 확인한 동작이 배포와 달라진다.
+
+잃는 건 추적성이다 — `t1a2b3c4` 만 보고 어느 커밋인지 알 수 없다. 되찾으려면 `.git` 을
+컨텍스트에 넣고 `.git/HEAD` 를 직접 읽는 경로를 만들어야 한다(git 바이너리가 없으므로
+`git rev-parse` 로는 안 된다).
 
 ### 런타임 env (host)
 
-| 이름                       | 값 예시                                  | 의미                                                          |
-| -------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
-| `REMOTE_CATALOG_SSR_ENTRY` | `https://<catalog-도메인>/mf-server.cjs` | host **서버**가 받아 실행할 node 번들 (빌드 인자에도 같은 값) |
-| `REMOTE_CART_SSR_ENTRY`    | `https://<cart-도메인>/mf-server.cjs`    | 〃                                                            |
-| `MF_REVALIDATE_SECRET`     | 랜덤 문자열                              | `/api/mf-revalidate` · `/internal/mf-warm` 접근 검사          |
-| `REMOTE_ALLOWED_ORIGINS`   | (보통 생략)                              | 생략하면 위 SSR 엔트리 오리진만 허용 — 기본이 이미 닫혀 있다  |
-| `MF_REMOTE_PUBLIC_KEY`     | Ed25519 공개키(base64)                   | 매니페스트 서명 검증                                          |
-| `MF_REQUIRE_SIGNATURE`     | `1` 또는 미설정                          | `1` 이면 서명 없는 remote 를 거부                             |
-| `MF_REQUIRE_INTEGRITY`     | (보통 생략)                              | production 기본 활성. `0` 으로만 끌 수 있다                   |
+| 이름                        | 값 예시                    | 의미                                                       |
+| --------------------------- | -------------------------- | ---------------------------------------------------------- |
+| `REMOTE_CATALOG_PUBLIC_URL` | `https://<catalog-도메인>` | host **서버**가 SSR 번들을 받아갈 곳 (빌드 인자와 같은 값) |
+| `REMOTE_CART_PUBLIC_URL`    | `https://<cart-도메인>`    | 〃                                                         |
+| `MF_REVALIDATE_SECRET`      | 랜덤 문자열                | `/api/mf-revalidate` · `/internal/mf-warm` 접근 검사       |
+| `REMOTE_ALLOWED_ORIGINS`    | (보통 생략)                | 생략하면 위 오리진만 허용 — 기본이 이미 닫혀 있다          |
+| `MF_REMOTE_PUBLIC_KEY`      | Ed25519 공개키(base64)     | 매니페스트 서명 검증                                       |
+| `MF_REQUIRE_SIGNATURE`      | `1` 또는 미설정            | `1` 이면 서명 없는 remote 를 거부                          |
+| `MF_REQUIRE_INTEGRITY`      | (보통 생략)                | production 기본 활성. `0` 으로만 끌 수 있다                |
 
-`REMOTE_*_SSR_ENTRY` 는 host **서버**가 읽는다. 내부 네트워크 주소를 써도 되지만,
-그러면 `REMOTE_ALLOWED_ORIGINS` 기본값이 내부 오리진이 되어 브라우저용 공개 도메인과
-어긋난다. 특별한 이유가 없으면 서버도 공개 도메인을 쓰는 편이 설정이 단순하다.
+브라우저가 읽는 매니페스트 URL 은 이미 번들에 구워졌으므로, 런타임에 이 값을 다시 읽는
+쪽은 host **서버**뿐이다. 내부 네트워크 주소를 쓰고 싶다면 그건 브라우저용 값과 갈라진다는
+뜻이고, 지금 구조에는 그 자리가 없다 — **오리진이 remote 당 하나다.** 애초에 갈라놓으면
+`REMOTE_ALLOWED_ORIGINS` 기본값도 내부 오리진이 되어 공개 도메인과 어긋난다.
+공개 도메인으로 통일하는 편이 설정이 단순하고, 그게 이 구조가 기대하는 형태다.
 
 ### 서명 키
 
@@ -160,12 +204,13 @@ Dokploy UI 에서 경로는 입력 후 **＋ 버튼을 눌러야 목록에 들�
 
 ### 값 없는 빌드 인자는 빈 문자열로 도착한다
 
-`ARG MF_BUILD_VERSION` 을 기본값 없이 선언하고 `ENV` 로 넘기면 컨테이너 안에서
-`MF_BUILD_VERSION=""` 이 된다. `??` 는 `null`/`undefined` 에서만 폴백하므로 빈 값이
-그대로 버전이 되어, 자산이 `dist/` 로 나가고 stamp 가 `dist/v/` 를 찾다 실패한다.
+`ARG` 를 기본값 없이 선언하고 `ENV` 로 넘기면 컨테이너 안에서 `VAR=""` 이 된다.
+`??` 는 `null`/`undefined` 에서만 폴백하므로 빈 값이 그대로 설정으로 쓰인다.
+당시 `MF_BUILD_VERSION` 에서 터졌다 — 버전이 빈 문자열이 되어 자산이 `dist/v<ver>/` 가
+아니라 `dist/` 로 나가고 stamp 가 `dist/v/` 를 찾다 실패했다.
 
-배포 시점 env 를 읽는 자리는 전부 `||` 를 쓴다. 지금 해당하는 곳:
-`mf-build-version.ts`, remote 두 곳의 `PUBLIC_URL`.
+배포 시점 env 를 읽는 자리는 전부 `||` 를 쓴다. 지금 해당하는 곳은 `publicOrigin()`
+하나다 — `MF_BUILD_VERSION` 은 그 뒤 갈래째 사라졌다(위 "빌드 버전은 타임스탬프다").
 
 ### Next standalone 이 @swc/helpers 의 ESM 파일을 빠뜨린다
 
@@ -226,15 +271,19 @@ host 가 나오는 게 더 나쁘기 때문이다. 근거와 실측:
 ## 로컬 선검증
 
 ```bash
+export MFA_HOST_IP=$(ipconfig getifaddr en0)   # 맥의 LAN IP. 없으면 compose 가 에러로 죽는다
 docker compose up -d --build remote-catalog remote-cart
 docker compose up --build host
 curl -s localhost:3000/checkout | grep 주문서   # remote SSR 확인
 ```
 
 두 번에 나누는 이유가 위와 같다. host **이미지를 만드는 시점에** remote 가 실제로 떠 있어야
-한다. `depends_on` 은 런타임 순서지 빌드 순서가 아니다. 빌드 컨테이너는 compose 네트워크에도
-붙지 않아서, host 빌드는 `remote-catalog:3001` 이 아니라 퍼블리시된 호스트 포트
-(`host.docker.internal:3001`)로 나간다.
+한다. `depends_on` 은 런타임 순서지 빌드 순서가 아니다.
 
-`docker-compose.yml` 은 로컬 검증 전용이다. `PUBLIC_URL` 이 localhost 로 굳으므로
-이 이미지를 그대로 배포하면 안 된다.
+`MFA_HOST_IP` 가 필요한 이유: 같은 remote 오리진을 맥의 브라우저와 컨테이너(빌드·런타임)가
+함께 읽는데, `localhost` 는 컨테이너 안에서 자기 자신이고 `host.docker.internal` 은 맥에서
+안 풀린다. **양쪽에서 같은 곳을 가리키는 주소는 LAN IP 뿐이다.** 이 덕분에 compose 에서도
+remote 당 변수가 하나로 끝난다. 배포에서는 이 자리가 공개 도메인이라 필요 없다.
+
+`docker-compose.yml` 은 로컬 검증 전용이다. 오리진이 LAN IP 로 굳으므로 이 이미지를
+그대로 배포하면 안 된다. 네트워크를 바꾸면(Wi-Fi ↔ 테더링) IP 가 바뀌니 재빌드해야 한다.

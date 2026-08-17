@@ -1,5 +1,55 @@
 # 진행 상황
 
+## 2026-08-17 (7차) — 환경변수를 remote 당 하나로
+
+질문: **remote 하나에 환경변수가 세 벌씩 필요한가?**
+
+`NEXT_PUBLIC_REMOTE_*_ENTRY` / `REMOTE_*_SSR_ENTRY` / `REMOTE_*_PUBLIC_URL` 셋의 실제 값은
+도메인 하나였고, 다른 건 오리진 뒤에 붙는 파일명뿐이었다. 그 파일명은 이미 `MF_FILES` 에
+있으니 **env 가 SSOT 를 문자열로 복제**하고 있었던 셈이다. 복제된 쪽이 어긋나면 404 가 아니라
+"폴백 응답을 파싱하다 실패"로 나타나 원인이 로그에 안 보인다.
+
+### 한 일
+
+- [x] `RemoteEnvKeys` 를 `publicUrl` 하나로 축소 — remote N 개에 환경변수 N 개
+- [x] `webManifestUrl()` / `ssrBundleUrl()` 이 오리진 + `MF_FILES` 를 조립. 호출부는 경로를 안 만든다
+- [x] `NEXT_PUBLIC_` 접두사 제거 — 브라우저 전달은 `next.config.ts` → `env:` 경로를 타므로
+      접두사가 하는 일이 없었다. `turbo.json` 의 와일드카드도 `REMOTE_*` 한 줄로
+- [x] docker-compose / docker-host-local 을 **맥 LAN IP 단일 주소**로 전환
+- [x] `docs/03-setup/03-environment.md` 신설 — 어느 `.env` 가 실제로 로드되는지가 앱마다 다르다
+- [x] 스크립트 이름의 `.mjs` 잔재 정리 (`serve-remote-dist.mjs` → `.ts` 등)
+
+### 왜 LAN IP 인가
+
+같은 remote 오리진을 맥의 브라우저와 컨테이너(빌드·런타임)가 함께 읽는데, `localhost` 는
+컨테이너 안에서 자기 자신이고 `host.docker.internal` 은 맥에서 안 풀린다. **양쪽에서 같은
+곳을 가리키는 주소는 LAN IP 뿐**이라, 이걸 쓰면 docker 검증 경로에서도 remote 당 변수가
+하나로 끝난다. 대안은 SSR 전용 오버라이드 변수를 하나 더 두는 것이었는데, 그건 "변수를
+줄인다"는 목적과 정면으로 부딪혀서 버렸다.
+
+### 검증
+
+| 항목                                | 결과                                                   |
+| ----------------------------------- | ------------------------------------------------------ |
+| `turbo run typecheck` / `lint`      | ✅ 16/16                                               |
+| `pnpm build` (host 프리렌더 포함)   | ✅ `next build exited with code 0`                     |
+| 후행 슬래시 정규화 / 빈 `ARG` 폴백  | ✅ node 로 직접 확인                                   |
+| `docker-host-local.sh` 전 구간      | ✅ EXIT=0                                              |
+| 컨테이너 → 맥 LAN IP 도달성         | ✅ 빌드 프리렌더가 `192.168.68.50:3001` 에서 수신      |
+| 컨테이너 런타임 remote SSR          | ✅ `/checkout` 에 `주문서`, ErrorBox 없음              |
+| 서버가 심은 버전 경로 엔트리        | ✅ `http://192.168.68.50:3001/v<ver>/mf-manifest.json` |
+| compose 변수 보간 (`MFA_HOST_IP:?`) | ✅ 미설정 시 메시지와 함께 exit 1, 설정 시 정상 해석   |
+
+`docker compose up` 전체 기동은 안 돌렸다 — `docker-host-local.sh` 가 같은 경로(빌드 컨테이너
+→ 맥 LAN IP → 퍼블리시된 포트)를 이미 통과했고, compose 쪽은 파일 보간까지만 확인했다.
+
+### 남은 것
+
+- Dokploy 의 Build Args / 런타임 env 를 새 이름으로 교체 — **웹 UI 작업이라 저장소 밖이다.**
+  체크리스트는 [03-setup/04-dokploy.md](./03-setup/04-dokploy.md#환경변수) 상단 경고 박스.
+  옛 이름은 에러가 아니라 **기본값 localhost 로 조용히 떨어져** host 빌드가 프리렌더에서
+  실패한다. 바꾸기 전까지 이 저장소의 main 은 배포하면 깨진다.
+
 ## 2026-08-15 (6차) — 컨테이너 배포 (Dokploy)
 
 질문: **remote 를 host 와 독립적으로 재배포할 수 있는가?** → 배포 표면을 먼저 만들었다.

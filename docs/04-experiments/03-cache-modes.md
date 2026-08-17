@@ -443,11 +443,14 @@ MF_REVALIDATE_SECRET=lab-secret pnpm --filter @mfa/host start
 DELAY_MS=800 node slow-proxy.mjs        # :3011 → :3001
 
 # host 를 그 프록시로 향하게 띄운다
-REMOTE_CATALOG_SSR_ENTRY=http://localhost:3011/mf-server.cjs \
+REMOTE_CATALOG_PUBLIC_URL=http://localhost:3011 \
 MF_REVALIDATE_SECRET=lab-secret pnpm --filter @mfa/host start
 
 # 라운드마다 host 재기동 + fetch-cache 삭제로 콜드 조건 고정
 ```
+
+> env 가 오리진 하나로 통합된 뒤에는 이 설정이 **catalog 트래픽 전부**를 프록시로 보낸다
+> (매니페스트·청크 포함). 지연은 `/mf-server.cjs` 에만 걸어야 원래 조건이 유지된다.
 
 `?warm=0` 으로 warm 을 끄면 옛 동작(대조군)이 재현된다.
 

@@ -9,7 +9,7 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 | [00-progress.md](./00-progress.md)          | 작업 진행 기록                                                                                  |
 | [01-research](./01-research/)               | `@module-federation/nextjs-mf` EOL 현황, 대체재 리서치, Vite MF 검토, **DTS 플러그인 검토**     |
 | [02-architecture](./02-architecture/)       | 아키텍처 결정(ADR), 토폴로지, SSR + 소프트 내비게이션 설계, **remote 수명주기(버전·캐시·신뢰)** |
-| [03-setup](./03-setup/)                     | 모노레포 구조, 실행 방법, 버전 고정 근거                                                        |
+| [03-setup](./03-setup/)                     | 모노레포 구조, 실행 방법, 버전 고정 근거, **환경변수**, 배포                                    |
 | [04-experiments](./04-experiments/)         | 실험 A(런타임 MF) / B(Multi-Zones·기각) / **C(ISR·Cache Components)** 결과와 비교               |
 | [05-troubleshooting](./05-troubleshooting/) | 구축 중 실제로 터진 문제와 해결책                                                               |
 
