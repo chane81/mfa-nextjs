@@ -10,11 +10,20 @@
 #
 # host 빌드는 프리렌더 도중 remote 의 SSR 번들을 **HTTP 로 받아 실행**한다.
 # 그래서 이미지를 만드는 시점에 remote 오리진이 살아 있어야 한다. 그런데 빌드 컨테이너는
-# compose 네트워크에도, 호스트 네트워크에도 없다. 그래서 이렇게 한다.
+# 호스트 네트워크에 없다. 그래서 이렇게 한다.
 #
 #   1. remote 를 로컬에서 빌드 (pnpm)
-#   2. 그 dist 를 이 맥의 3001/3002 에 서빙
-#   3. 빌드 컨테이너는 host.docker.internal 로 그 포트에 닿는다 (--add-host)
+#   2. 그 dist 를 이 맥의 3001/3002 에 서빙 (모든 인터페이스에 바인딩된다)
+#   3. 맥의 **LAN IP** 를 remote 오리진으로 넘긴다
+#
+# ## 왜 localhost 가 아니라 LAN IP 인가
+#
+# 같은 주소를 브라우저(맥)와 컨테이너(빌드·런타임)가 함께 읽는다. `localhost` 는 컨테이너
+# 안에서 자기 자신이고, `host.docker.internal` 은 맥에서 안 풀린다. **양쪽에서 같은 곳을
+# 가리키는 주소는 LAN IP 뿐이다.** 덕분에 remote 당 환경변수가 하나로 끝난다 — 예전에는
+# 이 자리 때문에 브라우저용과 SSR 용 변수를 따로 뒀다.
+#
+# 네트워크를 바꾸면 IP 가 바뀐다. 이미지에 구워진 값이라 그때는 다시 빌드해야 한다.
 #
 # 배포에서는 이 자리가 공개 도메인이라 이런 다리가 필요 없다.
 set -euo pipefail
@@ -51,6 +60,18 @@ say() { printf '\n\033[1;36m▸ %s\033[0m\n' "$*"; }
 # ---------------------------------------------------------------- 0. 사전 확인
 docker info >/dev/null 2>&1 || { echo "docker 가 안 떠 있다"; exit 1; }
 
+# 맥의 LAN IP. 브라우저와 컨테이너가 **같이** 읽는 주소라 루프백으로는 안 된다.
+# 조용히 빈 값으로 흘리면 오리진이 `http://:3001` 이 되어 원인이 안 보이므로 여기서 죽인다.
+HOST_IP="${MFA_HOST_IP:-$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)}"
+if [ -z "$HOST_IP" ]; then
+  echo "맥의 LAN IP 를 못 구했다 (en0/en1). 네트워크에 연결돼 있어야 한다."
+  echo "  직접 지정: MFA_HOST_IP=192.168.0.10 bash scripts/docker-host-local.sh"
+  exit 1
+fi
+CATALOG_URL="http://$HOST_IP:3001"
+CART_URL="http://$HOST_IP:3002"
+echo "remote 오리진: $CATALOG_URL / $CART_URL"
+
 for port in 3001 3002; do
   if lsof -nP -iTCP:$port -sTCP:LISTEN -t >/dev/null 2>&1; then
     echo "포트 $port 를 이미 누가 쓰고 있다. dev 서버가 떠 있으면 내리고 다시 실행할 것."
@@ -60,8 +81,14 @@ for port in 3001 3002; do
 done
 
 # ---------------------------------------------------------------- 1. remote 빌드
+#
+# remote 산출물의 자산 URL 접두사도 같은 오리진으로 굳힌다. 여기서 안 넘기면 청크가
+# `localhost:3001` 을 가리켜 브라우저에서는 우연히 동작하지만, host 가 보는 오리진과
+# 달라져서 "어디서 무엇을 받는지"가 배포와 다른 모양이 된다.
 say "remote 빌드"
-pnpm turbo run build --filter=@mfa/remote-catalog --filter=@mfa/remote-cart
+REMOTE_CATALOG_PUBLIC_URL="$CATALOG_URL" \
+REMOTE_CART_PUBLIC_URL="$CART_URL" \
+  pnpm turbo run build --filter=@mfa/remote-catalog --filter=@mfa/remote-cart
 
 for d in apps/remote-catalog/dist apps/remote-cart/dist; do
   [ -f "$d/mf-version.json" ] || { echo "$d/mf-version.json 이 없다"; exit 1; }
@@ -69,9 +96,9 @@ done
 
 # ---------------------------------------------------------------- 2. dist 서빙
 say "remote dist 서빙 (3001 / 3002)"
-node scripts/serve-remote-dist.mjs 3001 apps/remote-catalog/dist >/dev/null 2>&1 &
+node scripts/serve-remote-dist.ts 3001 apps/remote-catalog/dist >/dev/null 2>&1 &
 PIDS+=($!); disown %% 2>/dev/null || true
-node scripts/serve-remote-dist.mjs 3002 apps/remote-cart/dist >/dev/null 2>&1 &
+node scripts/serve-remote-dist.ts 3002 apps/remote-cart/dist >/dev/null 2>&1 &
 PIDS+=($!); disown %% 2>/dev/null || true
 
 PROBE="$(mktemp -t mfa-probe).mjs"
@@ -93,27 +120,26 @@ node "$PROBE" http://localhost:3002/mf-version.json
 
 # ---------------------------------------------------------------- 3. 이미지 빌드
 #
-# NEXT_PUBLIC_* 은 **브라우저**가 읽는 값 → 맥에서 닿는 주소(localhost).
-# REMOTE_*_SSR_ENTRY 는 **빌드/서버**가 읽는 값 → 컨테이너에서 닿는 주소(host.docker.internal).
+# remote 당 인자 하나다. 브라우저용 매니페스트 URL 과 프리렌더가 받아가는 SSR 번들 URL 이
+# 둘 다 여기서 파생된다(`@mfa/remote-config` 가 파일명을 붙인다).
 say "이미지 빌드"
 docker build \
   -f apps/host/Dockerfile \
   ${BUILD_FLAGS[@]+"${BUILD_FLAGS[@]}"} \
-  --add-host=host.docker.internal:host-gateway \
-  --build-arg NEXT_PUBLIC_REMOTE_CATALOG_ENTRY=http://localhost:3001/mf-manifest.json \
-  --build-arg NEXT_PUBLIC_REMOTE_CART_ENTRY=http://localhost:3002/mf-manifest.json \
-  --build-arg REMOTE_CATALOG_SSR_ENTRY=http://host.docker.internal:3001/mf-server.cjs \
-  --build-arg REMOTE_CART_SSR_ENTRY=http://host.docker.internal:3002/mf-server.cjs \
+  --build-arg REMOTE_CATALOG_PUBLIC_URL="$CATALOG_URL" \
+  --build-arg REMOTE_CART_PUBLIC_URL="$CART_URL" \
   -t "$IMAGE" .
 
 # ---------------------------------------------------------------- 4. 실행
+#
+# 브라우저용 값은 이미 번들에 구워졌다. 여기서 다시 넘기는 건 host **서버**가 런타임에
+# SSR 번들을 받아갈 때 쓰는 쪽이다 — 같은 변수, 같은 값.
 say "컨테이너 실행"
 docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
 docker run -d --name "$CONTAINER" \
   -p 3000:3000 \
-  --add-host=host.docker.internal:host-gateway \
-  -e REMOTE_CATALOG_SSR_ENTRY=http://host.docker.internal:3001/mf-server.cjs \
-  -e REMOTE_CART_SSR_ENTRY=http://host.docker.internal:3002/mf-server.cjs \
+  -e REMOTE_CATALOG_PUBLIC_URL="$CATALOG_URL" \
+  -e REMOTE_CART_PUBLIC_URL="$CART_URL" \
   -e MF_REVALIDATE_SECRET=local-secret \
   "$IMAGE" >/dev/null
 
@@ -148,6 +174,6 @@ if [ "$KEEP" = 1 ]; then
   echo "  docker rm -f $CONTAINER"
   echo "※ remote 서빙(3001/3002)은 이 스크립트가 끝나면서 같이 내려간다."
   echo "  브라우저로 볼 거면 따로 띄울 것:"
-  echo "    node scripts/serve-remote-dist.mjs 3001 apps/remote-catalog/dist &"
-  echo "    node scripts/serve-remote-dist.mjs 3002 apps/remote-cart/dist &"
+  echo "    node scripts/serve-remote-dist.ts 3001 apps/remote-catalog/dist &"
+  echo "    node scripts/serve-remote-dist.ts 3002 apps/remote-cart/dist &"
 fi

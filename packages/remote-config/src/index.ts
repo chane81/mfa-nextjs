@@ -92,13 +92,25 @@ export const MF_FILES = {
 export const REMOTE_NAMES = ['catalog', 'cart'] as const;
 export type RemoteName = (typeof REMOTE_NAMES)[number];
 
-/** remote 주소를 바꾸는 환경변수들의 **이름** (값이 아니다) */
+/**
+ * remote 주소를 바꾸는 환경변수의 **이름** (값이 아니다).
+ *
+ * remote 하나당 **하나**다. 예전에는 셋이었다 — 브라우저용 매니페스트 URL,
+ * host 서버용 SSR 번들 URL, 자산 오리진. 그런데 세 값의 차이는 오리진 뒤에 붙는
+ * 파일명뿐이었고, 그 파일명은 이미 `MF_FILES` 에 있다. 즉 env 가 SSOT 를 문자열로
+ * 복제하고 있었다. 복제된 쪽이 어긋나면 404 가 아니라 **폴백 응답을 파싱하다 실패**하는
+ * 형태로 나타나서(dev 서버의 SPA 폴백은 200 이다) 원인이 로그에 안 보인다.
+ *
+ * 이제 env 는 오리진만 받고 파일명은 `webManifestUrl` / `ssrBundleUrl` 이 붙인다.
+ * remote N 개에 환경변수 N 개다.
+ */
 export interface RemoteEnvKeys {
-  /** 브라우저가 읽는 매니페스트 URL (host 빌드 타임에 번들에 굳는다) */
-  readonly webEntry: string;
-  /** host 서버가 받아 실행하는 SSR 번들 URL */
-  readonly ssrEntry: string;
-  /** 이 remote 자산의 공개 오리진 (remote 빌드 타임에 산출물에 굳는다) */
+  /**
+   * 이 remote 의 공개 오리진. 세 자리가 전부 여기서 파생된다.
+   *   - remote 자신의 자산 URL 접두사 (`base` / `assetPrefix`)
+   *   - 브라우저가 읽는 매니페스트 URL
+   *   - host **서버**가 받아 실행하는 SSR 번들 URL
+   */
   readonly publicUrl: string;
 }
 
@@ -133,8 +145,6 @@ export const REMOTES = {
     workspaceDir: 'apps/remote-catalog',
     devPort: 3001,
     env: {
-      webEntry: 'NEXT_PUBLIC_REMOTE_CATALOG_ENTRY',
-      ssrEntry: 'REMOTE_CATALOG_SSR_ENTRY',
       publicUrl: 'REMOTE_CATALOG_PUBLIC_URL',
     },
   },
@@ -144,8 +154,6 @@ export const REMOTES = {
     workspaceDir: 'apps/remote-cart',
     devPort: 3002,
     env: {
-      webEntry: 'NEXT_PUBLIC_REMOTE_CART_ENTRY',
-      ssrEntry: 'REMOTE_CART_SSR_ENTRY',
       publicUrl: 'REMOTE_CART_PUBLIC_URL',
     },
   },
@@ -171,22 +179,29 @@ export function devOrigin(remote: RemoteName): string {
   return `http://localhost:${REMOTES[remote].devPort}`;
 }
 
-/** 브라우저가 읽는 매니페스트의 기본 URL */
-export function defaultWebEntry(remote: RemoteName): string {
-  return `${devOrigin(remote)}/${MF_FILES.webManifest}`;
+/**
+ * 브라우저 MF 런타임이 읽는 매니페스트 URL.
+ *
+ * 오리진은 env 에서, 파일명은 `MF_FILES` 에서 온다. **호출부가 경로를 조립하지 않는다** —
+ * 조립을 밖에 두면 파일명이 그만큼 복제되고, 어긋났을 때 증상이 404 가 아니라
+ * "폴백 응답을 파싱하다 실패" 라서 원인을 찾기 어렵다.
+ */
+export function webManifestUrl(remote: RemoteName): string {
+  return `${publicOrigin(remote)}/${MF_FILES.webManifest}`;
 }
 
-/** host 서버가 받아 실행하는 SSR 번들의 기본 URL */
-export function defaultSsrEntry(remote: RemoteName): string {
-  return `${devOrigin(remote)}/${MF_FILES.ssrBundle}`;
+/** host **서버**가 받아 실행하는 node 타깃 CJS 번들 URL */
+export function ssrBundleUrl(remote: RemoteName): string {
+  return `${publicOrigin(remote)}/${MF_FILES.ssrBundle}`;
 }
 
 /**
- * 이 remote 자산의 공개 오리진. **node 컨텍스트 전용**이다.
+ * 이 remote 의 공개 오리진. 모든 remote 주소가 여기서 파생된다.
  *
- * `process.env[이름]` 으로 동적 접근하므로 remote 의 번들러 config(빌드 시 node 에서
- * 평가된다)에서는 잘 동작하지만, 브라우저 번들에서 부르면 값이 치환되지 않는다.
- * 이 값은 remote 자신의 빌드에만 쓰이고 host 는 읽지 않는다.
+ * ⚠️ `process.env[이름]` 으로 **동적 접근**한다. node 컨텍스트(스크립트·번들러 config·
+ * `next.config.ts`·host 서버)에서는 그대로 동작하지만, **브라우저 번들에서 부르면
+ * 치환되지 않아 언제나 `devOrigin` 으로 떨어진다.** 그게 문제가 되지 않도록 브라우저용
+ * 값은 `next.config.ts` 가 node 에서 미리 꺼내 번들에 굽는다(`REMOTES` 주석 참고).
  *
  * `||` 인 이유: Dockerfile 에서 `ARG` 를 값 없이 선언하면 빈 문자열로 도착하는데,
  * `??` 는 그걸 유효한 설정으로 받아 `new URL("")` 에서 터진다.

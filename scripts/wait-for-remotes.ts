@@ -32,11 +32,7 @@
  * 시간 안에 못 뜨면 **막지 않고 경고만 남기고 통과**한다. remote 없이 host 만 띄우는
  * 것도 정당한 작업 방식이고(진단 화면 등), dev 가 영영 안 뜨는 쪽이 더 나쁘다.
  */
-import {
-  REMOTE_LIST,
-  defaultSsrEntry,
-  defaultWebEntry,
-} from '@mfa/remote-config';
+import { REMOTE_LIST, ssrBundleUrl, webManifestUrl } from '@mfa/remote-config';
 
 const TIMEOUT_MS = Number(process.env.WAIT_FOR_REMOTES_TIMEOUT ?? 60_000);
 const INTERVAL_MS = 300;
@@ -49,15 +45,14 @@ const FETCH_TIMEOUT_MS = 5000;
  * 줄어드는데, 그때마다 host 쪽 스크립트를 같이 고쳐야 한다면 그건 결합이다.
  * 필요한 모듈 URL 은 매니페스트에서 읽어낸다(`webReady`).
  *
- * env 이름도 기본값도 `@mfa/remote-config` 에서 온다. **기다리는 URL 과 host 가 실제로
- * 가져가는 URL 이 어긋나면 게이트가 헛돈다** — 같은 SSOT 를 host 의
- * `apps/host/src/mf/remote-endpoints.ts` 가 읽으므로 그 어긋남이 구조적으로 안 생긴다.
- * (host 는 `NEXT_PUBLIC_*` 치환 제약 때문에 env 를 리터럴로 읽는다. 그쪽 주석 참고.)
+ * URL 조립도 `@mfa/remote-config` 가 한다. **기다리는 URL 과 host 가 실제로 가져가는 URL 이
+ * 어긋나면 게이트가 헛돈다** — 같은 함수를 host 의 `apps/host/src/mf/remote-endpoints.ts` 가
+ * 쓰므로 그 어긋남이 구조적으로 안 생긴다.
  */
-const REMOTES = REMOTE_LIST.map(({ name, env }) => ({
+const REMOTES = REMOTE_LIST.map(({ name }) => ({
   name,
-  web: process.env[env.webEntry] || defaultWebEntry(name),
-  ssr: process.env[env.ssrEntry] || defaultSsrEntry(name),
+  web: webManifestUrl(name),
+  ssr: ssrBundleUrl(name),
 }));
 
 const sleep = (ms: number): Promise<void> =>

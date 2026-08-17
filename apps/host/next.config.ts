@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 
-import { REMOTE_LIST, defaultWebEntry } from '@mfa/remote-config';
+import { REMOTE_LIST, webManifestUrl } from '@mfa/remote-config';
 import type { NextConfig } from 'next';
 
 /**
@@ -21,16 +21,14 @@ import type { NextConfig } from 'next';
  * 그 접두사는 환경/`.env` 파일로 들어온 변수에만 적용되는 규칙이다.
  * https://nextjs.org/docs/app/api-reference/config/next-config-js/env
  *
- * ⚠️ SSR 엔트리(`REMOTE_*_SSR_ENTRY`)는 여기 넣지 않는다. host **서버**만 쓰는 값이고,
- * 브라우저에 굳이 노출할 이유가 없다. 그쪽은 서버에서 `process.env[이름]` 으로 읽는다
+ * ⚠️ SSR 엔트리는 여기 넣지 않는다. 같은 `REMOTE_*_PUBLIC_URL` 에서 파생되지만 host
+ * **서버**만 쓰는 값이라 브라우저에 노출할 이유가 없다. 그쪽은 서버에서 직접 파생한다
  * (`src/mf/remote-endpoints.ts`).
  */
 const REMOTE_WEB_ENTRIES = Object.fromEntries(
-  REMOTE_LIST.map(({ name, env }) => [
-    name,
-    // `||` 인 이유: 빈 `ARG` 가 빈 문자열로 도착한다 (docs/03-setup/04-dokploy.md)
-    process.env[env.webEntry] || defaultWebEntry(name),
-  ]),
+  // 빈 `ARG` 가 빈 문자열로 도착하는 함정은 `publicOrigin` 안에서 처리한다
+  // (docs/03-setup/04-dokploy.md)
+  REMOTE_LIST.map(({ name }) => [name, webManifestUrl(name)]),
 );
 
 /**

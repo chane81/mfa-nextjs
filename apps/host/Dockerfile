@@ -5,8 +5,8 @@
 # 빌드 컨텍스트는 **저장소 루트**다. pnpm 워크스페이스라 apps/host 만으로는 빌드할 수 없다.
 #   docker build -f apps/host/Dockerfile .
 #
-# NEXT_PUBLIC_* 은 클라이언트 번들에 **구워진다**. 런타임 env 로는 못 바꾼다.
-# 그래서 remote 매니페스트 URL 은 빌드 인자로 받는다.
+# remote 매니페스트 URL 은 클라이언트 번들에 **구워진다**. 런타임 env 로는 못 바꾼다.
+# 그래서 remote 오리진을 빌드 인자로 받는다.
 ARG NODE_VERSION=24-slim
 
 # ---------------------------------------------------------------- base
@@ -72,20 +72,22 @@ COPY --from=deps /repo/apps ./apps
 COPY --from=deps /repo/packages ./packages
 COPY . .
 
-# 브라우저 번들에 구워지는 값 (없으면 host 코드의 localhost 기본값이 들어간다)
-ARG NEXT_PUBLIC_REMOTE_CATALOG_ENTRY
-ARG NEXT_PUBLIC_REMOTE_CART_ENTRY
-ENV NEXT_PUBLIC_REMOTE_CATALOG_ENTRY=${NEXT_PUBLIC_REMOTE_CATALOG_ENTRY}
-ENV NEXT_PUBLIC_REMOTE_CART_ENTRY=${NEXT_PUBLIC_REMOTE_CART_ENTRY}
-
-# SSR 엔트리는 런타임 값이면서 **빌드 시점에도 필요하다**.
-# 프리렌더가 remote 의 SSR 번들을 실제로 받아 실행하기 때문이다. 여기서 안 넘기면
-# 빌드가 기본값(localhost:3001/3002)을 보고 아무것도 못 받아 실패한다.
-# 빈 값으로 도착해도 안전하도록 읽는 쪽은 `||` 로 폴백한다(src/mf/remote-version.ts).
-ARG REMOTE_CATALOG_SSR_ENTRY
-ARG REMOTE_CART_SSR_ENTRY
-ENV REMOTE_CATALOG_SSR_ENTRY=${REMOTE_CATALOG_SSR_ENTRY}
-ENV REMOTE_CART_SSR_ENTRY=${REMOTE_CART_SSR_ENTRY}
+# remote 오리진. **remote 하나당 변수 하나**고, 여기서 세 가지가 파생된다.
+#   - 브라우저 번들에 구워지는 매니페스트 URL  (…/mf-manifest.json)
+#   - 프리렌더가 받아 실행하는 SSR 번들 URL     (…/mf-server.cjs)
+#   - 오리진 허용 목록의 기본값
+# 파일명 조립은 `@mfa/remote-config` 가 한다.
+#
+# 브라우저용 값은 클라이언트 번들에 **구워지므로** 런타임 env 로 못 바꾼다.
+# SSR 쪽은 런타임 값이면서 **빌드 시점에도 필요하다** — 프리렌더가 remote 의 SSR 번들을
+# 실제로 받아 실행하기 때문이다. 여기서 안 넘기면 빌드가 기본값(localhost:3001/3002)을
+# 보고 아무것도 못 받아 실패한다. 그래서 런타임 env 에도 **같은 값을 그대로** 넣는다.
+#
+# 빈 값으로 도착해도 안전하도록 읽는 쪽은 `||` 로 폴백한다(`publicOrigin`).
+ARG REMOTE_CATALOG_PUBLIC_URL
+ARG REMOTE_CART_PUBLIC_URL
+ENV REMOTE_CATALOG_PUBLIC_URL=${REMOTE_CATALOG_PUBLIC_URL}
+ENV REMOTE_CART_PUBLIC_URL=${REMOTE_CART_PUBLIC_URL}
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

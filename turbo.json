@@ -5,23 +5,24 @@
   "globalEnv": [
     "NODE_ENV",
     /**
-     * remote 별 주소 설정 전체를 **와일드카드 두 줄**로 받는다. 이름 하나하나를 적으면
+     * remote 별 주소 설정 전체를 **와일드카드 한 줄**로 받는다. 이름 하나하나를 적으면
      * remote 를 추가할 때마다 `packages/remote-config` 와 이 파일을 같이 고쳐야 하는데,
      * 그러면 SSOT 가 반쪽이 된다. turbo 는 접두사 와일드카드를 지원하므로 이름 목록을
      * 여기 복제하지 않아도 된다.
      *
-     *   NEXT_PUBLIC_REMOTE_*  → 브라우저가 읽는 매니페스트 URL (…_ENTRY)
-     *   REMOTE_*              → SSR 엔트리(…_SSR_ENTRY), 자산 오리진(…_PUBLIC_URL),
-     *                           신뢰 경계(REMOTE_ALLOWED_ORIGINS),
-     *                           버전 보존 개수(REMOTE_KEEP_VERSIONS)
+     *   REMOTE_*  → remote 오리진(…_PUBLIC_URL — remote 당 이거 하나다),
+     *               신뢰 경계(REMOTE_ALLOWED_ORIGINS),
+     *               버전 보존 개수(REMOTE_KEEP_VERSIONS)
+     *
+     * 브라우저용 매니페스트 URL 과 host 서버용 SSR 번들 URL 은 전부 `…_PUBLIC_URL` 에서
+     * 파생된다. 파일명은 `MF_FILES` 에 있고 코드가 붙인다 — env 로 오지 않는다.
      *
      * 여기 등록하지 않은 변수는 turbo 가 태스크 환경에서 걸러낸다(strict env).
      */
-    "NEXT_PUBLIC_REMOTE_*",
     "REMOTE_*",
     /**
-     * 위 `NEXT_PUBLIC_REMOTE_*` 를 순회해 만든 값을 `next.config.ts` 가 이 이름으로
-     * 번들에 굽는다(그래야 host 코드가 remote 이름을 몰라도 된다 — 그쪽 주석 참고).
+     * 위 `REMOTE_*_PUBLIC_URL` 을 순회해 만든 매니페스트 URL 들을 `next.config.ts` 가
+     * 이 이름으로 번들에 굽는다(그래야 host 코드가 remote 이름을 몰라도 된다 — 그쪽 주석 참고).
      * 보통은 환경에서 오지 않지만, 밖에서 직접 넣어 덮어쓰는 것도 유효한 사용이라
      * turbo 가 캐시 키로 추적하게 둔다. remote 개수와 무관한 단일 이름이다.
      */
@@ -38,7 +39,7 @@
     "MF_*",
     // Next 서버가 실제로 바인딩한 포트. warm 자기호출 주소를 만들 때 읽는다.
     "PORT",
-    // host dev 가 remote 를 기다리는 시간 (scripts/wait-for-remotes.mjs).
+    // host dev 가 remote 를 기다리는 시간 (scripts/wait-for-remotes.ts).
     // 등록 전에는 `WAIT_FOR_REMOTES_TIMEOUT=1` 을 줘도 60초를 다 기다렸다 — 실측.
     "WAIT_FOR_REMOTES_TIMEOUT"
   ],
@@ -68,7 +69,7 @@
      * ⚠️ 패키지 스코프 설정은 기본 `build` 를 **상속하지 않고 대체**한다. outputs 를 다시 적는 이유다.
      *
      * `inputs` 의 `.env*` 는 보험이다. turbo 의 기본 입력 집합은 git 이 추적하는 파일이라
-     * gitignore 된 `.env.local` 이 빠지는데, 그 파일에 `REMOTE_*_SSR_ENTRY` 를 적으면
+     * gitignore 된 `.env.local` 이 빠지는데, 그 파일에 `REMOTE_*_PUBLIC_URL` 을 적으면
      * **프리렌더 결과가 거기 달린다**. 없으면 오리진을 바꿔도 캐시된 옛 `.next` 가 그대로
      * 복원된다(실측: FULL TURBO). 지금 저장소에 `.env.local` 은 없다 — 기본값이 코드에
      * 있어서 필요 없다 — 하지만 누가 만들면 그 순간 이 줄이 일한다.
@@ -119,7 +120,7 @@
      * `dev` 전체에 걸면 remote 도 이 태스크를 기다리게 되어 교착한다 — 대기 태스크는
      * remote 가 뜨기를 기다리는데 remote 는 대기 태스크가 끝나기를 기다린다.
      *
-     * 근거: scripts/wait-for-remotes.mjs
+     * 근거: scripts/wait-for-remotes.ts
      */
     "@mfa/host#dev": {
       "cache": false,

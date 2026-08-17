@@ -4,32 +4,48 @@
 # 검증하는 게 이 저장소의 미완 항목이라, 한 덩어리로 묶으면 그 검증이 불가능하다).
 # 이 파일은 "이미지 3개가 실제로 뜨고 서로 물리는지"를 로컬에서 먼저 확인하는 용도다.
 #
-# ## 두 번에 나눠 올린다
+# ## 실행 — `MFA_HOST_IP` 가 필요하다
 #
+#   export MFA_HOST_IP=$(ipconfig getifaddr en0)
 #   docker compose up -d --build remote-catalog remote-cart
 #   docker compose up --build host
 #   curl -s localhost:3000/checkout | grep 주문서   # remote SSR 확인
 #
-# host **빌드**가 프리렌더 도중 remote 의 SSR 번들을 HTTP 로 받아 실행하기 때문이다
-# (docs/03-setup/01-getting-started.md). 그래서 host 이미지를 만들기 전에 remote 가
+# 두 번에 나눠 올리는 이유: host **빌드**가 프리렌더 도중 remote 의 SSR 번들을 HTTP 로 받아
+# 실행한다(docs/03-setup/01-getting-started.md). 그래서 host 이미지를 만들기 전에 remote 가
 # 실제로 떠 있어야 한다. `depends_on` 은 런타임 순서지 빌드 순서가 아니라서 이걸 못 해준다.
 #
-# 빌드 컨테이너는 compose 네트워크에도 붙지 않는다. 그래서 host 빌드는 `remote-catalog:3001`
-# 이 아니라 **퍼블리시된 호스트 포트**(host.docker.internal:3001)로 나간다.
+# ## 왜 localhost 가 아니라 맥의 LAN IP 인가
 #
-# 주의: PUBLIC_URL 이 localhost 로 굳으므로 이 이미지는 배포용이 아니다.
+# 같은 remote 주소를 **세 곳**이 읽는데 셋의 네트워크 위치가 다르다.
 #
-# ⚠️ 아래 포트·env 이름·엔트리 경로의 **원본은 `packages/remote-config`** 다.
-# compose 는 정적 YAML 이라 그 모듈을 읽을 수 없어서 여기만 손으로 맞춘다 —
-# 코드·스크립트·번들러 설정·turbo.json 은 전부 SSOT 에서 파생되므로 손댈 곳이 없다.
-# 이 파일은 로컬 검증 전용이고 배포 경로가 아니라서 그 예외를 감수한다.
+#   맥의 브라우저      → 퍼블리시된 포트
+#   host 빌드 컨테이너 → compose 네트워크에 붙지 않는다 (빌드 시점엔 존재하지도 않는다)
+#   host 런타임 컨테이너 → compose 네트워크 안
+#
+# `localhost` 는 컨테이너 안에서 자기 자신을 가리키고, `remote-catalog` 는 맥에서 안 풀리고,
+# `host.docker.internal` 은 맥에서 안 풀린다. **셋 다에서 같은 곳을 가리키는 주소는 맥의
+# LAN IP 뿐이다.** 그래서 remote 당 주소가 하나로 끝나고, 환경변수도 하나로 끝난다.
+# (예전에는 이 자리 때문에 브라우저용·SSR용 변수를 따로 뒀다.)
+#
+# ⚠️ 이 이미지는 배포용이 아니다 — 오리진이 LAN IP 로 굳는다.
+# ⚠️ 네트워크를 바꾸면(Wi-Fi ↔ 테더링) IP 가 바뀐다. 이미지에 구워진 값이라 재빌드해야 한다.
+#
+# ⚠️ 아래 포트·env 이름의 **원본은 `packages/remote-config`** 다. compose 는 정적 YAML 이라
+# 그 모듈을 읽을 수 없어서 여기만 손으로 맞춘다 — 코드·스크립트·번들러 설정·turbo.json 은
+# 전부 SSOT 에서 파생되므로 손댈 곳이 없다. 로컬 검증 전용이라 그 예외를 감수한다.
+#
+# 아래 첫 참조의 `:?` 는 "없으면 이 메시지로 실패" 다. compose 는 어느 서비스를 대상으로
+# 하든 파일 전체를 보간하므로 한 곳에만 걸어두면 된다. 조용히 빈 문자열로 떨어지면
+# 오리진이 `http://:3001` 이 되어 원인이 안 보인다.
 services:
   remote-catalog:
     build:
       context: .
       dockerfile: apps/remote-catalog/Dockerfile
       args:
-        REMOTE_CATALOG_PUBLIC_URL: http://localhost:3001
+        # 자산 URL 접두사. 브라우저가 이 주소에서 청크를 받는다.
+        REMOTE_CATALOG_PUBLIC_URL: http://${MFA_HOST_IP:?맥의 LAN IP 가 필요하다 - export MFA_HOST_IP=$$(ipconfig getifaddr en0)}:3001
     ports: ['3001:3001']
     volumes: ['catalog-dist:/data']
 
@@ -38,7 +54,7 @@ services:
       context: .
       dockerfile: apps/remote-cart/Dockerfile
       args:
-        REMOTE_CART_PUBLIC_URL: http://localhost:3002
+        REMOTE_CART_PUBLIC_URL: http://${MFA_HOST_IP}:3002
     ports: ['3002:3002']
     volumes: ['cart-dist:/data']
 
@@ -46,24 +62,19 @@ services:
     build:
       context: .
       dockerfile: apps/host/Dockerfile
-      # 빌드 컨테이너 → 호스트 머신. Docker Desktop 이 아닌 곳에서도 붙게 명시한다.
-      extra_hosts:
-        - 'host.docker.internal:host-gateway'
       args:
-        # 브라우저가 읽는 값 → 호스트 머신에서 닿는 주소여야 한다
-        NEXT_PUBLIC_REMOTE_CATALOG_ENTRY: http://localhost:3001/mf-manifest.json
-        NEXT_PUBLIC_REMOTE_CART_ENTRY: http://localhost:3002/mf-manifest.json
-        # 빌드 시점에 프리렌더가 실제로 받아가는 SSR 번들.
-        # 이 시점엔 compose 네트워크가 없으므로 퍼블리시된 호스트 포트로 나간다.
-        REMOTE_CATALOG_SSR_ENTRY: http://host.docker.internal:3001/mf-server.cjs
-        REMOTE_CART_SSR_ENTRY: http://host.docker.internal:3002/mf-server.cjs
+        # 빌드 시점에 두 가지가 이 값에서 나온다.
+        #   ① 브라우저 번들에 구워지는 매니페스트 URL
+        #   ② 프리렌더가 실제로 받아가는 SSR 번들 URL
+        REMOTE_CATALOG_PUBLIC_URL: http://${MFA_HOST_IP}:3001
+        REMOTE_CART_PUBLIC_URL: http://${MFA_HOST_IP}:3002
     ports: ['3000:3000']
     environment:
-      # host **서버**가 읽는 값 → 컨테이너 네트워크 내부 주소
-      REMOTE_CATALOG_SSR_ENTRY: http://remote-catalog:3001/mf-server.cjs
-      REMOTE_CART_SSR_ENTRY: http://remote-cart:3002/mf-server.cjs
-      # 서버가 코드를 받아 실행하는 오리진 허용목록
-      REMOTE_ALLOWED_ORIGINS: http://remote-catalog:3001,http://remote-cart:3002
+      # host **서버**가 런타임에 읽는 값. 빌드 인자와 같은 값이다.
+      # (①은 이미 번들에 구워졌고, 여기서 다시 읽는 건 ②뿐이다)
+      REMOTE_CATALOG_PUBLIC_URL: http://${MFA_HOST_IP}:3001
+      REMOTE_CART_PUBLIC_URL: http://${MFA_HOST_IP}:3002
+      # REMOTE_ALLOWED_ORIGINS 는 생략한다. 미설정이면 위 오리진만 허용이라 이미 정확하다.
       MF_REVALIDATE_SECRET: local-dev-secret
       # 로컬 compose 는 서명 없이 빌드된다(build secret 미전달). 강제하면 안 뜬다.
       MF_REQUIRE_SIGNATURE: '0'
