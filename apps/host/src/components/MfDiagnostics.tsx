@@ -132,7 +132,9 @@ export function MfDiagnostics() {
                 </div>
                 <div>
                   {r.status !== 'pending' && (
-                    <span style={{ fontFamily: tokens.font.mono, fontSize: 11 }}>
+                    <span
+                      style={{ fontFamily: tokens.font.mono, fontSize: 11 }}
+                    >
                       {r.version
                         ? `버전 핀 ${r.version} · `
                         : '버전 핀 없음(폴백 엔트리) · '}
@@ -153,15 +155,15 @@ export function MfDiagnostics() {
           lineHeight: 1.7,
         }}
       >
-        여기서 찌르는 URL 은 MF 런타임이 실제로 초기화에 쓰는 값과 같다
-        (<code>pinnedEntry</code>). 배포에서는 서버가 심어준{' '}
-        <code>/v&lt;version&gt;/</code> 경로가 나오고, dev 에서는 버전 공표가 없어
-        폴백 엔트리가 나온다.
+        여기서 찌르는 URL 은 MF 런타임이 실제로 초기화에 쓰는 값과 같다 (
+        <code>pinnedEntry</code>). 배포에서는 서버가 심어준{' '}
+        <code>/v&lt;version&gt;/</code> 경로가 나오고, dev 에서는 버전 공표가
+        없어 폴백 엔트리가 나온다.
         <br />
-        fail 이면 (1) 해당 remote 미기동, (2) CORS 차단, (3) 포트 충돌 순으로 확인.
-        배포에서 <strong>버전 핀 없음</strong> 인데 404 라면 remote 가{' '}
-        <code>mf-version.json</code> 을 공표하지 못한 것이다 — 루트에는 그 파일뿐이고
-        매니페스트는 버전 경로 아래에만 있다.
+        fail 이면 (1) 해당 remote 미기동, (2) CORS 차단, (3) 포트 충돌 순으로
+        확인. 배포에서 <strong>버전 핀 없음</strong> 인데 404 라면 remote 가{' '}
+        <code>mf-version.json</code> 을 공표하지 못한 것이다 — 루트에는 그
+        파일뿐이고 매니페스트는 버전 경로 아래에만 있다.
         <br />
         브라우저 콘솔에서 <code>__FEDERATION__</code> 전역으로 shared scope 실제
         상태를 볼 수 있다.
