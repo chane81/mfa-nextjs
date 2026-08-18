@@ -2,9 +2,34 @@
 
 ## 요구사항
 
-- Node.js **>= 24.19.0** (검증: v24.3.0) — `packages/remote-config` 가 타입 스트리핑으로
-  `.ts` 를 직접 실행하므로 이 아래 버전에서는 로드되지 않는다
+- Node.js **>=24.19.0 <25** (검증: v24.19.0) — `packages/remote-config` 가 타입 스트리핑으로
+  `.ts` 를 직접 실행하므로 이 아래 버전에서는 로드되지 않는다. 상한을 둔 이유는 25 이상을
+  **한 번도 검증하지 않았기** 때문이다 — 상한이 없으면 Node 26 이 그대로 통과해서
+  실패가 설치 시점이 아니라 런타임 한복판으로 밀린다
 - pnpm **11.x** (검증: 11.22.0)
+
+저장소 루트에 `.nvmrc` 가 있다.
+
+```bash
+nvm use     # 또는  fnm use
+```
+
+`.node-version` 은 두지 않았다. nvm 은 그 파일을 읽지 않고(`nvm.sh` 에 처리 자체가 없다),
+fnm 은 `.nvmrc` 도 읽는다 — 즉 `.nvmrc` 하나가 nvm 과 fnm 을 모두 덮는다.
+두 파일을 같이 두면 값이 어긋날 자리만 하나 더 생긴다.
+
+버전이 안 맞으면 `pnpm install` 이 **먼저** 막는다.
+
+```
+[ERR_PNPM_UNSUPPORTED_ENGINE] Unsupported environment
+Expected version: >=24.19.0 <25
+Got: v26.5.0
+```
+
+이게 에러인 건 `pnpm-workspace.yaml` 의 `engineStrict: true` 덕분이다. **그게 없으면
+pnpm 11.22.0 은 경고만 찍고 설치를 끝낸다**(실측 — pnpm.io 문서 설명과 다르다).
+그러면 실패가 설치가 아니라 dev 한복판으로 밀리고, 거기서 나오는 메시지엔
+Node 라는 단어가 없다.
 
 ## 설치
 

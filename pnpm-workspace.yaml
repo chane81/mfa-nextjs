@@ -2,6 +2,15 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+# package.json 의 engines.node 범위를 **실패**로 만든다.
+#
+# pnpm 11.22.0 은 이게 없으면 범위를 벗어난 Node 에서도 경고만 찍고 설치를 끝낸다(실측).
+#   [WARN] Unsupported engine: wanted: {"node":">=24.19.0 <25"} (current: {"node":"v26.5.0"})
+# 그러면 실패가 설치 시점이 아니라 dev 서버나 프리렌더 한복판으로 밀린다. 거기서 나오는
+# 에러는 Node 버전을 한 글자도 언급하지 않는다 — 타입 스트리핑이 안 되면
+# `SyntaxError: Missing initializer in const declaration` 이 전부다.
+engineStrict: true
+
 minimumReleaseAgeExclude:
   - '@module-federation/vite@1.20.7'
   - '@next/env@16.3.1'
