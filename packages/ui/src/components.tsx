@@ -43,6 +43,7 @@ export function Panel({
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: tokens.space(3),
+          height: 36,
         }}
       >
         <div
