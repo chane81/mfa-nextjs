@@ -127,3 +127,7 @@ pnpm build       # 전체 빌드 (remote 는 웹/노드 두 타깃)
 pnpm lint
 pnpm typecheck
 ```
+
+## 라이선스
+
+[MIT](./LICENSE) — 가져다 쓰고, 고치고, 사내 코드에 넣어도 된다.
