@@ -3,16 +3,21 @@
  * host dev 를 remote 준비 이후로 미룬다. **dev 전용**이다.
  *
  * ## 왜 필요한가
- * Vite dev 는 기동 직후 의존성 프리번들을 돌린다. 그게 끝나기 전에 host 페이지가
- * remote 모듈을 당기면, 페이지는 최적화 이전 모듈을 잡은 채로 남는다.
+ * remote 가 아직 아무것도 못 주는 상태에서 host 페이지가 remote 를 당기면, 브라우저는
+ * 연결 거부를, host 서버 로더는 404 를 만난다. 그 창을 없앤다.
+ *
+ * ## 이 스크립트가 막지 **못하는** 것
+ * 한때 여기 아래 에러를 이 게이트의 존재 이유로 적어 두었다. 그건 오진이었다.
  *
  *   TypeError: _jsxDEV is not a function
  *     at ProductGrid (http://localhost:3001/src/exposes/ProductGrid.tsx)
  *
- * 보통의 Vite 앱이라면 최적화가 끝날 때 HMR 클라이언트가 페이지를 새로고침해 스스로
- * 낫는다. 그런데 이 모듈 그래프는 **host(3000) 페이지 안에** 있고, 새로고침 신호를 보내는
- * 쪽은 remote(3001) 의 HMR 클라이언트라 신호가 닿지 않는다. 그래서 첫 로드만 깨지고
- * 수동 새로고침 뒤에는 멀쩡한, 헷갈리는 증상이 된다.
+ * 이 게이트는 **HTTP 200 여부**만 본다. 저 에러는 HTTP 가 아니라 **브라우저 안의 모듈 평가
+ * 순서**에서 나므로 게이트를 통과한 뒤에 터진다. 게다가 catalog 의 매니페스트는 dev 모듈
+ * URL 을 싣지 않아서(`assets.js.sync` 가 `remoteEntry.js` 뿐) 이 스크립트가 그 파일들을 알
+ * 방법도 없다. 그래서 그쪽은 remote 자기 설정으로 푼다 —
+ * `apps/remote-catalog/vite.config.ts` 의 `server.warmup`,
+ * 근거는 docs/05-troubleshooting/01-known-issues.md 의 0-4c.
  *
  * ## 무엇을 기다리나
  * 포트가 열렸는지가 아니라 **host 가 실제로 가져갈 것**이 200 을 주는지를 본다.
@@ -124,6 +129,12 @@ function remoteEntryUrl(
  * (`node_modules/.vite/deps/_metadata.json`) 301ms 로 사실상 동시였다.
  * `vite.config.ts` 의 `optimizeDeps.entries` + `include` 가 기동 시점에 프리번들을
  * 끝내주기 때문이다. ②는 그 설정이 사라지거나 remote 가 늘었을 때를 위한 보험이다.
+ *
+ * ⚠️ **여기에 exposes 를 추가하지 않는다.** remoteEntry 가 200 이어도 exposes 소스의
+ * transform 은 아직 안 끝나 있고, 그 창에서 `_jsxDEV is not a function` 이 난다.
+ * 하지만 그 대기를 여기서 하려면 이 파일이 expose 목록을 알아야 하는데(매니페스트는
+ * dev 모듈 URL 을 안 싣는다) 그건 위 `REMOTES` 주석이 피하려는 결합 그 자체다.
+ * remote 자기 설정(`server.warmup`)이 맡는다. 0-4c 참고.
  */
 async function webReady(manifestUrl: string): Promise<boolean> {
   const res = await fetchOk(manifestUrl);

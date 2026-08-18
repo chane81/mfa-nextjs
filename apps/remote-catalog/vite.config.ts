@@ -191,6 +191,58 @@ export default defineConfig(({ command }) => {
       // host(3000) 에서 교차 출처로 remoteEntry 를 받아야 하므로 CORS 허용
       cors: true,
       origin: PUBLIC_URL,
+      /**
+       * exposes 를 **기동 시점에 미리 transform 해 둔다.** dev 전용이다.
+       *
+       * ## 왜 필요한가 — `_jsxDEV is not a function`
+       *
+       * `@module-federation/vite` 가 만드는 expose 로더는 shared 대기를
+       * `import()` **뒤에** 둔다(1.20.7 실측).
+       *
+       * ```js
+       * // virtual:mf-exposes:…
+       * "./ProductGrid": async () => {
+       *   await Promise.all([])                                  // ← 비어 있다
+       *   const importModule = await loadExposedModule(
+       *     "./ProductGrid",
+       *     () => import("/src/exposes/ProductGrid.tsx")          // ← 여기서 loadShare 가 평가된다
+       *   )
+       *   if (dependencyPending?.then) await dependencyPending;   // ← 배리어가 import 뒤
+       * }
+       * ```
+       *
+       * `ProductGrid.tsx` 는 `jsxDEV` 를 **정적 import** 한다(automatic JSX runtime).
+       * 그래서 `import()` 되는 순간 loadShare 모듈이 평가되고, 그 시점에 공유 스코프가
+       * 아직 비어 있으면 `jsxDEV` 를 `undefined` 인 채로 export 한다. 뒤늦게 배리어를
+       * await 해도 그 전에 React 가 렌더하면 터진다.
+       *
+       * 콜드 로드 실측(ms):
+       *
+       *   280→285  /src/exposes/ProductGrid.tsx
+       *   286→293  loadShare(react/jsx-dev-runtime)     ← 캐시 miss, undefined 로 굳는다
+       *   311→313  .vite/deps/react_jsx-dev-runtime.js  ← 실제 모듈은 20ms 뒤
+       *
+       * 미리 transform 해 두면 이 구간이 사라진다. 실측: 워밍 없이 2/2 실패,
+       * 워밍 후 4/4 성공(dev 재시작 + 새 브라우저 세션 기준).
+       *
+       * ## `optimizeDeps` 와 겹치지 않는다
+       *
+       * 아래 `optimizeDeps` 는 **의존성**(react 등)의 사전 번들링이고, 이건 **소스 파일**의
+       * 사전 transform 이다. 서로 다른 단계라 둘 다 필요하다.
+       *
+       * ## 왜 host 쪽 게이트로는 못 막나
+       *
+       * `scripts/wait-for-remotes.ts` 는 매니페스트와 remoteEntry 가 200 을 주는지까지만
+       * 본다. 이 레이스는 HTTP 가 아니라 **브라우저 안 모듈 평가 순서**에서 나므로 그 게이트를
+       * 통과한 뒤에 터진다. 게다가 catalog 의 매니페스트는 dev 모듈 URL 을 싣지 않아
+       * (`assets.js.sync` 가 `remoteEntry.js` 뿐) 게이트가 이 파일들을 알 방법도 없다.
+       * 그래서 remote 자기 설정으로 푼다 — host 와 결합이 생기지 않는다.
+       *
+       * https://vite.dev/config/server-options#server-warmup
+       */
+      warmup: {
+        clientFiles: ['./src/exposes/*.tsx'],
+      },
     },
     preview: {
       port: PORT,
@@ -203,11 +255,14 @@ export default defineConfig(({ command }) => {
      * Vite 는 기본적으로 **요청이 들어온 뒤에** 의존성을 발견해 사전 번들링한다.
      * 일반 앱이라면 최적화가 끝난 뒤 Vite HMR 클라이언트가 페이지를 새로고침해 정상화된다.
      * 그런데 remote 는 **host(3000) 페이지 안에서** 로드되므로 그 새로고침이 오지 않는다.
-     * 결과: catalog 를 처음 로드한 페이지에서만 interop 이 깨진 모듈이 남아
-     * `_jsxDEV is not a function` 이 터지고, 다음 내비게이션부터는 멀쩡해진다.
+     * 그래서 exposes 를 스캔 진입점으로 지정하고 react 계열을 미리 포함시켜
+     * 기동 시점에 사전 번들링을 끝낸다.
      *
-     * exposes 를 스캔 진입점으로 지정하고 react 계열을 미리 포함시켜
-     * dev 서버 기동 시점에 사전 번들링을 끝내면 이 창이 사라진다.
+     * ⚠️ **이것만으로는 `_jsxDEV is not a function` 이 안 막힌다.** 한때 그렇게 적혀 있었고,
+     * 그 상태로 재발했다. 이건 **의존성**의 사전 번들링이고, 그 에러는 **소스 파일**의
+     * transform 이 늦어서 나므로 단계가 다르다. 그쪽은 위 `server.warmup` 이 맡는다.
+     * 둘 다 필요하다 — 자세한 내용은 `server.warmup` 주석과
+     * docs/05-troubleshooting/01-known-issues.md 의 0-4c.
      */
     optimizeDeps: {
       entries: ['src/exposes/*.tsx', 'src/main.tsx'],
