@@ -58,6 +58,32 @@ export function assertAllowedOrigin(
 }
 
 /**
+ * 매니페스트가 준 **버전 문자열**이 안전한지.
+ *
+ * 이 값은 remote 가 주는 것이고, 검증 없이 세 군데로 흘러간다 —
+ * 자산 경로(`/v<version>/`), 캐시 키, 그리고 브라우저로 심는 인라인 스크립트
+ * (`RemoteVersionSync`). 마지막이 문제다: 거기서 쓰는 `JSON.stringify` 는
+ * `<` 와 `/` 를 이스케이프하지 않으므로, `version` 에 `</script>` 가 들어오면
+ * 스크립트 태그를 빠져나온다.
+ *
+ * `assertSafeEntryPath` 는 이걸 못 막는다. 그건 경로가 `/v<version>/` 로 시작하는지만
+ * 보는데, 매니페스트를 쓰는 쪽이 버전과 경로를 **같이** 정하므로 항상 통과한다.
+ *
+ * 그래서 형식을 여기서 좁힌다. `mf-build-version.ts` 가 만드는 값은
+ * `t<base36>`(예: `tmsy012z5`)이고, 아래 범위는 그보다 넉넉하다 — 나중에 버전 체계를
+ * 바꿔도 하이픈·점 정도는 통과한다. 대신 `< > / " '` 와 공백은 절대 안 들어온다.
+ */
+const SAFE_VERSION = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+export function assertSafeVersion(remote: RemoteName, version: string): void {
+  if (!SAFE_VERSION.test(version)) {
+    throw new Error(
+      `remote '${remote}' 의 버전 문자열이 허용되지 않습니다: ${JSON.stringify(version).slice(0, 80)}`,
+    );
+  }
+}
+
+/**
  * 매니페스트가 준 엔트리 경로가 안전한지.
  *
  * 허용: `/v<version>/<파일명>` — 버전 디렉터리 안의 단일 파일.

@@ -6,6 +6,7 @@ import {
   assertAllowedOrigin,
   assertManifestSignature,
   assertSafeEntryPath,
+  assertSafeVersion,
   allowedOrigins,
   signedPayload,
 } from './remote-trust';
@@ -224,6 +225,8 @@ export async function fetchRemoteVersion(
    * 검증 실패는 조용히 넘기지 않는다. 폴백으로 흘러가면 막은 의미가 없다.
    */
   try {
+    // 경로보다 먼저 버전을 좁힌다 — 경로 검사는 버전을 신뢰한 채로 도는 검사다
+    assertSafeVersion(remote, version);
     assertSafeEntryPath(remote, ssrEntry, version);
     assertSafeEntryPath(remote, webEntry, version);
     await assertManifestSignature(
