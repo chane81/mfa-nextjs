@@ -297,12 +297,47 @@ pnpm --filter @mfa/remote-catalog dev   # remote 만 단독 개발
 pnpm --filter @mfa/host dev             # host 만
 ```
 
-remote 가 안 떠 있으면 host 는 죽지 않는다.
+remote 가 안 떠 있어도 host 는 죽지 않는다. **단독 기동일 때** 그렇다(실측).
 
-- 서버 렌더 단계에서 SSR 번들 fetch 가 실패하면 `RemoteBoundary` 가 에러 박스를 그린다
-- 다른 remote 와 host 셸은 정상 동작한다
+- host 셸 · 헤더 · 라우팅은 그대로 SSR 된다. `/`, `/checkout`, `/debug` 전부 200
+- remote 자리에는 스켈레톤이 나간다. `RemoteBoundary` 의 에러 박스는 **서버 응답이 아니라
+  브라우저에서** 그려진다 — `'use client'` 경계라 hydrate 이후에 잡힌다.
+  서버 쪽 원인은 터미널 로그에 남는다
 
-독립 장애 격리를 확인하려면 remote 하나만 꺼보면 된다.
+```
+⨯ Error: remote 'cart' SSR 번들을 가져오지 못했습니다: http://localhost:3002/mf-server.cjs.
+  그 오리진에 remote 가 떠 있는지 확인하세요 — ...
+```
+
+### `pnpm dev` 로는 격리를 확인할 수 없다
+
+**remote 하나만 꺼보는 실험을 `pnpm dev` 상태에서 하면 안 된다.** 전부 죽는다(실측).
+
+```
+[web] vite exited with code SIGKILL
+--> Sending SIGTERM to other processes..            ← 그 remote 의 concurrently
+@mfa/remote-catalog:dev: [ELIFECYCLE] Command failed with exit code 1.
+@mfa/remote-cart:dev: [web] rsbuild dev exited with code SIGINT   ← 멀쩡한 remote 도
+@mfa/host:dev: [?25h                                              ← host 도
+ ERROR  run failed: command exited (1)
+```
+
+연쇄는 세 단계다. remote 의 `dev` 는 web·ssr 두 프로세스를 `concurrently
+--kill-others-on-fail` 로 묶으므로 하나가 죽으면 짝도 죽는다 → 그 패키지의 `dev` 가
+`exit 1` 로 끝난다 → `turbo run dev` 가 나머지 태스크를 전원 내린다.
+
+이건 **dev 오케스트레이션의 성질이지 런타임 격리의 실패가 아니다.** 배포에서는 각 remote
+가 별도 컨테이너라 이 연쇄 자체가 없다.
+
+격리를 직접 보려면 이렇게 한다 — remote 를 아예 띄우지 않고 host 만 기동한다.
+
+```bash
+pnpm --filter @mfa/host dev     # remote 0개인 상태
+curl -s -o /dev/null -w '%{http_code}\n' localhost:3000/checkout   # 200
+```
+
+`pnpm --filter` 는 turbo 를 우회해 패키지 스크립트를 직접 부르므로
+`dev:wait-remotes` 게이트도 타지 않는다. 그래서 remote 없이 바로 뜬다.
 
 ## 포트가 물려 있을 때
 
