@@ -1,6 +1,7 @@
 import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
 import { MF_FILES } from '@mfa/remote-config';
 
+import { REMOTE_FETCH_TIMEOUT_MS } from './constants';
 import { SSR_ENTRIES } from './remote-endpoints';
 import {
   assertAllowedOrigin,
@@ -189,12 +190,15 @@ export async function fetchRemoteVersion(
   remote: RemoteName,
 ): Promise<RemoteVersion | null> {
   const url = `${remoteOrigin(remote)}/${MF_FILES.versionManifest}`;
+  // 번들과 같은 제한을 건다 — 매니페스트가 매달리면 그 뒤 전부가 매달린다
+  const signal = AbortSignal.timeout(REMOTE_FETCH_TIMEOUT_MS);
   const init: RequestInit =
     process.env.NODE_ENV === 'production'
       ? ({
           next: { revalidate: 30, tags: [remoteVersionTag(remote)] },
+          signal,
         } as RequestInit)
-      : { cache: 'no-store' };
+      : { cache: 'no-store', signal };
 
   type Manifest = Partial<RemoteVersion> & {
     signature?: string;

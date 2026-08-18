@@ -10,6 +10,7 @@ import {
   type RemoteName,
 } from '@mfa/contracts';
 
+import { REMOTE_FETCH_TIMEOUT_MS } from './constants';
 import { normalizeModule } from './interop';
 import { recordEval, recordFetch, recordLoad } from './loader-stats';
 import {
@@ -124,11 +125,21 @@ export function remoteCacheTag(remote: RemoteName): string {
  *   4. 페이지 캐시        → revalidateTag(remoteCacheTag)
  * 실측: docs/04-experiments/03-cache-modes.md
  */
+/**
+ * `signal` 은 Next 의 **요청 메모이제이션**만 끈다. Data Cache 판단은
+ * `cache` / `revalidate` / `fetchCache` 만 보고 `signal` 은 보지 않는다
+ * (Next 16 `patch-fetch.ts`). 여기서는 `bundleCache` 가 Promise 자체를 들고 있어
+ * 같은 요청 안의 중복 호출이 이미 하나로 합쳐지므로, 메모이제이션 손실은 비용이 아니다.
+ */
 function bundleFetchInit(remote: RemoteName): RequestInit {
-  if (process.env.NODE_ENV !== 'production') return { cache: 'no-store' };
+  const signal = AbortSignal.timeout(REMOTE_FETCH_TIMEOUT_MS);
+  if (process.env.NODE_ENV !== 'production') {
+    return { cache: 'no-store', signal };
+  }
   return {
     cache: 'force-cache',
     next: { tags: [remoteBundleTag(remote)] },
+    signal,
   } as RequestInit;
 }
 
@@ -160,6 +171,9 @@ async function resolveEntry(
   };
 }
 
+/** 상태 코드 실패는 네트워크 실패와 섞이면 안 된다 — 위 catch 가 이걸로 구분한다. */
+class HttpStatusError extends Error {}
+
 async function loadServerBundle(
   remote: RemoteName,
   url: string,
@@ -169,16 +183,59 @@ async function loadServerBundle(
   assertAllowedOrigin(remote, url, trustedOrigins());
 
   recordFetch(remote);
-  const res = await fetch(url, bundleFetchInit(remote));
-  if (!res.ok) {
-    throw new Error(`remote '${remote}' SSR 번들 응답 ${res.status} (${url})`);
+
+  /**
+   * `fetch` 자체가 던지는 경우를 여기서 잡는다.
+   *
+   * 아래 `throw` 들은 전부 **응답이 돌아온 뒤**의 이야기다. 그런데 로컬에서 가장 흔한
+   * 실패는 응답이 아예 없는 쪽이다 — remote 를 안 띄웠거나 포트가 다르거나. 그때 Node 가
+   * 주는 건 `TypeError: fetch failed` 와 `code: 'ECONNREFUSED'` 뿐이라 어느 remote 인지,
+   * 어느 URL 인지가 로그에 남지 않는다. 그 두 가지를 붙여서 다시 던진다.
+   */
+  /**
+   * fetch **와 본문 읽기**를 같이 감싼다.
+   *
+   * 아래 `throw` 들은 전부 바이트를 다 받은 뒤의 이야기다. 정작 흔한 실패 둘은 그 앞에 있다.
+   *
+   *   연결 거부   remote 를 안 띄웠거나 포트가 다르다. Node 는 `TypeError: fetch failed` 와
+   *               `ECONNREFUSED` 만 준다 — 어느 remote 인지 URL 이 뭔지가 안 남는다.
+   *   응답 미완   연결은 됐는데 끝내지 않는다(배포 중·디스크 참·프록시). **헤더는 오므로
+   *               `await fetch` 도 `res.ok` 도 통과하고**, 실제로 매달리는 자리는
+   *               `res.arrayBuffer()` 다. 그래서 본문 읽기가 이 try 안에 있어야 한다.
+   *
+   * 후자를 안 감싸면 `AbortSignal.timeout` 의 `DOMException` 이 그대로 올라가는데,
+   * 그건 `message` 가 getter 전용이라 Next 의 에러 처리가
+   * `Cannot set property message of ... which has only a getter` 로 깨진다(실측).
+   */
+  let bytes: ArrayBuffer;
+  try {
+    const res = await fetch(url, bundleFetchInit(remote));
+    if (!res.ok) {
+      throw new HttpStatusError(
+        `remote '${remote}' SSR 번들 응답 ${res.status} (${url})`,
+      );
+    }
+    bytes = await res.arrayBuffer();
+  } catch (cause) {
+    if (cause instanceof HttpStatusError) throw cause;
+
+    const timedOut =
+      (cause as { name?: string } | null)?.name === 'TimeoutError';
+    throw new Error(
+      timedOut
+        ? `remote '${remote}' 가 ${REMOTE_FETCH_TIMEOUT_MS}ms 안에 SSR 번들을 다 주지 못했습니다: ${url}. ` +
+          `연결은 됐으나 응답이 끝나지 않았습니다 — 배포 중이거나 프록시에 막힌 상태일 수 있습니다.`
+        : `remote '${remote}' SSR 번들을 가져오지 못했습니다: ${url}. ` +
+          `그 오리진에 remote 가 떠 있는지 확인하세요 — dev 는 \`pnpm dev\`, ` +
+          `빌드 산출물은 \`pnpm --filter @mfa/remote-${remote} start\` 로 뜹니다.`,
+      { cause },
+    );
   }
 
   /**
    * 텍스트로 바꾸기 전에 **바이트 그대로** 대조한다.
    * 이 아래 줄부터는 남의 코드를 이 프로세스에서 실행하는 구간이다.
    */
-  const bytes = await res.arrayBuffer();
   await assertIntegrity(remote, bytes, integrity);
   const code = new TextDecoder().decode(bytes);
 
