@@ -441,38 +441,117 @@ dts: false,
 > 애초에 프로덕션 번들에 들어가지 않는다. `dts` 설정과 무관하게 항상 0 이 나온다.
 > dev 서버가 서빙하는 모듈을 봐야 한다.
 
-### 0-4c. remote 를 **처음** 로드한 페이지에서만 `_jsxDEV is not a function`
+### 0-4c. 콜드 dev 첫 로드에서 `_jsxDEV is not a function`
 
-증상이 0-5 와 같지만 원인이 다르다. 이쪽이 진짜 원인이었다.
+증상이 0-5 와 같지만 원인이 다르다.
 
-**재현 조건**: catalog(Vite) remote 를 아직 한 번도 안 부른 상태에서
-`/debug`(cart remote 만 사용) → `/`(catalog 사용) 순서로 이동.
-`/` 를 **첫 페이지로** 열면 재현되지 않는다. 다음 내비게이션부터는 정상.
+> **아래는 개정된 내용이다.** 처음에는 원인을 "Vite 가 요청 뒤에 의존성을 발견해
+> 사전 번들링(optimizeDeps)한다"로 적고 `optimizeDeps.entries` + `include` 를 해결책으로
+> 기록했다. 그 설정은 재현 창을 좁혔을 뿐 닫지 못했고, 같은 에러가 재발했다.
+> 진짜 원인은 아래 "원인" 절이다. `optimizeDeps` 설정은 그대로 두되(여전히 필요하다),
+> 그것만으로 해결됐다고 보면 안 된다.
 
-**원인**: Vite dev 서버는 요청이 들어온 **뒤에** 의존성을 발견해 사전 번들링(optimizeDeps)한다.
-일반 Vite 앱이라면 최적화 후 HMR 클라이언트가 페이지를 새로고침해 정상화된다.
-그런데 remote 는 **host 페이지 안에서** 로드되므로 그 새로고침이 오지 않는다.
-그 페이지에는 interop 이 깨진 모듈이 그대로 남는다.
+**재현 조건**: dev 서버 재시작 + **새 브라우저 세션**의 첫 로드. 관측 3/3 실패.
+같은 세션에서 새로고침하면 5/5 정상이라 "첫 로드만 깨지고 새로고침하면 낫는" 모양이 된다.
+(`/debug` → `/` 순서는 이번 조사에서 재현되지 않았다 — `optimizeDeps` 설정이 그 창은 막고 있다.)
 
-host 가 넘기는 모듈 자체는 멀쩡했다(브라우저에서 직접 확인).
+**원인**: `@module-federation/vite` 가 만드는 expose 로더가 **shared 대기를 `import()` 뒤에 둔다**
+(1.20.7 실측). `virtual:mf-exposes:…` 를 받아보면:
+
+```js
+"./ProductGrid": async () => {
+  await injectCssAssets("./ProductGrid")
+  await Promise.all([])                                  // ← 비어 있다
+  const importModule = await loadExposedModule(
+    "./ProductGrid",
+    () => import("/src/exposes/ProductGrid.tsx")          // ← 여기서 loadShare 가 평가된다
+  )
+  const dependencyPending = importModule && importModule.__mf_remote_dependency_pending;
+  if (dependencyPending?.then) await dependencyPending;   // ← 배리어가 import 뒤
+  ...
+}
+```
+
+`ProductGrid.tsx` 는 automatic JSX runtime 이라 `jsxDEV` 를 **정적 import** 한다. 게다가 그 import 는
+로컬 사본이 아니라 shared 를 가리킨다(0-4d — 플러그인이 서브엔트리를 자동으로 올린다).
+
+```js
+// /src/exposes/ProductGrid.tsx 의 transform 결과
+import { jsxDEV as _jsxDEV } from '/@id/__x00__virtual:mf:…loadShare__react/jsx-dev-runtime__loadShare__.js';
+```
+
+그 loadShare 모듈의 브라우저 분기는 공유 스코프가 비어 있으면 **`jsxDEV` 를 `undefined` 인 채로
+export 하고** 채우기를 뒤로 미룬다. top-level await 이 없다.
+
+```js
+let exportModule = __mfReadSharedCache(cache, {canonical:"default:react/jsx-dev-runtime", …});
+if (exportModule === undefined) {
+  if (import.meta.env.SSR) { /* 즉시 채운다 */ }
+  else {
+    (__mfModuleCache.pendingShareLoads ||= []).push(initPromise.then(…));  // ← 미루기만 한다
+  }
+}
+export { __mf_1 as jsxDEV };   // __mf_1 === undefined
+```
+
+즉 `import()` 되는 순간 값이 `undefined` 로 굳고, 배리어를 나중에 await 해도 그 전에 React 가
+렌더하면 터진다. live binding 이라 **나중에는 실제로 채워진다** — 그래서 사후에 확인하면
+멀쩡해 보이고, 새로고침하면 낫는다.
+
+콜드 로드 리소스 타임라인(ms):
 
 ```
-jsxDev: ["Fragment", "jsxDEV", "default"]      ← host 쪽은 정상
+219→220  /mf-manifest.json
+225→227  /remoteEntry.js
+280→285  /src/exposes/ProductGrid.tsx
+286→293  loadShare(react/jsx-dev-runtime)      ← 캐시 miss, undefined 로 굳는다
+311→313  .vite/deps/react_jsx-dev-runtime.js   ← 실제 모듈은 20ms 뒤에야 도착
 ```
 
-**해결**: dev 서버 기동 시점에 사전 번들링을 끝내도록 진입점과 대상을 명시한다.
+host 가 넘기는 모듈 자체는 멀쩡했다(실패한 페이지의 공유 캐시를 직접 확인).
+
+```
+default:react/jsx-dev-runtime → ["Fragment", "jsxDEV", "default"]      ← host 쪽은 정상
+```
+
+**아닌 것으로 확인된 것**: `.vite/deps` 의 `?v=<browserHash>` 가 스테일이라 504 가 난다는 가설.
+그 해시는 dev 재시작마다 바뀌지만(`fdd741cb` → `b9eb7437` 실측) 브라우저는 항상 새 transform 을
+받으므로 옛 해시를 참조하지 않는다. 실패한 페이지에서 `.vite/deps` 요청은 **전부 200** 이었다.
+
+**해결**: exposes 를 dev 서버 기동 시점에 미리 transform 해 둔다. 그러면 `import()` 가 즉시
+완료되어 위 구간이 사라진다.
 
 ```ts
 // apps/remote-catalog/vite.config.ts
-optimizeDeps: {
-  entries: ["src/exposes/*.tsx", "src/main.tsx"],
-  include: ["react", "react-dom", "react-dom/client",
-            "react/jsx-runtime", "react/jsx-dev-runtime"],
+server: {
+  warmup: {
+    clientFiles: ["./src/exposes/*.tsx"],
+  },
 },
 ```
 
+`optimizeDeps` 는 **의존성**의 사전 번들링이고 `server.warmup` 은 **소스 파일**의 사전 transform 이다.
+서로 다른 단계라 둘 다 필요하다. (Vite 8 `server.warmup` — `clientFiles` / `ssrFiles`, root 기준
+tinyglobby 패턴. https://vite.dev/config/server-options#server-warmup)
+
+검증(dev 재시작 + 새 브라우저 세션 기준):
+
+| 조건                           | 결과     |
+| ------------------------------ | -------- |
+| warmup 없음                    | 3/3 실패 |
+| exposes 를 `curl` 로 수동 워밍 | 4/4 성공 |
+| `server.warmup` 설정           | 5/5 성공 |
+
+**왜 `wait-for-remotes` 가 못 막나**: 그 게이트는 매니페스트와 remoteEntry 가 200 을 주는지까지만
+본다. 이 레이스는 HTTP 가 아니라 **브라우저 안 모듈 평가 순서**에서 나므로 게이트를 통과한 뒤에
+터진다. 게다가 catalog 의 매니페스트는 dev 모듈 URL 을 싣지 않아(`assets.js.sync` 가
+`remoteEntry.js` 뿐 — cart(Rsbuild) 는 실제 청크 경로를 다 싣는다) 게이트가 이 파일들을 알 방법도
+없다. 그래서 remote 자기 설정으로 푼다 — host 와 결합이 생기지 않는다.
+
 **교훈**: remote 는 "남의 페이지 안에서 실행되는 앱"이다.
 dev 서버가 자기 페이지를 새로고침해 해결하는 종류의 문제는 **remote 에서는 자동 복구되지 않는다.**
+그리고 "새로고침하면 낫는다"는 증상은 사후 관측으로 원인을 못 잡는다 —
+깨진 시점의 값이 나중에는 정상으로 채워져 있기 때문이다. 리소스 타임라인을 봐야 한다.
 
 ### 0-4d. host 가 서브엔트리 공유를 빼면 Vite remote 가 깨진다
 
@@ -725,3 +804,7 @@ TimeoutError: The operation was aborted due to timeout
    `react` / `react-dom` / `react/jsx-runtime` 이 다 들어있는지 확인
 5. 모듈 이름 불일치 → `/debug` 의 `exposes` 목록과
    `packages/contracts/src/remote-contract.ts` 의 `RemoteModuleMap` 키 대조
+6. `_jsxDEV is not a function` (dev, catalog) → **콘솔로 사후 확인하지 말 것.** 그때는 이미
+   정상으로 채워져 있다. DevTools Network 를 시각순으로 보고
+   `/src/exposes/*.tsx` 와 `.vite/deps/react_jsx-dev-runtime.js` 의 순서를 확인한다.
+   후자가 뒤면 그 창이다 → `vite.config.ts` 의 `server.warmup` 이 살아있는지 확인 (0-4c)

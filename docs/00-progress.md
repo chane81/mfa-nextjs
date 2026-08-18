@@ -1,5 +1,69 @@
 # 진행 상황
 
+## 2026-08-18 (8차) — `_jsxDEV is not a function` 재발, 3차 오진 정정
+
+`pnpm dev` 후 첫 로드에서 catalog 가 또 죽었다. 3차에서 "해결"로 적어둔 항목이라,
+**그 원인 진단 자체가 틀렸다**는 뜻이었다.
+
+### 오진 정정
+
+3차는 원인을 "Vite 의 지연 optimizeDeps"로 보고 `optimizeDeps.entries` + `include` 를 넣었다.
+그 설정은 재현 창을 좁혔을 뿐 닫지 못했다. 실제 원인은 **`@module-federation/vite` 의 expose
+로더가 shared 대기를 `import()` 뒤에 두는 것**이다(1.20.7 실측).
+
+```js
+// virtual:mf-exposes:…
+"./ProductGrid": async () => {
+  await Promise.all([])                                  // ← 비어 있다
+  const importModule = await loadExposedModule(
+    "./ProductGrid",
+    () => import("/src/exposes/ProductGrid.tsx")          // ← 여기서 loadShare 가 평가된다
+  )
+  if (dependencyPending?.then) await dependencyPending;   // ← 배리어가 import 뒤
+}
+```
+
+exposes 는 automatic JSX runtime 이라 `jsxDEV` 를 **정적 import** 하고, 그 import 는 shared 를
+가리킨다. 그래서 `import()` 되는 순간 공유 스코프가 비어 있으면 `jsxDEV` 가 `undefined` 로
+굳는다. live binding 이라 나중에는 채워지므로 **사후 관측으로는 원인을 못 잡는다** — 리소스
+타임라인을 봐야 보인다.
+
+```
+280→285  /src/exposes/ProductGrid.tsx
+286→293  loadShare(react/jsx-dev-runtime)      ← 캐시 miss, undefined 로 굳는다
+311→313  .vite/deps/react_jsx-dev-runtime.js   ← 실제 모듈은 20ms 뒤
+```
+
+기각된 가설: `.vite/deps` 의 `?v=<browserHash>` 스테일. 해시는 dev 재시작마다 바뀌지만
+(`fdd741cb` → `b9eb7437` 실측) 브라우저는 항상 새 transform 을 받는다. 실패한 페이지에서
+`.vite/deps` 요청은 전부 200 이었다.
+
+### 한 일
+
+- [x] `apps/remote-catalog/vite.config.ts` 에 `server.warmup.clientFiles: ["./src/exposes/*.tsx"]`
+- [x] 같은 파일 `optimizeDeps` 주석 정정 — 이건 **의존성** 사전 번들링, warmup 은 **소스 파일**
+      사전 transform. 단계가 달라 둘 다 필요하다
+- [x] `scripts/wait-for-remotes.ts` 주석 정정 — 이 게이트는 HTTP 200 만 보므로 이 에러를 못 막는다.
+      exposes 를 여기 넣지 않는 이유도 같이 적었다(매니페스트가 dev 모듈 URL 을 안 싣는다)
+- [x] `docs/05-troubleshooting/01-known-issues.md` 0-4c 전면 개정
+
+### 검증
+
+| 조건 (dev 재시작 + 새 브라우저 세션) | 결과        |
+| ------------------------------------ | ----------- |
+| warmup 없음                          | ❌ 3/3 실패 |
+| exposes 를 `curl` 로 수동 워밍       | ✅ 4/4 성공 |
+| `server.warmup` 설정                 | ✅ 5/5 성공 |
+| 같은 세션에서 새로고침 (대조)        | ✅ 5/5 성공 |
+| catalog `typecheck` / `lint`         | ✅          |
+
+### 교훈
+
+"새로고침하면 낫는다"는 증상은 **깨진 시점의 값이 나중에 정상으로 채워져 있다**는 뜻일 수 있다.
+그 상태에서 콘솔로 확인하면 전부 멀쩡해 보이고, 그래서 3차의 오진이 5차까지 살아남았다.
+재현 조건을 먼저 고정하고(여기서는 dev 재시작 + 새 브라우저 세션 = 3/3), 대조군을 세운 뒤에
+원인을 말해야 한다.
+
 ## 2026-08-17 (7차) — 환경변수를 remote 당 하나로
 
 질문: **remote 하나에 환경변수가 세 벌씩 필요한가?**
@@ -263,10 +327,10 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 
 ### 원인과 조치
 
-| #   | 증상                                                       | 원인                                                                                                        | 조치                                                                     |
-| --- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| 1   | `[ dynamic-remote-type-hints-plugin ] err: [object Event]` | MF 의 `DevPlugin` 이 dev 빌드에서 주입하는 런타임 플러그인이 `ws://127.0.0.1:<port>` 연결 실패 시 콘솔 에러 | 두 remote 모두 `dts: false` (⚠️ 원인 진단은 4차에서 정정)                |
-| 2   | `_jsxDEV is not a function` (catalog 첫 로드 페이지에서만) | Vite dev 의 지연 optimizeDeps. remote 는 host 페이지 안에서 돌아 Vite 의 자동 새로고침이 오지 않음          | catalog 에 `optimizeDeps.entries` + `include` 지정해 기동 시 사전 번들링 |
+| #   | 증상                                                       | 원인                                                                                                        | 조치                                                                                                              |
+| --- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 1   | `[ dynamic-remote-type-hints-plugin ] err: [object Event]` | MF 의 `DevPlugin` 이 dev 빌드에서 주입하는 런타임 플러그인이 `ws://127.0.0.1:<port>` 연결 실패 시 콘솔 에러 | 두 remote 모두 `dts: false` (⚠️ 원인 진단은 4차에서 정정)                                                         |
+| 2   | `_jsxDEV is not a function` (catalog 첫 로드 페이지에서만) | Vite dev 의 지연 optimizeDeps. remote 는 host 페이지 안에서 돌아 Vite 의 자동 새로고침이 오지 않음          | catalog 에 `optimizeDeps.entries` + `include` 지정해 기동 시 사전 번들링 (⚠️ 원인 진단은 8차에서 정정 — 재발했다) |
 
 과정에서 오진으로 서브엔트리 공유를 제거했다가
 `Failed to bridge external shared module "react-dom/client"` 를 만났다.
