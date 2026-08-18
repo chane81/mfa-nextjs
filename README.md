@@ -3,9 +3,53 @@
 Next.js 16 에서 **remote 가 SSR 되고, 모든 경계 이동이 소프트 내비게이션인**
 마이크로 프론트엔드를 구성하는 실험 저장소.
 
+## 지금 바로 보기
+
+**라이브 데모 — <https://mfa.lakegreen.net>** (clone 불필요)
+
+| 링크                                            | 뭘 보나                                                                |
+| ----------------------------------------------- | ---------------------------------------------------------------------- |
+| [/](https://mfa.lakegreen.net)                  | 보라 점선 = catalog(Vite), 초록 점선 = cart(Rsbuild). 담기 → 헤더 배지 |
+| [/checkout](https://mfa.lakegreen.net/checkout) | 결제까지 remote 다. 헤더에서 눌러 이동하면 document 요청이 안 늘어난다 |
+| [/debug](https://mfa.lakegreen.net/debug)       | MF 진단 — 두 remote 의 실제 entry 와 exposes                           |
+| [/lab](https://mfa.lakegreen.net/lab)           | SSR · ISR 등가 · 태그 무효화 세 모드 비교                              |
+
+**remote 가 정말 SSR 되는지** 는 브라우저 없이 한 줄로 확인된다. 자바스크립트를 실행하지
+않고 초기 HTML 만 받아서 remote 마크업이 이미 들어있는지 보는 것이다.
+
 ```bash
-pnpm install
-pnpm dev        # http://localhost:3000
+curl -s https://mfa.lakegreen.net/checkout | grep -c "주문서"   # 1
+```
+
+remote 는 각자 자기 버전을 공표한다. host 는 이걸 읽고 따라온다.
+
+```bash
+curl -s https://mfa-catalog.lakegreen.net/mf-version.json
+# {"remote":"catalog","version":"tmsy012z5","ssrEntry":"/vtmsy012z5/mf-server.cjs", ...}
+```
+
+## 로컬에서 돌리기
+
+**Node `>=24.19.0 <25`, pnpm 11.x** 가 필요하다. `.nvmrc` 가 있으니 nvm · fnm 을 쓰면
+`nvm use` 한 줄이면 된다. 안 맞으면 `pnpm install` 이 `ERR_PNPM_UNSUPPORTED_ENGINE`
+으로 먼저 막는다.
+
+```bash
+nvm use          # 또는 fnm use
+pnpm install     # rspack 바이너리 받느라 1~2분 멈춘 것처럼 보일 수 있다
+pnpm dev         # http://localhost:3000
+```
+
+`pnpm dev` 는 프로세스를 다섯 개 띄운다(host 1 + remote 2개 × web·ssr).
+host 는 remote 가 200 을 줄 때까지 기다렸다 뜬다 — 단 그 게이트는 60초 뒤엔
+**경고만 찍고 통과한다**(`scripts/wait-for-remotes.ts`). 로그에
+`[wait-remotes] ... 준비됨` 이 네 줄 다 찍혔는지로 확인한다.
+
+**remote 가 정말 SSR 되는지** 는 이 두 줄로 확인한다. 브라우저 없이 초기 HTML 만 본다.
+
+```bash
+curl -s localhost:3000/products/kb-001 | grep -c "Aurora 75"   # 1
+curl -s localhost:3000/checkout        | grep -c "주문서"       # 1
 ```
 
 ## 문제
