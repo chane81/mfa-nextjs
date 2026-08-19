@@ -4,14 +4,14 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 
 ## 문서 지도
 
-| 폴더                                        | 내용                                                                                            |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [00-progress.md](./00-progress.md)          | 작업 진행 기록                                                                                  |
-| [01-research](./01-research/)               | `@module-federation/nextjs-mf` EOL 현황, 대체재 리서치, Vite MF 검토, **DTS 플러그인 검토**     |
+| 폴더                                        | 내용                                                                                                      |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| [00-progress.md](./00-progress.md)          | 작업 진행 기록                                                                                            |
+| [01-research](./01-research/)               | `@module-federation/nextjs-mf` EOL 현황, 대체재 리서치, Vite MF 검토, **DTS 플러그인 검토**               |
 | [02-architecture](./02-architecture/)       | 아키텍처 결정(ADR), 토폴로지, SSR + 소프트 내비게이션 설계, **remote 수명주기(버전·캐시·신뢰)** |
-| [03-setup](./03-setup/)                     | 모노레포 구조, 실행 방법, 버전 고정 근거, **환경변수**, 배포                                    |
-| [04-experiments](./04-experiments/)         | 실험 A(런타임 MF) / B(Multi-Zones·기각) / **C(ISR·Cache Components)** 결과와 비교               |
-| [05-troubleshooting](./05-troubleshooting/) | 구축 중 실제로 터진 문제와 해결책                                                               |
+| [03-setup](./03-setup/)                     | 실행 방법, 버전 고정 근거(Node·pnpm·TS), **환경변수**, Dokploy 컨테이너 배포                              |
+| [04-experiments](./04-experiments/)         | 실험 A(런타임 MF) / B(Multi-Zones·기각) / **C(ISR·Cache Components)** 결과와 비교                         |
+| [05-troubleshooting](./05-troubleshooting/) | 구축 중 실제로 터진 문제와 해결책                                                                         |
 
 ## 6줄 요약
 
@@ -33,6 +33,16 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 - 렌더링 — [02-architecture/03-ssr-and-soft-nav.md](./02-architecture/03-ssr-and-soft-nav.md)
 - 배포·캐시·신뢰 — [02-architecture/04-remote-lifecycle.md](./02-architecture/04-remote-lifecycle.md)
 
+## 지금 상태
+
+- 로컬 · 컨테이너 · Dokploy(<https://mfa.lakegreen.net>) 세 곳에서 돈다.
+- 앱 3개(host / catalog / cart)가 각자 이미지로 배포된다. remote 만 재배포하는 경로가 열려 있다.
+- CI 가 `lint` · `typecheck` · `format:check` 와 **전체 빌드**를 검증한다.
+  host 빌드는 프리렌더가 remote SSR 번들을 실제로 받아 실행하므로, 빌드 통과 자체가
+  "Next 16 에서 런타임 MF + SSR 이 된다"는 이 저장소의 주장에 대한 계약 테스트다.
+- 남은 것은 [00-progress.md](./00-progress.md) 의 "다음에 해볼 것".
+
 ## 검증 기준일
 
-2026-08-14 ~ 15. 모든 버전 정보는 이 기간의 npm registry 조회 결과다.
+- 리서치·버전 조사: 2026-08-14 ~ 15 (npm registry 직접 조회)
+- 구조·실행·배포 기록: 2026-08-19 기준으로 갱신됨

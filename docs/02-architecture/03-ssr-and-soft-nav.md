@@ -129,16 +129,38 @@ $ curl -s localhost:3000/checkout | grep -c "주문서"
 장바구니 상태는 `useSyncExternalStore` 의 서버 스냅샷을 빈 값으로 두어
 SSR/CSR 불일치를 원천 차단했다.
 
-## 3. 정적 프리렌더를 끈 이유
+## 3. 캐시는 끄는 게 아니라 무효화 경로를 만든다
 
-remote 를 SSR 하는 페이지는 전부 `force-dynamic` 이다.
+초판에서는 remote 를 SSR 하는 페이지를 전부 `export const dynamic = "force-dynamic"` 으로
+두었다. 빌드 시점에 굳히면 remote 를 재배포해도 host 가 옛 마크업을 계속 내보내서
+**독립 배포라는 MFA 의 전제가 깨지기** 때문이었다.
 
-```ts
-export const dynamic = 'force-dynamic';
+지금은 다르다. host 는 `cacheComponents: true` 로 이행했고, Next 16 은
+`dynamic` / `revalidate` / `fetchCache` 세그먼트 설정을 **아예 받지 않는다** — 남겨두면
+컴파일이 실패한다.
+
+```
+Error: Route segment config "revalidate" is not compatible with
+       `nextConfig.cacheComponents`. Please remove it.
 ```
 
-빌드 시점에 굳히면 remote 를 재배포해도 host 가 옛 마크업을 계속 내보낸다.
-**독립 배포라는 MFA 의 전제가 깨진다.**
+이행 매핑:
+
+| 옛 설정                     | 지금                                                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `dynamic = "force-dynamic"` | 삭제. 캐시하지 않으면 기본이 동적이다. 요청 시점 실행이 꼭 필요하면 `await connection()` + `<Suspense>` |
+| `revalidate = N`            | `"use cache"` + `cacheLife({ revalidate: N })`                                                          |
+| `experimental_ppr`          | 삭제. PPR 이 Cache Components 에 흡수됐다                                                               |
+| `dynamicParams`             | 미지원. 삭제                                                                                            |
+
+즉 "동적"이 라우트 속성이 아니라 **트리 안의 구멍**이 됐다. 그래서 캐시를 끄는 대신
+remote 재배포를 **태그 무효화**로 잇는다 — remote 가 새 버전을 공표하면 웹훅이
+`/api/mf-revalidate` 를 때리고, 해당 remote 태그를 단 캐시 엔트리만 만료된다.
+독립 배포 전제는 그 경로로 유지된다.
+
+세 모드(`요청마다 렌더` / `ISR 등가` / `태그 무효화`)를 같은 트리로 나란히 재현한 게
+`/lab` 이다. 측정값: [04-experiments/03-cache-modes.md](../04-experiments/03-cache-modes.md),
+무효화 설계: [04-remote-lifecycle.md](./04-remote-lifecycle.md).
 
 ## 4. 남은 트레이드오프
 

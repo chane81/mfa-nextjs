@@ -113,20 +113,36 @@ remote 를 일부러 다른 번들러로 만들었다.
 - [아키텍처 결정 기록(ADR)](./docs/02-architecture/01-decision.md)
 - [토폴로지](./docs/02-architecture/02-topology.md)
 - **[SSR + 소프트 내비게이션](./docs/02-architecture/03-ssr-and-soft-nav.md)**
+- **[remote 수명주기 — 버전 공표 · 캐시 무효화 · 신뢰 경계](./docs/02-architecture/04-remote-lifecycle.md)**
 - [실행 방법](./docs/03-setup/01-getting-started.md)
 - [버전 고정 근거](./docs/03-setup/02-versions.md)
+- [환경변수](./docs/03-setup/03-environment.md)
+- [Dokploy 컨테이너 배포](./docs/03-setup/04-dokploy.md)
 - [실험 A — 런타임 MF](./docs/04-experiments/01-runtime-mf.md)
 - [실험 B — Multi-Zones (기각·앱 삭제됨)](./docs/04-experiments/02-multi-zones.md)
+- [실험 C — 캐시 모드 3종 (SSR / ISR 등가 / 태그 무효화)](./docs/04-experiments/03-cache-modes.md)
 - [트러블슈팅](./docs/05-troubleshooting/01-known-issues.md)
 
 ## 스크립트
 
 ```bash
-pnpm dev         # 전체 개발 서버 (remote 는 web + ssr 두 프로세스)
-pnpm build       # 전체 빌드 (remote 는 웹/노드 두 타깃)
+pnpm dev            # 전체 개발 서버 (remote 는 web + ssr 두 프로세스)
+pnpm build          # 전체 빌드 (remote 는 웹/노드 두 타깃)
+pnpm start          # 빌드 후 프로덕션 기동
 pnpm lint
 pnpm typecheck
+pnpm format         # prettier --write .
+pnpm format:check   # CI 가 검사하는 것
 ```
+
+CI(`.github/workflows/ci.yml`)는 두 job 이다. `lint` · `typecheck` · `format:check` 는
+분 단위로 끝나고, `build` 는 따로 돈다. **빌드를 CI 에 넣은 게 핵심이다** — host 의
+`next build` 는 프리렌더 도중 remote 의 SSR 번들을 HTTP 로 받아 실제로 실행하므로,
+빌드가 통과한다는 건 "Next 16 에서 런타임 MF + SSR 이 된다"는 이 저장소의 주장이
+아직 참이라는 뜻이다.
+
+컨테이너로 확인하려면 `docker-compose.yml` 을 쓴다(`MFA_HOST_IP` 필요 —
+이유는 [Dokploy 문서](./docs/03-setup/04-dokploy.md)와 compose 파일 주석에 있다).
 
 ## 라이선스
 

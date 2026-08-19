@@ -1,5 +1,10 @@
 # 실험 A — 런타임 전용 Module Federation
 
+> **이 문서는 1차(2026-08-14) 실험 기록이다.** 가설과 측정값은 그때 것 그대로 둔다.
+> 이후 SSR · 소프트 내비게이션 · 버전 공표 · 캐시 · 컨테이너 배포가 얹히면서 저장소는
+> 많이 달라졌다. 지금 구조는 [02-architecture/02-topology.md](../02-architecture/02-topology.md)
+> 를 본다. 아래 성능 표의 "5 라우트" 같은 수치도 그 시점의 값이다.
+
 ## 가설
 
 Next.js 16(Turbopack) host 에 **번들러 플러그인 없이** `@module-federation/runtime` 만
@@ -137,11 +142,11 @@ const lazyCache = new Map<
 
 ## 성능 관찰
 
-| 앱                       | 빌드 시간    | 산출물                              |
-| ------------------------ | ------------ | ----------------------------------- |
-| remote-catalog (Vite 8)  | ~1.4s        | remoteEntry 0.17 kB + 청크 분리     |
-| remote-cart (Rsbuild 2)  | ~1.3s        | remoteEntry 115.7 kB (32.5 kB gzip) |
-| host (Next 16 Turbopack) | ~0.4s 컴파일 | 5 라우트                            |
+| 앱                       | 빌드 시간    | 산출물                                                 |
+| ------------------------ | ------------ | ------------------------------------------------------ |
+| remote-catalog (Vite 8)  | ~1.4s        | remoteEntry 0.17 kB + 청크 분리                        |
+| remote-cart (Rsbuild 2)  | ~1.3s        | remoteEntry 115.7 kB (32.5 kB gzip)                    |
+| host (Next 16 Turbopack) | ~0.4s 컴파일 | 5 라우트 (1차 시점. 지금은 실험·내부 라우트가 더 있다) |
 
 Vite 쪽 `remoteEntry.js` 가 0.17 kB 로 작은 건 ESM 동적 import 로 잘게 쪼개기 때문이고,
 Rsbuild 쪽은 런타임을 remoteEntry 에 인라인하기 때문이다. 둘 다 정상.

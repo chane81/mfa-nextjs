@@ -78,17 +78,72 @@
 - 재검토 시점: `typescript-eslint` 가 TS7 을 지원하면 즉시 7 로 올린다.
   (`npm view typescript-eslint peerDependencies` 로 확인)
 
-## 경계 설계 원칙
+## ADR-007 — 캐시는 `cacheComponents` 로 이행하고, remote 재배포는 태그로 깬다
 
-| 책임                  | 소유자                       | 이유                                                       |
-| --------------------- | ---------------------------- | ---------------------------------------------------------- |
-| 라우팅                | host                         | remote 에 `next/link` 를 강요하면 프레임워크 종속이 생긴다 |
-| 레이아웃 · 헤더       | host                         | 셸은 하나여야 한다                                         |
-| 상품 목록/상세 렌더링 | catalog remote               | 도메인 소유 팀이 UI 를 통째로 배포                         |
-| 장바구니 UI           | cart remote                  | 위와 동일                                                  |
-| 장바구니 상태         | `@mfa/contracts` 싱글턴      | 어느 쪽도 소유하지 않는 공유 계약                          |
-| 결제 플로우           | cart remote (`CheckoutFlow`) | 라우터를 host 하나로 유지해야 소프트 내비게이션이 된다     |
+- 상태: 채택 (2026-08-14 5차)
+- 맥락: 초판은 remote 를 SSR 하는 페이지를 전부 `dynamic = "force-dynamic"` 으로 두어
+  캐시를 통째로 껐다. "MFA 에서 ISR 이 되는가" 를 확인하려면 그 전제를 걷어내야 했다.
+  게다가 Next 16 은 `cacheComponents` 를 켠 상태에서 `dynamic` / `revalidate` /
+  `fetchCache` 세그먼트 설정을 **컴파일 에러로 거부한다.**
+- 결정: host 전체를 `cacheComponents: true` 로 이행한다. 캐시를 끄는 대신
+  `"use cache"` + `cacheLife` 로 캐시하고, remote 재배포를 `cacheTag` 무효화로 잇는다
+  (`/api/mf-revalidate`).
+- 결과:
+  - ⭕ 캐시된 HTML 안에 remote 마크업이 들어간다. HIT 구간에는 remote 번들을 아예 안 건드린다.
+  - ⭕ 독립 배포 전제가 "캐시 끔"이 아니라 "무효화 경로"로 유지된다.
+  - ❌ 무효화 대상이 네 층(페이지 캐시 · 버전 캐시 · 번들 캐시 · 브라우저 MF 캐시)으로 늘었다.
+  - ⚠️ 캐시 스코프 없이 프리렌더된 정적 라우트는 `cacheTag` 가 없어 별도 처리가 필요하다.
+- 상세: [04-experiments/03-cache-modes.md](../04-experiments/03-cache-modes.md) ·
+  [04-remote-lifecycle.md](./04-remote-lifecycle.md)
 
-remote 는 **props 와 콜백으로만** host 와 대화한다.
-`onSelect(product)` → host 가 `router.push` 를 수행. remote 는 라우터를 모른다.
-이 규칙 덕분에 remote 를 어느 라우트로 옮겨도 소프트 내비게이션이 유지된다.
+## ADR-008 — remote 배치 지식을 `@mfa/remote-config` 한 곳에 모은다
+
+- 상태: 채택 (SSOT 2026-08-16 / 환경변수 통합 2026-08-18 7차)
+- 맥락: "remote 가 몇 개이고, 어느 포트에 뜨고, 어떤 env 로 주소를 바꾸고, 어떤 파일명으로
+  산출물을 내보내는가" 가 **아홉 군데**에 흩어져 있었다(host 런타임 · 서버 로더 · dev 대기
+  스크립트 · 정적 서버 · stamp 스크립트 · Vite config · Rsbuild config · package.json 3개).
+  하나만 고치면 증상이 제각각으로 나타난다 — 예: 포트만 바꾸면 dev 대기 스크립트가
+  영영 안 뜨는 remote 를 60초 기다린다.
+- 결정: 소비처 다섯 종류(node 스크립트 · 번들러 config · `next.config.ts` · Next 번들 ·
+  워크스페이스 패키지)가 모두 읽을 수 있도록 **빌드 산출물 없는 패키지**로 만들고,
+  `exports` 가 소스 `.ts` 를 직접 가리키게 한다. Node 24 타입 스트리핑이 이걸 실행한다.
+- 함께 정한 것: **remote 주소 환경변수는 remote 당 하나**(`REMOTE_*_PUBLIC_URL`).
+  예전에는 셋이었는데(브라우저 매니페스트 URL · SSR 번들 URL · 자산 오리진) 차이가
+  오리진 뒤 파일명뿐이었고, 그 파일명은 이미 `MF_FILES` 에 있었다 — env 가 SSOT 를
+  문자열로 복제하고 있던 셈이다.
+- 결과:
+  - ⭕ remote 추가/삭제 시 고칠 파일이 하나다. `satisfies` 가 누락을 컴파일 타임에 잡는다.
+  - ⭕ host 코드에 remote 이름이 남지 않는다(`remote-endpoints.ts` 에 한 줄도 없다).
+  - ❌ `engines.node >= 24.19.0` 이 하드 요구사항이 된다. 그 아래에서는 패키지가 로드조차 안 된다.
+  - ⚠️ `docker-compose.yml` 만 예외다. 정적 YAML 이라 이 모듈을 읽을 수 없어 손으로 맞춘다.
+- 상세: [03-setup/03-environment.md](../03-setup/03-environment.md)
+
+## ADR-009 — 앱마다 별도 컨테이너로 배포한다 (Dokploy)
+
+- 상태: 채택 (2026-08-15 6차)
+- 맥락: "독립 배포"를 주장하려면 remote 만 재배포해도 host 가 안 죽는 걸 실제로 확인해야 한다.
+  한 덩어리로 묶으면 그 검증 자체가 불가능하다.
+- 결정: 세 앱이 각자 `Dockerfile` 을 갖고, Dokploy 에 **앱마다 별도 Application** 으로 올린다.
+  host 는 `output: "standalone"` 산출물을 쓴다.
+- 결과:
+  - ⭕ remote 단독 재배포가 가능하다.
+  - ❌ Dokploy 에 배포 후 훅이 없다. remote 재배포 → host 캐시 무효화는 GitHub Actions
+    (`.github/workflows/mf-revalidate.yml`)가 대신한다 — 새 버전이 공표될 때까지 기다렸다
+    host 에 알린다.
+  - ❌ `outputFileTracingRoot` 를 저장소 루트로 올려야 한다(pnpm isolated 링커).
+    `@swc/helpers` 의 `esm/` 누락은 `outputFileTracingIncludes` 로 따로 담는다.
+- 상세: [03-setup/04-dokploy.md](../03-setup/04-dokploy.md)
+
+## ADR-010 — Node 는 `>=24.19.0 <25` 로 고정한다
+
+- 상태: 채택 (2026-08-19 9차)
+- 맥락: ADR-008 이 Node 타입 스트리핑에 기대므로 버전이 곧 기능 요구사항이다. 그런데
+  범위를 벗어난 Node 에서 pnpm 은 경고만 찍고 설치를 끝냈다(실측). 그러면 실패가 설치
+  시점이 아니라 dev 서버나 프리렌더 한복판으로 밀리는데, 거기서 나오는 에러는 Node 버전을
+  한 글자도 언급하지 않는다 — `SyntaxError: Missing initializer in const declaration` 이 전부다.
+- 결정: `engines.node` 를 `>=24.19.0 <25` 로 두고 `pnpm-workspace.yaml` 에
+  `engineStrict: true` 를 켠다. `.nvmrc` 도 같이 둔다.
+- 결과:
+  - ⭕ 안 맞으면 `pnpm install` 이 `ERR_PNPM_UNSUPPORTED_ENGINE` 으로 **먼저** 막는다.
+  - ⭕ CI 도 같은 값을 쓴다(`pnpm/setup` 의 `runtime: node@^24.19.0`).
+- 상세: [03-setup/02-versions.md](../03-setup/02-versions.md)

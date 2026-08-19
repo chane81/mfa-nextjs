@@ -713,11 +713,12 @@ Error: Module Federation 런타임은 브라우저에서만 초기화할 수 있
 `loadRemoteModule` 이 `typeof window === "undefined"` 일 때 remote 의 node 번들을 가져오므로
 `React.lazy` 팩토리가 프리렌더 중 실행돼도 정상적으로 컴포넌트를 돌려준다.
 
-대신 프리렌더로 굳으면 안 되므로 해당 라우트는 전부 dynamic 이다.
-
-```ts
-export const dynamic = 'force-dynamic';
-```
+프리렌더로 굳으면 remote 재배포가 반영되지 않는데, 그 자리를 **캐시 무효화가 맡는다.**
+당시에는 라우트마다 `export const dynamic = "force-dynamic"` 을 달았지만, 5차에서
+`cacheComponents: true` 로 이행하면서 그 세그먼트 설정은 제거됐다 — Next 16 은
+켜진 상태에서 옛 설정을 컴파일 에러로 거부한다. 지금은 `"use cache"` + `cacheTag(remote)` 로
+캐시하고 재배포 웹훅이 태그를 만료시킨다.
+→ [04-experiments/03-cache-modes.md](../04-experiments/03-cache-modes.md)
 
 ## 2. Turbopack 이 상대경로 `.js` 확장자를 못 찾음
 
@@ -863,7 +864,9 @@ TimeoutError: The operation was aborted due to timeout
 1. `curl localhost:3001/mf-server.cjs | head -c 100` → 200 인지
 2. remote 의 `ssr` watch 프로세스가 살아있는지 (`pnpm dev` 로그의 `[ssr]` 라인)
 3. host 서버 로그에 `예상 밖 모듈을 require` 에러가 있는지 → external 설정 문제
-4. 해당 라우트에 `export const dynamic = "force-dynamic"` 이 있는지
+4. 캐시 HIT 가 아닌지 — `"use cache"` 라우트는 옛 HTML 을 그대로 준다.
+   `/api/mf-revalidate` 로 태그를 깨거나 `/lab/ssr`(캐시 없는 경로)로 대조한다
+   (`export const dynamic = "force-dynamic"` 은 Next 16 `cacheComponents` 에서 쓰지 않는다)
 
 **remote 자체가 안 뜰 때** 순서대로:
 
