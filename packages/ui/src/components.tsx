@@ -1,6 +1,26 @@
 import type { CSSProperties, ReactNode } from 'react';
 
-import { tokens } from './tokens.js';
+/**
+ * host / remote 가 공유하는 프리미티브.
+ *
+ * 스타일은 Tailwind 클래스로 적는다. **이 패키지는 CSS 를 만들지 않는다** — 클래스 이름만
+ * 내보내고, 실제 CSS 는 이 패키지를 쓰는 앱이 자기 파이프라인에서 컴파일한다.
+ * `@mfa/tailwind-config` 의 `@source '../ui/src'` 가 그 스캔을 걸어 둔다.
+ *
+ * 공유 패키지가 CSS 까지 빌드해 배포하면 그 산출물이 새 배포 단위가 되고, 앱이 새 클래스를
+ * 쓸 때마다 그걸 먼저 배포해야 한다. MFA 의 독립 배포와 정면으로 어긋난다.
+ */
+
+/**
+ * remote 마다 다른 경계 색을 넘기는 통로.
+ *
+ * `originHue` 는 런타임 값이라 클래스로 굳힐 수 없다. CSS 변수로 내려보내고
+ * `remote-boundary` / `text-origin` 같은 유틸리티가 그 변수를 읽는다
+ * (정의: `packages/tailwind-config/theme.css`).
+ */
+function hueVar(hue: number): CSSProperties {
+  return { '--hue': hue } as CSSProperties;
+}
 
 export interface PanelProps {
   /** 어느 앱(remote)이 렌더링했는지 시각적으로 표시 */
@@ -9,7 +29,7 @@ export interface PanelProps {
   title?: string;
   actions?: ReactNode;
   children: ReactNode;
-  style?: CSSProperties;
+  className?: string;
 }
 
 /**
@@ -22,53 +42,28 @@ export function Panel({
   title,
   actions,
   children,
-  style,
+  className = '',
 }: PanelProps) {
   return (
     <section
-      style={{
-        border: `1px dashed hsl(${originHue} 70% 62% / 0.5)`,
-        background: tokens.color.surface,
-        borderRadius: tokens.radius.lg,
-        padding: tokens.space(5),
-        display: 'flex',
-        flexDirection: 'column',
-        gap: tokens.space(4),
-        ...style,
-      }}
+      style={hueVar(originHue)}
+      className={`remote-boundary flex flex-col gap-4 rounded-lg bg-surface p-5 ${className}`}
     >
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: tokens.space(3),
-          height: 36,
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: tokens.space(2),
-          }}
-        >
+      {/*
+        높이는 고정이 아니라 **최소값**이다. 좁은 컬럼(홈의 장바구니 열은 280px 다)에서는
+        제목 + origin 라벨 + actions 가 한 줄에 안 들어간다. 고정 높이 + `nowrap` 이면
+        글자가 상자 밖으로 넘치고, `whitespace-nowrap` 이 없으면 라벨과 버튼 **안쪽**이
+        쪼개져 "비우/기" 처럼 끊긴다(실측). 줄바꿈은 요소 단위로만 일어나게 두고
+        높이는 필요한 만큼 늘어나게 한다 — 넓은 화면에서는 36px 그대로다.
+      */}
+      <header className="flex min-h-9 flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
           {title ? (
-            <h2 style={{ margin: 0, fontSize: 16, color: tokens.color.text }}>
+            <h2 className="m-0 text-base whitespace-nowrap text-text">
               {title}
             </h2>
           ) : null}
-          <span
-            style={{
-              fontFamily: tokens.font.mono,
-              fontSize: 11,
-              letterSpacing: '0.04em',
-              color: `hsl(${originHue} 70% 72%)`,
-              border: `1px solid hsl(${originHue} 70% 62% / 0.45)`,
-              borderRadius: tokens.radius.sm,
-              padding: '2px 6px',
-            }}
-          >
+          <span className="text-origin border-origin rounded-sm border px-1.5 py-0.5 font-mono text-[11px] tracking-[0.04em] whitespace-nowrap">
             {origin}
           </span>
         </div>
@@ -94,22 +89,14 @@ export function Button({
   disabled = false,
   type = 'button',
 }: ButtonProps) {
-  const palette: Record<NonNullable<ButtonProps['variant']>, CSSProperties> = {
-    primary: {
-      background: tokens.color.accent,
-      color: tokens.color.accentText,
-      border: 'none',
-    },
-    ghost: {
-      background: 'transparent',
-      color: tokens.color.text,
-      border: `1px solid ${tokens.color.border}`,
-    },
-    danger: {
-      background: 'transparent',
-      color: tokens.color.danger,
-      border: `1px solid ${tokens.color.danger}55`,
-    },
+  /**
+   * ⚠️ 클래스 문자열은 **완성된 형태로** 적는다. `bg-${variant}` 처럼 조립하면
+   * Tailwind 의 소스 스캔이 그 클래스를 못 찾아 CSS 에서 조용히 빠진다.
+   */
+  const palette: Record<NonNullable<ButtonProps['variant']>, string> = {
+    primary: 'bg-accent text-accent-text border-none',
+    ghost: 'bg-transparent text-text border border-line',
+    danger: 'bg-transparent text-danger border border-danger/35',
   };
 
   return (
@@ -117,16 +104,7 @@ export function Button({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      style={{
-        ...palette[variant],
-        borderRadius: tokens.radius.md,
-        padding: '8px 14px',
-        fontSize: 13,
-        fontWeight: 600,
-        fontFamily: tokens.font.body,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.45 : 1,
-      }}
+      className={`${palette[variant]} cursor-pointer rounded-md px-3.5 py-2 font-sans text-[13px] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-45`}
     >
       {children}
     </button>
@@ -142,14 +120,9 @@ export function Badge({
 }) {
   return (
     <span
-      style={{
-        background: `hsl(${hue} 70% 62% / 0.15)`,
-        color: `hsl(${hue} 70% 75%)`,
-        borderRadius: 999,
-        padding: '2px 10px',
-        fontSize: 12,
-        fontFamily: tokens.font.mono,
-      }}
+      style={hueVar(hue)}
+      // pill 안에서 줄바꿈되면 알약 모양이 무너진다. 넘칠 자리는 부모가 wrap 으로 만든다
+      className="bg-origin-soft text-origin rounded-full px-2.5 py-0.5 font-mono text-xs whitespace-nowrap"
     >
       {children}
     </span>
@@ -158,17 +131,7 @@ export function Badge({
 
 export function Skeleton({ label }: { label: string }) {
   return (
-    <div
-      style={{
-        border: `1px dashed ${tokens.color.border}`,
-        borderRadius: tokens.radius.lg,
-        padding: tokens.space(6),
-        color: tokens.color.textMuted,
-        fontFamily: tokens.font.mono,
-        fontSize: 13,
-        textAlign: 'center',
-      }}
-    >
+    <div className="rounded-lg border border-dashed border-line p-6 text-center font-mono text-[13px] text-muted">
       {label}
     </div>
   );
@@ -182,30 +145,10 @@ export function ErrorBox({
   detail?: string;
 }) {
   return (
-    <div
-      style={{
-        border: `1px solid ${tokens.color.danger}55`,
-        background: `${tokens.color.danger}12`,
-        borderRadius: tokens.radius.lg,
-        padding: tokens.space(5),
-        color: tokens.color.text,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: tokens.space(2),
-      }}
-    >
-      <strong style={{ color: tokens.color.danger, fontSize: 14 }}>
-        {title}
-      </strong>
+    <div className="flex flex-col gap-2 rounded-lg border border-danger/35 bg-danger/7 p-5 text-text">
+      <strong className="text-sm text-danger">{title}</strong>
       {detail ? (
-        <code
-          style={{
-            fontFamily: tokens.font.mono,
-            fontSize: 12,
-            color: tokens.color.textMuted,
-            whiteSpace: 'pre-wrap',
-          }}
-        >
+        <code className="font-mono text-xs whitespace-pre-wrap text-muted">
           {detail}
         </code>
       ) : null}

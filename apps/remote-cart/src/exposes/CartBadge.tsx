@@ -1,5 +1,7 @@
+import type { CSSProperties } from 'react';
+
 import type { CartBadgeProps } from '@mfa/contracts';
-import { tokens, useCart } from '@mfa/ui';
+import { useCart } from '@mfa/ui';
 
 /**
  * host 에 노출되는 모듈: `cart/CartBadge`
@@ -10,21 +12,13 @@ export default function CartBadge({ label = '장바구니' }: CartBadgeProps) {
 
   return (
     <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: tokens.space(2),
-        border: `1px dashed hsl(150 70% 62% / 0.5)`,
-        borderRadius: 999,
-        padding: '6px 12px',
-        fontSize: 12,
-        fontFamily: tokens.font.mono,
-        color: tokens.color.text,
-      }}
+      // cart 의 경계 색(hue 150). 값은 Panel 이 쓰는 것과 같은 통로로 내려간다.
+      style={{ '--hue': 150 } as CSSProperties}
+      className="remote-boundary inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-mono text-xs text-text"
     >
       🛒 {label}
-      <strong style={{ color: 'hsl(150 70% 72%)' }}>{totalQuantity}</strong>
-      <span style={{ color: tokens.color.textMuted }}>{totalPriceLabel}</span>
+      <strong className="text-origin">{totalQuantity}</strong>
+      <span className="text-muted">{totalPriceLabel}</span>
     </span>
   );
 }

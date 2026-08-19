@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 
-import { tokens } from '@mfa/ui';
 import { Skeleton } from '@mfa/ui';
 
 import { ProductDetailSection } from '@/components/ProductDetailSection';
@@ -23,7 +22,7 @@ export default function ProductPage({
 }) {
   return (
     <>
-      <Link href="/" style={{ color: tokens.color.accent, fontSize: 13 }}>
+      <Link href="/" className="text-[13px] text-accent">
         ← 목록으로
       </Link>
       <Suspense fallback={<Skeleton label="상품 상세 준비 중…" />}>

@@ -1,5 +1,5 @@
 import { formatKRW, type CartPanelProps } from '@mfa/contracts';
-import { Button, Panel, tokens, useCart } from '@mfa/ui';
+import { Button, Panel, useCart } from '@mfa/ui';
 
 /** host 에 노출되는 모듈: `cart/CartPanel` */
 export default function CartPanel({
@@ -22,60 +22,28 @@ export default function CartPanel({
       }
     >
       {lines.length === 0 ? (
-        <p style={{ margin: 0, color: tokens.color.textMuted, fontSize: 13 }}>
+        <p className="m-0 text-[13px] text-muted">
           담긴 상품이 없습니다. catalog remote 에서 상품을 담아보세요.
         </p>
       ) : (
-        <ul
-          style={{
-            listStyle: 'none',
-            margin: 0,
-            padding: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: tokens.space(2),
-          }}
-        >
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {lines.map((line) => (
             <li
               key={line.productId}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: tokens.space(3),
-                background: tokens.color.surfaceAlt,
-                border: `1px solid ${tokens.color.border}`,
-                borderRadius: tokens.radius.md,
-                padding: tokens.space(3),
-              }}
+              className="flex items-center gap-3 rounded-md border border-line bg-surface-alt p-3"
             >
-              <span style={{ fontSize: 24 }}>{line.emoji}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    color: tokens.color.text,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
+              <span className="text-2xl">{line.emoji}</span>
+              <div className="min-w-0 flex-1">
+                <div className="overflow-hidden text-[13px] font-semibold text-ellipsis whitespace-nowrap text-text">
                   {line.name}
                 </div>
                 {!compact ? (
-                  <div style={{ color: tokens.color.textMuted, fontSize: 12 }}>
+                  <div className="text-xs text-muted">
                     {formatKRW(line.unitPrice)} × {line.quantity}
                   </div>
                 ) : null}
               </div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: tokens.space(2),
-                }}
-              >
+              <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   onClick={() =>
@@ -84,14 +52,7 @@ export default function CartPanel({
                 >
                   −
                 </Button>
-                <span
-                  style={{
-                    fontFamily: tokens.font.mono,
-                    color: tokens.color.text,
-                    minWidth: 20,
-                    textAlign: 'center',
-                  }}
-                >
+                <span className="min-w-5 text-center font-mono text-text">
                   {line.quantity}
                 </span>
                 <Button
@@ -108,20 +69,10 @@ export default function CartPanel({
         </ul>
       )}
 
-      <footer
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderTop: `1px solid ${tokens.color.border}`,
-          paddingTop: tokens.space(3),
-        }}
-      >
-        <span style={{ color: tokens.color.textMuted, fontSize: 13 }}>
+      <footer className="flex items-center justify-between border-t border-line pt-3">
+        <span className="text-[13px] text-muted">
           {totalQuantity}개 · 합계{' '}
-          <strong style={{ color: tokens.color.text }}>
-            {totalPriceLabel}
-          </strong>
+          <strong className="text-text">{totalPriceLabel}</strong>
         </span>
         <Button disabled={lines.length === 0} onClick={onCheckout}>
           결제하기

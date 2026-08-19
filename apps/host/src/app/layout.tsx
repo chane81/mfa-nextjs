@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { Suspense, type ReactNode } from 'react';
 
-import { tokens } from '@mfa/ui';
-
 import { SiteHeader } from '@/components/SiteHeader';
 import { RemoteVersionSync } from '@/mf/RemoteVersionSync';
+
+import './globals.css';
 
 export const metadata: Metadata = {
   title: 'MFA Shop — Next.js 16 host',
@@ -14,15 +14,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ko">
-      <body
-        style={{
-          margin: 0,
-          background: tokens.color.bg,
-          color: tokens.color.text,
-          fontFamily: tokens.font.body,
-          minHeight: '100vh',
-        }}
-      >
+      {/*
+        body 의 배경·글자색·기본 폰트는 `@mfa/tailwind-config` 의 base 레이어에 있다.
+        remote 의 스타일시트에도 같은 규칙이 들어가지만 값이 같아 충돌하지 않는다.
+      */}
+      <body className="m-0">
         {/*
           remote 버전을 읽어 globalThis 와 브라우저에 반영한다.
           이게 있어야 웹훅을 못 받은 host 인스턴스도 스스로 재배포를 알아챈다.
@@ -37,19 +33,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           (digest: CLIENT_HOOK_DYNAMIC). Suspense 로 감싸 셸 뒤로 스트리밍시킨다.
           MFA 와 무관한 일반적인 Next 16 이행 비용이다.
         */}
-        <Suspense fallback={<div style={{ height: 57 }} />}>
+        <Suspense fallback={<div className="h-[57px]" />}>
           <SiteHeader />
         </Suspense>
-        <main
-          style={{
-            maxWidth: 1120,
-            margin: '0 auto',
-            padding: `${tokens.space(8)} ${tokens.space(6)}`,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: tokens.space(6),
-          }}
-        >
+        <main className="mx-auto flex max-w-[1120px] flex-col gap-6 px-6 py-8">
           {children}
         </main>
       </body>

@@ -1,30 +1,23 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { tokens } from '@mfa/ui';
-
 import ProductDetail from './exposes/ProductDetail.js';
 import ProductGrid from './exposes/ProductGrid.js';
+import './styles.css';
 
 /**
  * remote 단독 실행 셸.
  * MFA 에서 remote 는 host 없이도 독립 개발/테스트가 가능해야 한다.
+ *
+ * **CSS 를 import 하는 곳은 여기 하나다.** expose 는 CSS 를 import 하지 않는다 —
+ * host 안에서 렌더될 때는 host 가 `<link>` 로 걸어주기 때문이다(`RemoteComponent`).
+ * 그래서 이 import 가 곧 `dist/style.css` 를 만들어 내는 유일한 지점이다 —
+ * 지우면 배포 산출물에서 스타일시트가 통째로 사라지고, host 화면까지 같이 무너진다.
  */
 function StandaloneApp() {
   return (
-    <main
-      style={{
-        fontFamily: tokens.font.body,
-        color: tokens.color.text,
-        background: tokens.color.bg,
-        minHeight: '100vh',
-        padding: tokens.space(8),
-        display: 'flex',
-        flexDirection: 'column',
-        gap: tokens.space(6),
-      }}
-    >
-      <h1 style={{ margin: 0, fontSize: 18 }}>catalog remote — standalone</h1>
+    <main className="flex min-h-screen flex-col gap-6 p-8">
+      <h1 className="m-0 text-lg">catalog remote — standalone</h1>
       <ProductGrid />
       <ProductDetail productId="kb-001" />
     </main>

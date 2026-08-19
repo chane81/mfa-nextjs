@@ -3,8 +3,6 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { tokens } from '@mfa/ui';
-
 import { RemoteComponent } from '@/mf/RemoteComponent';
 
 const NAV = [
@@ -21,60 +19,31 @@ export function SiteHeader() {
   const pathname = usePathname();
 
   return (
-    <header
-      style={{
-        borderBottom: `1px solid ${tokens.color.border}`,
-        background: tokens.color.surface,
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 1120,
-          margin: '0 auto',
-          padding: `${tokens.space(4)} ${tokens.space(6)}`,
-          display: 'flex',
-          alignItems: 'center',
-          gap: tokens.space(6),
-          flexWrap: 'wrap',
-        }}
-      >
+    <header className="sticky top-0 z-10 border-b border-line bg-surface">
+      <div className="mx-auto flex max-w-[1120px] flex-wrap items-center gap-6 px-6 py-4">
         <Link
           href="/"
-          style={{
-            color: tokens.color.text,
-            textDecoration: 'none',
-            fontWeight: 700,
-          }}
+          className="font-bold whitespace-nowrap text-text no-underline"
         >
           🛍️ MFA Shop
-          <span
-            style={{
-              marginLeft: 8,
-              fontFamily: tokens.font.mono,
-              fontSize: 11,
-              color: tokens.color.textMuted,
-            }}
-          >
+          <span className="ml-2 font-mono text-[11px] text-muted">
             host · next 16
           </span>
         </Link>
 
-        <nav style={{ display: 'flex', gap: tokens.space(4), flex: 1 }}>
+        {/*
+          `whitespace-nowrap` 이 없으면 좁은 화면에서 링크가 **글자 단위로** 쪼개진다
+          ("장/바/구/니" 세로 한 줄씩 — 390px 실측). flex 아이템은 기본적으로 축소되므로
+          줄바꿈을 링크 단위로만 허용하고 넘칠 자리는 `flex-wrap` 이 만든다.
+        */}
+        <nav className="flex flex-1 flex-wrap gap-4">
           {NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              style={{
-                color:
-                  pathname === item.href
-                    ? tokens.color.accent
-                    : tokens.color.textMuted,
-                textDecoration: 'none',
-                fontSize: 14,
-              }}
+              className={`text-sm whitespace-nowrap no-underline ${
+                pathname === item.href ? 'text-accent' : 'text-muted'
+              }`}
             >
               {item.label}
             </Link>

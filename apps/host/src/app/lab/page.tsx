@@ -1,6 +1,5 @@
 import Link from 'next/link';
-
-import { tokens } from '@mfa/ui';
+import type { CSSProperties } from 'react';
 
 import { LAB_MODES, LAB_ORDER } from '@/components/lab/modes';
 
@@ -13,77 +12,39 @@ import { LAB_MODES, LAB_ORDER } from '@/components/lab/modes';
 export default function LabIndexPage() {
   return (
     <>
-      <section
-        style={{
-          border: `1px solid ${tokens.color.border}`,
-          borderRadius: tokens.radius.lg,
-          padding: tokens.space(6),
-          background: tokens.color.surface,
-        }}
-      >
-        <h1 style={{ margin: 0, fontSize: 22 }}>
-          캐시 실험 — MFA 에서 ISR 이 되는가
-        </h1>
-        <p
-          style={{
-            color: tokens.color.textMuted,
-            fontSize: 14,
-            lineHeight: 1.7,
-          }}
-        >
+      <section className="rounded-lg border border-line bg-surface p-6">
+        <h1 className="m-0 text-[22px]">캐시 실험 — MFA 에서 ISR 이 되는가</h1>
+        <p className="text-sm leading-[1.7] text-muted">
           런타임 Module Federation 으로 remote 를 소비할 때 Next.js 의 캐시
           기능이 어디까지 그대로 쓰이는지 실측한다. 세 페이지 모두{' '}
           <code>catalog/ProductGrid</code> 를 렌더하고, 차이는 라우트 세그먼트
           설정뿐이다.
         </p>
-        <p
-          style={{
-            color: tokens.color.textMuted,
-            fontSize: 13,
-            lineHeight: 1.7,
-            margin: 0,
-          }}
-        >
+        <p className="m-0 text-[13px] leading-[1.7] text-muted">
           판정 기준: <strong>서버 렌더 시각이 얼어붙는가</strong> ·{' '}
           <strong>캐시된 HTML 안에 remote 마크업이 있는가</strong> ·{' '}
           <strong>요청당 remote 번들 fetch 가 0 인가</strong> (
-          <Link href="/api/lab/stats" style={{ color: tokens.color.accent }}>
+          <Link href="/api/lab/stats" className="text-accent">
             /api/lab/stats
           </Link>
           )
         </p>
       </section>
 
-      <div style={{ display: 'grid', gap: tokens.space(4) }}>
+      <div className="grid gap-4">
         {LAB_ORDER.map((mode) => {
           const spec = LAB_MODES[mode];
           return (
             <Link
               key={mode}
               href={`/lab/${mode}`}
-              style={{
-                textDecoration: 'none',
-                color: 'inherit',
-                border: `1px solid hsl(${spec.hue} 60% 45% / 0.5)`,
-                background: `hsl(${spec.hue} 60% 45% / 0.08)`,
-                borderRadius: tokens.radius.lg,
-                padding: tokens.space(5),
-                display: 'flex',
-                flexDirection: 'column',
-                gap: tokens.space(2),
-              }}
+              // 모드 색(hue)은 `modes.ts` 가 정하는 런타임 값이라 클래스로 굳힐 수 없다
+              style={{ '--hue': spec.hue } as CSSProperties}
+              className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--hue)_60%_45%/0.5)] bg-[hsl(var(--hue)_60%_45%/0.08)] p-5 text-inherit no-underline"
             >
-              <strong style={{ fontSize: 16 }}>{spec.label}</strong>
-              <code style={{ fontSize: 12, color: tokens.color.textMuted }}>
-                {spec.segmentConfig}
-              </code>
-              <span
-                style={{
-                  fontSize: 13,
-                  lineHeight: 1.6,
-                  color: tokens.color.textMuted,
-                }}
-              >
+              <strong className="text-base">{spec.label}</strong>
+              <code className="text-xs text-muted">{spec.segmentConfig}</code>
+              <span className="text-[13px] leading-relaxed text-muted">
                 {spec.expect}
               </span>
             </Link>

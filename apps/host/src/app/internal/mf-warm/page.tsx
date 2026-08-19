@@ -62,7 +62,7 @@ export default async function MfWarmPage({
   return (
     <>
       <MfWarmup remotes={remotes} nonce={nonce ?? 'warm'} />
-      <p data-testid="warm-done" style={{ fontSize: 12 }}>
+      <p data-testid="warm-done" className="text-xs">
         warmed: {remotes.join(', ')}
       </p>
     </>

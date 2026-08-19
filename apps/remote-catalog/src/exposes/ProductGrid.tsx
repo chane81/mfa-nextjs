@@ -6,7 +6,7 @@ import {
   type ProductCategory,
   type ProductGridProps,
 } from '@mfa/contracts';
-import { Button, Panel, tokens } from '@mfa/ui';
+import { Button, Panel } from '@mfa/ui';
 
 import { ProductCard } from '../components/ProductCard.js';
 
@@ -31,9 +31,7 @@ export default function ProductGrid({
       originHue={280}
       title="상품 목록"
       actions={
-        <div
-          style={{ display: 'flex', gap: tokens.space(2), flexWrap: 'wrap' }}
-        >
+        <div className="flex flex-wrap gap-2">
           {(['all', ...PRODUCT_CATEGORIES] as const).map((c) => (
             <Button
               key={c}
@@ -46,13 +44,7 @@ export default function ProductGrid({
         </div>
       }
     >
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          gap: tokens.space(4),
-        }}
-      >
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
         {products.map((product) => (
           <ProductCard key={product.id} product={product} onSelect={onSelect} />
         ))}

@@ -1,6 +1,4 @@
-import type { ReactNode } from 'react';
-
-import { tokens } from '@mfa/ui';
+import type { CSSProperties, ReactNode } from 'react';
 
 import { CatalogSection } from '@/components/CatalogSection';
 import { formatKst } from '@/lib/format-time';
@@ -27,79 +25,39 @@ export function LabPanel({ mode, renderedAt, children }: LabPanelProps) {
   return (
     <>
       <section
-        style={{
-          border: `1px solid hsl(${spec.hue} 60% 45% / 0.5)`,
-          borderRadius: tokens.radius.lg,
-          padding: tokens.space(6),
-          background: `hsl(${spec.hue} 60% 45% / 0.08)`,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: tokens.space(3),
-        }}
+        // 모드 색(hue)은 `modes.ts` 가 정하는 런타임 값이라 클래스로 굳힐 수 없다
+        style={{ '--hue': spec.hue } as CSSProperties}
+        className="flex flex-col gap-3 rounded-lg border border-[hsl(var(--hue)_60%_45%/0.5)] bg-[hsl(var(--hue)_60%_45%/0.08)] p-6"
       >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            gap: tokens.space(3),
-          }}
-        >
-          <h1 style={{ margin: 0, fontSize: 20 }}>{spec.label}</h1>
-          <code style={{ fontSize: 12, color: tokens.color.textMuted }}>
-            /lab/{mode}
-          </code>
+        <div className="flex items-baseline gap-3">
+          <h1 className="m-0 text-xl">{spec.label}</h1>
+          <code className="text-xs text-muted">/lab/{mode}</code>
         </div>
 
-        <pre
-          style={{
-            margin: 0,
-            padding: tokens.space(3),
-            background: tokens.color.bg,
-            borderRadius: tokens.radius.md,
-            fontSize: 12,
-            overflowX: 'auto',
-          }}
-        >
+        <pre className="m-0 overflow-x-auto rounded-md bg-bg p-3 text-xs">
           {spec.segmentConfig}
         </pre>
 
-        <dl
-          style={{
-            margin: 0,
-            display: 'grid',
-            gridTemplateColumns: 'auto 1fr',
-            gap: `${tokens.space(2)} ${tokens.space(4)}`,
-            fontSize: 13,
-          }}
-        >
-          <dt style={{ color: tokens.color.textMuted }}>
-            서버 렌더 시각 (KST)
-          </dt>
-          <dd style={{ margin: 0 }}>
+        <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-[13px]">
+          <dt className="text-muted">서버 렌더 시각 (KST)</dt>
+          <dd className="m-0">
             {/* 화면은 KST, `dateTime` 은 원본 UTC — 값 자체는 ISO 로 남긴다 */}
             <time
               dateTime={renderedAt}
               data-testid="rendered-at"
-              style={{ fontFamily: tokens.font.mono, fontWeight: 700 }}
+              className="font-mono font-bold"
             >
               {formatKst(renderedAt)}
             </time>
           </dd>
 
-          <dt style={{ color: tokens.color.textMuted }}>브라우저 시각 (KST)</dt>
-          <dd style={{ margin: 0 }}>
+          <dt className="text-muted">브라우저 시각 (KST)</dt>
+          <dd className="m-0">
             <HydrationStamp />
           </dd>
         </dl>
 
-        <p
-          style={{
-            margin: 0,
-            fontSize: 13,
-            lineHeight: 1.7,
-            color: tokens.color.textMuted,
-          }}
-        >
+        <p className="m-0 text-[13px] leading-[1.7] text-muted">
           {spec.expect}
         </p>
       </section>

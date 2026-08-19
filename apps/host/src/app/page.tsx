@@ -1,5 +1,3 @@
-import { tokens } from '@mfa/ui';
-
 import { CartSection } from '@/components/CartSection';
 import { CatalogSection } from '@/components/CatalogSection';
 
@@ -10,24 +8,11 @@ import { CatalogSection } from '@/components/CatalogSection';
 export default function HomePage() {
   return (
     <>
-      <section
-        style={{
-          border: `1px solid ${tokens.color.border}`,
-          borderRadius: tokens.radius.lg,
-          padding: tokens.space(6),
-          background: tokens.color.surface,
-        }}
-      >
-        <h1 style={{ margin: 0, fontSize: 22 }}>
+      <section className="rounded-lg border border-line bg-surface p-6">
+        <h1 className="m-0 text-[22px]">
           Next.js 16 host + 런타임 Module Federation
         </h1>
-        <p
-          style={{
-            color: tokens.color.textMuted,
-            fontSize: 14,
-            lineHeight: 1.7,
-          }}
-        >
+        <p className="text-sm leading-[1.7] text-muted">
           이 페이지의 뼈대(헤더 · 레이아웃 · 라우팅)는 <strong>host</strong> 가
           SSR 하고, 점선으로 감싸인 영역은 브라우저에서 별도 배포된 remote
           번들을 받아 그린다.
@@ -37,14 +22,7 @@ export default function HomePage() {
         </p>
       </section>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 1fr)',
-          gap: tokens.space(6),
-          alignItems: 'start',
-        }}
-      >
+      <div className="grid grid-cols-[minmax(0,2fr)_minmax(280px,1fr)] items-start gap-6">
         <CatalogSection />
         <CartSection compact />
       </div>

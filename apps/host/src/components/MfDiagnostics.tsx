@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
-import { Badge, Panel, tokens } from '@mfa/ui';
+import { Badge, Panel } from '@mfa/ui';
 
 import { REMOTE_ENTRIES, pinnedEntry, pinnedVersion } from '@/mf/runtime';
 
@@ -100,41 +100,30 @@ export function MfDiagnostics() {
       originHue={210}
       title="Module Federation 진단"
     >
-      <table
-        style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}
-      >
+      <table className="w-full border-collapse text-[13px]">
         <thead>
-          <tr style={{ textAlign: 'left', color: tokens.color.textMuted }}>
-            <th style={{ padding: 8 }}>remote</th>
-            <th style={{ padding: 8 }}>상태</th>
-            <th style={{ padding: 8 }}>entry / 상세</th>
+          <tr className="text-left text-muted">
+            <th className="p-2">remote</th>
+            <th className="p-2">상태</th>
+            <th className="p-2">entry / 상세</th>
           </tr>
         </thead>
         <tbody>
           {results.map((r) => (
-            <tr
-              key={r.remote}
-              style={{ borderTop: `1px solid ${tokens.color.border}` }}
-            >
-              <td style={{ padding: 8, fontFamily: tokens.font.mono }}>
-                {r.remote}
-              </td>
-              <td style={{ padding: 8 }}>
+            <tr key={r.remote} className="border-t border-line">
+              <td className="p-2 font-mono">{r.remote}</td>
+              <td className="p-2">
                 <Badge
                   hue={r.status === 'ok' ? 140 : r.status === 'fail' ? 0 : 45}
                 >
                   {r.status}
                 </Badge>
               </td>
-              <td style={{ padding: 8, color: tokens.color.textMuted }}>
-                <div style={{ fontFamily: tokens.font.mono, fontSize: 12 }}>
-                  {r.entry}
-                </div>
+              <td className="p-2 text-muted">
+                <div className="font-mono text-xs">{r.entry}</div>
                 <div>
                   {r.status !== 'pending' && (
-                    <span
-                      style={{ fontFamily: tokens.font.mono, fontSize: 11 }}
-                    >
+                    <span className="font-mono text-[11px]">
                       {r.version
                         ? `버전 핀 ${r.version} · `
                         : '버전 핀 없음(폴백 엔트리) · '}
@@ -147,14 +136,7 @@ export function MfDiagnostics() {
           ))}
         </tbody>
       </table>
-      <p
-        style={{
-          margin: 0,
-          color: tokens.color.textMuted,
-          fontSize: 12,
-          lineHeight: 1.7,
-        }}
-      >
+      <p className="m-0 text-xs leading-[1.7] text-muted">
         여기서 찌르는 URL 은 MF 런타임이 실제로 초기화에 쓰는 값과 같다 (
         <code>pinnedEntry</code>). 배포에서는 서버가 심어준{' '}
         <code>/v&lt;version&gt;/</code> 경로가 나오고, dev 에서는 버전 공표가

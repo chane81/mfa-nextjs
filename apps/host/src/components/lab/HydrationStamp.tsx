@@ -2,8 +2,6 @@
 
 import { useEffect, useRef } from 'react';
 
-import { tokens } from '@mfa/ui';
-
 import { formatKst } from '@/lib/format-time';
 
 /**
@@ -25,11 +23,7 @@ export function HydrationStamp() {
   }, []);
 
   return (
-    <span
-      ref={ref}
-      data-testid="hydrated-at"
-      style={{ fontFamily: tokens.font.mono, color: tokens.color.textMuted }}
-    >
+    <span ref={ref} data-testid="hydrated-at" className="font-mono text-muted">
       hydration 대기…
     </span>
   );

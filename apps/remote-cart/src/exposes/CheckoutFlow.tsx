@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { formatKRW, type CheckoutFlowProps } from '@mfa/contracts';
-import { Badge, Button, Panel, tokens, useCart } from '@mfa/ui';
+import { Badge, Button, Panel, useCart } from '@mfa/ui';
 
 /**
  * host 에 노출되는 모듈: `cart/CheckoutFlow`
@@ -20,7 +20,7 @@ export default function CheckoutFlow({
   if (placed) {
     return (
       <Panel origin="remote: cart · rsbuild" originHue={150} title="주문 완료">
-        <p style={{ margin: 0, color: tokens.color.text, fontSize: 14 }}>
+        <p className="m-0 text-sm text-text">
           주문이 접수되었습니다. 장바구니를 비웠습니다.
         </p>
         <div>
@@ -40,67 +40,34 @@ export default function CheckoutFlow({
       actions={<Badge hue={150}>{totalQuantity}개</Badge>}
     >
       {lines.length === 0 ? (
-        <p style={{ margin: 0, color: tokens.color.textMuted, fontSize: 13 }}>
+        <p className="m-0 text-[13px] text-muted">
           장바구니가 비어 있습니다.{' '}
           <button
             type="button"
             onClick={onContinueShopping}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              color: tokens.color.accent,
-              cursor: 'pointer',
-              fontSize: 13,
-              fontFamily: tokens.font.body,
-            }}
+            className="cursor-pointer border-none bg-none p-0 font-sans text-[13px] text-accent"
           >
             상품 담으러 가기
           </button>
         </p>
       ) : (
         <>
-          <ul
-            style={{
-              listStyle: 'none',
-              margin: 0,
-              padding: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: tokens.space(2),
-            }}
-          >
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {lines.map((line) => (
               <li
                 key={line.productId}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  padding: tokens.space(3),
-                  background: tokens.color.surfaceAlt,
-                  border: `1px solid ${tokens.color.border}`,
-                  borderRadius: tokens.radius.md,
-                  fontSize: 13,
-                }}
+                className="flex justify-between rounded-md border border-line bg-surface-alt p-3 text-[13px]"
               >
                 <span>
                   {line.emoji} {line.name} × {line.quantity}
                 </span>
-                <span style={{ fontFamily: tokens.font.mono }}>
+                <span className="font-mono">
                   {formatKRW(line.unitPrice * line.quantity)}
                 </span>
               </li>
             ))}
           </ul>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              borderTop: `1px solid ${tokens.color.border}`,
-              paddingTop: tokens.space(3),
-            }}
-          >
+          <div className="flex items-center justify-between border-t border-line pt-3">
             <strong>{totalPriceLabel}</strong>
             <Button
               onClick={() => {
