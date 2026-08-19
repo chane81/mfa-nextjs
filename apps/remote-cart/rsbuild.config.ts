@@ -153,6 +153,19 @@ export default defineConfig({
   output: {
     assetPrefix: ASSET_PREFIX,
     // 웹 자산 전체를 버전 디렉터리로 내보낸다 → 배포된 URL 은 다시 바뀌지 않는다
-    distPath: { root: DIST_ROOT },
+    distPath: {
+      root: DIST_ROOT,
+      /**
+       * CSS 를 `static/css/` 가 아니라 루트에 낸다. host 가 가리킬 주소를
+       * `@mfa/remote-config` 가 조립하는데(`stylesPath`), 그 조립식에 번들러별 디렉터리
+       * 규칙이 들어가면 계약이 catalog(Vite)와 갈라진다.
+       */
+      css: '',
+    },
+    /**
+     * CSS 파일명에서 해시를 뺀다 — 이유는 `MF_FILES.styles` 주석 참고.
+     * 이 앱의 CSS 는 진입점 하나에서 나오는 한 덩어리라 이름 충돌이 없다.
+     */
+    filename: { css: MF_FILES.styles },
   },
 });

@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 import { federation } from '@module-federation/vite';
 import { MF_FILES, REMOTES, publicOrigin } from '@mfa/remote-config';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Connect, type Plugin } from 'vite';
 
@@ -135,6 +136,53 @@ function serveSsrBundle(): Plugin {
 }
 
 /**
+ * dev 에서 `/style.css` 를 **순수 CSS 로** 내려준다.
+ *
+ * host 는 dev 든 배포든 똑같이 `<link rel="stylesheet" href=".../style.css">` 를
+ * 건다(`RemoteComponent`). 그런데 dev 의 Vite 는 CSS 를 파일로 내보내지 않는다 — HMR 을 위해
+ * `<style>` 을 주입하는 **JS 모듈**로 감싸서 서빙한다. 그 응답을 `<link>` 로 받으면
+ * 브라우저가 JavaScript 를 스타일시트로 해석하려다 통째로 무시한다(에러도 안 난다).
+ *
+ * `?direct` 는 그 JS 래퍼를 벗기고 변환된 CSS 본문만 달라는 Vite 의 내부 쿼리다.
+ * 여기서 그걸 한 번 대신 요청해 `text/css` 로 돌려주면 주소 하나로 dev 와 배포가 같아진다.
+ *
+ * dev 전용이다. 빌드 산출물의 `/style.css` 는 실제 파일이고
+ * `scripts/serve-remote-dist.ts` 가 서빙한다.
+ */
+function serveDevStylesheet(): Plugin {
+  return {
+    name: 'mfa-serve-dev-stylesheet',
+    configureServer: (server) => {
+      server.middlewares.use((req, res, next) => {
+        if ((req.url?.split('?')[0] ?? '') !== `/${MF_FILES.styles}`) {
+          next();
+          return;
+        }
+
+        server
+          .transformRequest('/src/styles.css?direct')
+          .then((result) => {
+            if (!result) {
+              res.statusCode = 404;
+              res.end('/* src/styles.css 를 변환하지 못했습니다 */');
+              return;
+            }
+            res.setHeader('Content-Type', 'text/css; charset=utf-8');
+            // host(3000) 페이지가 교차 출처로 이 스타일시트를 받아간다
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Cache-Control', 'no-store');
+            res.end(result.code);
+          })
+          .catch((error: unknown) => {
+            res.statusCode = 500;
+            res.end(`/* ${String(error)} */`);
+          });
+      });
+    },
+  };
+}
+
+/**
  * catalog remote — Vite 8 + @module-federation/vite
  *
  * nextjs-mf(webpack) 를 쓰지 않는 이유는 docs/01-research 참고.
@@ -152,7 +200,9 @@ export default defineConfig(({ command }) => {
   return {
     plugins: [
       react(),
+      tailwindcss(),
       serveSsrBundle(),
+      serveDevStylesheet(),
       federation({
         name: REMOTE.name,
         filename: 'remoteEntry.js',
@@ -281,7 +331,26 @@ export default defineConfig(({ command }) => {
       // Module Federation 은 top-level await 를 사용한다
       target: 'chrome89',
       minify: false,
+      /**
+       * CSS 를 한 파일로 모은다. expose 마다 CSS 가 쪼개지면 컴포넌트가 가리킬 주소가
+       * 여러 개가 되고, 그 목록을 다시 계약으로 만들어야 한다.
+       */
       cssCodeSplit: false,
+      rollupOptions: {
+        output: {
+          /**
+           * CSS 파일명에서 해시를 뺀다. host 가 이 주소를 계산으로 알아야 하기
+           * 때문이다 (`MF_FILES.styles` 주석 참고).
+           * 캐시 무효화는 이미 `/v<version>/` 불변 경로가 맡고 있다.
+           *
+           * CSS 만 고정하고 나머지 자산은 기본 해시 규칙을 그대로 둔다.
+           */
+          assetFileNames: (asset) =>
+            asset.names?.some((name) => name.endsWith('.css'))
+              ? MF_FILES.styles
+              : 'assets/[name]-[hash][extname]',
+        },
+      },
     },
   };
 });

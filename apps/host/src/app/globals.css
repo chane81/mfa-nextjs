@@ -1,0 +1,14 @@
+/**
+ * host 의 CSS 진입점.
+ *
+ * 토큰과 `@mfa/ui` 스캔 지정은 `@mfa/tailwind-config` 에 있다. 여기서는 이 앱의
+ * 소스를 스캔 대상에 넣는다 — Tailwind v4 의 자동 탐지는 CSS 를 import 한 파일 위치를
+ * 기준으로 도는데, 그 기준점이 워크스페이스 링크 안이라 이 앱 소스가 잡히지 않는다.
+ *
+ * host 는 remote 의 CSS 를 신경 쓰지 않는다. remote 컴포넌트가 자기 스타일시트를
+ * `<link rel="stylesheet" precedence>` 로 직접 렌더하고 React 19 가 그걸 `<head>` 로
+ * 올린다. 그래야 remote 가 새 클래스를 써도 host 를 다시 빌드하지 않는다.
+ */
+@import '@mfa/tailwind-config';
+
+@source '../';

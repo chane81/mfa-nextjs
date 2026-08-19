@@ -1,0 +1,114 @@
+/**
+ * host / remote 가 공유하는 디자인 토큰 (Tailwind v4 `@theme`).
+ *
+ * 이 파일이 **토큰의 유일한 원본**이다. 예전에는 `packages/ui/src/tokens.ts` 가
+ * 인라인 스타일 값으로 같은 역할을 했다 — CSS 파이프라인이 세 앱에서 제각각이라
+ * (Next/Turbopack · Vite · Rsbuild) CSS 를 아예 안 쓰는 쪽이 확실했기 때문이다.
+ * 지금은 세 번들러 모두 Tailwind v4 를 물고 있어서 그 회피가 필요 없어졌다.
+ *
+ * ## 왜 각 앱이 이 파일을 **각자** 컴파일하나
+ *
+ * MFA 의 전제는 독립 배포다. 공유 CSS 를 한 번 빌드해 배포하면 remote 가 새 클래스를
+ * 쓸 때마다 그 공유 산출물을 다시 배포해야 하고, 그러면 배포 단위가 다시 하나로 묶인다.
+ * 대신 이 파일은 **소스로 배포**되고 각 앱이 자기 파이프라인에서 컴파일한다.
+ * 같은 유틸리티가 여러 CSS 에 중복되지만 값이 같아 부작용이 없다 — CSS 캐스케이드
+ * 레이어(`theme`/`base`/`components`/`utilities`)는 이름이 같으면 병합되고 순서는
+ * 첫 선언을 따르므로, 나중에 로드된 remote CSS 가 host 의 유틸리티를 덮지 않는다.
+ *
+ * ## `@source` 가 왜 여기 있나
+ *
+ * Tailwind v4 의 자동 소스 탐지는 `node_modules` 를 훑지 않는다. `@mfa/ui` 는 pnpm
+ * 워크스페이스 링크라 앱 입장에서는 `node_modules` 안에 있고, 그래서 그 패키지가 쓰는
+ * 클래스가 **조용히 빠진다**(빌드는 성공하고 화면만 무너진다). 여기서 한 번 지정하면
+ * 이 파일을 import 하는 앱 전부에 적용된다 — 앱마다 같은 줄을 복제하지 않는다.
+ * 경로는 **이 CSS 파일 위치 기준**이다.
+ */
+
+@import 'tailwindcss';
+
+@source '../ui/src';
+
+@theme {
+  /**
+   * 색.
+   *
+   * `--color-*` 네임스페이스에 넣으면 `bg-surface` `text-muted` `border-line` 처럼
+   * 색을 받는 모든 유틸리티가 자동으로 생긴다.
+   *
+   * ⚠️ 이름 두 개가 옛 `tokens.ts` 와 다르다.
+   *   textMuted → muted   (`text-text-muted` 가 되는 걸 피한다)
+   *   border    → line    (`border-border` 를 피한다)
+   */
+  --color-bg: #0b0d12;
+  --color-surface: #141821;
+  --color-surface-alt: #1b2130;
+  --color-line: #252c3b;
+  --color-text: #e6e9ef;
+  --color-muted: #98a2b3;
+  --color-accent: #6ea8fe;
+  --color-accent-text: #0b0d12;
+  --color-danger: #f87171;
+  --color-success: #4ade80;
+
+  /**
+   * 모서리. Tailwind 기본 스케일(4/6/8px)을 디자인 시스템 값으로 덮어쓴다.
+   * 값이 두 벌 존재하는 것보다 기본을 옮기는 쪽이 SSOT 에 맞다.
+   */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /**
+   * 폰트. 옛 `tokens.font.body` 가 기본 sans 자리로 들어간다 — 아래 base 레이어에서
+   * body 에 걸리므로 대부분의 화면은 클래스 없이도 이 폰트를 쓴다.
+   *
+   * 간격은 손대지 않는다. 옛 `tokens.space(n) = n * 4px` 와 Tailwind 기본
+   * `--spacing: 0.25rem`(=4px)이 이미 같은 눈금이라 `space(5)` 가 그대로 `p-5` 다.
+   */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo',
+    system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+}
+
+/**
+ * 문서 기본값.
+ *
+ * host 의 `layout.tsx` 와 각 remote 의 standalone 셸이 똑같은 body 스타일을 세 번
+ * 적던 자리다. remote CSS 가 host 페이지에 함께 로드돼도 값이 같아 충돌하지 않는다.
+ */
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+  }
+}
+
+/**
+ * remote 경계 표시.
+ *
+ * "이 UI 는 어느 앱이 그렸나"를 눈으로 판별하려고 점선 테두리를 두른다. 색은 remote 마다
+ * 다르고 **런타임 값**(`originHue`)이라 클래스로 못 굳힌다 — 호출부가 `--hue` 를 인라인
+ * 스타일로 넘기고 여기서 읽는다. 유틸리티 하나로 묶어 두면 그 `hsl(...)` 조립식이
+ * 컴포넌트마다 복제되지 않는다.
+ */
+@utility remote-boundary {
+  border: 1px dashed hsl(var(--hue) 70% 62% / 0.5);
+}
+
+/** 경계 색과 같은 계열의 글자색 — 라벨 배지에 쓴다 */
+@utility text-origin {
+  color: hsl(var(--hue) 70% 72%);
+}
+
+/** 경계 색과 같은 계열의 테두리 — 라벨 배지에 쓴다 */
+@utility border-origin {
+  border-color: hsl(var(--hue) 70% 62% / 0.45);
+}
+
+/** 경계 색과 같은 계열의 옅은 배경 — 배지 칩에 쓴다 */
+@utility bg-origin-soft {
+  background-color: hsl(var(--hue) 70% 62% / 0.15);
+}

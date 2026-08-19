@@ -1,0 +1,15 @@
+/**
+ * catalog remote 의 CSS 진입점.
+ *
+ * 토큰과 `@source` 지정은 전부 `@mfa/tailwind-config` 에 있다. 여기서 하는 일은
+ * **이 앱의 소스를 스캔 대상에 넣는 것**뿐이다 — Tailwind v4 는 CSS 를 import 한
+ * 파일 위치를 기준으로 소스를 자동 탐지하는데, 그 기준점이 워크스페이스 링크 안의
+ * `theme.css` 라서 이 앱 소스가 자동으로는 잡히지 않는다.
+ *
+ * 이 파일을 import 하는 곳은 standalone 셸 하나다. expose 는 CSS 를 import 하지 않는다 —
+ * MF 로 로드되는 모듈에는 번들러의 CSS 주입 런타임이 붙지 않고(SSR 번들은 아예 CSS 를
+ * 싣지 못한다), host 안에서 렌더될 때는 host 가 `<link>` 로 이 파일을 걸어준다.
+ */
+@import '@mfa/tailwind-config';
+
+@source '.';
