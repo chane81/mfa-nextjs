@@ -1,0 +1,48 @@
+---
+paths:
+  - 'apps/host/src/mf/**'
+  - 'packages/remote-config/**'
+  - 'packages/contracts/**'
+---
+
+# host 의 MF 소비 계약
+
+host 는 번들러 플러그인 없이 `@module-federation/runtime` 만 쓴다. 브라우저는 웹 매니페스트로,
+서버는 CJS 번들(`mf-server.cjs`)을 받아 **평가해서** remote 를 렌더한다.
+
+## SSOT 를 지킨다
+
+| 무엇                     | 어디                                                 |
+| ------------------------ | ---------------------------------------------------- |
+| remote 이름 · 포트 · env | `packages/remote-config`                             |
+| 산출물 파일명 · URL 조립 | 같은 패키지의 `MF_FILES` · `*Url()` · `stylesPath()` |
+| remote 모듈 타입         | `packages/contracts` 의 `RemoteModuleMap`            |
+
+경로 문자열(`/mf-server.cjs`, `/style.css`, `/v<version>/…`)을 호출부에서 **직접 조립하지 않는다.**
+번들러별 디렉터리 규칙이 계약에 새면 catalog(Vite)와 cart(Rsbuild)가 갈라진다.
+
+`packages/remote-config` 는 빌드 산출물이 없다 — `exports` 가 소스 `.ts` 를 직접 가리키고
+Node 의 타입 스트리핑에 기댄다. 그래서 이 패키지에는 런타임 의존성을 넣지 않는다.
+
+## 서버 전용 값과 브라우저 안전 값을 섞지 않는다
+
+`publicOrigin()` 은 `process.env[이름]` 을 **동적으로** 읽으므로 Next 가 치환하지 못한다.
+브라우저 번들에서 쓰면 배포에서 조용히 `localhost` 로 떨어진다.
+
+| 쓰는 곳              | 써야 할 것                                                         |
+| -------------------- | ------------------------------------------------------------------ |
+| 서버(SSR 로더 등)    | `SSR_ENTRIES` · `publicOrigin()`                                   |
+| 브라우저에 나가는 값 | `REMOTE_ORIGINS` · `WEB_ENTRIES` (`next.config.ts` 가 구워 넣는다) |
+
+## 환경변수를 추가하면 `turbo.json` 에 등록한다
+
+`globalEnv` 에 없는 변수는 turbo 가 **걸러낸다**. 실패가 "값이 비어 있다"로 나타나 원인이 안 보인다.
+이 함정은 두 번 밟았다(known-issues A-10, B-8).
+
+## remote 호출은 반드시 실패 가능하다고 본다
+
+버전 조회 · SSR 번들 fetch 에는 제한 시간(`AbortSignal.timeout`)이 걸려 있고, 실패 원인
+(제한 시간 / 응답 이상 / 검증 실패)을 구분해 로그에 남긴다. 새 remote 호출을 추가할 때 이 셋을
+빠뜨리지 않는다. 렌더 경계는 `RemoteBoundary` 가 맡는다 — remote 하나가 죽어도 페이지는 산다.
+
+버전 문자열은 경로(`/v<version>/`)에 들어가므로 쓰기 전에 형태를 검증한다(`assertSafeVersion`).
