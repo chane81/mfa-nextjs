@@ -239,7 +239,6 @@
   src/cart/totals.ts             cartTotals — 셀렉터가 아닌 순수 함수
   src/cart/index.ts              도메인 공개 표면
   src/utils/global-singleton.ts  (내부)  번들 경계를 넘는 인스턴스 1개 보장
-  src/utils/create-hook.ts       (내부)  createHook — 싱글턴 확보 + 훅 배선, UseStore<T>
   src/index.ts                   → "@mfa/store"  도메인 index 들을 모은다
   ```
 
@@ -255,10 +254,10 @@
   cartTotals(lines); // 합계 계산. 셀렉터가 아니라 평범한 순수 함수
   ```
 
-  **비교는 훅이 못 박는다.** 안에서 `shallow` 를 쓰고 밖으로 열지 않는다. 호출부는 조각을
-  하나 뽑든 객체로 묶어 뽑든 같은 모양으로 쓴다 — "새 객체를 돌려주면 `shallow` 를 같이
-  넘겨라"는 zustand 규칙이 화면으로 새지 않는다. 비교 방식을 인자로 열어두면 그 규칙이
-  다시 호출부의 판단거리가 되므로 열지 않았다.
+  **비교 함수는 스토어가 못 박는다.** `createWithEqualityFn`(`zustand/traditional`)의
+  두 번째 인자로 `shallow` 를 기본값으로 준다. `create` 는 비교가 `Object.is` 로 고정이라
+  새 객체를 돌려주는 셀렉터(`(state) => ({ clear, setQuantity })`)가 매 렌더 다르다고
+  판정되어 무한 렌더로 간다 — 그 규칙이 화면으로 새지 않게 하려는 것이다.
 
   스토어 인스턴스(`cartStore`)와 팩토리는 내보내지 않는다 — 인스턴스를 공개하면
   "어디서든 `getState()` 로 건드릴 수 있는 전역"이 하나 더 생긴다.
