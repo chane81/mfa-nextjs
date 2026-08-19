@@ -81,6 +81,19 @@ export const MF_FILES = {
   ssrBundle: `${MF_SSR_BUNDLE.name}${MF_SSR_BUNDLE.extension}`,
   /** remote 가 "지금 버전이 뭔지"를 공표하는 파일 (버전 경로 아래가 아니라 루트에 있다) */
   versionManifest: 'mf-version.json',
+  /**
+   * remote 가 컴파일한 Tailwind CSS.
+   *
+   * host 는 이 파일을 **가져오지 않는다.** 주소만 조립해
+   * `<link rel="stylesheet" precedence>` 로 걸고(`RemoteComponent`), 받아 파싱하는 건
+   * 브라우저다. React 19 가 그 `<link>` 를 `<head>` 로 올리며 중복을 제거한다.
+   *
+   * 이름을 고정하는 이유: 그래야 **주소를 계산으로 알 수 있기** 때문이다. 해시가 붙으면
+   * host 가 remote 의 매니페스트를 받아 파싱해 자산 경로를 캐내야 하고, 그 순간 host 가
+   * remote 의 빌드 산출물 구조에 묶인다. 캐시 무효화는 파일명 해시가 아니라 이미 있는
+   * `/v<version>/` 불변 경로가 맡는다.
+   */
+  styles: 'style.css',
 } as const;
 
 /**
@@ -193,6 +206,27 @@ export function webManifestUrl(remote: RemoteName): string {
 /** host **서버**가 받아 실행하는 node 타깃 CJS 번들 URL */
 export function ssrBundleUrl(remote: RemoteName): string {
   return `${publicOrigin(remote)}/${MF_FILES.ssrBundle}`;
+}
+
+/**
+ * remote 가 컴파일한 CSS 의 **오리진 기준 상대 경로**.
+ *
+ * 위의 두 함수와 달리 오리진을 붙이지 않는다. 이 값을 쓰는 곳이 host 의 **브라우저
+ * 번들**이기 때문이다 — 거기서는 `publicOrigin` 이 못 쓴다. 그 함수는 `process.env[이름]`
+ * 을 동적으로 읽는데, Next 는 `process.env.리터럴` 형태만 빌드 타임에 치환하므로
+ * 브라우저에서는 언제나 `devOrigin` 으로 떨어진다. 배포에서 remote CSS 를
+ * `http://localhost:3001/...` 로 찾게 되고, 서버가 만든 HTML 과 값이 갈려
+ * 하이드레이션까지 어긋난다.
+ *
+ * 그래서 오리진은 호출부가 붙인다. host 는 `next.config.ts` 가 구워 넣은 값에서 파생한
+ * `REMOTE_ORIGINS` 를 쓴다(`apps/host/src/mf/remote-endpoints.ts`). `RemoteVersion` 의
+ * `webEntry` · `ssrEntry` 도 같은 이유로 상대 경로다.
+ *
+ * `version` 이 없으면(dev) 버전 없는 경로로 떨어진다. dev 서버는 자산을 루트 경로로
+ * 서빙하므로 그때는 그게 맞는 주소다.
+ */
+export function stylesPath(version?: string | null): string {
+  return version ? `/v${version}/${MF_FILES.styles}` : `/${MF_FILES.styles}`;
 }
 
 /**

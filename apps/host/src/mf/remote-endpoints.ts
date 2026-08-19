@@ -69,3 +69,21 @@ export const WEB_ENTRIES = byRemote(
 
 /** host **서버**가 받아 실행하는 node 번들 URL */
 export const SSR_ENTRIES = byRemote((remote) => ssrBundleUrl(remote));
+
+/**
+ * remote 오리진. **브라우저에서도 맞는 값이다.**
+ *
+ * `remote-version.ts` 의 `remoteOrigin()` 과 값은 같지만 출처가 다르다. 그쪽은
+ * `SSR_ENTRIES` 에서 뽑으므로 위의 설명대로 **서버 전용**이다 — 브라우저 번들에서는
+ * `publicOrigin` 이 치환되지 않아 언제나 `localhost` 로 떨어진다.
+ *
+ * 여기는 `WEB_ENTRIES` 에서 뽑는다. 그 값은 `next.config.ts` 가 node 에서 꺼내 번들에
+ * 구워 넣은 것이라 브라우저에서도 배포된 오리진을 정확히 가리킨다. 서버 렌더와 값이
+ * 같으므로 하이드레이션도 어긋나지 않는다.
+ *
+ * 쓰는 곳: `RemoteComponent` 가 remote 스타일시트 주소를 만들 때
+ * (`stylesPath` 와 합쳐서). 그쪽 주석에 근거가 있다.
+ */
+export const REMOTE_ORIGINS = byRemote(
+  (remote) => new URL(WEB_ENTRIES[remote]).origin,
+);

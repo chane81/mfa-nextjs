@@ -7,8 +7,10 @@ import type {
   RemoteModuleMap,
   RemoteName,
 } from '@mfa/contracts';
+import { stylesPath } from '@mfa/remote-config';
 import { Skeleton } from '@mfa/ui';
 
+import { REMOTE_ORIGINS } from './remote-endpoints';
 import { REMOTE_ENTRIES, loadRemoteModule } from './runtime';
 import { knownVersion } from './remote-version';
 import { RemoteBoundary } from './RemoteBoundary';
@@ -73,6 +75,31 @@ interface RemoteComponentProps<K extends RemoteModuleId> {
  * 브라우저는 같은 컴포넌트를 MF 웹 번들로 받아 그 HTML 을 hydrate 한다.
  *
  * remote 하나가 죽어도 host 는 살아야 하므로 RemoteBoundary 로 감싼다.
+ *
+ * ## remote 의 스타일시트도 여기서 건다
+ *
+ * remote 컴포넌트는 host 페이지 안에서 렌더되는데 **CSS 는 두 로딩 경로 어디로도
+ * 따라오지 않는다.** 브라우저에서는 MF 런타임이 모듈만 가져오고(번들러의 CSS 주입
+ * 런타임은 remote 자신의 HTML 진입점에 붙어 있다), 서버에서는 CJS 문자열을 평가할
+ * 뿐이라 스타일시트를 실을 자리가 없다.
+ *
+ * 한때는 remote 의 expose 마다 `<RemoteStyles />` 를 적어 remote 가 자기 주소를
+ * 렌더하게 했다. 계약이 remote 안에 닫혀 좋았지만 **expose 를 추가할 때마다 잊으면
+ * 조용히 깨지는** 구조였다. 지금은 모든 remote 소비가 지나가는 이 자리에서 한 번 건다 —
+ * 반복이 사라지고 누락이 불가능해진다.
+ *
+ * host 가 remote 의 파일 레이아웃을 아는 셈이지만 새로 생긴 결합은 아니다. 주소를
+ * 만드는 곳은 SSOT(`@mfa/remote-config`) 하나고, 같은 패턴을 `webEntryUrl` 이 이미
+ * 쓰고 있다. 피해야 하는 건 **host 가 remote 매니페스트를 파싱해 자산 경로를 캐내는**
+ * 쪽이고 그건 지금도 하지 않는다.
+ *
+ * `precedence` 가 붙은 `<link>` 는 React 19 가 `<head>` 로 올리고 같은 `href` 를
+ * 중복 제거한다. 한 화면에 같은 remote 의 expose 를 몇 개 놓든 `<link>` 는 하나다.
+ * 값을 remote 마다 다르게 두지 않는 이유는 host 스타일시트와의 상대 순서가 remote
+ * 개수·로드 순서에 따라 흔들리지 않게 하기 위해서다.
+ *
+ * ⚠️ `<link>` 는 `Suspense` **밖**에 둔다. 안에 두면 remote 번들을 기다리는 동안
+ * 스타일시트 요청이 시작되지 않아, 정작 마크업이 도착했을 때 CSS 를 다시 기다린다.
  */
 export function RemoteComponent<K extends RemoteModuleId>({
   module: moduleId,
@@ -91,6 +118,15 @@ export function RemoteComponent<K extends RemoteModuleId>({
 
   return (
     <RemoteBoundary remoteName={remoteName} entry={REMOTE_ENTRIES[remoteName]}>
+      {/*
+        버전은 서버가 심어준 값을 그대로 쓴다(`RemoteVersionSync`). 없으면 버전 없는
+        경로로 떨어지는데, 그건 dev 서버가 자산을 서빙하는 주소라 그때는 그게 맞다.
+      */}
+      <link
+        rel="stylesheet"
+        href={`${REMOTE_ORIGINS[remoteName]}${stylesPath(knownVersion(remoteName)?.version)}`}
+        precedence="mfa-remote"
+      />
       <Suspense fallback={placeholder}>
         {/* eslint-disable-next-line react-hooks/static-components */}
         <Remote {...(props as Record<string, unknown>)} />
