@@ -1,13 +1,14 @@
 import {
   findProduct,
   formatKRW,
-  getCartStore,
   type ProductDetailProps,
 } from '@mfa/contracts';
+import { useCart } from '@mfa/store';
 import { Badge, Button, ErrorBox, Panel } from '@mfa/ui';
 
 /** host 에 노출되는 모듈: `catalog/ProductDetail` */
 export default function ProductDetail({ productId }: ProductDetailProps) {
+  const add = useCart((state) => state.add);
   const product = findProduct(productId);
 
   if (!product) {
@@ -39,10 +40,7 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
             {formatKRW(product.price)}
           </strong>
           <div>
-            <Button
-              disabled={product.stock === 0}
-              onClick={() => getCartStore().add(product)}
-            >
+            <Button disabled={product.stock === 0} onClick={() => add(product)}>
               장바구니에 담기
             </Button>
           </div>

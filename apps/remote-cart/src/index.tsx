@@ -1,11 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { PRODUCTS, getCartStore } from '@mfa/contracts';
+import { PRODUCTS } from '@mfa/contracts';
+import { useCart } from '@mfa/store';
 import { Button } from '@mfa/ui';
 
-import CartBadge from './exposes/CartBadge.js';
-import CartPanel from './exposes/CartPanel.js';
+import CartBadge from './exposes/CartBadge';
+import CartPanel from './exposes/CartPanel';
 import './styles.css';
 
 /**
@@ -17,6 +18,8 @@ import './styles.css';
  * 지우면 배포 산출물에서 스타일시트가 통째로 사라지고, host 화면까지 같이 무너진다.
  */
 function StandaloneApp() {
+  const add = useCart((state) => state.add);
+
   return (
     <main className="flex min-h-screen flex-col gap-6 p-8">
       <header className="flex items-center gap-4">
@@ -25,11 +28,7 @@ function StandaloneApp() {
       </header>
       <div className="flex flex-wrap gap-2">
         {PRODUCTS.slice(0, 4).map((product) => (
-          <Button
-            key={product.id}
-            variant="ghost"
-            onClick={() => getCartStore().add(product)}
-          >
+          <Button key={product.id} variant="ghost" onClick={() => add(product)}>
             {product.emoji} {product.name} 담기
           </Button>
         ))}

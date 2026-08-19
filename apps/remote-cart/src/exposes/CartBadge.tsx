@@ -1,14 +1,16 @@
 import type { CSSProperties } from 'react';
 
 import type { CartBadgeProps } from '@mfa/contracts';
-import { useCart } from '@mfa/ui';
+import { cartTotals, useCart } from '@mfa/store';
 
 /**
  * host 에 노출되는 모듈: `cart/CartBadge`
  * host 헤더에 박히는 아주 작은 remote — "조각 단위 소비" 실험용.
  */
 export default function CartBadge({ label = '장바구니' }: CartBadgeProps) {
-  const { totalQuantity, totalPriceLabel } = useCart();
+  const { totalQuantity, totalPriceLabel } = cartTotals(
+    useCart((state) => state.lines),
+  );
 
   return (
     <span

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 
 import { formatKRW, type CheckoutFlowProps } from '@mfa/contracts';
-import { Badge, Button, Panel, useCart } from '@mfa/ui';
+import { cartTotals, useCart } from '@mfa/store';
+import { Badge, Button, Panel } from '@mfa/ui';
 
 /**
  * host 에 노출되는 모듈: `cart/CheckoutFlow`
@@ -14,7 +15,9 @@ export default function CheckoutFlow({
   onDone,
   onContinueShopping,
 }: CheckoutFlowProps) {
-  const { lines, totalPriceLabel, totalQuantity, store } = useCart();
+  const lines = useCart((state) => state.lines);
+  const clear = useCart((state) => state.clear);
+  const { totalPriceLabel, totalQuantity } = cartTotals(lines);
   const [placed, setPlaced] = useState(false);
 
   if (placed) {
@@ -71,7 +74,7 @@ export default function CheckoutFlow({
             <strong>{totalPriceLabel}</strong>
             <Button
               onClick={() => {
-                store.clear();
+                clear();
                 setPlaced(true);
               }}
             >

@@ -1,12 +1,18 @@
 import { formatKRW, type CartPanelProps } from '@mfa/contracts';
-import { Button, Panel, useCart } from '@mfa/ui';
+import { cartTotals, useCart } from '@mfa/store';
+import { Button, Panel } from '@mfa/ui';
 
 /** host 에 노출되는 모듈: `cart/CartPanel` */
 export default function CartPanel({
   onCheckout,
   compact = false,
 }: CartPanelProps) {
-  const { lines, totalQuantity, totalPriceLabel, store } = useCart();
+  const lines = useCart((state) => state.lines);
+  const { clear, setQuantity } = useCart((state) => ({
+    clear: state.clear,
+    setQuantity: state.setQuantity,
+  }));
+  const { totalQuantity, totalPriceLabel } = cartTotals(lines);
 
   return (
     <Panel
@@ -15,7 +21,7 @@ export default function CartPanel({
       title="장바구니"
       actions={
         lines.length > 0 ? (
-          <Button variant="danger" onClick={() => store.clear()}>
+          <Button variant="danger" onClick={() => clear()}>
             비우기
           </Button>
         ) : null
@@ -46,9 +52,7 @@ export default function CartPanel({
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
-                  onClick={() =>
-                    store.setQuantity(line.productId, line.quantity - 1)
-                  }
+                  onClick={() => setQuantity(line.productId, line.quantity - 1)}
                 >
                   −
                 </Button>
@@ -57,9 +61,7 @@ export default function CartPanel({
                 </span>
                 <Button
                   variant="ghost"
-                  onClick={() =>
-                    store.setQuantity(line.productId, line.quantity + 1)
-                  }
+                  onClick={() => setQuantity(line.productId, line.quantity + 1)}
                 >
                   +
                 </Button>

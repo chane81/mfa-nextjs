@@ -1,4 +1,5 @@
-import { formatKRW, getCartStore, type Product } from '@mfa/contracts';
+import { formatKRW, type Product } from '@mfa/contracts';
+import { useCart } from '@mfa/store';
 import { Badge, Button } from '@mfa/ui';
 
 export interface ProductCardProps {
@@ -7,6 +8,7 @@ export interface ProductCardProps {
 }
 
 export function ProductCard({ product, onSelect }: ProductCardProps) {
+  const add = useCart((state) => state.add);
   const soldOut = product.stock === 0;
 
   return (
@@ -41,7 +43,7 @@ export function ProductCard({ product, onSelect }: ProductCardProps) {
         <Button
           variant="primary"
           disabled={soldOut}
-          onClick={() => getCartStore().add(product)}
+          onClick={() => add(product)}
         >
           담기
         </Button>
