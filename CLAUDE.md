@@ -36,7 +36,8 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 - 마크다운 · 코드를 고쳤으면 `pnpm format`. CI 가 `format:check` 로 막는다.
 - 커밋은 목적별로 나눈다. push 는 별도 요청 없으면 하지 않는다.
 - **SSOT 를 복제하지 않는다.** remote 배치는 `packages/remote-config`, remote 모듈 타입은
-  `packages/contracts`, 디자인 토큰은 `packages/tailwind-config` 한 곳에만 있다.
+  `packages/contracts`, 런타임 공유 상태는 `packages/store`, 디자인 토큰은
+  `packages/tailwind-config` 한 곳에만 있다.
 
 ## 명령
 
