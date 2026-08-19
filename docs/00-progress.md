@@ -1,5 +1,96 @@
 # 진행 상황
 
+## 2026-08-19 (10차) — Tailwind v4 도입, remote 가 자기 CSS 를 선언한다
+
+초판은 CSS 를 아예 안 썼다. 세 앱의 CSS 파이프라인이 제각각(Next/Turbopack · Vite ·
+Rsbuild)이라 `@mfa/ui` 의 인라인 토큰(`tokens.ts`)으로 통일하는 쪽이 확실했기 때문이다.
+지금은 세 번들러 모두 Tailwind v4 공식 연동이 있어서 그 회피가 필요 없어졌다.
+
+### 한 일
+
+- [x] `packages/tailwind-config` 신설 — `theme.css`(`@theme` 토큰 SSOT) + PostCSS 설정 원본.
+      **빌드하지 않고 소스로 배포**하고 각 앱이 자기 파이프라인에서 컴파일한다
+      (host·cart `@tailwindcss/postcss`, catalog `@tailwindcss/vite`)
+- [x] `MF_FILES.styles` (`style.css`) 와 `stylesPath(version)` 을
+      `@mfa/remote-config` 에 추가 — 주소 조립을 SSOT 안에 둔다
+- [x] host 의 `RemoteComponent` 가 remote 스타일시트를 함께 건다 —
+      `<link rel="stylesheet" precedence="mfa-remote">`. 모든 remote 소비가 지나가는
+      단일 진입점이라 반복이 없고 누락이 불가능하다
+- [x] 오리진은 `REMOTE_ORIGINS`(브라우저에서도 맞는 값), 경로는 `stylesPath(version)`
+- [x] CSS 출력 규칙 고정 — catalog `cssCodeSplit: false` + `assetFileNames`,
+      cart `distPath.css: ''` + `filename.css`
+- [x] Vite dev 전용 미들웨어 — `/style.css` 를 `?direct` 로 변환해 `text/css` 로 돌려준다
+- [x] catalog · cart 의 expose 와 `@mfa/ui` 컴포넌트를 클래스로 이행
+- [x] host 화면 이행 — `layout.tsx` 가 `globals.css` 를 물고, body 기본값은 공유 base 레이어로
+- [x] `@mfa/ui` 의 `tokens.ts` 제거. 남은 인라인 스타일은 런타임 값(`--hue`) 전달뿐이다
+- [x] 전략·토큰·실측을 [02-architecture/05-styling.md](./02-architecture/05-styling.md) 로 분리
+
+### 왜 host 가 remote CSS 를 안 가져오나
+
+remote 컴포넌트는 host 페이지 안에서 렌더되는데 CSS 는 두 로딩 경로 어디로도 따라가지
+않는다. 브라우저에서는 MF 런타임이 모듈만 가져오고, 서버에서는 CJS 문자열을 평가할 뿐이라
+스타일시트를 실을 자리가 없다.
+
+host 가 매니페스트를 **파싱해** CSS 주소를 캐내면 remote 의 빌드 산출물 구조에 묶인다.
+대신 파일명을 계약으로 고정해 주소를 계산으로 알아내고, `<link>` 만 걸어 파싱은 브라우저에
+맡긴다. 대가는 파일명 해시를 못 쓴다는 것이고, 캐시 무효화는 이미 있는 `/v<version>/`
+불변 경로가 맡는다.
+
+`<link>` 를 어디서 거는지는 한 번 옮겼다. 처음에는 remote 의 expose 마다
+`<RemoteStyles />` 를 렌더했는데(계약이 remote 안에 닫힌다), expose 를 추가할 때마다
+잊으면 **스타일 없는 화면이 에러 없이** 나오는 구조였다. 지금은 모든 remote 소비가 지나가는
+`RemoteComponent` 에서 한 번 건다. layout 에 두는 안은 접었다 — 모든 라우트가 remote 를
+로드하게 되고, CSS 를 받으려고 MF 모듈 왕복이 선행된다.
+
+### 함정 셋
+
+| 함정                                              | 증상                                                                                                  |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 브라우저에서 `publicOrigin` 사용                  | 동적 env 접근이라 치환되지 않아 배포에서 `localhost` 를 가리킨다 — 오리진은 `WEB_ENTRIES` 에서 뽑는다 |
+| Vite dev 가 CSS 를 JS 모듈로 서빙                 | `<link>` 로 받으면 브라우저가 **에러 없이** 통째로 무시한다                                           |
+| Tailwind v4 자동 탐지가 `node_modules` 를 안 훑음 | `@mfa/ui` 가 쓰는 클래스가 조용히 빠진다 — 빌드는 성공하고 화면만 무너진다                            |
+
+### 실측
+
+`pnpm build` 후 host 프리렌더 HTML 에 stylesheet `<link>` 3개가 전부 `<head>` 안에 있다 —
+host(`precedence=next`) 하나와 remote 둘(`precedence=mfa-remote`). `index.html` 은 cart 의
+expose 를 둘 렌더하는데 cart 의 `<link>` 는 하나만 남았다(React 19 중복 제거 동작 확인).
+dev 에서는 버전 없는 경로가 나오고 두 remote 모두 `text/css` + `Access-Control-Allow-Origin: *`
+로 응답한다.
+
+## 2026-08-19 (9차) — 실패를 앞으로 당긴다 (CI · 버전 게이트 · 제한 시간)
+
+기능이 아니라 **실패가 드러나는 시점**을 손본 회차다. 셋 다 같은 성격이다 —
+원인이 안 보이는 자리에서 터지던 걸 원인이 보이는 자리로 옮겼다.
+
+### 한 일
+
+- [x] **Node 범위 고정** — `engines.node: ">=24.19.0 <25"` + `pnpm-workspace.yaml` 의
+      `engineStrict: true` + `.nvmrc`. `@mfa/remote-config` 가 타입 스트리핑에 기대므로
+      Node 버전이 곧 기능 요구사항이다.
+- [x] **CI 도입** (`.github/workflows/ci.yml`) — job 2개. `verify`(lint · typecheck ·
+      format:check) 와 `build`.
+- [x] **remote 매니페스트 `version` 문자열 검증** — `assertSafeVersion` 으로 버전 디렉터리
+      경로에 쓰이기 전에 형태를 확정한다.
+- [x] **remote 호출에 제한 시간** — `AbortSignal.timeout(REMOTE_FETCH_TIMEOUT_MS)` 를
+      버전 조회와 SSR 번들 fetch 양쪽에 건다. 실패 원인(제한 시간 초과 / 응답 이상 /
+      검증 실패)을 구분해 로그에 남긴다.
+- [x] 장애 격리 확인 방법을 실제 동작에 맞춰 다시 쓰고, 트러블슈팅에 **증상 색인** 추가
+- [x] README 를 라이브 데모 먼저 보이도록 재배치, MIT 라이선스 추가
+
+### 왜 이 셋인가
+
+| 손댄 곳   | 고치기 전 증상                                                              | 고친 뒤                       |
+| --------- | --------------------------------------------------------------------------- | ----------------------------- |
+| Node 범위 | 설치는 통과하고 dev·프리렌더에서 `Missing initializer in const declaration` | `pnpm install` 이 먼저 막는다 |
+| CI        | MF 계약이 깨져도 PR 이 초록                                                 | 빌드가 계약 테스트            |
+| 제한 시간 | remote 가 응답 안 하면 host 요청이 같이 멈춘다 — 격리가 무의미              | 끊고 폴백, 원인 구분          |
+
+빌드를 CI 에 넣은 게 핵심이다. host 의 `next build` 는 순수 컴파일이 아니라 프리렌더가
+remote 의 SSR 번들을 HTTP 로 받아 **실제로 실행한다**(`apps/host/src/mf/server-loader.ts`).
+그래서 빌드 통과 = "Next 16 에서 런타임 MF + SSR 이 된다"는 이 저장소의 유일한 주장이
+아직 참이라는 뜻이다. 빠른 정적 검사와 붙여두면 느린 신호가 빠른 신호를 막아서 job 을 나눴다.
+
 ## 2026-08-18 (8차) — `_jsxDEV is not a function` 재발, 3차 오진 정정
 
 `pnpm dev` 후 첫 로드에서 catalog 가 또 죽었다. 3차에서 "해결"로 적어둔 항목이라,
@@ -442,6 +533,8 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 - [x] remote 재배포 시 host 서버 캐시 무효화 경로 → `/api/mf-revalidate` + `cacheTag` (5차)
 - [x] 무효화 시 remote 번들 선 warm → 스켈레톤 위험 제거 (5차 발견 6)
 - [x] `/internal/mf-warm` 접근 제어 → middleware 시크릿 검사 (5차 발견 7)
+- [x] CI 에서 MF 계약 검증 — 빌드 프리렌더가 remote SSR 번들을 실제로 실행한다 (9차)
+- [x] remote 호출 제한 시간 + 실패 원인 구분 (9차)
 - [ ] 캐시 스코프 없이 프리렌더되는 정적 라우트(`/` 등)의 무효화 경로 정리
 - [~] remote 배포 파이프라인 시뮬레이션 — 배포 표면은 만들었다(6차). 무중단 재배포 실측은 남았다
 - [ ] SSR 실패 시 CSR 폴백 — 서버 로드 실패해도 브라우저에서 재시도

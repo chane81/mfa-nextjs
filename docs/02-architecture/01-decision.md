@@ -147,3 +147,48 @@
   - ⭕ 안 맞으면 `pnpm install` 이 `ERR_PNPM_UNSUPPORTED_ENGINE` 으로 **먼저** 막는다.
   - ⭕ CI 도 같은 값을 쓴다(`pnpm/setup` 의 `runtime: node@^24.19.0`).
 - 상세: [03-setup/02-versions.md](../03-setup/02-versions.md)
+
+## ADR-011 — 스타일은 Tailwind v4 로 가고, host 가 remote CSS 주소를 건다
+
+- 상태: 채택 (2026-08-19)
+- 맥락: 초판은 `@mfa/ui` 의 인라인 스타일 토큰(`tokens.ts`)으로 스타일을 통일했다.
+  CSS 파이프라인이 세 앱에서 제각각(Next/Turbopack · Vite · Rsbuild)이라 CSS 를
+  아예 안 쓰는 쪽이 확실했기 때문이다. 지금은 세 번들러 모두 Tailwind v4 공식 연동이
+  있어서 그 회피가 필요 없어졌다.
+- 결정 ①: 토큰 원본을 `@mfa/tailwind-config` 의 `theme.css`(`@theme`)로 옮기고,
+  **각 앱이 그 소스를 자기 파이프라인에서 컴파일한다.** 공유 CSS 를 한 번 빌드해
+  배포하면 remote 가 새 클래스를 쓸 때마다 그 산출물을 다시 배포해야 하고,
+  그러면 배포 단위가 다시 하나로 묶인다.
+- 결정 ②: remote 의 CSS 는 host 가 **가져오지 않고 주소만 건다.** 파일명을 계약으로
+  고정해(`style.css`) 주소를 계산으로 알아내고, `RemoteComponent` 가
+  `<link rel="stylesheet" precedence>` 를 렌더하면 React 19 가 `<head>` 로 올리며 중복
+  제거한다. MF 로 로드되는 모듈에는 번들러의 CSS 주입 런타임이 붙지 않고, SSR 번들은 아예
+  CSS 를 실을 수 없어서 다른 경로가 없다.
+- 결과:
+  - ⭕ host 가 remote 매니페스트를 파싱하지 않는다 — 자산 구조에 묶이지 않는다.
+  - ⭕ 토큰이 한 곳(`theme.css`)에서만 정의된다.
+  - ⭕ 반복도 누락도 없다. remote 소비가 지나가는 자리가 `RemoteComponent` 하나뿐이라
+    expose 를 추가할 때 잊을 여지가 없다.
+  - ⭕ 페이지마다 실제로 쓰는 remote 의 CSS 만 실린다.
+  - ❌ CSS 파일명에 해시를 못 붙인다(주소를 계산으로 알아야 하므로).
+    캐시 무효화는 `/v<version>/` 불변 경로가 맡는다.
+  - ❌ 오리진을 `publicOrigin` 으로 만들면 안 된다. 동적 env 접근이라 브라우저 번들에서
+    치환되지 않아 배포에서 `localhost` 를 가리킨다 — `WEB_ENTRIES` 에서 뽑아야 한다.
+  - ❌ Vite dev 는 CSS 를 JS 모듈로 서빙해서 `<link>` 가 조용히 무시된다 —
+    `?direct` 로 순수 CSS 를 돌려주는 dev 전용 미들웨어가 필요했다.
+- 상세: [02-topology.md](./02-topology.md) 의 "remote 의 CSS 는 어떻게 따라오나"
+
+## 경계 설계 원칙
+
+| 책임                  | 소유자                       | 이유                                                       |
+| --------------------- | ---------------------------- | ---------------------------------------------------------- |
+| 라우팅                | host                         | remote 에 `next/link` 를 강요하면 프레임워크 종속이 생긴다 |
+| 레이아웃 · 헤더       | host                         | 셸은 하나여야 한다                                         |
+| 상품 목록/상세 렌더링 | catalog remote               | 도메인 소유 팀이 UI 를 통째로 배포                         |
+| 장바구니 UI           | cart remote                  | 위와 동일                                                  |
+| 장바구니 상태         | `@mfa/contracts` 싱글턴      | 어느 쪽도 소유하지 않는 공유 계약                          |
+| 결제 플로우           | cart remote (`CheckoutFlow`) | 라우터를 host 하나로 유지해야 소프트 내비게이션이 된다     |
+
+remote 는 **props 와 콜백으로만** host 와 대화한다.
+`onSelect(product)` → host 가 `router.push` 를 수행. remote 는 라우터를 모른다.
+이 규칙 덕분에 remote 를 어느 라우트로 옮겨도 소프트 내비게이션이 유지된다.

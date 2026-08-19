@@ -102,6 +102,12 @@ loadRemoteModule("cart/CheckoutFlow")
 remote 를 일부러 다른 번들러로 만들었다.
 "번들러가 달라도 런타임 계약만 맞으면 된다"를 실제로 확인하기 위해서다.
 
+스타일도 같은 원칙이다. 토큰은 `@mfa/tailwind-config` 한 곳에 두고 **각 앱이 자기
+파이프라인에서 컴파일**하며(Next/PostCSS · Vite 플러그인 · Rsbuild/PostCSS), remote 는
+자기 CSS 주소를 `<link rel="stylesheet" precedence>` 로 직접 렌더한다 — host 코드에는
+remote CSS 에 대한 지식이 없다. 근거와 실측은
+[스타일링 전략](./docs/02-architecture/05-styling.md)에 있다.
+
 ## 문서
 
 전부 [`docs/`](./docs/) 에 있다. 핵심은 **SSR + 소프트 내비게이션 설계**.
@@ -114,6 +120,7 @@ remote 를 일부러 다른 번들러로 만들었다.
 - [토폴로지](./docs/02-architecture/02-topology.md)
 - **[SSR + 소프트 내비게이션](./docs/02-architecture/03-ssr-and-soft-nav.md)**
 - **[remote 수명주기 — 버전 공표 · 캐시 무효화 · 신뢰 경계](./docs/02-architecture/04-remote-lifecycle.md)**
+- [스타일링 — MFA 에서 Tailwind CSS 를 어떻게 나눠 갖나](./docs/02-architecture/05-styling.md)
 - [실행 방법](./docs/03-setup/01-getting-started.md)
 - [버전 고정 근거](./docs/03-setup/02-versions.md)
 - [환경변수](./docs/03-setup/03-environment.md)
