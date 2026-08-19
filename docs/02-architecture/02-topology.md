@@ -58,7 +58,8 @@ remote 자산은 **버전 디렉터리 아래 불변 경로**에 올라가고, �
 
 | 패키지                   | 역할                                                                       |
 | ------------------------ | -------------------------------------------------------------------------- |
-| `@mfa/contracts`         | 도메인 타입 · 목 데이터 · 장바구니 싱글턴 · **remote 모듈 타입 계약**      |
+| `@mfa/contracts`         | 도메인 타입 · 목 데이터 · **remote 모듈 타입 계약**                        |
+| `@mfa/store`             | **런타임 공유 상태 SSOT** — 도메인별 폴더, 밖으로는 훅만 내보낸다          |
 | `@mfa/remote-config`     | **remote 배치의 SSOT** — 이름 · 포트 · env 이름 · 산출물 파일명 · URL 조립 |
 | `@mfa/tailwind-config`   | **디자인 토큰 SSOT** — Tailwind v4 `@theme` + PostCSS 설정 원본            |
 | `@mfa/ui`                | 공용 컴포넌트 — Tailwind 클래스만 내보내고 CSS 는 만들지 않는다            |
@@ -76,6 +77,19 @@ catalog 는 `@tailwindcss/vite`). 공유 CSS 를 한 번 빌드해 배포하면 
 쓸 때마다 그 공유 산출물을 다시 배포해야 하고, 그러면 배포 단위가 다시 하나로 묶인다.
 같은 유틸리티가 여러 CSS 에 중복되지만 값이 같고, 캐스케이드 레이어는 이름이 같으면
 병합되므로 나중에 로드된 remote CSS 가 host 유틸리티를 덮지 않는다.
+
+### 왜 `@mfa/contracts` 가 아니라 별도 패키지인가
+
+contracts 는 **타입 계약**이다 — remote 가 무엇을 노출하고 props 모양이 어떤지.
+장바구니 스토어는 **런타임 상태**다. 값이 시간에 따라 변하고 구독자가 있고 localStorage 를
+만진다. 둘을 한 패키지에 두면 타입만 필요한 소비처(host 의 `RemoteModuleMap`)까지
+zustand 와 DOM 타입을 끌고 온다. 실제로 contracts 의 tsconfig 에는 스토어 때문에 넣은
+`lib: ["DOM", ...]` 이 있었고, 분리하면서 지웠다.
+
+cart remote 안에 두는 안은 접었다. **catalog remote 도 스토어에 쓴다**("담기" 버튼).
+앱끼리 소스를 import 하면 독립 배포 전제가 깨지고, 대신 cart 가 스토어를 expose 하고
+catalog 가 그걸 런타임에 로드하면 remote → remote 의존이 생긴다(지금 규칙은 "remote 는
+host 하고만 대화한다"). 소유자가 없는 상태라는 성질은 [ADR-004](./01-decision.md) 그대로다.
 
 ## 노출 모듈 계약
 
@@ -222,14 +236,23 @@ remote 의 node 번들이 `require("react/jsx-runtime")` 를 그대로 호출하
 catalog remote              cart remote                 cart remote
   "담기" 클릭                 CartBadge                   CheckoutFlow
       │                          ▲                            ▲
-      ▼                          │ useSyncExternalStore       │
-  getCartStore().add(p) ─────────┴────────────────────────────┘
+      ▼                          │ useStore(zustand/react)    │
+  useCart((s) => s.add)(p) ──────┴────────────────────────────┘
+  (@mfa/store)                     (@mfa/store)
       │
       ▼
-  globalThis.__MFA_CART_STORE__   ──persist──▶  localStorage["mfa-nextjs:cart"]
+  globalSingleton('cart', …)      ──persist 미들웨어──▶  localStorage["mfa-nextjs:cart"]
+  (@mfa/store 내부 — zustand/vanilla createStore)
 ```
 
 - 전부 host 페이지 안이므로 **소프트 내비게이션 중 상태가 메모리에 그대로 남는다.**
 - `localStorage` 는 새로고침 복원용이지 경계 통신 수단이 아니다.
   (Multi-Zones 였다면 경계마다 이 왕복이 강제됐다)
 - SSR 스냅샷은 항상 빈 장바구니 → hydration mismatch 없음.
+  `useStore` 가 서버 스냅샷으로 `getInitialState()` 를 쓰고, 그 값은 **스토어 생성 시점에
+  캐시**되므로 persist 가 복원한 값이 섞이지 않는다.
+- 상태는 `lines` 하나뿐이다. 합계는 순수 함수 `cartTotals(lines)` 가 렌더 중에 계산한다.
+- 구독할 조각은 호출부가 정한다 — `useCart((state) => state.lines)`.
+  비교는 훅이 `shallow` 로 못 박는다(구현은 `useStoreWithEqualityFn`,
+  `zustand/traditional`). zustand 기본값인 `Object.is` 를 그대로 뒀다면 객체를 돌려주는
+  셀렉터마다 호출부가 비교 함수를 챙겨야 한다.

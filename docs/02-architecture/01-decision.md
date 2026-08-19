@@ -49,15 +49,19 @@
 
 ## ADR-004 — 공유 상태는 `globalThis` 싱글턴으로 잡는다
 
-- 상태: 채택
+- 상태: 채택 (구현은 ADR-012 로 교체 — 싱글턴 결정 자체는 유효)
 - 맥락: host, catalog(Vite), cart(Rsbuild)는 서로 다른 번들이다.
   `@mfa/contracts` 가 각 번들에 중복 포함되면 장바구니 상태가 갈라진다.
-- 결정: 스토어를 `globalThis.__MFA_CART_STORE__` 에 심는다.
+- 결정: 스토어 **인스턴스**를 realm 전역에 한 번만 심는다.
   MF `shared` 설정이 어긋나도 상태는 하나로 유지된다.
+  (구현은 `packages/store/src/utils/global-singleton.ts` — `Symbol.for` 레지스트리 한 개)
 - 결과:
   - ⭕ MF 설정 실수에 강건하다. Multi-Zones 쪽에서도 `localStorage` 로 이어진다.
-  - ⭕ `useSyncExternalStore` 로 구독 → React 버전에 독립적.
-  - ⚠️ 전역 네임스페이스 오염. 실무에서는 키에 앱 네임스페이스를 반드시 붙일 것.
+  - ⭕ 구독 방식이 React 버전에 독립적이다.
+  - ⚠️ 전역 네임스페이스 오염. 지금은 `Symbol.for('@mfa/store/singletons')` 레지스트리
+    **하나**만 쓰고 도메인은 그 안의 이름으로 가른다 — 도메인마다 전역 키를 새로 파지 않는다.
+  - ⚠️ 먼저 도착한 쪽이 이긴다. 두 번째 평가에서는 팩토리를 아예 부르지 않으므로,
+    상태 모양을 바꾸는 배포는 remote 를 같이 올려야 안전하다.
 
 ## ADR-005 — React 는 host 가 remote 에 주입한다
 
@@ -178,16 +182,127 @@
     `?direct` 로 순수 CSS 를 돌려주는 dev 전용 미들웨어가 필요했다.
 - 상세: [02-topology.md](./02-topology.md) 의 "remote 의 CSS 는 어떻게 따라오나"
 
+## ADR-012 — 장바구니 스토어는 zustand 로 갈아탄다 (싱글턴은 유지)
+
+- 상태: 채택 (2026-08-19)
+- 맥락: 스토어를 직접 구현했다. 리스너 Set, 스냅샷 재계산, localStorage 읽기·쓰기,
+  `useSyncExternalStore` 배선까지 140줄이 전부 손으로 쓴 코드였다.
+  MFA 실험에서 검증하려는 것은 **경계를 넘는 상태 공유**이지 스토어 구현이 아니다.
+- 대안 검토:
+  - 직접 구현 유지 → 의존성 0. 대신 미들웨어(persist·devtools)를 매번 손으로 짜야 한다.
+  - Redux Toolkit → Provider 가 필요하다. host 트리에 Provider 를 두면 **remote 가
+    host 의 React 트리 구조에 의존**하게 되어 독립 배포 전제가 약해진다.
+  - Jotai / Valtio → 원자 단위 모델이 이 도메인(줄 목록 하나)에는 과하다.
+  - **zustand** → Provider 가 필요 없다. `zustand/vanilla` 는 React 에 의존하지 않아
+    contracts(프레임워크 무관 계약 패키지)에 그대로 들어간다.
+- 결정: `zustand/vanilla` 의 `createStore` + `persist` 미들웨어로 바꾸고,
+  **`packages/store`(`@mfa/store`) 로 분리한다**(배치 근거는 ADR-013).
+  React 바인딩은 같은 패키지의 `/react` 서브패스에 둔다. **싱글턴 배치는 그대로다** —
+  상태는 zustand 모듈이 아니라 스토어 인스턴스에 있으므로, 인스턴스를 globalThis 에
+  심어야 번들이 갈려도 장바구니가 하나로 유지된다.
+- 왜 zustand 를 MF `shared` 에 넣지 않았나: 넣을 이유가 없다. 스토어 API 는 평범한
+  객체라 번들마다 zustand 사본이 달라도 상호운용된다. 공유해야 하는 것은 React 뿐이다(ADR-005).
+- 결과:
+  - ⭕ localStorage 배선이 `persist` 로 사라졌다. 스토어 파일이 절반 이하로 줄었다.
+  - ⭕ 구독 범위를 셀렉터로 좁힐 수 있다 — `CartBadge` 는 합계만 구독한다.
+  - ⭕ SSR 은 그대로 안전하다. `useStore` 의 서버 스냅샷이 `getInitialState()` 이고,
+    그 값은 생성 시점에 캐시되므로 persist 복원값이 섞이지 않는다
+    → `skipHydration` + 수동 `rehydrate()` 가 필요 없다.
+  - ❌ 파생값(합계)을 상태에 두지 않으므로 셀렉터가 매번 새 객체를 만든다.
+    zustand 5 의 기본 비교는 `Object.is` 라 그대로 두면 무한 렌더다 — 훅이
+    `useStoreWithEqualityFn`(`zustand/traditional`) + `shallow`(`zustand/shallow`) 를 쓴다.
+    이 훅도 서버 스냅샷으로 `getInitialState()` 를 넘기므로 hydration 안전성은 같다.
+  - ❌ 의존성이 둘 늘었다. zustand 5.0.15, 그리고 `zustand/traditional` 이 optional peer 로
+    요구하는 `use-sync-external-store` 1.6.0 — 둘 다 `@mfa/store` 한 곳만 가진다.
+
+## ADR-013 — 런타임 공유 상태는 `packages/store` 가 소유한다
+
+- 상태: 채택 (2026-08-19)
+- 맥락: 장바구니 스토어가 `@mfa/contracts` 안에 있었다. 그런데 contracts 는 **타입 계약**
+  패키지다 — remote 가 무엇을 노출하고 props 모양이 어떤지. 스토어는 **런타임 상태**다.
+  성질이 다른 둘이 한 패키지에 있으면 타입만 필요한 소비처까지 zustand 와 DOM 타입을
+  끌고 온다(실제로 contracts tsconfig 에 스토어 때문에 넣은 `lib: ["DOM", ...]` 이 있었다).
+- 대안 검토:
+  - **cart remote 가 소유** → 도메인 소유권으로는 가장 정직하다. 그러나 catalog remote 도
+    스토어에 쓴다("담기" 버튼). 앱끼리 소스를 import 하면 독립 배포 전제가 깨지고,
+    cart 가 스토어를 expose 하고 catalog 가 런타임에 로드하면 **remote → remote 의존**이
+    생긴다 — 지금 규칙("remote 는 host 하고만 props·콜백으로 대화한다")을 정면으로 뒤집는다.
+    이 전환은 catalog 의 props 계약(`onAddToCart`)과 host 배선까지 바꾸는 일이라 따로 다룬다.
+  - `@mfa/ui` 가 소유 → ui 는 CSS 를 만들지 않는 프리젠테이션 패키지다. 상태를 넣으면
+    비-React 소비처(standalone 셸)가 UI 패키지를 끌고 오게 된다.
+  - contracts 유지 → 위 맥락 그대로.
+- 결정: `packages/store`(`@mfa/store`) 신설. **도메인별 폴더**로 나누되 진입점은 하나다.
+  각 도메인이 자기 공개 표면을 `<도메인>/index.ts` 에 정하고, 루트 배럴이 그걸 모은다.
+
+  ```
+  src/cart/create-store.ts       스토어 + globalSingleton + useCart ('use client')
+  src/cart/totals.ts             cartTotals — 셀렉터가 아닌 순수 함수
+  src/cart/index.ts              도메인 공개 표면
+  src/utils/global-singleton.ts  (내부)  번들 경계를 넘는 인스턴스 1개 보장
+  src/index.ts                   → "@mfa/store"  도메인 index 들을 모은다
+  ```
+
+  상대 경로에 **확장자를 붙이지 않는다**(이 패키지에서 시작해 저장소 전역으로 맞췄다).
+  모든 소비가 번들러를 거치기 때문이다. 대가는 dist 를 raw Node 로 직접 못 연다는 것이고,
+  예외(`@mfa/remote-config`)와 재발 조건은
+  [D-1](../05-troubleshooting/01-known-issues.md#d-1-확장자-없는-상대-경로는-번들러에서만-풀린다).
+
+  **밖으로 나가는 것은 훅 하나와 순수 함수 하나, 그리고 타입이다.**
+
+  ```ts
+  useCart(selector); // 스토어에 묶인 훅. 무엇을 구독할지는 호출부가 정한다
+  cartTotals(lines); // 합계 계산. 셀렉터가 아니라 평범한 순수 함수
+  ```
+
+  **비교는 훅이 못 박는다.** 안에서 `shallow` 를 쓰고 밖으로 열지 않는다. 호출부는 조각을
+  하나 뽑든 객체로 묶어 뽑든 같은 모양으로 쓴다 — "새 객체를 돌려주면 `shallow` 를 같이
+  넘겨라"는 zustand 규칙이 화면으로 새지 않는다. 비교 방식을 인자로 열어두면 그 규칙이
+  다시 호출부의 판단거리가 되므로 열지 않았다.
+
+  스토어 인스턴스(`cartStore`)와 팩토리는 내보내지 않는다 — 인스턴스를 공개하면
+  "어디서든 `getState()` 로 건드릴 수 있는 전역"이 하나 더 생긴다.
+
+  **셀렉터를 패키지에 미리 정의하지 않는다.** 화면마다 필요한 조각이 다르고, 미리 정의하면
+  쓰지도 않는 조합이 공개 API 로 굳는다. 합계만 순수 함수로 뺐다 — 상태의 조각이 아니라
+  화면이 쓰는 계산값이라 구독·비교와 얽힐 이유가 없다.
+
+  `utils/` 도 진입점이 없다. 새 도메인은 `globalSingleton('auth', createAuthStore)` 로
+  같은 장치를 재사용하고, `src/index.ts` 에 자기 index 한 줄을 더한다.
+
+  ⚠️ 대가: 배럴 하나라 도메인이 늘면 `@mfa/store` 를 쓰는 쪽이 안 쓰는 도메인 모듈까지
+  그래프에 들인다. 번들러 tree-shaking 이 걷어내지만, 도메인이 많아지면 도메인별
+  서브패스(`@mfa/store/cart`)로 되돌리는 편이 낫다 — `exports` 한 줄이면 된다.
+
+  react 는 peerDependency. 다음 도메인(인증 토큰 등)은 `src/auth/` 로 같은 모양을 반복한다.
+
+- 결과:
+  - ⭕ contracts 는 다시 타입만 남았다. DOM lib 오버라이드와 zustand 의존이 빠졌다.
+  - ⭕ `@mfa/ui` 는 의존성이 0 이 됐다(cart 훅이 나가면서 contracts·zustand 둘 다 빠짐).
+  - ⭕ 상태를 더 만들 자리가 생겼다(인증 토큰 등 — `docs/00-progress.md` 의 남은 항목).
+  - ⚠️ 여전히 "어느 remote 도 소유하지 않는" 상태다([ADR-004](#adr-004--공유-상태는-globalthis-싱글턴으로-잡는다)).
+    cart remote 소유로 옮기는 안은 위 대안에 기록해 뒀다.
+- API 표면을 한 번 깎았다. 처음엔 편의 래퍼가 셋 있었는데 전부 지웠다.
+  - `cartActions` (React 밖 호출용 래퍼) → 소비처가 전부 컴포넌트라
+    `useCart((state) => state.add)` 면 된다. 스토어 인스턴스를 공개하지 않아도 되는 이유다.
+  - 화면별 훅(`useCartLines` · `useCartTotals` · `useCartActions`) → `useCart` 하나로 합쳤다.
+    구독 범위를 정하는 주체는 스토어가 아니라 그 화면이다.
+  - `selectTotals` + 참조 1칸 캐시 → `shallow` 비교 함수로 대체. 손으로 짠 캐시가 사라졌다.
+  - `getCartStore()` → `cartStore` 모듈 상수. 호출부에서 함수 호출이 한 겹 빠진다.
+- **전역 레지스트리 조회는 지우지 않았다.** 훅에서 `createCartStore()` 를 바로 부르면
+  번들마다(host · catalog · cart) 인스턴스가 따로 생겨 장바구니가 갈라진다. 증상은
+  "catalog 에서 담았는데 cart 배지가 0" 이고, 빌드·타입체크는 전부 통과한다.
+  `createCartStore()` 는 export 로 남겨 뒀지만 용도는 테스트 격리다.
+
 ## 경계 설계 원칙
 
-| 책임                  | 소유자                       | 이유                                                       |
-| --------------------- | ---------------------------- | ---------------------------------------------------------- |
-| 라우팅                | host                         | remote 에 `next/link` 를 강요하면 프레임워크 종속이 생긴다 |
-| 레이아웃 · 헤더       | host                         | 셸은 하나여야 한다                                         |
-| 상품 목록/상세 렌더링 | catalog remote               | 도메인 소유 팀이 UI 를 통째로 배포                         |
-| 장바구니 UI           | cart remote                  | 위와 동일                                                  |
-| 장바구니 상태         | `@mfa/contracts` 싱글턴      | 어느 쪽도 소유하지 않는 공유 계약                          |
-| 결제 플로우           | cart remote (`CheckoutFlow`) | 라우터를 host 하나로 유지해야 소프트 내비게이션이 된다     |
+| 책임                  | 소유자                          | 이유                                                       |
+| --------------------- | ------------------------------- | ---------------------------------------------------------- |
+| 라우팅                | host                            | remote 에 `next/link` 를 강요하면 프레임워크 종속이 생긴다 |
+| 레이아웃 · 헤더       | host                            | 셸은 하나여야 한다                                         |
+| 상품 목록/상세 렌더링 | catalog remote                  | 도메인 소유 팀이 UI 를 통째로 배포                         |
+| 장바구니 UI           | cart remote                     | 위와 동일                                                  |
+| 장바구니 상태         | `@mfa/contracts` zustand 싱글턴 | 어느 쪽도 소유하지 않는 공유 계약                          |
+| 결제 플로우           | cart remote (`CheckoutFlow`)    | 라우터를 host 하나로 유지해야 소프트 내비게이션이 된다     |
 
 remote 는 **props 와 콜백으로만** host 와 대화한다.
 `onSelect(product)` → host 가 `router.push` 를 수행. remote 는 라우터를 모른다.

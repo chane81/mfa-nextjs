@@ -126,8 +126,10 @@ $ curl -s localhost:3000/checkout | grep -c "주문서"
 서버는 `mf-server.cjs` 의 컴포넌트로, 브라우저는 `remoteEntry` 의 컴포넌트로 렌더한다.
 **소스가 같으므로 마크업이 일치한다.** 브라우저 콘솔 하이드레이션 경고 0건 확인.
 
-장바구니 상태는 `useSyncExternalStore` 의 서버 스냅샷을 빈 값으로 두어
-SSR/CSR 불일치를 원천 차단했다.
+장바구니 상태는 서버 스냅샷을 빈 값으로 두어 SSR/CSR 불일치를 원천 차단했다.
+zustand 의 `useStore` 는 서버 스냅샷으로 `getInitialState()` 를 쓰는데, 이 값은 스토어를
+만든 시점에 캐시된 초기 상태다 — persist 가 localStorage 에서 복원한 값이 여기 섞이지 않는다.
+그래서 `skipHydration` + 수동 `rehydrate()` 없이도 hydration 이 안전하다.
 
 ## 3. 캐시는 끄는 게 아니라 무효화 경로를 만든다
 

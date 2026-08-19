@@ -24,6 +24,8 @@
 | `@tailwindcss/postcss`              | 4.3.3  | **4.3.3**    | host · cart                   |
 | `@tailwindcss/vite`                 | 4.3.3  | **4.3.3**    | catalog                       |
 | `eslint-plugin-react-hooks`         | 7.1.1  | **7.1.1**    | eslint 10 OK                  |
+| `zustand`                           | 5.0.15 | **5.0.15**   | `@mfa/store` 전용             |
+| `use-sync-external-store`           | 1.6.0  | **1.6.0**    | `zustand/traditional` 의 peer |
 
 ## ⚠️ TypeScript 7 을 안 쓴 이유
 

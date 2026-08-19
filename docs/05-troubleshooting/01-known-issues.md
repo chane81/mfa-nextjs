@@ -9,11 +9,12 @@
 
 ### 설치 · 기동
 
-| 증상                                                              | 항목                                                                                                                                                                                |
-| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm install` 이 `@rspack/binding-*` 에서 멈춤 · 타임아웃        | [8](#8-pnpm-설치-중-rspack-바이너리-타임아웃)                                                                                                                                       |
-| `ERR_PNPM_UNSUPPORTED_ENGINE` / `Expected version: >=24.19.0 <25` | Node 가 범위 밖이다 — [실행 방법 › 요구사항](../03-setup/01-getting-started.md#요구사항)                                                                                            |
-| 포트가 안 비어서 기동 실패 / 옛 빌드가 계속 응답                  | [0-1](#0-1-pkill--f-next-start-가-안-먹혀서-옛-빌드를-계속-테스트함), [B-4](#b-4-dev-서버가-떠-있으면-포트-충돌조차-안-난다), [B-4b](#b-4b-pnpm-start-가-자기-자신과-포트를-다툰다) |
+| 증상                                                               | 항목                                                                                                                                                                                |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install` 이 `@rspack/binding-*` 에서 멈춤 · 타임아웃         | [8](#8-pnpm-설치-중-rspack-바이너리-타임아웃)                                                                                                                                       |
+| `ERR_PNPM_UNSUPPORTED_ENGINE` / `Expected version: >=24.19.0 <25`  | Node 가 범위 밖이다 — [실행 방법 › 요구사항](../03-setup/01-getting-started.md#요구사항)                                                                                            |
+| 포트가 안 비어서 기동 실패 / 옛 빌드가 계속 응답                   | [0-1](#0-1-pkill--f-next-start-가-안-먹혀서-옛-빌드를-계속-테스트함), [B-4](#b-4-dev-서버가-떠-있으면-포트-충돌조차-안-난다), [B-4b](#b-4b-pnpm-start-가-자기-자신과-포트를-다툰다) |
+| `Directory import … is not supported` / `Cannot find module './x'` | dist 를 raw Node 로 로드했다 — [D-1](#d-1-확장자-없는-상대-경로는-번들러에서만-풀린다)                                                                                              |
 
 ### `pnpm build` 실패
 
@@ -79,6 +80,60 @@
 | `eslint-plugin-react` 가 ESLint 10 에서 크래시  | [4](#4-eslint-plugin-react-7375-가-eslint-10-에서-크래시)                             |
 | `react-hooks@7` 이 렌더 중 컴포넌트 생성을 막음 | [5](#5-react-hooks7-렌더-중-컴포넌트-생성-금지)                                       |
 | `@next/next/no-html-link-for-pages` 오탐        | [6](#6-multi-zone-경계에서-nextnextno-html-link-for-pages-오탐-앱-삭제됨) (앱 삭제됨) |
+
+## D. (11차) 상태 패키지(`@mfa/store`)에서 밟은 것
+
+### D-1. 확장자 없는 상대 경로는 번들러에서만 풀린다
+
+파일을 합치면서 배럴의 재-export 하나가 확장자를 잃었다. `pnpm typecheck` 도
+`pnpm lint` 도 `pnpm build` 도 **전부 통과했고**, dist 를 Node 로 직접 로드할 때만 터졌다.
+
+```
+Cannot find module '…/packages/store/dist/cart/create-store'
+  imported from …/packages/store/dist/cart/index.js
+```
+
+디렉터리를 가리키면 메시지가 한 번 더 바뀐다.
+
+```
+Directory import '…/packages/store/dist/cart' is not supported resolving ES modules
+  imported from …/packages/store/dist/index.js
+```
+
+**원인**은 셋이 겹친 것이다.
+
+1. `tsc` 는 import 경로를 **재작성하지 않는다.** 소스에 적은 문자열이 그대로 산출물에 남는다.
+2. 이 저장소의 tsconfig 는 `moduleResolution: "bundler"` 라 확장자 생략을 **허용**한다.
+   그래서 타입체크가 통과한다.
+3. 산출물은 `"type": "module"` 인 Node ESM 이다. Node 의 ESM 리졸버는 확장자 자동 추가도,
+   디렉터리 `index` 자동 탐색도 하지 않는다.
+
+즉 **번들러로 소비하면 멀쩡하고 Node 로 직접 로드할 때만 깨진다.** 그래서 CI 가 못 잡는다.
+
+**결정**: 상대 경로에서 확장자를 **생략한다**(저장소 전역). 판단 기준은 "raw Node 가 이 파일을
+여느냐" 하나이고, 지금은 모든 소비가 번들러를 거친다.
+
+| 코드                                | 확장자 | 근거                                                                                |
+| ----------------------------------- | ------ | ----------------------------------------------------------------------------------- |
+| `@mfa/store`                        | 생략   | catalog(Vite)·cart(Rsbuild)만 소비한다                                              |
+| `@mfa/contracts` · `@mfa/ui`        | 생략   | host 가 `transpilePackages` 로 **직접 번들**한다(externalize 되지 않는다)           |
+| remote 앱 소스(`apps/remote-*/src`) | 생략   | Vite·Rsbuild 가 번들한다                                                            |
+| host 앱 내부(`apps/host/src`)       | 생략   | Turbopack 이 `.js` 를 못 찾는다 — [2](#2-turbopack-이-상대경로-js-확장자를-못-찾음) |
+| `@mfa/remote-config`                | `.js`  | **예외** — `vite.config.ts`·`scripts/*.ts` 를 Node 가 직접 읽는다                   |
+
+실측: 전 패키지 생략 상태에서 typecheck 11/11, lint 11/11, build 6/6, host 프리렌더 정상.
+워크스페이스 패키지는 remote SSR 번들(`mf-server.cjs`)에 **인라인된다** —
+`require("@mfa/…")` 가 하나도 남지 않는 것으로 확인했다.
+
+**재발 조건**은 둘이다.
+
+- 워크스페이스 패키지를 host 의 `transpilePackages`(`apps/host/next.config.ts`)에서 빼면,
+  Next 가 그걸 externalize 해서 raw Node ESM 해석으로 떨어진다. `@mfa/store` 를 host 서버에서
+  import 하는 경우도 같다 — 지금 그 패키지는 목록에 없다.
+- `scripts/*.ts` 처럼 Node 가 직접 실행하는 코드에서 워크스페이스 패키지를 import 하는 경우.
+  지금은 `@mfa/remote-config` 만 그렇고, 그래서 그 패키지만 확장자를 지킨다.
+
+둘 중 하나가 생기면 확장자를 도로 붙이거나 dist 를 번들로 낸다.
 
 ## C. (10차) Tailwind 를 붙이면서 밟은 것들
 

@@ -1,5 +1,101 @@
 # 진행 상황
 
+## 2026-08-19 (11차) — 장바구니 스토어를 zustand 로 이행하고 `@mfa/store` 로 분리
+
+직접 구현한 스토어(리스너 Set · 스냅샷 재계산 · localStorage 배선 · `useSyncExternalStore`)를
+`zustand/vanilla` + `persist` 로 갈아탔다. **싱글턴 배치는 그대로다** — 상태는 zustand 모듈이
+아니라 스토어 인스턴스에 있으므로, 번들이 갈려도 장바구니가 하나이려면 인스턴스가
+`globalThis` 에 있어야 한다. 결정 근거는 [ADR-012](./02-architecture/01-decision.md).
+
+### 한 일
+
+- [x] `packages/store`(`@mfa/store`) 신설 — 런타임 공유 상태의 새 SSOT.
+      **도메인별 폴더**(`src/cart/`)로 나누고, 각 도메인의 공개 표면을 `<도메인>/index.ts`
+      에 정한 뒤 루트 `src/index.ts` 가 모은다. 진입점은 `@mfa/store` 하나
+- [x] 스토어를 `createStore()(persist(...))` 로 재작성.
+      상태는 `lines` 하나, 액션 4개(`add`·`setQuantity`·`remove`·`clear`)
+- [x] `persist` 미들웨어가 localStorage 를 맡는다 — `partialize` 로 `lines` 만 저장,
+      `createJSONStorage` getter 가 서버에서 던져 persist 를 통째로 건너뛴다
+- [x] 파생값(합계)은 상태에서 뺐다. **셀렉터가 아니라 순수 함수** `cartTotals(lines)` 다 —
+      상태의 조각이 아니라 화면이 쓰는 계산값이라 구독·비교와 얽힐 이유가 없다
+- [x] 훅은 `@mfa/store/cart/hooks` 로 — `useStore` 기반. `useCartLines` · `useCartTotals` ·
+      `useCart` 로 쪼개 구독 범위를 좁혔다(`CartBadge` 는 합계만 구독)
+- [x] **공개 표면은 둘뿐이다** — `useCart(selector)` · `cartTotals(lines)`.
+      스토어 인스턴스와 팩토리는 내보내지 않는다
+- [x] 상대 경로에서 `.js` 확장자를 뺐다 — `@mfa/store` 에서 시작해 `contracts` · `ui` ·
+      remote 앱 소스까지 저장소 전역으로 맞췄다. 예외는 `@mfa/remote-config` 하나
+      (Node 가 직접 읽는다). raw Node 로드만 깨지고 CI 는 못 잡는다는 성질은 D-1 에 기록
+- [x] 셀렉터는 패키지에 정의하지 않고 **호출부가 정한다**.
+      `useCart((state) => state.lines)` · `useCart((state) => state.add)`.
+      비교는 훅이 `shallow` 로 못 박는다 — 객체로 묶어 뽑아도 호출부는 그대로 쓴다
+- [x] 싱글턴 장치를 `src/utils/global-singleton.ts` 로 뽑았다 —
+      `globalSingleton(name, create)`. 도메인마다 전역 키를 새로 파는 대신
+      `Symbol.for('@mfa/store/singletons')` 레지스트리 하나를 이름으로 가른다
+- [x] 호출부 6곳 이행
+- [x] `@mfa/contracts` 정리 — 스토어와 zustand 의존, 스토어 때문에 있던
+      tsconfig 의 `lib: ["DOM", ...]` 오버라이드 제거. 이제 타입 계약만 남았다
+- [x] `@mfa/ui` 는 의존성 0 이 됐다 — cart 훅이 나가면서 contracts·zustand 둘 다 빠짐
+- [x] `zustand@5.0.15` 는 `@mfa/store` 한 곳만 가진다
+
+### 왜 contracts 에서 뺐나
+
+contracts 는 **타입 계약**(remote 가 무엇을 노출하는가), 스토어는 **런타임 상태**(값이
+변하고 구독자가 있고 localStorage 를 만진다)다. 한 패키지에 두면 타입만 필요한 소비처까지
+zustand 와 DOM 타입을 끌고 온다.
+
+cart remote 가 소유하는 안이 도메인상 가장 정직하지만 지금은 접었다 — **catalog remote 도
+스토어에 쓴다**("담기"). 옮기려면 catalog 가 `onAddToCart` 콜백을 props 로 받고 host 가
+cart 로 배선하는 계약 변경이 함께 필요하다. 근거와 대안은
+[ADR-013](./02-architecture/01-decision.md).
+
+### API 표면을 깎았다 — 무엇을 지웠고 무엇은 못 지우나
+
+편의 래퍼 셋을 지웠다.
+
+| 지운 것                   | 대체                         | 왜 지워도 되나                    |
+| ------------------------- | ---------------------------- | --------------------------------- |
+| `cartActions`             | `useCartActions()`           | 소비처가 전부 React 컴포넌트다    |
+| `selectTotals` + 1칸 캐시 | 순수 함수 `cartTotals()`     | 렌더 중 계산이면 비교가 필요 없다 |
+| `getCartStore()`          | 패키지 내부 `cartStore` 상수 | 함수 호출이 한 겹 필요 없었다     |
+
+**전역 레지스트리 조회는 못 지운다.** 훅에서 `createCartStore()` 를 바로 부르면 번들마다
+(host · catalog · cart) 스토어 인스턴스가 따로 생긴다. 증상은 "catalog 에서 담았는데
+cart 배지는 0", 그리고 빌드·타입체크·린트는 전부 통과한다. 그래서 인스턴스 생성은
+`createCartStore()` 에 남기되(테스트 격리용), 앱이 쓰는 것은 `globalSingleton('cart', …)` 을
+거쳐 만든 `cartStore` 상수 하나다(패키지 내부에만 있다). 실측: 같은 모듈을 두 번 평가해도
+인스턴스는 하나이고,
+`globalThis` 의 자체 프로퍼티는 0개다(레지스트리가 심볼 키라서).
+
+### SSR 이 그대로 안전한 이유
+
+`useStore` 는 서버 스냅샷으로 `getInitialState()` 를 넘긴다(zustand 5.0.x `src/react.ts`).
+이 값은 **스토어 생성 시점에 캐시된 초기 상태**라, persist 가 localStorage 에서 복원한
+값이 섞이지 않는다. 그래서 `skipHydration` + 수동 `rehydrate()` 를 쓰지 않았다.
+서버 렌더와 hydration 렌더가 둘 다 빈 장바구니라서 mismatch 가 없다.
+
+### 밟을 뻔한 것 — zustand 5 의 셀렉터 규칙
+
+v5 의 기본 비교는 `Object.is` 다(v4 의 얕은 비교가 빠졌다). **새 객체를 돌려주는 셀렉터**는
+매 렌더 다르다고 판정되어 무한 렌더로 간다. 셀렉터를 호출부가 쓰게 만든 뒤로는 이 함정도
+호출부로 옮겨가는데, 그건 스토어 쪽 사정이지 화면의 관심사가 아니다. 그래서 `useCart` 가
+안에서 `shallow` 를 쓰고 비교 방식을 밖으로 열지 않는다.
+
+훅은 `useStoreWithEqualityFn`(`zustand/traditional`) + `shallow`(`zustand/shallow`) 를 쓴다.
+비교 함수를 인자로 받는 형태라 셀렉터를 감싸지 않아도 되고, 서버 스냅샷은 이 훅도
+`getInitialState()` 로 가져가므로(`src/traditional.ts` 의 `useSyncExternalStoreWithSelector`
+3번째 인자) hydration 안전성은 그대로다. 앱은 zustand 를 직접 의존하지 않는다 —
+`shallow` 를 포함해 zustand 는 `@mfa/store` 안에만 있다.
+
+**대가:** `zustand/traditional` 은 `use-sync-external-store` 를 optional peer 로 요구한다.
+설치돼 있지 않았으므로 `@mfa/store` 의 dependencies 에 `use-sync-external-store@1.6.0` 을
+추가했다. `useStore` + `useShallow` 조합이었다면 필요 없는 의존성이다.
+
+### 실측
+
+`pnpm typecheck` · `pnpm lint` · `pnpm build` 전부 통과(패키지 11개). host 프리렌더 HTML 에
+cart remote 의 마크업이 빈 장바구니 상태로 그대로 들어있다(`담긴 상품이 없습니다`,
+badge 수량 0). remote SSR 번들이 Node 에서 평가되는 경로까지 확인된 셈이다.
+
 ## 2026-08-19 (10차) — Tailwind v4 도입, remote 가 자기 CSS 를 선언한다
 
 초판은 CSS 를 아예 안 썼다. 세 앱의 CSS 파이프라인이 제각각(Next/Turbopack · Vite ·
@@ -542,5 +638,7 @@ if (!normalizedDev.disableDynamicRemoteTypeHints) {
 - [ ] SSR 실패 시 CSR 폴백 — 서버 로드 실패해도 브라우저에서 재시도
 - [ ] 초기 로딩 성능 측정 — SSR 경로의 TTFB / LCP 정량화
 - [ ] 프레임워크 혼용 remote (Vue/Svelte)로 자유도 한계 확인
-- [ ] 인증 토큰 공유 전략 (현재는 장바구니만 다룸)
+- [ ] 인증 토큰 공유 전략 (현재는 장바구니만 다룸) — `packages/store/src/auth/` 로 같은 모양 반복
+- [ ] 상태 소유권을 cart remote 로 넘기는 안 — catalog 가 `onAddToCart` 콜백을 받고
+      host 가 cart 로 배선한다 (ADR-013 의 기각 대안)
 - [ ] `@module-federation/bridge-react` 로 remote 안에 자체 라우터 두는 패턴 검증
