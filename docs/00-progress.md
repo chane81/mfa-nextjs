@@ -50,6 +50,8 @@ host 가 매니페스트를 **파싱해** CSS 주소를 캐내면 remote 의 빌
 | Vite dev 가 CSS 를 JS 모듈로 서빙                 | `<link>` 로 받으면 브라우저가 **에러 없이** 통째로 무시한다                                           |
 | Tailwind v4 자동 탐지가 `node_modules` 를 안 훑음 | `@mfa/ui` 가 쓰는 클래스가 조용히 빠진다 — 빌드는 성공하고 화면만 무너진다                            |
 
+셋 다 재현 절차와 해결은 [05-troubleshooting/01-known-issues.md](./05-troubleshooting/01-known-issues.md#c-10차-tailwind-를-붙이면서-밟은-것들) 의 C 절에 있다.
+
 ### 실측
 
 `pnpm build` 후 host 프리렌더 HTML 에 stylesheet `<link>` 3개가 전부 `<head>` 안에 있다 —

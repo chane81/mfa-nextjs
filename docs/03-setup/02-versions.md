@@ -1,6 +1,6 @@
 # 버전 고정 근거
 
-조회일: 2026-08-14 (npm registry 직접 조회)
+조회일: 2026-08-14 (npm registry 직접 조회) · Tailwind 항목은 2026-08-19 조회
 
 ## 채택 버전
 
@@ -20,6 +20,9 @@
 | `@module-federation/rsbuild-plugin` | 2.8.2  | **2.8.2**    |                               |
 | `@module-federation/runtime`        | 2.8.2  | **2.8.2**    | host 가 쓰는 유일한 MF 패키지 |
 | `eslint-plugin-react`               | 7.37.5 | **7.37.5**   | ⚠️ 아래 참고                  |
+| `tailwindcss`                       | 4.3.3  | **4.3.3**    | v4 — 설정이 CSS 안에 있다     |
+| `@tailwindcss/postcss`              | 4.3.3  | **4.3.3**    | host · cart                   |
+| `@tailwindcss/vite`                 | 4.3.3  | **4.3.3**    | catalog                       |
 | `eslint-plugin-react-hooks`         | 7.1.1  | **7.1.1**    | eslint 10 OK                  |
 
 ## ⚠️ TypeScript 7 을 안 쓴 이유
@@ -54,6 +57,20 @@ TypeError: Error while loading rule 'react/display-name':
 settings: { react: { version: "19.2" } },
 ```
 
+## Tailwind 는 세 앱이 같은 버전이어야 한다
+
+`tailwindcss` · `@tailwindcss/postcss` · `@tailwindcss/vite` 를 세 앱과
+`@mfa/tailwind-config` 에서 모두 `^4.3.3` 으로 맞춘다. 공유 CSS 를 빌드해 배포하는 대신
+**각 앱이 같은 `theme.css` 를 자기 파이프라인에서 컴파일**하기 때문이다
+([05-styling.md](../02-architecture/05-styling.md)). 버전이 갈리면 같은 소스에서 서로 다른
+유틸리티가 나오고, 그 CSS 들이 한 페이지에 함께 로드된다.
+
+재확인:
+
+```bash
+npm view tailwindcss version
+```
+
 ## Node / 패키지 매니저
 
 ```
@@ -81,7 +98,8 @@ node 요구가 next 16 의 `>=20.9.0` 보다 높은 이유는 `packages/remote-c
 ## 버전 재확인 방법
 
 ```bash
-for p in next turbo typescript eslint react \
+for p in next turbo typescript eslint react tailwindcss \
+         @tailwindcss/postcss @tailwindcss/vite \
          @module-federation/vite @module-federation/runtime \
          @module-federation/rsbuild-plugin @rsbuild/core \
          @module-federation/nextjs-mf; do

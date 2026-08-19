@@ -61,7 +61,7 @@ remote 자산은 **버전 디렉터리 아래 불변 경로**에 올라가고, �
 | `@mfa/contracts`         | 도메인 타입 · 목 데이터 · 장바구니 싱글턴 · **remote 모듈 타입 계약**      |
 | `@mfa/remote-config`     | **remote 배치의 SSOT** — 이름 · 포트 · env 이름 · 산출물 파일명 · URL 조립 |
 | `@mfa/tailwind-config`   | **디자인 토큰 SSOT** — Tailwind v4 `@theme` + PostCSS 설정 원본            |
-| `@mfa/ui`                | 공용 컴포넌트 (토큰 → Tailwind 클래스로 이행 중)                           |
+| `@mfa/ui`                | 공용 컴포넌트 — Tailwind 클래스만 내보내고 CSS 는 만들지 않는다            |
 | `@mfa/eslint-config`     | ESLint 10 flat config (base / react / next)                                |
 | `@mfa/typescript-config` | tsconfig 프리셋 (base / nextjs / react-library / vite)                     |
 

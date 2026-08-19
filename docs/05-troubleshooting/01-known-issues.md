@@ -47,6 +47,14 @@
 | hydration 불일치                                        | [A-8](#a-8-버전-스크립트가-suspense-안에-있으면-hydration-이-깨진다)            |
 | 서버 로더에 node builtin 을 썼더니 브라우저 번들이 깨짐 | [0-2](#0-2-서버-로더에-node-builtin-을-쓰면-브라우저-번들이-깨진다)             |
 
+### 스타일 · CSS
+
+| 증상                                                | 항목                                                                           |
+| --------------------------------------------------- | ------------------------------------------------------------------------------ |
+| dev 에서만 remote 가 무스타일 (`/style.css` 는 200) | [C-1](#c-1-dev-에서-vite-remote-의-css-를-브라우저가-통째로-무시한다)          |
+| `@mfa/ui` 컴포넌트만 무스타일 · 빌드는 성공         | [C-2](#c-2-mfaui-의-클래스가-css-에서-조용히-빠진다)                           |
+| 배포에서 스타일시트가 `localhost` 를 가리킴         | [C-3](#c-3-브라우저에서-만든-스타일시트-주소가-배포에서-localhost-를-가리킨다) |
+
 ### 캐시 · 버전 · 재배포
 
 | 증상                                        | 항목                                                                                                                                                                                     |
@@ -71,6 +79,73 @@
 | `eslint-plugin-react` 가 ESLint 10 에서 크래시  | [4](#4-eslint-plugin-react-7375-가-eslint-10-에서-크래시)                             |
 | `react-hooks@7` 이 렌더 중 컴포넌트 생성을 막음 | [5](#5-react-hooks7-렌더-중-컴포넌트-생성-금지)                                       |
 | `@next/next/no-html-link-for-pages` 오탐        | [6](#6-multi-zone-경계에서-nextnextno-html-link-for-pages-오탐-앱-삭제됨) (앱 삭제됨) |
+
+## C. (10차) Tailwind 를 붙이면서 밟은 것들
+
+스타일 계약 자체는 [02-architecture/05-styling.md](../02-architecture/05-styling.md) 에 있다.
+여기는 **틀렸을 때 어떻게 보이는지**만 적는다. 셋 다 공통점이 하나 있다 —
+**에러가 안 난다.** 빌드도 통과하고 콘솔도 조용한데 화면만 무너진다.
+
+### C-1. dev 에서 Vite remote 의 CSS 를 브라우저가 통째로 무시한다
+
+증상: `pnpm build` 로는 멀쩡한데 `pnpm dev` 에서만 catalog 영역이 무스타일이다.
+Network 탭에서 `http://localhost:3001/style.css` 는 **200** 이고, 콘솔 에러는 없다.
+
+원인: dev 의 Vite 는 CSS 를 파일로 내보내지 않는다. HMR 을 위해 `<style>` 을 주입하는
+**JS 모듈**로 감싸서 서빙한다. host 는 dev 든 배포든 똑같이
+`<link rel="stylesheet">` 를 거는데(`RemoteComponent`), 브라우저는 스타일시트 자리에서
+받은 JavaScript 를 파싱하지 못하고 그냥 버린다 — 그게 에러가 아니라 정상 동작이다.
+
+해결: dev 전용 미들웨어가 `/style.css` 를 Vite 의 내부 쿼리 `?direct` 로 한 번 대신
+요청해 JS 래퍼를 벗기고 `text/css` 로 돌려준다. 주소 하나로 dev 와 배포가 같아진다.
+
+```ts
+// apps/remote-catalog/vite.config.ts — serveDevStylesheet()
+server.transformRequest('/src/styles.css?direct').then((result) => {
+  res.setHeader('Content-Type', 'text/css; charset=utf-8');
+  res.setHeader('Access-Control-Allow-Origin', '*'); // host(3000) 가 교차 출처로 받아간다
+  res.end(result.code);
+});
+```
+
+cart(Rsbuild)는 해당 없다. dev 에서도 CSS 를 실제 파일로 낸다 —
+`output.distPath.css: ''` + `filename.css` 로 위치와 이름만 계약에 맞춰 뒀다.
+
+### C-2. `@mfa/ui` 의 클래스가 CSS 에서 조용히 빠진다
+
+증상: 앱 소스에 직접 쓴 클래스는 먹는데 `@mfa/ui` 컴포넌트만 무스타일이다.
+빌드는 성공한다. 생성된 CSS 를 열어 보면 해당 유틸리티가 아예 없다.
+
+원인: Tailwind v4 의 자동 소스 탐지는 `node_modules` 를 훑지 않는다. `@mfa/ui` 는
+pnpm 워크스페이스 링크라 앱 입장에서 `node_modules` 안에 있다.
+
+해결: `packages/tailwind-config/theme.css` 가 `@source '../ui/src'` 로 한 번 지정해
+세 앱에 모두 적용한다(경로는 그 CSS 파일 위치 기준). 대신 자동 탐지의 기준점이
+워크스페이스 링크 안의 `theme.css` 가 되므로, **앱 진입 CSS 가 자기 소스를 다시
+지정해야 한다**(`@source '.'` / `@source '../'`).
+
+같은 함정의 다른 얼굴: 클래스 이름을 `bg-${variant}` 처럼 조립하면 소스 스캔이 못 찾아
+똑같이 빠진다. `packages/ui` 의 `Button` 은 variant 별 클래스를 완성된 문자열로 나열한다.
+
+### C-3. 브라우저에서 만든 스타일시트 주소가 배포에서 `localhost` 를 가리킨다
+
+증상: 로컬은 멀쩡한데 배포에서 remote 스타일시트만 안 뜬다. HTML 을 보면
+`<link href="http://localhost:3001/...">` 가 박혀 있다.
+
+원인: `publicOrigin()` 은 `process.env[이름]` 을 **동적으로** 읽는다. Next 는 정적
+`process.env.X` 만 치환하므로 브라우저 번들에서는 값이 남지 않고 로컬 기본값으로 떨어진다.
+`SSR_ENTRIES` 에서 오리진을 뽑는 경로도 같은 이유로 서버 전용이다.
+
+해결: `RemoteComponent` 는 `REMOTE_ORIGINS` 를 쓴다. 이 값은 `next.config.ts` 가 node 에서
+꺼내 번들에 구워 넣은 `WEB_ENTRIES` 에서 나오므로 브라우저에서도 배포 오리진을 가리키고,
+서버 렌더와 값이 같아 하이드레이션도 어긋나지 않는다.
+
+```tsx
+// apps/host/src/mf/RemoteComponent.tsx
+href={`${REMOTE_ORIGINS[remoteName]}${stylesPath(knownVersion(remoteName)?.version)}`}
+```
+
+---
 
 ## B. (6차) 로컬에서 `pnpm build` 가 안 됐다
 
