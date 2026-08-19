@@ -30,3 +30,4 @@ next-env.d.ts
 
 # MF 빌드 버전 (빌드 중에만 존재)
 .mf-version
+.gstack/
