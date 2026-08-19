@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 
-import type { Product, ProductCategory } from './product.js';
+import type { Product, ProductCategory } from './product';
 
 /**
  * remote 가 노출(expose)하는 모듈의 타입 계약.

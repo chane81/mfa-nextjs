@@ -8,7 +8,7 @@ import {
 } from '@mfa/contracts';
 import { Button, Panel } from '@mfa/ui';
 
-import { ProductCard } from '../components/ProductCard.js';
+import { ProductCard } from '../components/ProductCard';
 
 /** host 에 노출되는 모듈: `catalog/ProductGrid` */
 export default function ProductGrid({

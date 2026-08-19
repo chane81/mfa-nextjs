@@ -1,6 +1,6 @@
-import CartBadge from './exposes/CartBadge.js';
-import CartPanel from './exposes/CartPanel.js';
-import CheckoutFlow from './exposes/CheckoutFlow.js';
+import CartBadge from './exposes/CartBadge';
+import CartPanel from './exposes/CartPanel';
+import CheckoutFlow from './exposes/CheckoutFlow';
 
 /**
  * SSR 전용 진입점 (node 타깃 CJS 번들).

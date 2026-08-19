@@ -1,8 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import ProductDetail from './exposes/ProductDetail.js';
-import ProductGrid from './exposes/ProductGrid.js';
+import ProductDetail from './exposes/ProductDetail';
+import ProductGrid from './exposes/ProductGrid';
 import './styles.css';
 
 /**
