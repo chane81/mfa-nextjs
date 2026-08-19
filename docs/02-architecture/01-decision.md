@@ -239,6 +239,7 @@
   src/cart/totals.ts             cartTotals — 셀렉터가 아닌 순수 함수
   src/cart/index.ts              도메인 공개 표면
   src/utils/global-singleton.ts  (내부)  번들 경계를 넘는 인스턴스 1개 보장
+  src/utils/create-hook.ts       (내부)  createHook — 싱글턴 확보 + 훅 배선, UseStore<T>
   src/index.ts                   → "@mfa/store"  도메인 index 들을 모은다
   ```
 

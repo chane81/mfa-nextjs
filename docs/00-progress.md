@@ -31,6 +31,15 @@
 - [x] 싱글턴 장치를 `src/utils/global-singleton.ts` 로 뽑았다 —
       `globalSingleton(name, create)`. 도메인마다 전역 키를 새로 파는 대신
       `Symbol.for('@mfa/store/singletons')` 레지스트리 하나를 이름으로 가른다
+- [x] 도메인이 반복하던 두 단계(싱글턴 확보 + 훅 배선)를 `src/utils/create-hook.ts` 의
+      `createHook(name, create)` 로 모았다. 도메인 쪽은
+      `export const useCart = createHook(STORE_NAME, createCartStore)` 한 줄이다
+- [x] 훅 타입 `UseStore<T>` 도 같은 파일에 둔다. `<U>` 는 **호출 시그니처 안쪽**이다 —
+      별칭 파라미터로 빼면 적용 시점에 `unknown` 으로 굳어 호출부 타입이 깨진다
+      (`'unknown' 형식에 'setQuantity' 속성이 없습니다`)
+- [x] 인스턴스가 아니라 **팩토리**를 받는다. 인스턴스를 받으면 호출부가 `globalSingleton`
+      을 먼저 불러야 하고, 빠뜨리면 번들마다 스토어가 갈라진다 — 빌드·타입체크는 통과하고
+      화면만 어긋난다
 - [x] 호출부 6곳 이행
 - [x] `@mfa/contracts` 정리 — 스토어와 zustand 의존, 스토어 때문에 있던
       tsconfig 의 `lib: ["DOM", ...]` 오버라이드 제거. 이제 타입 계약만 남았다
