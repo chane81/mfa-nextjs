@@ -30,6 +30,19 @@ paths:
 remote 쪽 expose 마다 선언하지 않는다 — expose 를 추가할 때 잊으면 스타일 없는 화면이 조용히 나온다.
 주소는 `REMOTE_ORIGINS[remote] + stylesPath(version)` 로 만든다(브라우저에서도 맞는 값).
 
+## CSS 파일에는 **유틸리티로 못 적는 것**만 둔다
+
+전환·애니메이션도 마찬가지다. 크기 전환(`grid-rows-[0fr]` → `data-[open=true]:grid-rows-[1fr]`),
+흐림(`blur-xs`), 자식 지정(`*:overflow-hidden`), 움직임 줄이기(`motion-reduce:`)는 전부
+유틸리티로 적힌다 — CSS 로 내려보내면 그 규칙이 마크업에서 안 보이게 된다.
+
+정말 못 적는 건 **키프레임**뿐이다. 그건 `@theme` 안에 `--animate-*` 와 `@keyframes` 로
+등록해 `animate-<이름>` 유틸리티가 생기게 한다(v4 규약). 곡선처럼 여러 자리가 공유하는 값은
+`--ease-*` 토큰으로 `theme.css` 에 둔다 — 같은 곡선을 타야 하나의 동작으로 읽힌다.
+
+긴 유틸리티 조합이 여러 곳에 복제될 것 같으면 CSS 클래스가 아니라 **컴포넌트**로 묶는다
+(`apps/remote-cart/src/components/Reveal.tsx`).
+
 ## 인라인 스타일은 런타임 값만
 
 `tokens.ts` 는 삭제됐다. 클래스로 굳힐 수 없는 런타임 값(remote 경계 색 `--hue`)만 CSS 변수로
