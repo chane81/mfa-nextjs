@@ -14,6 +14,7 @@
  * 근거: ADR-015
  */
 export { useCart } from './create-store';
+export { useCartSync } from './use-cart-sync';
 export * from './totals';
 
 export type { CartLine, CartState } from './create-store';
