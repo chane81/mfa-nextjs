@@ -1,17 +1,29 @@
 import { formatKRW, type CartPanelProps } from '@mfa/contracts';
-import { cartTotals, useCart } from '@mfa/store';
+import { cartTotals, useCart, useCartSync, useHydrated } from '@mfa/store';
 import { Button, Panel } from '@mfa/ui';
 
 /** host 에 노출되는 모듈: `cart/CartPanel` */
 export default function CartPanel({
   onCheckout,
   compact = false,
+  initialLines,
 }: CartPanelProps) {
-  const lines = useCart((state) => state.lines);
+  /** 다른 탭이 장바구니를 바꿨으면 이 탭이 앞으로 나올 때 다시 읽는다 */
+  useCartSync();
+
+  const hydrated = useHydrated();
+  const storeLines = useCart((state) => state.lines);
   const { clear, setQuantity } = useCart((state) => ({
     clear: state.clear,
     setQuantity: state.setQuantity,
   }));
+
+  /**
+   * 하이드레이션 커밋 전에는 host 가 쿠키에서 읽어 넘긴 값을 쓴다 — 스토어의 서버
+   * 스냅샷은 빈 장바구니다. 둘 다 같은 쿠키에서 나오므로 값이 바뀌지 않는다
+   * (단일 탭 기준. 다른 탭이 그사이 바꿨다면 `useCartSync` 가 포커스 때 맞춘다).
+   */
+  const lines = hydrated ? storeLines : (initialLines ?? []);
   const { totalQuantity, totalPriceLabel } = cartTotals(lines);
 
   return (

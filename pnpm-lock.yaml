@@ -41,6 +41,9 @@ importers:
       '@mfa/remote-config':
         specifier: workspace:*
         version: link:../../packages/remote-config
+      '@mfa/store':
+        specifier: workspace:*
+        version: link:../../packages/store
       '@mfa/tailwind-config':
         specifier: workspace:*
         version: link:../../packages/tailwind-config

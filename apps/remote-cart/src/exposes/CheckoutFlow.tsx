@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { formatKRW, type CheckoutFlowProps } from '@mfa/contracts';
-import { cartTotals, useCart } from '@mfa/store';
+import { cartTotals, useCart, useCartSync, useHydrated } from '@mfa/store';
 import { Badge, Button, Panel } from '@mfa/ui';
 
 /**
@@ -14,9 +14,17 @@ import { Badge, Button, Panel } from '@mfa/ui';
 export default function CheckoutFlow({
   onDone,
   onContinueShopping,
+  initialLines,
 }: CheckoutFlowProps) {
-  const lines = useCart((state) => state.lines);
+  /** 다른 탭이 장바구니를 바꿨으면 이 탭이 앞으로 나올 때 다시 읽는다 */
+  useCartSync();
+
+  const hydrated = useHydrated();
+  const storeLines = useCart((state) => state.lines);
   const clear = useCart((state) => state.clear);
+
+  /** 근거는 `CartPanel` 과 같다 — 커밋 전에는 서버가 넘겨준 값을 쓴다 */
+  const lines = hydrated ? storeLines : (initialLines ?? []);
   const { totalPriceLabel, totalQuantity } = cartTotals(lines);
   const [placed, setPlaced] = useState(false);
 

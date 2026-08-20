@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import type { CartLine } from '@mfa/contracts';
+
 import { RemoteComponent } from '@/mf/RemoteComponent';
 
 const NAV = [
@@ -15,7 +17,12 @@ const NAV = [
   { href: '/lab', label: '캐시 실험' },
 ] as const;
 
-export function SiteHeader() {
+export function SiteHeader({
+  initialLines,
+}: {
+  /** 서버가 요청 쿠키에서 읽어 넘긴 장바구니. 배지가 첫 렌더부터 맞는 값을 그린다 */
+  initialLines?: readonly CartLine[];
+}) {
   const pathname = usePathname();
 
   return (
@@ -51,7 +58,11 @@ export function SiteHeader() {
         </nav>
 
         {/* 헤더 배지 자체가 cart remote 에서 온다 */}
-        <RemoteComponent module="cart/CartBadge" fallbackLabel="🛒 …" />
+        <RemoteComponent
+          module="cart/CartBadge"
+          fallbackLabel="🛒 …"
+          props={{ initialLines }}
+        />
       </div>
     </header>
   );
