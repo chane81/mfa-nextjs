@@ -30,11 +30,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      # pnpm 11+ 는 action-setup 이 아니라 pnpm/setup 이다 — 자체 릴리스 바이너리를 받고
-      # `pnpm runtime set` 으로 Node 까지 같이 깐다. 그래서 actions/setup-node 가 없다.
-      # pnpm 버전은 package.json 의 `packageManager` 에서 읽는다(11.22.0).
-      # Node 범위는 package.json 의 `engines.node` 와 같은 값으로 적는다.
       - uses: pnpm/setup@v2
         with:
           runtime: node@^24.19.0
@@ -54,6 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # verify 와 캐시 키를 공유한다 — 저장 경합 경고는 verify job 쪽 주석 참고.
       - uses: pnpm/setup@v2
         with:
           runtime: node@^24.19.0
