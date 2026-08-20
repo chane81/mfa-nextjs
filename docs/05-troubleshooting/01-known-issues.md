@@ -47,6 +47,10 @@
 | `/` 만 스켈레톤이 먼저 나감                             | [0-6](#0-6-만-스켈레톤이-먼저-나가는-현상)                                      |
 | hydration 불일치                                        | [A-8](#a-8-버전-스크립트가-suspense-안에-있으면-hydration-이-깨진다)            |
 | 서버 로더에 node builtin 을 썼더니 브라우저 번들이 깨짐 | [0-2](#0-2-서버-로더에-node-builtin-을-쓰면-브라우저-번들이-깨진다)             |
+| 새로고침하면 장바구니 영역이 한 번 깜빡임               | [E-1](#e-1-새로고침-때-장바구니가-깜빡인다--저장소가-느린-게-아니다)            |
+| 깜빡임을 자리표시자로 가렸더니 더 심해짐                | [E-2](#e-2-자리표시자로-가리면-더-나빠진다)                                     |
+| `blocking-prerender-dynamic` 빌드 에러                  | [E-3](#e-3-쿠키를-suspense-밖에서-읽으면-빌드가-멈춘다)                         |
+| 안 쓰는 패키지가 브라우저 번들에 실림                   | [E-4](#e-4-use-client-를-재수출하는-배럴은-서버에서-써도-브라우저로-따라온다)   |
 
 ### 스타일 · CSS
 
@@ -80,6 +84,117 @@
 | `eslint-plugin-react` 가 ESLint 10 에서 크래시  | [4](#4-eslint-plugin-react-7375-가-eslint-10-에서-크래시)                             |
 | `react-hooks@7` 이 렌더 중 컴포넌트 생성을 막음 | [5](#5-react-hooks7-렌더-중-컴포넌트-생성-금지)                                       |
 | `@next/next/no-html-link-for-pages` 오탐        | [6](#6-multi-zone-경계에서-nextnextno-html-link-for-pages-오탐-앱-삭제됨) (앱 삭제됨) |
+
+## E. (13차) 장바구니를 쿠키로 옮기며 밟은 것
+
+### E-1. 새로고침 때 장바구니가 깜빡인다 — 저장소가 느린 게 아니다
+
+`persist` + `localStorage` 를 쓰니 "저장소를 읽는 동안 비어 보이는 것"이라고 오진했다.
+아니다. zustand 문서(5.0.15)가 명시한다 — **동기 저장소면 스토어 생성 시점에 복원이 끝나 있다.**
+
+> With synchronous hydration, the Zustand store will already have been hydrated at its creation.
+
+늦는 쪽은 React 다. `useStore` 는 하이드레이션 렌더에서 **서버 스냅샷**
+(`getInitialState()` = `lines: []`)을 쓴다. 서버 HTML 과 첫 클라이언트 렌더가 달라지면
+안 되기 때문이다. 즉 **이미 아는 값을 일부러 한 프레임 안 쓴다.**
+
+CDP 로 rAF 마다 표본을 뜨면 이렇게 보인다(항목 3개, 프로덕션 빌드).
+
+```
+  t(ms)  badgeW  panelBodyH
+    9.2    97.8         0     ← 서버 스냅샷. 빈 장바구니
+   34.6    97.8         0     ← 하이드레이션 커밋 직전
+   51.2   187.6     206.5     ← 한 프레임에 두 자리가 튄다
+```
+
+**깜빡임의 정체는 색이 아니라 층 이동이다.**
+
+진단할 때 헷갈리지 않는 방법: 저장소를 의심하지 말고 `useCart.getState().lines` 를 첫
+스크립트에서 찍어 본다. 이미 들어 있다.
+
+근본 원인은 **저장 위치**다. localStorage 는 브라우저에만 있어 서버가 모르고, 서버가
+모르면 첫 HTML 은 반드시 비어 있다. 쿠키로 옮겨야 사라진다(ADR-014).
+
+### E-2. 자리표시자로 가리면 더 나빠진다
+
+E-1 을 "값이 준비될 때까지 가린다"로 풀려다 두 번 실패했다.
+
+1. **스켈레톤** — 회색 상자가 "로딩 중"이 아니라 **번쩍임**으로 읽혔다. 한 프레임 남짓
+   보이는 것에 로딩 UI 를 붙이면 없는 것보다 시끄럽다. 스켈레톤 1줄 대 실제 2줄이라
+   층 이동이 오히려 하나 늘었다.
+2. **색 없는 자리표시자** — 소리는 줄었는데 크기가 여전히 안 맞았다. 당연하다.
+   **줄 수는 서버도, 첫 클라이언트 렌더도 모른다.** 자리 크기를 실제와 맞추는 건 원리상 불가능하다.
+
+가려서 될 문제가 아니었다. 서버가 값을 알아야 끝난다.
+
+### E-3. 쿠키를 Suspense 밖에서 읽으면 빌드가 멈춘다
+
+`cacheComponents` 가 켜진 상태에서 페이지 본문에 `cookies()` 를 넣으면 빌드가 실패한다.
+
+```
+Error: Route "/cart": Next.js encountered uncached or runtime data during prerendering.
+`fetch(...)`, `cookies()`, `headers()`, `params`, `searchParams`, or `connection()`
+accessed outside of `<Suspense>` prevents the route from being prerendered…
+```
+
+문서에는 "프리렌더되지 않는다"고만 적혀 있어 **경고인 줄 알기 쉽지만 빌드 에러다.**
+Cache Components 는 모든 페이지가 비어 있지 않은 정적 셸을 만드는지도 검증하기 때문이다.
+
+에러 메시지가 세 가지 길을 준다.
+
+| 길                             | 이 저장소에서                                               |
+| ------------------------------ | ----------------------------------------------------------- |
+| `<Suspense>` 로 감싼다         | ❌ 장바구니가 스트리밍으로 늦게 와 없애려던 전이가 돌아온다 |
+| `"use cache"` 로 캐시한다      | ❌ 요청마다 다른 값이라 캐시 대상이 아니다                  |
+| `export const instant = false` | ⭕ 블로킹 라우트를 허용하는 공식 통로                       |
+
+`instant = false` 는 **루트 레이아웃이 아니라 그 페이지에만** 건다. 문서가
+"as low as possible" 이라고 못박는데, 위에 걸면 그 아래 전부가 정적 셸 검증에서
+빠지기 때문이다 — 여기서는 `/lab` 의 캐시 실험이 검증을 잃는다.
+
+`dynamic = 'force-dynamic'` 은 답이 아니다. `cacheComponents` 와 함께 쓰면 컴파일이
+막힌다(known-issues 의 세그먼트 설정 항목과 같은 규칙).
+
+### E-4. `'use client'` 를 재수출하는 배럴은 서버에서 써도 브라우저로 따라온다
+
+쿠키 코덱을 `@mfa/store` 로 옮기면서 `cart/index.ts` 배럴에 얹고, host 의 **서버 전용**
+모듈에서 `import { parseCartCookie } from '@mfa/store'` 로 꺼냈다. 배럴이 재수출하는
+`create-store.ts` 에는 `'use client'` 가 붙어 있으니 Next 가 서버 그래프에서 클라이언트
+참조로 바꿔 평가하지 않는다 — 거기까지는 맞았다.
+
+**그런데 평가되지 않는 것과 전송되지 않는 것은 다르다.** 클라이언트 참조가 되었다는 건
+"브라우저가 이 모듈을 받는다"는 뜻이다.
+
+```
+apps/host/.next/static/chunks/2ch43vbu-qx5a.js   21.8KB (gzip 9.1KB)
+  → zustand + 장바구니 스토어 전체
+  → 참조하는 페이지: _not-found · debug · lab   ← 장바구니가 없는 화면들
+```
+
+host 는 `useCart` 를 **한 번도 부르지 않는다.** 순수 함수 두 개를 꺼내려고 배럴을 탄
+대가로 상태 라이브러리가 통째로 따라왔다.
+
+확인 방법:
+
+```bash
+grep -rl "zustand" apps/host/.next/static --include='*.js'
+```
+
+빌드 성공으로는 안 잡힌다. 타입도 린트도 통과한다. **번들을 직접 봐야 보인다.**
+
+고친 방법은 `package.json` 의 **`react-server` export 조건**이다. RSC 그래프는
+`'use client'` 를 재수출하지 않는 `dist/server.js` 로, 나머지는 기존 배럴로 간다.
+소비처의 import 문(`@mfa/store`)은 그대로다.
+
+전용 서브패스(`@mfa/store/cart-cookie`)를 내는 방법도 되지만 **이름을 지어내야 해서**
+도메인이 늘면 `package.json` 이 지저분해진다. 조건부 export 는 진입점을 안 늘린다.
+
+조건이 원인이라는 건 **대조군으로 확인**했다 — 조건만 빼고 같은 코드로 빌드하면
+21,817바이트가 그대로 돌아온다. Turbopack 의 해석기는 Rust 라 소스 grep 으로는 못 본다.
+
+⚠️ 이 방식은 서버 코드에서 훅을 import 해도 **`tsc` 를 통과한다**(타입은 `default` 조건으로
+해석된다). `next build` 가 `Export useCart doesn't exist in target module ... [app-rsc]` 로
+잡는다. 근거: ADR-015
 
 ## D. (11차) 상태 패키지(`@mfa/store`)에서 밟은 것
 
