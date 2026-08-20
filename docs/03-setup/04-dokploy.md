@@ -180,11 +180,15 @@ warm 자기호출은 요청 오리진이 아니라 **루프백**(`MF_SELF_ORIGIN
 
 ## 실제 배포 구성
 
-| 서비스               | 공개 도메인                 | 컨테이너 이름(내부 DNS)         | 포트 |
-| -------------------- | --------------------------- | ------------------------------- | ---- |
-| `mfa-host`           | `mfa.lakegreen.net`         | `web-mfa-host-0es2dw`           | 3000 |
-| `mfa-remote-catalog` | `mfa-catalog.lakegreen.net` | `web-mfa-remote-catalog-x4ijue` | 3001 |
-| `mfa-remote-cart`    | `mfa-cart.lakegreen.net`    | `web-mfa-remote-cart-…`         | 3002 |
+| 서비스               | 공개 도메인                 | 포트 |
+| -------------------- | --------------------------- | ---- |
+| `mfa-host`           | `mfa.lakegreen.net`         | 3000 |
+| `mfa-remote-catalog` | `mfa-catalog.lakegreen.net` | 3001 |
+| `mfa-remote-cart`    | `mfa-cart.lakegreen.net`    | 3002 |
+
+컨테이너 이름(내부 DNS)은 Dokploy 가 서비스명 뒤에 임의 접미사를 붙여 만든다. 인스턴스마다
+값이 달라서 적어둘 이유가 없다 — 이 구조에서 내부 주소를 쓰는 곳도 없다. warm 자기호출조차
+루프백으로 나가고, remote 오리진은 브라우저와 host 서버가 함께 읽어야 해서 공개 도메인이다.
 
 ### Watch Paths
 
