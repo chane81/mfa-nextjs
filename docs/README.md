@@ -6,6 +6,7 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 
 | 폴더                                        | 내용                                                                                                      |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| [anatomy.html](./anatomy.html)              | **전체 구조 해부도** — 배포 파이프라인과 host↔remote 런타임을 그림으로. 브라우저로 연다                  |
 | [00-progress.md](./00-progress.md)          | 작업 진행 기록                                                                                            |
 | [01-research](./01-research/)               | `@module-federation/nextjs-mf` EOL 현황, 대체재 리서치, Vite MF 검토, **DTS 플러그인 검토**               |
 | [02-architecture](./02-architecture/)       | 아키텍처 결정(ADR), 토폴로지, SSR + 소프트 내비게이션 설계, **remote 수명주기(버전·캐시·신뢰)**, 스타일링 |
@@ -30,6 +31,7 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 
 핵심 설계 두 편:
 
+- 그림으로 먼저 보려면 — [anatomy.html](./anatomy.html) (GitHub 화면은 HTML 을 렌더링하지 않는다. 받아서 브라우저로 연다)
 - 렌더링 — [02-architecture/03-ssr-and-soft-nav.md](./02-architecture/03-ssr-and-soft-nav.md)
 - 배포·캐시·신뢰 — [02-architecture/04-remote-lifecycle.md](./02-architecture/04-remote-lifecycle.md)
 - 스타일링 — [02-architecture/05-styling.md](./02-architecture/05-styling.md)

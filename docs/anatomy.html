@@ -1,0 +1,3008 @@
+<!doctype html>
+<!--
+  전체 구조 해부도 — 배포 파이프라인과 host↔remote 런타임을 그림으로 설명한다.
+
+  ## 왜 마크다운이 아닌가
+
+  이 문서가 담는 건 문장이 아니라 **경로와 순서**다. 어느 화살표가 어디로 가는지,
+  무엇이 무엇보다 먼저인지가 내용의 전부라서 표와 목록으로는 같은 값을 못 낸다.
+  마크다운의 ASCII 다이어그램(토폴로지 문서 상단 같은)은 세로 흐름 하나까지가 한계고,
+  분기·되돌아오는 화살표·레인이 겹치는 순간 읽히지 않는다.
+
+  ## 이 파일이 SSOT 가 아니다
+
+  근거와 실측은 전부 `docs/**.md` 에 있고 여기는 **그 지도**다. 각 절의 "근거 문서"
+  링크가 원본을 가리킨다. 설계가 바뀌면 마크다운을 먼저 고치고 그림을 따라 고친다 —
+  반대로 하면 두 곳이 갈린다.
+
+  ## 보는 법
+
+  GitHub 저장소 화면은 HTML 을 렌더링하지 않고 소스로 보여준다.
+  파일을 받아서 브라우저로 열거나(`open docs/anatomy.html`) raw 뷰어를 쓴다.
+
+  의존성이 없다 — 폰트(Google Fonts) 말고는 전부 이 파일 안에 있고, 스크립트는
+  테마 토글 하나뿐이다. 라이트/다크는 OS 설정을 따르고 토글이 그걸 덮는다.
+-->
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Next 16 페더레이션 해부도 — mfa-nextjs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@600;700&display=swap"
+    />
+
+    <style>
+      :root {
+        --bg: #eaeef2;
+        --surface: #ffffff;
+        --surface-2: #f3f6f9;
+        --ink: #151a20;
+        --ink-2: #59656f;
+        --line: #d3dbe3;
+        --line-2: #9badba;
+        --cat: #6a45c8;
+        --cart: #0f7454;
+        --hostc: #1b4f8f;
+        --alert: #a83a22;
+        --sans:
+          'IBM Plex Sans KR', system-ui, -apple-system, 'Apple SD Gothic Neo',
+          sans-serif;
+        --serif: 'Noto Serif KR', Georgia, 'Apple SD Gothic Neo', serif;
+        --mono:
+          'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --bg: #0e1318;
+          --surface: #161d24;
+          --surface-2: #1d262e;
+          --ink: #e4eaf0;
+          --ink-2: #94a3b0;
+          --line: #2a343e;
+          --line-2: #4a5a68;
+          --cat: #af90ff;
+          --cart: #3fd09b;
+          --hostc: #6fa8e8;
+          --alert: #f08a6c;
+        }
+      }
+
+      :root[data-theme='dark'] {
+        --bg: #0e1318;
+        --surface: #161d24;
+        --surface-2: #1d262e;
+        --ink: #e4eaf0;
+        --ink-2: #94a3b0;
+        --line: #2a343e;
+        --line-2: #4a5a68;
+        --cat: #af90ff;
+        --cart: #3fd09b;
+        --hostc: #6fa8e8;
+        --alert: #f08a6c;
+      }
+
+      /* 최소 리셋 — 이 파일은 단독으로 열리므로 프레임워크 리셋이 없다 */
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      img,
+      svg {
+        max-width: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 16px;
+        line-height: 1.75;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .wrap {
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 0 28px 96px;
+      }
+
+      .prose {
+        max-width: 68ch;
+      }
+
+      /* ---------------------------------------------------------- 헤더 */
+      header.masthead {
+        padding: 72px 0 40px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+      }
+
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+      }
+
+      h1 {
+        font-family: var(--serif);
+        font-weight: 700;
+        font-size: clamp(34px, 5.2vw, 54px);
+        line-height: 1.18;
+        letter-spacing: -0.015em;
+        margin: 0;
+        text-wrap: balance;
+      }
+
+      .lede {
+        max-width: 62ch;
+        font-size: 17.5px;
+        color: var(--ink-2);
+        margin: 0;
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 8px;
+        padding: 7px 13px;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        background: var(--surface);
+        font-size: 13px;
+      }
+
+      .chip b {
+        font-weight: 600;
+      }
+      .chip .port {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--ink-2);
+      }
+      .chip.cat {
+        border-left: 3px solid var(--cat);
+      }
+      .chip.crt {
+        border-left: 3px solid var(--cart);
+      }
+      .chip.hst {
+        border-left: 3px solid var(--hostc);
+      }
+
+      /* ---------------------------------------------------------- 섹션 */
+      section {
+        padding-top: 68px;
+      }
+
+      .part-head {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        border-top: 3px solid var(--ink);
+        padding-top: 14px;
+        margin-bottom: 30px;
+      }
+
+      .part-num {
+        font-family: var(--mono);
+        font-size: 13px;
+        letter-spacing: 0.1em;
+        color: var(--ink-2);
+        white-space: nowrap;
+      }
+
+      h2 {
+        font-family: var(--serif);
+        font-weight: 700;
+        font-size: clamp(24px, 3.2vw, 32px);
+        line-height: 1.3;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+
+      h3 {
+        font-family: var(--serif);
+        font-weight: 600;
+        font-size: 20px;
+        line-height: 1.45;
+        margin: 52px 0 10px;
+        letter-spacing: -0.005em;
+      }
+
+      h3:first-of-type {
+        margin-top: 8px;
+      }
+
+      p {
+        margin: 0 0 16px;
+      }
+
+      .claim {
+        font-size: 17px;
+        border-left: 3px solid var(--line-2);
+        padding-left: 16px;
+        color: var(--ink);
+        margin: 0 0 22px;
+        max-width: 66ch;
+      }
+
+      code {
+        font-family: var(--mono);
+        font-size: 0.88em;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        border-radius: 2px;
+        padding: 1px 5px;
+      }
+
+      strong {
+        font-weight: 600;
+      }
+      em {
+        font-style: normal;
+        font-weight: 600;
+        color: var(--hostc);
+      }
+
+      /* ---------------------------------------------------------- 도표 */
+      figure {
+        margin: 26px 0 34px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 22px 22px 6px;
+      }
+
+      .scroller {
+        overflow-x: auto;
+      }
+
+      figure svg {
+        display: block;
+        width: 100%;
+        min-width: 640px;
+        max-width: 100%;
+        height: auto;
+      }
+
+      figcaption {
+        margin-top: 14px;
+        padding-top: 13px;
+        border-top: 1px solid var(--line);
+        font-size: 13.5px;
+        line-height: 1.65;
+        color: var(--ink-2);
+      }
+
+      figcaption b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      /* SVG 공통 */
+      svg text {
+        font-family: var(--sans);
+        font-size: 12.5px;
+        fill: var(--ink);
+      }
+      svg .sm {
+        font-size: 10.5px;
+      }
+      svg .xs {
+        font-size: 9.8px;
+      }
+      svg .mono {
+        font-family: var(--mono);
+      }
+      svg .mut {
+        fill: var(--ink-2);
+      }
+      svg .cat {
+        fill: var(--cat);
+      }
+      svg .crt {
+        fill: var(--cart);
+      }
+      svg .hst {
+        fill: var(--hostc);
+      }
+      svg .alr {
+        fill: var(--alert);
+      }
+      svg .ttl {
+        font-weight: 600;
+        font-size: 12.5px;
+      }
+      svg .box {
+        fill: var(--surface-2);
+        stroke: var(--line-2);
+        stroke-width: 1;
+      }
+      svg .box-plain {
+        fill: none;
+        stroke: var(--line-2);
+        stroke-width: 1;
+      }
+      svg .box-cat {
+        fill: none;
+        stroke: var(--cat);
+        stroke-width: 1.4;
+      }
+      svg .box-crt {
+        fill: none;
+        stroke: var(--cart);
+        stroke-width: 1.4;
+      }
+      svg .box-hst {
+        fill: none;
+        stroke: var(--hostc);
+        stroke-width: 1.4;
+      }
+      svg .box-alr {
+        fill: none;
+        stroke: var(--alert);
+        stroke-width: 1.4;
+      }
+      svg .fillsoft {
+        fill: var(--surface-2);
+      }
+      svg .ed {
+        stroke: var(--line-2);
+        stroke-width: 1.4;
+        fill: none;
+      }
+      svg .ed-hst {
+        stroke: var(--hostc);
+        stroke-width: 1.6;
+        fill: none;
+      }
+      svg .ed-alr {
+        stroke: var(--alert);
+        stroke-width: 1.5;
+        fill: none;
+      }
+      svg .ed-crt {
+        stroke: var(--cart);
+        stroke-width: 1.5;
+        fill: none;
+      }
+      svg .dash {
+        stroke-dasharray: 5 4;
+      }
+      svg .life {
+        stroke: var(--line-2);
+        stroke-width: 1;
+        stroke-dasharray: 3 5;
+      }
+      svg .mk {
+        fill: var(--line-2);
+      }
+      svg .mk-hst {
+        fill: var(--hostc);
+      }
+      svg .mk-alr {
+        fill: var(--alert);
+      }
+      svg .mk-crt {
+        fill: var(--cart);
+      }
+
+      /* ---------------------------------------------------------- 표 */
+      .tablewrap {
+        overflow-x: auto;
+        margin: 22px 0 30px;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 560px;
+        font-size: 14px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+
+      thead th {
+        font-size: 11.5px;
+        font-family: var(--mono);
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        font-weight: 500;
+        background: var(--surface-2);
+      }
+
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+      td.num {
+        font-family: var(--mono);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      td code,
+      th code {
+        background: transparent;
+        border: 0;
+        padding: 0;
+      }
+
+      .tag {
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 2px 7px;
+        border-radius: 2px;
+        border: 1px solid currentColor;
+      }
+      .tag.ok {
+        color: var(--cart);
+      }
+      .tag.no {
+        color: var(--alert);
+      }
+
+      /* ---------------------------------------------------------- 노트 */
+      .note {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--alert);
+        border-radius: 3px;
+        padding: 16px 20px;
+        margin: 24px 0 30px;
+        font-size: 14.5px;
+        max-width: 74ch;
+      }
+
+      .note .note-h {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--alert);
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .note p:last-child {
+        margin-bottom: 0;
+      }
+
+      /* ---------------------------------------------------------- Q&A */
+      .qa {
+        display: grid;
+        gap: 2px;
+        background: var(--line);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .qa > div {
+        background: var(--surface);
+        padding: 18px 22px;
+      }
+      .qa q {
+        display: block;
+        font-family: var(--serif);
+        font-weight: 600;
+        font-size: 17px;
+        quotes: none;
+        margin-bottom: 8px;
+      }
+      .qa p {
+        font-size: 14.5px;
+        color: var(--ink-2);
+        margin: 0;
+      }
+      .qa p + p {
+        margin-top: 10px;
+      }
+
+      footer {
+        margin-top: 76px;
+        padding-top: 22px;
+        border-top: 1px solid var(--line);
+        font-size: 13px;
+        color: var(--ink-2);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 22px;
+      }
+
+      a {
+        color: var(--hostc);
+        text-decoration-thickness: 1px;
+        text-underline-offset: 2px;
+      }
+      a:focus-visible,
+      summary:focus-visible {
+        outline: 2px solid var(--hostc);
+        outline-offset: 3px;
+      }
+
+      h4 {
+        font-family: var(--serif);
+        font-weight: 600;
+        font-size: 16.5px;
+        line-height: 1.5;
+        margin: 36px 0 8px;
+        letter-spacing: -0.003em;
+      }
+
+      /* ------------------------------------------------------ 근거 문서 */
+      .srcdocs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 18px;
+        margin: 0 0 28px;
+        padding: 12px 16px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        font-family: var(--mono);
+        font-size: 12.5px;
+      }
+
+      .srcdocs .srcdocs-h {
+        color: var(--ink-2);
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        font-size: 11px;
+      }
+
+      /* ------------------------------------------------------ 테마 토글 */
+      .theme-toggle {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        z-index: 10;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        letter-spacing: 0.08em;
+        padding: 7px 12px;
+        color: var(--ink-2);
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        cursor: pointer;
+      }
+
+      .theme-toggle:hover {
+        color: var(--ink);
+        border-color: var(--line-2);
+      }
+
+      @media print {
+        .theme-toggle {
+          display: none;
+        }
+        figure,
+        table,
+        .qa {
+          break-inside: avoid;
+        }
+      }
+
+      @media (max-width: 620px) {
+        .wrap {
+          padding: 0 18px 72px;
+        }
+        header.masthead {
+          padding-top: 48px;
+        }
+        figure {
+          padding: 16px 14px 4px;
+        }
+        .theme-toggle {
+          top: 8px;
+          right: 8px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <button
+      type="button"
+      class="theme-toggle"
+      id="theme-toggle"
+      aria-label="라이트 · 다크 전환"
+    >
+      테마
+    </button>
+
+    <div class="wrap">
+      <header class="masthead">
+        <span class="eyebrow"
+          >mfa-nextjs · 마이크로 프론트엔드 실험 저장소</span
+        >
+        <h1>Next 16 페더레이션 해부도</h1>
+        <p class="lede">
+          번들러 플러그인 없이 <code>@module-federation/runtime</code> 만으로
+          remote 를 SSR 하고, 경계를 넘어도 소프트 내비게이션을 유지한다. 배포는
+          앱 셋이 각자, 런타임은 host 하나가 합친다. 이 문서는 그 두 축을
+          그림으로 설명한다.
+        </p>
+        <div class="chips">
+          <span class="chip hst"
+            ><b>host</b> Next.js 16 · Turbopack
+            <span class="port">:3000</span></span
+          >
+          <span class="chip cat"
+            ><b>remote-catalog</b> Vite 8 <span class="port">:3001</span></span
+          >
+          <span class="chip crt"
+            ><b>remote-cart</b> Rsbuild 2 · Rspack
+            <span class="port">:3002</span></span
+          >
+        </div>
+      </header>
+
+      <!-- ============================================================ PART 1 -->
+      <section>
+        <div class="part-head">
+          <span class="part-num">PART 1</span>
+          <h2>배포 — 저장소는 하나, 배포 단위는 셋</h2>
+        </div>
+
+        <div class="srcdocs">
+          <span class="srcdocs-h">근거 문서</span>
+          <a href="./03-setup/04-dokploy.md">03-setup/04-dokploy.md</a>
+          <a href="./02-architecture/04-remote-lifecycle.md"
+            >02-architecture/04-remote-lifecycle.md</a
+          >
+          <a href="./03-setup/03-environment.md">03-setup/03-environment.md</a>
+          <a href="./04-experiments/03-cache-modes.md"
+            >04-experiments/03-cache-modes.md</a
+          >
+        </div>
+
+        <p class="claim">
+          마이크로 프론트엔드의 값어치는 <strong>독립 배포</strong> 하나로
+          결정된다. 그래서 세 앱을 한 Compose 로 묶지 않고 각각 별도의
+          Application 으로 올린다 — catalog 만 고쳐서 배포했을 때 host 가
+          무중단인지가 이 구조가 증명하려는 것이다.
+        </p>
+
+        <h3>1-1. 푸시 하나에서 배포 셋이 갈라진다</h3>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 1000 500"
+              role="img"
+              aria-label="한 저장소의 푸시가 Watch Paths 로 갈라져 세 이미지 빌드와 세 컨테이너가 되고, host 이미지 빌드는 이미 떠 있는 remote 오리진에 HTTP 로 닿아야 하므로 배포 순서가 remote 다음 host 로 강제된다"
+            >
+              <defs>
+                <marker
+                  id="d1a"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk" />
+                </marker>
+                <marker
+                  id="d1h"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7.5"
+                  markerHeight="7.5"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk-hst" />
+                </marker>
+              </defs>
+
+              <!-- 푸시 -->
+              <rect x="40" y="16" width="920" height="44" rx="3" class="box" />
+              <text x="500" y="43" text-anchor="middle" class="ttl">
+                GitHub
+                <tspan class="mono">main</tspan>
+                푸시 — 저장소 하나
+              </text>
+
+              <line
+                x1="160"
+                y1="60"
+                x2="160"
+                y2="84"
+                class="ed"
+                marker-end="url(#d1a)"
+              />
+              <line
+                x1="430"
+                y1="60"
+                x2="430"
+                y2="84"
+                class="ed"
+                marker-end="url(#d1a)"
+              />
+              <line
+                x1="840"
+                y1="60"
+                x2="840"
+                y2="84"
+                class="ed"
+                marker-end="url(#d1a)"
+              />
+
+              <!-- 감시 경로 -->
+              <rect
+                x="40"
+                y="88"
+                width="240"
+                height="48"
+                rx="3"
+                class="box-cat"
+              />
+              <text x="160" y="106" text-anchor="middle" class="xs mut">
+                Watch Paths
+              </text>
+              <text x="160" y="123" text-anchor="middle" class="xs mono cat">
+                apps/remote-catalog/** + packages/**
+              </text>
+
+              <rect
+                x="310"
+                y="88"
+                width="240"
+                height="48"
+                rx="3"
+                class="box-crt"
+              />
+              <text x="430" y="106" text-anchor="middle" class="xs mut">
+                Watch Paths
+              </text>
+              <text x="430" y="123" text-anchor="middle" class="xs mono crt">
+                apps/remote-cart/** + packages/**
+              </text>
+
+              <rect
+                x="720"
+                y="88"
+                width="240"
+                height="48"
+                rx="3"
+                class="box-hst"
+              />
+              <text x="840" y="106" text-anchor="middle" class="xs mut">
+                Watch Paths
+              </text>
+              <text x="840" y="123" text-anchor="middle" class="xs mono hst">
+                apps/host/** + packages/**
+              </text>
+
+              <line
+                x1="160"
+                y1="136"
+                x2="160"
+                y2="158"
+                class="ed"
+                marker-end="url(#d1a)"
+              />
+              <line
+                x1="430"
+                y1="136"
+                x2="430"
+                y2="158"
+                class="ed"
+                marker-end="url(#d1a)"
+              />
+              <line
+                x1="840"
+                y1="136"
+                x2="840"
+                y2="158"
+                class="ed"
+                marker-end="url(#d1a)"
+              />
+
+              <!-- 이미지 빌드 -->
+              <rect
+                x="40"
+                y="160"
+                width="240"
+                height="104"
+                rx="3"
+                class="box"
+              />
+              <text x="56" y="180" class="ttl">이미지 빌드 — Vite 8</text>
+              <text x="56" y="200" class="xs mut">
+                ARG
+                <tspan class="mono">REMOTE_CATALOG_PUBLIC_URL</tspan>
+              </text>
+              <text x="56" y="218" class="xs mut">
+                secret
+                <tspan class="mono">mf_signing_key</tspan>
+                → 서명
+              </text>
+              <text x="56" y="236" class="xs mut">
+                →
+                <tspan class="mono">dist/v&lt;ver&gt;/</tspan>
+                + 버전 스탬프
+              </text>
+              <text x="56" y="254" class="xs mut">
+                런타임에 못 바꾸는 값이 여기서 굳는다
+              </text>
+
+              <rect
+                x="310"
+                y="160"
+                width="240"
+                height="104"
+                rx="3"
+                class="box"
+              />
+              <text x="326" y="180" class="ttl">이미지 빌드 — Rsbuild 2</text>
+              <text x="326" y="200" class="xs mut">
+                ARG
+                <tspan class="mono">REMOTE_CART_PUBLIC_URL</tspan>
+              </text>
+              <text x="326" y="218" class="xs mut">
+                secret
+                <tspan class="mono">mf_signing_key</tspan>
+                → 서명
+              </text>
+              <text x="326" y="236" class="xs mut">
+                →
+                <tspan class="mono">dist/v&lt;ver&gt;/</tspan>
+                + 버전 스탬프
+              </text>
+              <text x="326" y="254" class="xs mut">
+                번들러만 다르고 계약은 catalog 와 동일
+              </text>
+
+              <rect
+                x="720"
+                y="160"
+                width="240"
+                height="104"
+                rx="3"
+                class="box"
+              />
+              <text x="736" y="180" class="ttl">이미지 빌드 — Next 16</text>
+              <text x="736" y="200" class="xs mut">
+                ARG
+                <tspan class="mono">REMOTE_*_PUBLIC_URL</tspan>
+                → 번들에 구움
+              </text>
+              <text x="736" y="218" class="xs mut">
+                <tspan class="mono">turbo run docker:build</tspan>
+              </text>
+              <text x="736" y="236" class="xs mut">
+                프리렌더가 remote SSR 번들을 실행
+              </text>
+              <text x="736" y="254" class="xs mut">
+                산출물
+                <tspan class="mono">.next/standalone</tspan>
+              </text>
+
+              <line
+                x1="160"
+                y1="264"
+                x2="160"
+                y2="296"
+                class="ed"
+                marker-end="url(#d1a)"
+              />
+              <line
+                x1="430"
+                y1="264"
+                x2="430"
+                y2="296"
+                class="ed"
+                marker-end="url(#d1a)"
+              />
+              <line
+                x1="840"
+                y1="264"
+                x2="840"
+                y2="296"
+                class="ed"
+                marker-end="url(#d1a)"
+              />
+
+              <!-- 런타임 -->
+              <rect
+                x="40"
+                y="298"
+                width="240"
+                height="110"
+                rx="3"
+                class="box-cat"
+              />
+              <text x="56" y="318" class="ttl cat">mfa-remote-catalog</text>
+              <text x="56" y="336" class="xs mono mut">
+                mfa-catalog.lakegreen.net :3001
+              </text>
+              <rect
+                x="56"
+                y="348"
+                width="208"
+                height="46"
+                rx="2"
+                class="box-plain dash"
+              />
+              <text x="160" y="366" text-anchor="middle" class="xs">
+                볼륨
+                <tspan class="mono">/data</tspan>
+              </text>
+              <text x="160" y="382" text-anchor="middle" class="xs mut">
+                버전 디렉터리 5개 보존
+              </text>
+
+              <rect
+                x="310"
+                y="298"
+                width="240"
+                height="110"
+                rx="3"
+                class="box-crt"
+              />
+              <text x="326" y="318" class="ttl crt">mfa-remote-cart</text>
+              <text x="326" y="336" class="xs mono mut">
+                mfa-cart.lakegreen.net :3002
+              </text>
+              <rect
+                x="326"
+                y="348"
+                width="208"
+                height="46"
+                rx="2"
+                class="box-plain dash"
+              />
+              <text x="430" y="366" text-anchor="middle" class="xs">
+                볼륨
+                <tspan class="mono">/data</tspan>
+              </text>
+              <text x="430" y="382" text-anchor="middle" class="xs mut">
+                버전 디렉터리 5개 보존
+              </text>
+
+              <rect
+                x="720"
+                y="298"
+                width="240"
+                height="110"
+                rx="3"
+                class="box-hst"
+              />
+              <text x="736" y="318" class="ttl hst">mfa-host</text>
+              <text x="736" y="336" class="xs mono mut">
+                mfa.lakegreen.net :3000
+              </text>
+              <rect
+                x="736"
+                y="348"
+                width="208"
+                height="46"
+                rx="2"
+                class="box-plain dash"
+              />
+              <text x="840" y="366" text-anchor="middle" class="xs">
+                볼륨 없음
+              </text>
+              <text x="840" y="382" text-anchor="middle" class="xs mut">
+                가진 상태는 캐시뿐 — 버려도 된다
+              </text>
+
+              <!-- 순서 강제 -->
+              <path
+                d="M160 408 L160 450 L980 450 L980 212 L964 212"
+                class="ed-hst"
+                marker-end="url(#d1h)"
+              />
+              <path d="M430 408 L430 450" class="ed-hst" />
+              <text x="500" y="472" text-anchor="middle" class="sm hst">
+                host 이미지 빌드는 프리렌더 도중 이 오리진에서
+                <tspan class="mono">mf-server.cjs</tspan>
+                를 받아 실제로 실행한다
+              </text>
+              <text x="500" y="490" text-anchor="middle" class="sm hst">
+                → 배포 순서 remote → host 는 권장이 아니라 강제다
+              </text>
+            </svg>
+            <figcaption>
+              <b>여기서 한 문장만 가져간다면:</b> host 의
+              <code>next build</code> 는 순수 컴파일이 아니다. 프리렌더가 remote
+              서버 번들을 HTTP 로 받아 실행하므로, remote 가 안 떠 있으면
+              <code>ECONNREFUSED</code> 로 빌드가 죽는다. 그래서 CI 의
+              <code>pnpm build</code> 통과 자체가 “Next 16 에서 런타임 MF + SSR
+              이 된다”는 주장의 회귀 테스트다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="note">
+          <span class="note-h"
+            >함정 — 왜 host 이미지는 <code>build</code> 가 아니라
+            <code>docker:build</code> 를 부르나</span
+          >
+          <p>
+            로컬 <code>build</code> 는 워크스페이스 remote 를 먼저 빌드해서
+            띄운다. 그런데 이미지 안에서 remote 는 이미 배포된 공개 도메인이다.
+            같은 태스크 이름을 쓰면
+            <strong>catalog 빌드 실패가 host 배포까지 끌고 내려가</strong>
+            빌드 그래프에서 독립 배포가 다시 묶인다. 그래서 remote 게이트만 뺀
+            태스크로 이름을 갈랐다.
+          </p>
+        </div>
+
+        <h3>1-2. remote 아티팩트는 불변, 볼륨에 덧붙인다</h3>
+
+        <p class="claim">
+          컨테이너는 휘발이다. 이미지 안의 <code>dist</code> 만 서빙하면 재배포
+          순간 이전 버전이 사라지고, 이미 캐시된 host HTML 이 가리키던 옛 청크가
+          <strong>hydration 단계에서 404</strong> 가 된다.
+        </p>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 920 350"
+              role="img"
+              aria-label="remote 컨테이너의 entrypoint 가 이미지의 dist 를 영속 볼륨에 덧붙이는 방식. 새 버전 디렉터리는 추가하고 기존 디렉터리는 건드리지 않으며 mf-version.json 만 항상 교체한다"
+            >
+              <defs>
+                <marker
+                  id="d2a"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk" />
+                </marker>
+                <marker
+                  id="d2c"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk-crt" />
+                </marker>
+              </defs>
+
+              <rect x="30" y="52" width="240" height="200" rx="3" class="box" />
+              <text x="46" y="42" class="sm mut">이미지 안</text>
+              <text x="46" y="76" class="ttl mono">/app/dist</text>
+              <text x="46" y="102" class="sm mono">mf-version.json</text>
+              <text x="46" y="126" class="sm mono">v-t9/</text>
+              <text x="62" y="146" class="xs mut mono">mf-manifest.json</text>
+              <text x="62" y="164" class="xs mut mono">remoteEntry.js</text>
+              <text x="62" y="182" class="xs mut mono">mf-server.cjs</text>
+              <text x="62" y="200" class="xs mut mono">style.css</text>
+              <text x="46" y="228" class="xs mut">버전 = 빌드 타임스탬프</text>
+              <text x="46" y="244" class="xs mut">
+                (빌드마다 달라지기만 하면 된다)
+              </text>
+
+              <line
+                x1="270"
+                y1="150"
+                x2="336"
+                y2="150"
+                class="ed"
+                marker-end="url(#d2a)"
+              />
+
+              <rect
+                x="340"
+                y="52"
+                width="230"
+                height="200"
+                rx="3"
+                class="box-plain"
+              />
+              <text x="356" y="42" class="sm mut">컨테이너 진입점</text>
+              <text x="356" y="76" class="ttl mono">remote-entrypoint.sh</text>
+              <text x="356" y="106" class="sm">새 버전 디렉터리</text>
+              <text x="356" y="124" class="xs mut">→ 볼륨에 복사해 추가</text>
+              <text x="356" y="152" class="sm">기존 버전 디렉터리</text>
+              <text x="356" y="170" class="xs mut">
+                → 덮어쓰지 않는다 (불변)
+              </text>
+              <text x="356" y="198" class="sm">
+                <tspan class="mono">mf-version.json</tspan>
+              </text>
+              <text x="356" y="216" class="xs mut">
+                → 항상 교체 (현재 버전 공표)
+              </text>
+              <text x="356" y="240" class="xs mut">
+                초과분은
+                <tspan class="mono">REMOTE_KEEP_VERSIONS</tspan>
+                로 정리
+              </text>
+
+              <line
+                x1="570"
+                y1="150"
+                x2="646"
+                y2="150"
+                class="ed"
+                marker-end="url(#d2a)"
+              />
+
+              <rect
+                x="650"
+                y="52"
+                width="240"
+                height="200"
+                rx="3"
+                class="box-crt"
+              />
+              <text x="666" y="42" class="sm mut">영속 볼륨</text>
+              <text x="666" y="76" class="ttl mono crt">/data</text>
+              <text x="666" y="106" class="sm mono">mf-version.json</text>
+              <text x="666" y="124" class="xs mut">→ t9 로 교체됨</text>
+              <text x="666" y="152" class="sm mono">v-t9/</text>
+              <text x="666" y="170" class="xs crt">이번 배포 · 추가</text>
+              <text x="666" y="196" class="sm mono">v-t8/</text>
+              <text x="666" y="214" class="xs mut">
+                유지 — 캐시된 HTML 이 아직 가리킨다
+              </text>
+              <text x="666" y="240" class="sm mono">v-t7/ …</text>
+
+              <path
+                d="M770 268 L770 296 L560 296"
+                class="ed-crt dash"
+                marker-end="url(#d2c)"
+              />
+              <text x="548" y="300" text-anchor="end" class="sm crt">
+                롤백 = 볼륨의
+                <tspan class="mono">mf-version.json</tspan>
+                을 v-t8 로 되돌린다
+              </text>
+              <text x="548" y="318" text-anchor="end" class="xs mut">
+                자산은 남아 있으므로 재빌드도, 재배포도 필요 없다
+              </text>
+            </svg>
+            <figcaption>
+              <b>배포 계약이 “불변 아티팩트”라는 뜻:</b>
+              <code>/v&lt;ver&gt;/…</code> 는 한 번 올라가면 내용이 바뀌지 않고,
+              루트의 <code>mf-version.json</code> 하나가 “지금 어느 버전인지”만
+              공표한다. 그래서 롤백이 배포가 아니라 <b>파일 한 개 교체</b>로
+              끝난다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <h3>1-3. 재배포를 host 에 알리는 경로</h3>
+
+        <p class="claim">
+          remote 를 따로 배포하면 host 는 바뀐 사실을 알 방법이 없다 — 페이지
+          캐시가 옛 remote 마크업을 계속 서빙한다. Dokploy 에는 배포 후 훅이
+          없어서, 그 자리를 GitHub Actions 가 <strong>폴링 후 웹훅</strong>으로
+          메운다.
+        </p>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 980 560"
+              role="img"
+              aria-label="푸시부터 host 캐시 무효화까지의 시퀀스. GitHub Actions 가 remote 의 mf-version.json 버전이 바뀔 때까지 15초 간격으로 폴링한 뒤 host 의 무효화 웹훅을 호출하고, host 는 태그 만료, 생존 확인, warm, 페이지 무효화 순으로 처리한다"
+            >
+              <defs>
+                <marker
+                  id="d3a"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk" />
+                </marker>
+                <marker
+                  id="d3h"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk-hst" />
+                </marker>
+              </defs>
+
+              <rect x="5" y="10" width="150" height="34" rx="3" class="box" />
+              <text x="80" y="32" text-anchor="middle" class="sm ttl">
+                개발자 푸시
+              </text>
+              <rect x="185" y="10" width="150" height="34" rx="3" class="box" />
+              <text x="260" y="32" text-anchor="middle" class="sm ttl">
+                Dokploy
+              </text>
+              <rect x="365" y="10" width="150" height="34" rx="3" class="box" />
+              <text x="440" y="32" text-anchor="middle" class="sm ttl">
+                remote 오리진
+              </text>
+              <rect x="555" y="10" width="150" height="34" rx="3" class="box" />
+              <text x="630" y="32" text-anchor="middle" class="sm ttl">
+                GitHub Actions
+              </text>
+              <rect
+                x="775"
+                y="10"
+                width="150"
+                height="34"
+                rx="3"
+                class="box-hst"
+              />
+              <text x="850" y="32" text-anchor="middle" class="sm ttl hst">
+                host
+              </text>
+
+              <line x1="80" y1="44" x2="80" y2="505" class="life" />
+              <line x1="260" y1="44" x2="260" y2="505" class="life" />
+              <line x1="440" y1="44" x2="440" y2="505" class="life" />
+              <line x1="630" y1="44" x2="630" y2="505" class="life" />
+              <line x1="850" y1="44" x2="850" y2="325" class="life" />
+
+              <line
+                x1="80"
+                y1="80"
+                x2="254"
+                y2="80"
+                class="ed"
+                marker-end="url(#d3a)"
+              />
+              <text x="167" y="73" text-anchor="middle" class="xs mut">
+                Watch Paths 일치 → 자동 빌드
+              </text>
+
+              <line
+                x1="80"
+                y1="112"
+                x2="624"
+                y2="112"
+                class="ed dash"
+                marker-end="url(#d3a)"
+              />
+              <text x="352" y="105" text-anchor="middle" class="xs mut">
+                같은 푸시가
+                <tspan class="mono">mf-revalidate</tspan>
+                워크플로도 깨운다
+              </text>
+
+              <line
+                x1="260"
+                y1="152"
+                x2="434"
+                y2="152"
+                class="ed"
+                marker-end="url(#d3a)"
+              />
+              <text x="347" y="145" text-anchor="middle" class="xs mut">
+                이미지 빌드 → 컨테이너 교체
+              </text>
+
+              <path
+                d="M440 178 L486 178 L486 204 L446 204"
+                class="ed"
+                marker-end="url(#d3a)"
+              />
+              <text x="498" y="184" class="xs">
+                새 버전 공표
+                <tspan class="mono">mf-version.json</tspan>
+              </text>
+              <text x="498" y="200" class="xs mut">
+                서명 · SRI 값이 함께 들어 있다
+              </text>
+
+              <line
+                x1="624"
+                y1="240"
+                x2="446"
+                y2="240"
+                class="ed"
+                marker-end="url(#d3a)"
+              />
+              <text x="535" y="233" text-anchor="middle" class="xs mut">
+                15초 간격 폴링 (최대 20분)
+              </text>
+              <line
+                x1="446"
+                y1="266"
+                x2="624"
+                y2="266"
+                class="ed dash"
+                marker-end="url(#d3a)"
+              />
+              <text x="535" y="282" text-anchor="middle" class="xs mut">
+                버전이
+                <tspan class="ttl">바뀌었을 때만</tspan>
+                통과
+              </text>
+
+              <line
+                x1="630"
+                y1="315"
+                x2="844"
+                y2="315"
+                class="ed-hst"
+                marker-end="url(#d3h)"
+              />
+              <text x="737" y="308" text-anchor="middle" class="xs hst mono">
+                POST /api/mf-revalidate
+              </text>
+
+              <rect
+                x="690"
+                y="330"
+                width="278"
+                height="150"
+                rx="3"
+                class="box-hst"
+              />
+              <text x="706" y="352" class="sm ttl hst">
+                warm-then-revalidate
+              </text>
+              <text x="706" y="376" class="xs">
+                ① 버전 · 번들 태그 즉시 만료
+              </text>
+              <text x="706" y="398" class="xs">
+                ② remote 생존 확인 — 매니페스트 재조회
+              </text>
+              <text x="706" y="420" class="xs">
+                ③ warm — 새 번들을 받아 평가 · 검증
+              </text>
+              <text x="706" y="442" class="xs">
+                ④ 페이지 태그 무효화
+                <tspan class="mut">(여기서 처음)</tspan>
+              </text>
+              <text x="706" y="466" class="xs alr">
+                ②·③ 실패 → 502, 페이지 캐시는 건드리지 않는다
+              </text>
+
+              <text x="20" y="520" class="xs mut">
+                웹훅은
+                <tspan class="ttl">최적화일 뿐이다.</tspan>
+                웹훅이 유실돼도 모든 host 인스턴스가 매니페스트 TTL 30초 안에 새
+                버전으로 스스로 수렴한다 — 그래서 유실이 정합성 문제가 되지
+                않는다.
+              </text>
+              <text x="20" y="540" class="xs mut">
+                빌드가 끝나기
+                <tspan class="ttl">전에</tspan>
+                웹훅을 때리면 host 가 옛 remote 로 페이지를 다시 굽는다. 폴링이
+                있는 이유가 그것이다.
+              </text>
+            </svg>
+            <figcaption>
+              <b>순서가 전부다.</b> 무효화를 먼저 하면, 재생성 렌더가 remote
+              번들을 네트워크로 받는 동안
+              <b>Suspense 스켈레톤 상태로 캐시에 굳는다</b>. 그 엔트리는 이후
+              계속 HIT 로 서빙된다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 900 270"
+              role="img"
+              aria-label="무효화만 하는 경우와 warm 을 먼저 하는 경우의 비교. 무효화만 하면 네 라운드 모두 스켈레톤이 캐시에 굳고, warm 을 먼저 하면 한 번도 굳지 않는다"
+            >
+              <defs>
+                <marker
+                  id="d6a"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk-alr" />
+                </marker>
+                <marker
+                  id="d6c"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk-crt" />
+                </marker>
+              </defs>
+
+              <text x="20" y="30" class="sm ttl alr">기각 — 무효화만 한다</text>
+              <rect
+                x="20"
+                y="42"
+                width="160"
+                height="52"
+                rx="3"
+                class="box-alr"
+              />
+              <text x="100" y="66" text-anchor="middle" class="xs">
+                페이지 태그 무효화
+              </text>
+              <text x="100" y="82" text-anchor="middle" class="xs mut">
+                캐시 비움
+              </text>
+              <line
+                x1="180"
+                y1="68"
+                x2="204"
+                y2="68"
+                class="ed-alr"
+                marker-end="url(#d6a)"
+              />
+              <rect
+                x="208"
+                y="42"
+                width="160"
+                height="52"
+                rx="3"
+                class="box-alr"
+              />
+              <text x="288" y="66" text-anchor="middle" class="xs">
+                요청 도착 · 재생성
+              </text>
+              <text x="288" y="82" text-anchor="middle" class="xs mut">
+                콜드 프로세스
+              </text>
+              <line
+                x1="368"
+                y1="68"
+                x2="392"
+                y2="68"
+                class="ed-alr"
+                marker-end="url(#d6a)"
+              />
+              <rect
+                x="396"
+                y="42"
+                width="160"
+                height="52"
+                rx="3"
+                class="box-alr"
+              />
+              <text x="476" y="66" text-anchor="middle" class="xs">
+                remote 번들을 아직
+              </text>
+              <text x="476" y="82" text-anchor="middle" class="xs">
+                받는 중 (+800ms)
+              </text>
+              <line
+                x1="556"
+                y1="68"
+                x2="580"
+                y2="68"
+                class="ed-alr"
+                marker-end="url(#d6a)"
+              />
+              <rect
+                x="584"
+                y="42"
+                width="180"
+                height="52"
+                rx="3"
+                class="box-alr"
+              />
+              <text x="674" y="66" text-anchor="middle" class="xs">
+                스켈레톤이 그대로
+              </text>
+              <text x="674" y="82" text-anchor="middle" class="xs">
+                캐시에 굳는다
+              </text>
+              <text x="796" y="62" class="ttl alr">4 / 4</text>
+              <text x="796" y="80" class="xs mut">라운드</text>
+
+              <text x="20" y="150" class="sm ttl crt">
+                채택 — warm-then-revalidate
+              </text>
+              <rect
+                x="20"
+                y="162"
+                width="160"
+                height="52"
+                rx="3"
+                class="box-crt"
+              />
+              <text x="100" y="186" text-anchor="middle" class="xs">
+                warm 자기호출
+              </text>
+              <text x="100" y="202" text-anchor="middle" class="xs mut">
+                루프백으로만
+              </text>
+              <line
+                x1="180"
+                y1="188"
+                x2="204"
+                y2="188"
+                class="ed-crt"
+                marker-end="url(#d6c)"
+              />
+              <rect
+                x="208"
+                y="162"
+                width="160"
+                height="52"
+                rx="3"
+                class="box-crt"
+              />
+              <text x="288" y="186" text-anchor="middle" class="xs">
+                새 번들 평가 · 검증
+              </text>
+              <text x="288" y="202" text-anchor="middle" class="xs mut">
+                캐시를 믿지 않는다
+              </text>
+              <line
+                x1="368"
+                y1="188"
+                x2="392"
+                y2="188"
+                class="ed-crt"
+                marker-end="url(#d6c)"
+              />
+              <rect
+                x="396"
+                y="162"
+                width="160"
+                height="52"
+                rx="3"
+                class="box-crt"
+              />
+              <text x="476" y="186" text-anchor="middle" class="xs">
+                성공 확인 후에
+              </text>
+              <text x="476" y="202" text-anchor="middle" class="xs">
+                페이지 태그 무효화
+              </text>
+              <line
+                x1="556"
+                y1="188"
+                x2="580"
+                y2="188"
+                class="ed-crt"
+                marker-end="url(#d6c)"
+              />
+              <rect
+                x="584"
+                y="162"
+                width="180"
+                height="52"
+                rx="3"
+                class="box-crt"
+              />
+              <text x="674" y="186" text-anchor="middle" class="xs">
+                재생성이 곧바로
+              </text>
+              <text x="674" y="202" text-anchor="middle" class="xs">
+                완성 마크업을 담는다
+              </text>
+              <text x="796" y="182" class="ttl crt">0 / 4</text>
+              <text x="796" y="200" class="xs mut">라운드</text>
+
+              <text x="20" y="252" class="xs mut">
+                측정 조건: 콜드 프로세스 + 인위적으로 느린 remote(+800ms),
+                4라운드 반복. 값은 “스켈레톤이 캐시에 굳은 횟수”.
+              </text>
+            </svg>
+            <figcaption>
+              warm 이 실패하면 페이지 캐시를 아예 건드리지 않고 502 로 중단한다.
+              판단 기준은 하나다 — <b>옛 화면이 스켈레톤보다 낫다.</b>
+            </figcaption>
+          </figure>
+        </div>
+
+        <h3>1-4. 어디까지가 빌드 시점에 굳는 값인가</h3>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>값</th>
+                <th>주는 방법</th>
+                <th>런타임에 바꿀 수 있나</th>
+                <th>왜</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <code>REMOTE_*_PUBLIC_URL</code><br /><span
+                    style="color: var(--ink-2); font-size: 13px"
+                    >remote 쪽</span
+                  >
+                </td>
+                <td class="num">Build Arg</td>
+                <td><span class="tag no">불가</span></td>
+                <td>
+                  자산 URL 접두사(<code>base</code> /
+                  <code>assetPrefix</code>)로 청크마다 박힌다
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <code>REMOTE_*_PUBLIC_URL</code><br /><span
+                    style="color: var(--ink-2); font-size: 13px"
+                    >host 쪽</span
+                  >
+                </td>
+                <td class="num">Build Arg + 런타임 env</td>
+                <td><span class="tag no">반만</span></td>
+                <td>
+                  브라우저용 매니페스트 URL 은 번들에 구워지고, host
+                  <b>서버</b>가 SSR 번들을 받을 때는 런타임에 읽는다
+                </td>
+              </tr>
+              <tr>
+                <td><code>MF_SIGNING_KEY</code></td>
+                <td class="num">BuildKit secret</td>
+                <td><span class="tag no">불가</span></td>
+                <td>개인키다. Build Arg 로 넘기면 이미지 히스토리에 남는다</td>
+              </tr>
+              <tr>
+                <td><code>MF_REVALIDATE_SECRET</code></td>
+                <td class="num">런타임 env</td>
+                <td><span class="tag ok">가능</span></td>
+                <td>
+                  웹훅·warm 접근 검사. 저장소 Secret 과 같은 값이어야 한다
+                </td>
+              </tr>
+              <tr>
+                <td><code>MF_REMOTE_PUBLIC_KEY</code></td>
+                <td class="num">런타임 env (host)</td>
+                <td><span class="tag ok">가능</span></td>
+                <td>
+                  공개키는 host 에만. 개인키와 같은 곳에 있으면 막으려던 걸 못
+                  막는다
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============================================================ PART 2 -->
+      <section>
+        <div class="part-head">
+          <span class="part-num">PART 2</span>
+          <h2>런타임 — host 와 remote 는 어떻게 만나나</h2>
+        </div>
+
+        <div class="srcdocs">
+          <span class="srcdocs-h">근거 문서</span>
+          <a href="./02-architecture/03-ssr-and-soft-nav.md"
+            >02-architecture/03-ssr-and-soft-nav.md</a
+          >
+          <a href="./02-architecture/02-topology.md"
+            >02-architecture/02-topology.md</a
+          >
+          <a href="./02-architecture/01-decision.md"
+            >02-architecture/01-decision.md</a
+          >
+          <a href="./02-architecture/04-remote-lifecycle.md"
+            >02-architecture/04-remote-lifecycle.md</a
+          >
+          <a href="./02-architecture/05-styling.md"
+            >02-architecture/05-styling.md</a
+          >
+        </div>
+
+        <p class="claim">
+          요구사항은 두 개였다. <strong>remote 영역이 SSR 될 것</strong>, 그리고
+          <strong>경계를 넘어도 소프트 내비게이션일 것</strong>. Multi-Zones 는
+          두 번째에서, CSR 전용 MF 는 첫 번째에서 탈락한다.
+        </p>
+
+        <h3>2-1. 라우터를 하나만 둔다 — 소프트 내비게이션의 정체</h3>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 900 250"
+              role="img"
+              aria-label="Multi-Zones 는 라우터가 둘이라 경계에서 하드 내비게이션이 강제되고, 채택안은 라우터가 host 하나뿐이라 remote 로 이동해도 document 요청이 늘지 않는다"
+            >
+              <defs>
+                <marker
+                  id="d5a"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="8"
+                  markerHeight="8"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk-alr" />
+                </marker>
+              </defs>
+
+              <rect
+                x="14"
+                y="14"
+                width="416"
+                height="222"
+                rx="4"
+                class="box-plain"
+              />
+              <text x="34" y="44" class="ttl alr">기각 — Multi-Zones</text>
+              <rect x="34" y="62" width="150" height="46" rx="3" class="box" />
+              <text x="109" y="90" text-anchor="middle" class="sm">
+                host 라우터
+              </text>
+              <rect x="260" y="62" width="150" height="46" rx="3" class="box" />
+              <text x="335" y="90" text-anchor="middle" class="sm">
+                zone 라우터
+              </text>
+              <line
+                x1="186"
+                y1="85"
+                x2="254"
+                y2="85"
+                class="ed-alr"
+                marker-end="url(#d5a)"
+              />
+              <text x="220" y="130" text-anchor="middle" class="xs alr">
+                하드 내비
+              </text>
+              <text x="34" y="164" class="sm mut">
+                라우터가 둘이라
+                <tspan class="mono">next/link</tspan>
+                로 넘어갈 수 없다.
+              </text>
+              <text x="34" y="184" class="sm mut">
+                경계를 넘을 때마다 앱이 통째로 다시 뜬다 —
+              </text>
+              <text x="34" y="204" class="sm mut">
+                SPA 를 유지할 이유가 사라진다.
+              </text>
+              <text x="34" y="228" class="sm alr">document 요청 +1</text>
+
+              <rect
+                x="470"
+                y="14"
+                width="416"
+                height="222"
+                rx="4"
+                class="box-plain"
+              />
+              <text x="490" y="44" class="ttl crt">
+                채택 — 라우터는 host 하나
+              </text>
+              <rect
+                x="490"
+                y="62"
+                width="150"
+                height="46"
+                rx="3"
+                class="box-hst"
+              />
+              <text x="565" y="90" text-anchor="middle" class="sm hst">
+                host 라우터 (유일)
+              </text>
+              <text x="670" y="72" class="xs mono cat">
+                / → catalog/ProductGrid
+              </text>
+              <text x="670" y="90" class="xs mono cat">
+                /products/:id → catalog/ProductDetail
+              </text>
+              <text x="670" y="108" class="xs mono crt">
+                /cart → cart/CartPanel
+              </text>
+              <text x="670" y="126" class="xs mono crt">
+                /checkout → cart/CheckoutFlow
+              </text>
+              <text x="490" y="164" class="sm mut">
+                라우팅은 host, 렌더링은 remote.
+              </text>
+              <text x="490" y="184" class="sm mut">
+                결제까지 remote 로 옮겨서 경계가 라우터를
+              </text>
+              <text x="490" y="204" class="sm mut">
+                가르지 않게 했다. 이동은
+                <tspan class="mono">onDone</tspan>
+                콜백으로 위임.
+              </text>
+              <text x="490" y="228" class="sm crt">document 요청 0</text>
+            </svg>
+            <figcaption>
+              경계에서 하드 내비게이션이 나는 이유는 하나다 —
+              <b>라우터가 둘이기 때문</b>이다. 그래서 해결책도 하나다. remote 는
+              여전히 라우터를 모르고, 이동만 host 에 콜백으로 넘긴다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <h3>2-2. 같은 호출이 실행 환경에 따라 두 갈래로 갈린다</h3>
+
+        <p class="claim">
+          <code>@module-federation/nextjs-mf</code> 는 Next 16 을 지원하지 않고,
+          <code>@module-federation/node</code> 는 peer 가 webpack 이다. host 는
+          Turbopack 이라 webpack 이 없다. 그래서 host 에는
+          <strong>번들러 플러그인을 아예 넣지 않고</strong>, 런타임 라이브러리만
+          평범하게 쓴다.
+        </p>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 960 440"
+              role="img"
+              aria-label="loadRemoteModule 호출이 서버에서는 remote 의 node 번들을 받아 new Function 으로 평가하고 host 의 React 를 주입하는 경로로, 브라우저에서는 Module Federation 런타임으로 remoteEntry 를 받는 경로로 갈린다. 두 경로가 같은 소스에서 나온 같은 컴포넌트를 돌려주므로 hydration 이 성립한다"
+            >
+              <defs>
+                <marker
+                  id="d4a"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk" />
+                </marker>
+              </defs>
+
+              <rect x="300" y="16" width="360" height="46" rx="3" class="box" />
+              <text x="480" y="45" text-anchor="middle" class="mono ttl">
+                loadRemoteModule("cart/CheckoutFlow")
+              </text>
+
+              <path
+                d="M480 62 L480 88 L200 88 L200 116"
+                class="ed"
+                marker-end="url(#d4a)"
+              />
+              <path
+                d="M480 62 L480 88 L760 88 L760 116"
+                class="ed"
+                marker-end="url(#d4a)"
+              />
+              <text x="330" y="82" text-anchor="middle" class="xs mono mut">
+                typeof window === "undefined"
+              </text>
+              <text x="630" y="82" text-anchor="middle" class="xs mut">
+                브라우저
+              </text>
+
+              <rect
+                x="40"
+                y="118"
+                width="320"
+                height="204"
+                rx="3"
+                class="box-hst"
+              />
+              <text x="56" y="142" class="ttl hst">
+                서버 경로 —
+                <tspan class="mono">server-loader.ts</tspan>
+              </text>
+              <rect x="56" y="156" width="288" height="44" rx="2" class="box" />
+              <text x="70" y="174" class="xs mono">
+                fetch(origin + /v&lt;ver&gt;/mf-server.cjs)
+              </text>
+              <text x="70" y="190" class="xs mut">
+                오리진 허용 목록 · SRI · 서명을 먼저 통과
+              </text>
+              <rect x="56" y="208" width="288" height="44" rx="2" class="box" />
+              <text x="70" y="226" class="xs mono">
+                new Function('module','exports','require')
+              </text>
+              <text x="70" y="242" class="xs mut">
+                <tspan class="mono">node:vm</tspan>
+                을 안 쓴 이유 — 브라우저 번들에도 들어간다
+              </text>
+              <rect x="56" y="260" width="288" height="44" rx="2" class="box" />
+              <text x="70" y="278" class="xs">
+                <tspan class="mono">require</tspan>
+                셰임으로 host 의 React 주입
+              </text>
+              <text x="70" y="294" class="xs mut">
+                remote 번들의 react 는 external — 2벌이면 훅이 깨진다
+              </text>
+
+              <text x="480" y="176" text-anchor="middle" class="sm ttl">
+                remote 를 두 벌 빌드한다
+              </text>
+              <text x="480" y="200" text-anchor="middle" class="xs mut">
+                같은 소스, 타깃만 다르다
+              </text>
+              <text x="480" y="228" text-anchor="middle" class="xs mono cat">
+                웹 타깃 → remoteEntry.js
+              </text>
+              <text x="480" y="248" text-anchor="middle" class="xs mono crt">
+                노드 타깃 → mf-server.cjs
+              </text>
+              <text x="480" y="278" text-anchor="middle" class="xs mut">
+                react 는 양쪽 모두 external
+              </text>
+
+              <rect
+                x="600"
+                y="118"
+                width="320"
+                height="204"
+                rx="3"
+                class="box-hst"
+              />
+              <text x="616" y="142" class="ttl hst">
+                브라우저 경로 — MF 런타임
+              </text>
+              <rect
+                x="616"
+                y="156"
+                width="288"
+                height="44"
+                rx="2"
+                class="box"
+              />
+              <text x="630" y="174" class="xs mono">
+                init({ shared: react → lib: () =&gt; React })
+              </text>
+              <text x="630" y="190" class="xs mut">
+                host 의 React 를 직접 넘긴다 (싱글턴 보장)
+              </text>
+              <rect
+                x="616"
+                y="208"
+                width="288"
+                height="44"
+                rx="2"
+                class="box"
+              />
+              <text x="630" y="226" class="xs mono">
+                loadRemote → /v&lt;ver&gt;/mf-manifest.json
+              </text>
+              <text x="630" y="242" class="xs mut">
+                엔트리는 서버가 HTML 에 심어준 버전으로 고정
+              </text>
+              <rect
+                x="616"
+                y="260"
+                width="288"
+                height="44"
+                rx="2"
+                class="box"
+              />
+              <text x="630" y="278" class="xs mono">remoteEntry.js + 청크</text>
+              <text x="630" y="294" class="xs mut">
+                브라우저가 remote 오리진에서 직접 받는다
+              </text>
+
+              <path
+                d="M200 322 L200 384 L286 384"
+                class="ed"
+                marker-end="url(#d4a)"
+              />
+              <path
+                d="M760 322 L760 384 L674 384"
+                class="ed"
+                marker-end="url(#d4a)"
+              />
+
+              <rect
+                x="290"
+                y="356"
+                width="380"
+                height="58"
+                rx="3"
+                class="box"
+              />
+              <text x="480" y="380" text-anchor="middle" class="sm ttl">
+                같은 소스에서 나온 같은 컴포넌트
+              </text>
+              <text x="480" y="400" text-anchor="middle" class="xs mut">
+                → 마크업이 일치한다 → hydration 경고 0건
+              </text>
+            </svg>
+            <figcaption>
+              <b>이게 이 저장소의 핵심 주장이다.</b> 서버는
+              <code>mf-server.cjs</code> 로, 브라우저는
+              <code>remoteEntry</code> 로 렌더하지만 소스가 같으므로 마크업이
+              일치한다. 검증은 브라우저 없이 한 줄로 끝난다 —
+              <code>curl -s /checkout | grep -c "주문서"</code> → <b>1</b>.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="note">
+          <span class="note-h"
+            >여기서 가장 자주 걸리는 질문 — “남의 코드를 서버에서
+            실행한다고요?”</span
+          >
+          <p>
+            그렇다. 그래서 신뢰 경계를 별도로 설계했다(2-4). 브라우저에서 remote
+            청크를 실행하는 것과 신뢰 수준은 같지만, 뚫렸을 때 영향 범위가
+            <strong>서버 프로세스</strong>라는 점이 다르다는 게 판단의
+            출발점이었다.
+          </p>
+        </div>
+
+        <h3>2-3. remote 를 소비하는 자리는 단 하나다</h3>
+
+        <p>
+          모든 remote 소비가 <code>RemoteComponent</code> 하나를 지난다. 이
+          진입점이 세 가지를 한 번에 감싼다 — 서버·브라우저 두 로딩 경로, remote
+          하나가 죽어도 host 는 사는 장애 격리(<code>RemoteBoundary</code>),
+          그리고 <strong>remote 의 스타일시트</strong>다.
+        </p>
+        <p>
+          CSS 는 두 로딩 경로 어디로도 따라오지 않는다. 브라우저에서는 MF
+          런타임이 모듈만 가져오고, 서버에서는 CJS 문자열을 평가할 뿐이라
+          스타일시트를 실을 자리가 없다. 그래서 host 가 소비하는 자리에서
+          <code>&lt;link rel="stylesheet" precedence&gt;</code> 를 함께 건다 —
+          React 19 가 <code>&lt;head&gt;</code> 로 올리고 같은
+          <code>href</code> 를 중복 제거하므로, 한 화면에 같은 remote 를 몇 개
+          놓든 링크는 하나다.
+        </p>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>캐시 층</th>
+                <th>담는 것</th>
+                <th>무효화 수단</th>
+                <th>수명</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="num">1 · 버전 매니페스트</td>
+                <td><code>mf-version.json</code> 응답</td>
+                <td>
+                  <code>revalidateTag(…version)</code>
+                  <span class="tag no">expire:0</span>
+                </td>
+                <td class="num">TTL 30초</td>
+              </tr>
+              <tr>
+                <td class="num">2 · 번들 응답</td>
+                <td><code>mf-server.cjs</code> 바이트</td>
+                <td>
+                  <code>revalidateTag(…bundle)</code>
+                  <span class="tag no">expire:0</span>
+                </td>
+                <td class="num">태그까지</td>
+              </tr>
+              <tr>
+                <td class="num">3 · 평가된 모듈</td>
+                <td><code>new Function</code> 결과</td>
+                <td>버전 변경 · warm 세대 증가</td>
+                <td class="num">프로세스</td>
+              </tr>
+              <tr>
+                <td class="num">4 · 페이지</td>
+                <td>remote 마크업이 든 HTML/RSC</td>
+                <td><code>revalidateTag(…remote, "max")</code></td>
+                <td class="num"><code>cacheLife</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          <em>태그를 세 개로 나눈 이유</em>가 여기 있다. 하나로 묶으면 순서를
+          만들 수 없다 — 번들을 깨는 순간 페이지도 같이 깨져서 재생성이 warm
+          보다 먼저 일어난다. 그리고 1·2 는 <code>expire:0</code>, 4 는
+          <code>"max"</code> 다. <code>"max"</code> 는 stale-while-revalidate 라
+          번들 계층에 쓰면 warm 이 <strong>옛 코드</strong>를 데우고 remote 가
+          죽어 있어도 “성공”해버린다. 반대로 페이지 계층에서는 SWR 이 맞다.
+        </p>
+
+        <h3>2-4. host 서버가 남의 코드를 실행하기 전에 통과시키는 네 겹</h3>
+
+        <p class="claim">
+          <code>mf-version.json</code> 은
+          <strong>remote 가 주는 값</strong>이다. 그대로 믿으면 “이 주소에서 이
+          파일을 받아 실행하라”는 지시를 그대로 따르게 된다. 그래서 실행 전에 두
+          가지를 확인한다 —
+          <strong>받은 파일이 도중에 바뀌지 않았나</strong>(내용), 그리고
+          <strong>이 지시를 정말 우리 remote 빌드가 냈나</strong>(출처).
+        </p>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 1000 280"
+              role="img"
+              aria-label="remote 응답이 오리진 허용 목록, 경로 형태 검증, 내용 해시 대조, 서명 확인 네 관문을 통과해야 host 서버에서 실행된다. 어느 관문에서 걸리든 502 로 거부하고 마지막 정상 remote 로 서비스를 계속한다"
+            >
+              <defs>
+                <marker
+                  id="d7a"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk" />
+                </marker>
+                <marker
+                  id="d7r"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk-alr" />
+                </marker>
+              </defs>
+
+              <rect x="14" y="46" width="146" height="76" rx="3" class="box" />
+              <text x="87" y="76" text-anchor="middle" class="sm ttl">
+                remote 응답
+              </text>
+              <text x="87" y="96" text-anchor="middle" class="xs mut">
+                매니페스트 + 번들
+              </text>
+              <text x="87" y="113" text-anchor="middle" class="xs mut">
+                — 전부 남이 준 값이다
+              </text>
+              <line
+                x1="160"
+                y1="84"
+                x2="186"
+                y2="84"
+                class="ed"
+                marker-end="url(#d7a)"
+              />
+
+              <rect
+                x="192"
+                y="46"
+                width="140"
+                height="76"
+                rx="3"
+                class="box-plain"
+              />
+              <text x="262" y="72" text-anchor="middle" class="xs ttl">
+                ① 오리진 허용 목록
+              </text>
+              <text x="262" y="92" text-anchor="middle" class="xs mut">
+                아는 주소에서 받은 것만
+              </text>
+              <text x="262" y="110" text-anchor="middle" class="xs mono mut">
+                ALLOWED_ORIGINS
+              </text>
+              <line
+                x1="332"
+                y1="84"
+                x2="344"
+                y2="84"
+                class="ed"
+                marker-end="url(#d7a)"
+              />
+
+              <rect
+                x="350"
+                y="46"
+                width="140"
+                height="76"
+                rx="3"
+                class="box-plain"
+              />
+              <text x="420" y="72" text-anchor="middle" class="xs ttl">
+                ② 경로 형태 검증
+              </text>
+              <text x="420" y="92" text-anchor="middle" class="xs mut">
+                절대 URL · 경로 탈출
+              </text>
+              <text x="420" y="110" text-anchor="middle" class="xs mut">
+                공표한 버전과 다른 경로
+              </text>
+              <line
+                x1="490"
+                y1="84"
+                x2="502"
+                y2="84"
+                class="ed"
+                marker-end="url(#d7a)"
+              />
+
+              <rect
+                x="508"
+                y="46"
+                width="140"
+                height="76"
+                rx="3"
+                class="box-plain"
+              />
+              <text x="578" y="72" text-anchor="middle" class="xs ttl">
+                ③ 내용 해시 대조
+              </text>
+              <text x="578" y="92" text-anchor="middle" class="xs mut">
+                받은 바이트가 그대로인가
+              </text>
+              <text x="578" y="110" text-anchor="middle" class="xs mono mut">
+                SHA-384 (SRI)
+              </text>
+              <line
+                x1="648"
+                y1="84"
+                x2="660"
+                y2="84"
+                class="ed"
+                marker-end="url(#d7a)"
+              />
+
+              <rect
+                x="666"
+                y="46"
+                width="140"
+                height="76"
+                rx="3"
+                class="box-plain"
+              />
+              <text x="736" y="72" text-anchor="middle" class="xs ttl">
+                ④ 서명 확인
+              </text>
+              <text x="736" y="92" text-anchor="middle" class="xs mut">
+                정말 우리 빌드가 낸 것인가
+              </text>
+              <text x="736" y="110" text-anchor="middle" class="xs mono mut">
+                Ed25519 · 공개키
+              </text>
+              <line
+                x1="806"
+                y1="84"
+                x2="818"
+                y2="84"
+                class="ed"
+                marker-end="url(#d7a)"
+              />
+
+              <rect
+                x="824"
+                y="46"
+                width="156"
+                height="76"
+                rx="3"
+                class="box-hst"
+              />
+              <text x="902" y="76" text-anchor="middle" class="xs ttl hst">
+                실행
+              </text>
+              <text x="902" y="96" text-anchor="middle" class="xs mono mut">
+                new Function
+              </text>
+              <text x="902" y="113" text-anchor="middle" class="xs mut">
+                host 서버 프로세스 안에서
+              </text>
+
+              <path
+                d="M262 122 L262 172"
+                class="ed-alr"
+                marker-end="url(#d7r)"
+              />
+              <path
+                d="M420 122 L420 172"
+                class="ed-alr"
+                marker-end="url(#d7r)"
+              />
+              <path
+                d="M578 122 L578 172"
+                class="ed-alr"
+                marker-end="url(#d7r)"
+              />
+              <path
+                d="M736 122 L736 172"
+                class="ed-alr"
+                marker-end="url(#d7r)"
+              />
+
+              <rect
+                x="192"
+                y="174"
+                width="614"
+                height="46"
+                rx="3"
+                class="box-alr"
+              />
+              <text x="499" y="203" text-anchor="middle" class="sm alr">
+                거부 → 502 · 마지막 정상 remote 로 서비스는 계속 뜬다
+              </text>
+
+              <text x="14" y="248" class="xs mut">
+                네 겹이 막는 사고가 서로 다르다 — 모르는 주소(①) · 뒤틀린
+                경로(②) · 바뀐 내용(③) · 위조된 출처(④). 앞 셋을 다 통과해도
+                ④에서 걸릴 수 있다.
+              </text>
+              <text x="14" y="266" class="xs mut">
+                검증은
+                <tspan class="mono">node:crypto</tspan>
+                가 아니라 WebCrypto 로 한다. 이 로더 모듈이 브라우저 번들에도
+                포함되기 때문이다.
+              </text>
+            </svg>
+            <figcaption>
+              <b>변조 후 배포를 실제로 시도한 결과:</b> 번들 바이트 변조 ·
+              매니페스트가 외부 오리진 지정 · 경로 탈출 · 서명 없이 매니페스트
+              교체 · 서명 두고 해시 값만 교체 — 다섯 시나리오 모두
+              <b>502 로 거부</b>, 서비스는 마지막 정상 remote 로 계속 유지됐다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <h4>③ 해시는 무엇을 대조하나 — 그리고 왜 그것만으로는 부족한가</h4>
+
+        <p>
+          <strong>해시는 파일 내용을 짧은 문자열로 요약한 값</strong>이다.
+          내용이 1바이트만 달라져도 값이 전혀 다르게 나온다. 그래서 remote 가
+          매니페스트에 적어 보낸 해시와, host 가 받은 파일을 직접 계산한 해시를
+          맞춰보면 <strong>전송 중 잘렸거나 바뀐 파일</strong>을 잡아낼 수 있다.
+          이 대조가 SRI 이고, 요약을 만드는 방식이 SHA-384 다.
+        </p>
+
+        <p>
+          문제는 <em>해시를 적어 보내는 쪽과 파일을 주는 쪽이 같다</em>는
+          것이다. remote 오리진이 통째로 털리면 공격자는 번들을 바꾸고
+          <strong>해시도 다시 계산해서 매니페스트에 써넣으면 된다</strong>. host
+          가 보기에 둘은 정확히 일치한다. 같은 출처가 준 값끼리 대조하는
+          <strong>자기 증명</strong>이라, 이 공격은 원리적으로 막히지 않는다.
+        </p>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 960 380"
+              role="img"
+              aria-label="같은 공격에 대해 해시만 대조하면 공격자가 해시도 다시 계산해 써넣을 수 있어 통과하지만, 서명까지 확인하면 개인키가 없어 서명을 만들 수 없으므로 502 로 거부된다"
+            >
+              <defs>
+                <marker
+                  id="d8a"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk-alr" />
+                </marker>
+                <marker
+                  id="d8b"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk-crt" />
+                </marker>
+              </defs>
+
+              <text x="20" y="28" class="sm ttl alr">
+                ① 내용 해시만 대조한다
+              </text>
+
+              <rect
+                x="20"
+                y="40"
+                width="200"
+                height="78"
+                rx="3"
+                class="box-alr"
+              />
+              <text x="120" y="68" text-anchor="middle" class="xs">
+                공격자가 remote 오리진 장악
+              </text>
+              <text x="120" y="88" text-anchor="middle" class="xs mut">
+                번들 바이트를 갈아끼운다
+              </text>
+              <text x="120" y="106" text-anchor="middle" class="xs mut">
+                (DNS · 스토리지 · CI 무엇이든)
+              </text>
+              <line
+                x1="220"
+                y1="79"
+                x2="244"
+                y2="79"
+                class="ed-alr"
+                marker-end="url(#d8a)"
+              />
+
+              <rect
+                x="250"
+                y="40"
+                width="260"
+                height="78"
+                rx="3"
+                class="box-alr"
+              />
+              <text x="380" y="68" text-anchor="middle" class="xs">
+                해시를 다시 계산해
+              </text>
+              <text x="380" y="88" text-anchor="middle" class="xs">
+                매니페스트에 써넣는다
+              </text>
+              <text x="380" y="106" text-anchor="middle" class="xs alr">
+                — 공격자가 할 수 있는 일이다
+              </text>
+              <line
+                x1="510"
+                y1="79"
+                x2="534"
+                y2="79"
+                class="ed-alr"
+                marker-end="url(#d8a)"
+              />
+
+              <rect
+                x="540"
+                y="40"
+                width="220"
+                height="78"
+                rx="3"
+                class="box-plain"
+              />
+              <text x="650" y="68" text-anchor="middle" class="xs">
+                host — 적힌 해시와
+              </text>
+              <text x="650" y="88" text-anchor="middle" class="xs">
+                받은 파일의 해시를 대조
+              </text>
+              <text x="650" y="106" text-anchor="middle" class="xs mut">
+                → 정확히 일치한다
+              </text>
+              <line
+                x1="760"
+                y1="79"
+                x2="784"
+                y2="79"
+                class="ed-alr"
+                marker-end="url(#d8a)"
+              />
+
+              <rect
+                x="790"
+                y="40"
+                width="150"
+                height="78"
+                rx="3"
+                class="box-alr"
+              />
+              <text x="865" y="74" text-anchor="middle" class="sm ttl alr">
+                통과 · 실행됨
+              </text>
+              <text x="865" y="96" text-anchor="middle" class="xs mut">
+                서버에서 남의 코드가
+              </text>
+              <text x="865" y="112" text-anchor="middle" class="xs mut">
+                돈다
+              </text>
+
+              <text x="20" y="146" class="xs mut">
+                해시를 적어 보내는 쪽과 파일을 주는 쪽이
+                <tspan class="ttl">같다</tspan>
+                . 자기가 낸 답을 자기가 채점하는 셈이라, 출처가 통째로 바뀐
+                경우를 잡을 수 없다.
+              </text>
+
+              <text x="20" y="200" class="sm ttl crt">② 서명까지 확인한다</text>
+
+              <rect
+                x="20"
+                y="212"
+                width="200"
+                height="78"
+                rx="3"
+                class="box-plain"
+              />
+              <text x="120" y="240" text-anchor="middle" class="xs">
+                공격 조건은 완전히 같다
+              </text>
+              <text x="120" y="260" text-anchor="middle" class="xs mut">
+                번들 바이트를 갈아끼운다
+              </text>
+              <text x="120" y="278" text-anchor="middle" class="xs mut">
+                오리진은 공격자 손에 있다
+              </text>
+              <line
+                x1="220"
+                y1="251"
+                x2="244"
+                y2="251"
+                class="ed-crt"
+                marker-end="url(#d8b)"
+              />
+
+              <rect
+                x="250"
+                y="212"
+                width="260"
+                height="78"
+                rx="3"
+                class="box-crt"
+              />
+              <text x="380" y="240" text-anchor="middle" class="xs">
+                해시는 다시 계산해도
+              </text>
+              <text x="380" y="260" text-anchor="middle" class="xs">
+                서명은 만들 수 없다
+              </text>
+              <text x="380" y="278" text-anchor="middle" class="xs crt">
+                — 개인키가 여기 없다
+              </text>
+              <line
+                x1="510"
+                y1="251"
+                x2="534"
+                y2="251"
+                class="ed-crt"
+                marker-end="url(#d8b)"
+              />
+
+              <rect
+                x="540"
+                y="212"
+                width="220"
+                height="78"
+                rx="3"
+                class="box-plain"
+              />
+              <text x="650" y="240" text-anchor="middle" class="xs">
+                host — 공개키로
+              </text>
+              <text x="650" y="260" text-anchor="middle" class="xs">
+                서명을 확인
+              </text>
+              <text x="650" y="278" text-anchor="middle" class="xs mut">
+                → 맞지 않는다
+              </text>
+              <line
+                x1="760"
+                y1="251"
+                x2="784"
+                y2="251"
+                class="ed-crt"
+                marker-end="url(#d8b)"
+              />
+
+              <rect
+                x="790"
+                y="212"
+                width="150"
+                height="78"
+                rx="3"
+                class="box-crt"
+              />
+              <text x="865" y="246" text-anchor="middle" class="sm ttl crt">
+                502 로 거부
+              </text>
+              <text x="865" y="268" text-anchor="middle" class="xs mut">
+                마지막 정상 remote 로
+              </text>
+              <text x="865" y="284" text-anchor="middle" class="xs mut">
+                서비스는 계속 뜬다
+              </text>
+
+              <text x="20" y="318" class="xs mut">
+                서명을 만들 수 있는 열쇠는 remote 의
+                <tspan class="ttl">빌드 파이프라인 안에만</tspan>
+                있다. 오리진을 장악해도 그 열쇠는 손에 들어오지 않는다.
+              </text>
+              <text x="20" y="352" class="xs">
+                두 시나리오의 공격은 똑같다. 달라지는 건
+                <tspan class="ttl">host 가 무엇을 근거로 판단하느냐</tspan>
+                하나뿐이다.
+              </text>
+            </svg>
+            <figcaption>
+              <b
+                >해시는 “내용이 바뀌었나”에 답하고, 서명은 “누가 만들었나”에
+                답한다.</b
+              >
+              둘은 대체재가 아니라 서로 다른 질문이다 — 그래서 겹을 나눠 둘 다
+              통과시킨다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <h4>④ 그래서 비대칭키를 쓴다 — 만드는 열쇠와 확인하는 열쇠를 나눈다</h4>
+
+        <p>
+          서명은 “이 내용을 우리가 냈다”를 증명하는 장치다. 핵심은
+          <strong>열쇠가 한 쌍</strong>이라는 데 있다.
+          한쪽(<strong>개인키</strong>)으로만 서명을 만들 수 있고, 다른
+          한쪽(<strong>공개키</strong>)으로는 <strong>확인만</strong> 된다.
+          공개키를 아무리 들여다봐도 개인키를 되돌릴 수 없고, 따라서 공개키를
+          가진 쪽은 가짜 서명을 만들지 못한다. 이 “한 방향으로만 되는” 성질이
+          비대칭키의 전부이고, Ed25519 는 그 성질을 구현한 방식 중 하나다.
+        </p>
+
+        <p>
+          그래서 배치가 결정된다.
+          <em>개인키는 remote 의 빌드 파이프라인 안에만</em>,
+          <em>공개키는 host 의 런타임 env 에만</em> 둔다. 오리진이 털려도
+          공격자에게는 개인키가 없으니 번들과 해시는 바꿔도 서명은 만들 수 없다.
+          결과적으로
+          <strong
+            >“배포된 파일을 바꾸는 사고”와 “빌드 파이프라인을 뚫는 사고”가
+            분리된다</strong
+          >
+          — 둘 다 뚫려야 host 가 속는다.
+        </p>
+
+        <p>
+          만약
+          <strong>양쪽이 같은 비밀 하나를 나눠 갖는 방식(대칭키)</strong
+          >이었다면, 확인만 하면 되는 host 도 서명을
+          <em>만들 수 있는</em> 열쇠를 갖게 된다. host 가 털리는 순간 그 열쇠로
+          가짜 remote 를 서명할 수 있으니, 막으려던 것을 못 막는다.
+          <strong>확인만 하면 되는 쪽에 위조 능력을 주지 않는 것</strong> —
+          비대칭을 쓰는 이유가 이것이다.
+        </p>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 940 300"
+              role="img"
+              aria-label="개인키는 remote 의 CI 빌드에만 두어 서명을 만들고, 공개키는 host 런타임에만 두어 확인만 한다. 공개키로는 서명을 만들 수 없으므로 역방향은 성립하지 않는다"
+            >
+              <defs>
+                <marker
+                  id="d9a"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk" />
+                </marker>
+              </defs>
+
+              <rect
+                x="20"
+                y="42"
+                width="230"
+                height="96"
+                rx="3"
+                class="box-cat"
+              />
+              <text x="36" y="34" class="xs mut">
+                remote 쪽 — 빌드할 때 한 번
+              </text>
+              <text x="36" y="68" class="sm ttl cat">개인키</text>
+              <text x="36" y="88" class="xs mono mut">MF_SIGNING_KEY</text>
+              <text x="36" y="108" class="xs">
+                서명을
+                <tspan class="ttl">만든다</tspan>
+              </text>
+              <text x="36" y="126" class="xs mut">
+                이미지에 남지 않게 build secret 으로 전달
+              </text>
+
+              <line
+                x1="250"
+                y1="90"
+                x2="324"
+                y2="90"
+                class="ed"
+                marker-end="url(#d9a)"
+              />
+              <text x="287" y="82" text-anchor="middle" class="xs mut">
+                서명해서
+              </text>
+              <text x="287" y="110" text-anchor="middle" class="xs mut">
+                싣는다
+              </text>
+
+              <rect x="330" y="42" width="280" height="96" rx="3" class="box" />
+              <text x="470" y="34" text-anchor="middle" class="xs mut">
+                공개된 곳에 올라가는 값 — 누구나 읽는다
+              </text>
+              <text x="470" y="68" text-anchor="middle" class="sm ttl mono">
+                mf-version.json
+              </text>
+              <text x="470" y="90" text-anchor="middle" class="xs mut">
+                version · 자산 경로
+              </text>
+              <text x="470" y="108" text-anchor="middle" class="xs mut">
+                파일 해시(SRI)
+              </text>
+              <text x="470" y="126" text-anchor="middle" class="xs">서명</text>
+
+              <line
+                x1="610"
+                y1="90"
+                x2="684"
+                y2="90"
+                class="ed"
+                marker-end="url(#d9a)"
+              />
+              <text x="647" y="82" text-anchor="middle" class="xs mut">
+                받아서
+              </text>
+              <text x="647" y="110" text-anchor="middle" class="xs mut">
+                확인한다
+              </text>
+
+              <rect
+                x="690"
+                y="42"
+                width="230"
+                height="96"
+                rx="3"
+                class="box-hst"
+              />
+              <text x="706" y="34" class="xs mut">host 쪽 — 요청마다</text>
+              <text x="706" y="68" class="sm ttl hst">공개키</text>
+              <text x="706" y="88" class="xs mono mut">
+                MF_REMOTE_PUBLIC_KEY
+              </text>
+              <text x="706" y="108" class="xs">
+                <tspan class="ttl">확인만</tspan>
+                한다
+              </text>
+              <text x="706" y="126" class="xs mut">
+                만들 수는 없다 — 그게 요점이다
+              </text>
+
+              <path d="M690 178 L620 178" class="ed-alr dash" />
+              <line x1="648" y1="170" x2="662" y2="186" class="ed-alr" />
+              <line x1="662" y1="170" x2="648" y2="186" class="ed-alr" />
+              <text x="700" y="182" class="xs alr">
+                공개키로 서명을 만드는 방향은 성립하지 않는다 (되돌리기 불가)
+              </text>
+
+              <text x="20" y="228" class="xs mut">
+                대칭키(양쪽이 같은 비밀 하나를 나눠 갖는 방식)로 했다면, 확인만
+                하면 되는 host 도 서명을 만들 수 있는 열쇠를 갖게 된다.
+              </text>
+              <text x="20" y="248" class="xs mut">
+                host 가 털리는 순간 그 열쇠로 가짜 remote 를 서명할 수 있다 —
+                막으려던 것을 못 막는다.
+              </text>
+              <text x="20" y="278" class="xs">
+                그래서 개인키와 공개키를
+                <tspan class="ttl">절대 같은 곳에 두지 않는다.</tspan>
+                둘이 한곳에 모이면 이 겹은 그냥 없는 것과 같다.
+              </text>
+            </svg>
+            <figcaption>
+              키를 만드는 명령은 <code>node scripts/gen-signing-key.ts</code> 한
+              줄이다. 개인키는 remote 빌드에 BuildKit secret 으로, 공개키는 host
+              런타임 env 로 들어간다. 시크릿을 넘기지 않으면 서명 없이 빌드되고,
+              그때 host 의 <code>MF_REQUIRE_SIGNATURE=1</code> 은 remote 로드를
+              전부 거부한다 — 해시 대조는 서명과 무관하게 계속 동작한다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <h3>2-5. remote 끼리는 서로를 모른다 — 상태는 어떻게 공유하나</h3>
+
+        <p>
+          catalog 의 “담기” 버튼이 cart 의 헤더 배지를 바꾼다. 그런데 규칙은
+          <strong>“remote 는 host 하고만 대화한다”</strong> 다. remote 가 다른
+          remote 를 import 하면 독립 배포 전제가 깨지고, 한쪽이 스토어를 expose
+          하면 remote → remote 의존이 생긴다.
+        </p>
+        <p>
+          그래서 스토어를 공유 패키지(<code>@mfa/store</code>)에 두고
+          <code>globalSingleton</code> 으로 한 인스턴스만 살린다. 전부 host
+          페이지 안이라
+          <strong>소프트 내비게이션 중 상태가 메모리에 그대로 남는다</strong> —
+          <code>localStorage</code> 는 새로고침 복원용이지 경계 통신 수단이
+          아니다. Multi-Zones 였다면 경계마다 그 왕복이 강제됐다. SSR 스냅샷은
+          항상 빈 장바구니라서 hydration 불일치도 생기지 않는다.
+        </p>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>검증 항목</th>
+                <th>측정 방법</th>
+                <th>결과</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>remote SSR</td>
+                <td class="num">curl /checkout | grep 주문서</td>
+                <td><span class="tag ok">초기 HTML 에 존재</span></td>
+              </tr>
+              <tr>
+                <td>소프트 내비 <code>/</code> → <code>/checkout</code></td>
+                <td class="num">document 요청 증가 수</td>
+                <td><span class="tag ok">0</span></td>
+              </tr>
+              <tr>
+                <td>hydration</td>
+                <td class="num">브라우저 콘솔 경고</td>
+                <td><span class="tag ok">0건</span></td>
+              </tr>
+              <tr>
+                <td>크로스 remote 상태 공유</td>
+                <td class="num">담기 → 헤더 배지</td>
+                <td><span class="tag ok">0원 → 189,000원</span></td>
+              </tr>
+              <tr>
+                <td>멀티 인스턴스 수렴</td>
+                <td class="num">웹훅 없이 TTL 경과</td>
+                <td><span class="tag ok">30초</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============================================================ FAQ -->
+      <section>
+        <div class="part-head">
+          <span class="part-num">FAQ</span>
+          <h2>설계를 두고 자주 나오는 질문</h2>
+        </div>
+
+        <div class="qa">
+          <div>
+            <q>“그냥 Multi-Zones 를 쓰면 되지 않나”</q>
+            <p>
+              zone 마다 Next 라우터가 따로 있어서 <code>next/link</code> 로
+              경계를 넘을 수 없다. 넘을 때마다 하드 내비게이션이 강제되는데,
+              그러면 SPA 를 유지할 이유가 사라진다. 대조군으로 실제 zone 앱을
+              두고 쟀고 document 요청이 +1 로 나왔다. 측정이 끝난 뒤 그 앱은
+              지웠다.
+            </p>
+          </div>
+          <div>
+            <q>“왜 공식 플러그인을 쓰지 않나”</q>
+            <p>
+              <code>@module-federation/nextjs-mf</code> 는 peer 가 Next 15 에서
+              끊기고 App Router 를 지원한 적이 없으며 업스트림이 maintenance
+              mode 다. <code>@module-federation/node</code> 는 peer 가 webpack
+              인데 host 는 Turbopack 이다. 그래서 host 에는 번들러 플러그인을
+              넣지 않고 <code>@module-federation/runtime</code> 만 평범한
+              라이브러리로 쓴다 — Turbopack 이 MF 를 몰라도 된다.
+            </p>
+          </div>
+          <div>
+            <q>“remote 를 재배포하면 host 는 그걸 어떻게 아나”</q>
+            <p>
+              두 경로다. remote 가 <code>mf-version.json</code> 으로 자기 버전을
+              공표하고, host 는 그 파일을 30초 TTL 로 읽어
+              <b>스스로 수렴한다</b>. 웹훅은 그 수렴을 즉시로 당기는 최적화일
+              뿐이라 유실돼도 정합성이 깨지지 않는다. 다만 이미 캐시된 페이지
+              HTML 은 태그를 깨야만 바뀌므로, 웹훅이 warm 을 먼저 하고 성공했을
+              때만 페이지 태그를 무효화한다.
+            </p>
+          </div>
+          <div>
+            <q>“host 서버에서 remote 코드를 실행하는 게 위험하지 않나”</q>
+            <p>
+              브라우저에서 remote 청크를 실행하는 것과 신뢰 수준은 같지만,
+              뚫렸을 때 영향 범위가 서버 프로세스라 다르다. 그래서 실행 전에 네
+              가지를 확인한다 — 아는 주소에서 받았는가, 경로가 뒤틀리지
+              않았는가, <b>받은 파일의 내용이 그대로인가</b>, 그리고
+              <b>이 목록을 정말 우리 빌드가 냈는가</b>.
+            </p>
+            <p>
+              앞의 세 개만으로는 부족하다. 파일 내용 대조에 쓰는 해시를
+              <b>remote 가 같이 보내주기</b>
+              때문에, 오리진이 털리면 공격자가 파일을 바꾸고 해시도 다시 계산해
+              써넣으면 그대로 통과한다. 자기가 낸 답을 자기가 채점하는 구조다.
+            </p>
+            <p>
+              그래서 마지막 겹에 <b>비대칭키 서명</b>을 쓴다. 서명을 만들 수
+              있는 열쇠(개인키)는 remote 의 빌드 파이프라인에만 두고, host 에는
+              <b>확인만 되는 열쇠</b>(공개키)를 둔다. 오리진을 장악해도 서명은
+              만들 수 없으니 거기서 걸린다. 반대로 host 와 remote 가 같은 비밀을
+              나눠 갖는 방식이었다면 host 가 털리는 순간 가짜 remote 를 서명할
+              수 있게 된다. 변조 배포 5종을 직접 시도해 전부 502 로 거부되는
+              것까지 확인했다.
+            </p>
+          </div>
+          <div>
+            <q>“이 구조의 한계는 무엇인가”</q>
+            <p>
+              remote 를 웹 · 노드 두 타깃으로 빌드해야 하고, remote 는 여전히
+              클라이언트 컴포넌트라 서버 컴포넌트를 federate 할 수 없다.
+              <code>new Function</code> 평가가 필요해 Edge 런타임도 쓸 수 없다.
+              그리고 웹훅은 인스턴스 하나에만 닿으므로 멀티 인스턴스 무효화는
+              TTL 만큼 지연된다 — 즉시성이 필요하면 공유 캐시 핸들러를 붙여야
+              한다.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        <span>mfa-nextjs — Next.js 16 · Turbopack · pnpm · Turborepo</span>
+        <span
+          >라이브 데모
+          <a href="https://mfa.lakegreen.net">mfa.lakegreen.net</a></span
+        >
+        <span>문서 지도 <a href="./README.md">docs/README.md</a></span>
+        <span
+          >이 파일은 지도다. 수치와 실측의 원본은 각 절의 근거 문서에
+          있다.</span
+        >
+      </footer>
+    </div>
+
+    <script>
+      // 테마 토글 — OS 설정이 기본이고, 누르면 그걸 덮는다. 선택은 localStorage 에 남는다.
+      (function () {
+        var KEY = 'mfa-anatomy-theme';
+        var root = document.documentElement;
+        var saved = null;
+
+        try {
+          saved = localStorage.getItem(KEY);
+        } catch (e) {
+          // 프라이빗 모드 등에서 접근이 막히면 저장 없이 이번 세션만 동작한다
+        }
+
+        if (saved === 'dark' || saved === 'light')
+          root.setAttribute('data-theme', saved);
+
+        document
+          .getElementById('theme-toggle')
+          .addEventListener('click', function () {
+            var systemDark = window.matchMedia(
+              '(prefers-color-scheme: dark)',
+            ).matches;
+            var current =
+              root.getAttribute('data-theme') ||
+              (systemDark ? 'dark' : 'light');
+            var next = current === 'dark' ? 'light' : 'dark';
+
+            root.setAttribute('data-theme', next);
+            try {
+              localStorage.setItem(KEY, next);
+            } catch (e) {
+              /* 저장 실패는 무시한다 — 화면은 이미 바뀌었다 */
+            }
+          });
+      })();
+    </script>
+  </body>
+</html>
