@@ -30,9 +30,14 @@ node builtin 을 넣을 수 없고, node 전용 코드는 전부 `node.ts`(`@mfa
 
 상대 import 경로에는 **확장자를 붙이지 않는다**(저장소 전역 규칙). 모든 소비가 번들러를
 거치기 때문이다 — host 는 `transpilePackages` 로 `@mfa/ui`·`@mfa/contracts` 를 직접 번들하고,
-remote 는 Vite·Rsbuild 가 번들한다. 예외는 `packages/remote-config` 하나로, 이건 Node 가
-직접 읽으므로 확장자가 **필수**다 — `node.ts` 가 `./index.ts` 를 그렇게 부른다. 빼면
-`ERR_MODULE_NOT_FOUND` 로 빌드가 죽는다(15차에 실제로 밟았다). 근거: known-issues D-1.
+remote 는 Vite·Rsbuild 가 번들한다. 근거: known-issues D-1.
+
+`packages/remote-config` **안에서는 상대 import 를 쓰지 않는다.** 이건 Node 가 번들러 없이
+직접 읽는 유일한 패키지라, 확장자를 빼면 Node 가 못 찾고(`ERR_MODULE_NOT_FOUND`) 붙이면
+tsc 가 막는다(`TS5097`). 이 패키지는 빌드 산출물이 없어서 소비처의 tsc 가 소스를 직접
+검사하므로 `allowImportingTsExtensions` 를 켤 수도 없다 — 소비처 중에 dist 를 emit 하는
+프로젝트가 있다. **자기 참조로 부른다**: `import { … } from '@mfa/remote-config'`.
+15차에 양쪽을 다 밟고 나온 결론이다.
 
 경로 문자열(`/mf-server.cjs`, `/style.css`, `/v<version>/…`)을 호출부에서 **직접 조립하지 않는다.**
 번들러별 디렉터리 규칙이 계약에 새면 catalog(Vite)와 cart(Rsbuild)가 갈라진다.
