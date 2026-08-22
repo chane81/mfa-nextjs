@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 
 import type { CartBadgeProps } from '@mfa/contracts';
-import { cartTotals, useCart, useCartSync, useHydrated } from '@mfa/store';
+import { cartTotals, useCartLines } from '@mfa/store';
 
 /**
  * host 에 노출되는 모듈: `cart/CartBadge`
@@ -11,19 +11,8 @@ export default function CartBadge({
   label = '장바구니',
   initialLines,
 }: CartBadgeProps) {
-  /** 다른 탭이 장바구니를 바꿨으면 이 탭이 앞으로 나올 때 다시 읽는다 */
-  useCartSync();
-
-  const hydrated = useHydrated();
-  const storeLines = useCart((state) => state.lines);
-
-  /**
-   * 하이드레이션 커밋 전에는 host 가 쿠키에서 읽어 넘긴 값을 쓴다. 스토어의 서버
-   * 스냅샷은 빈 장바구니라 여기서 쓰면 첫 HTML 이 비어 버린다. 둘 다 같은 쿠키에서
-   * 나오므로 커밋 순간에 값이 바뀌지 않는다 — 전이 자체가 없다. 단일 탭 기준이고,
-   * 다른 탭이 그사이 쿠키를 바꾼 경우는 `useCartSync` 가 포커스 복귀 때 맞춘다.
-   */
-  const lines = hydrated ? storeLines : (initialLines ?? []);
+  /** 무엇을 그릴지는 `@mfa/store` 가 정한다 — 하이드레이션 경계도 탭 동기화도 그 안이다 */
+  const lines = useCartLines(initialLines);
   const { totalQuantity, totalPriceLabel } = cartTotals(lines);
 
   return (
