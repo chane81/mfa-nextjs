@@ -13,17 +13,26 @@ host 는 번들러 플러그인 없이 `@module-federation/runtime` 만 쓴다. 
 
 ## SSOT 를 지킨다
 
-| 무엇                     | 어디                                                 |
-| ------------------------ | ---------------------------------------------------- |
-| remote 이름 · 포트 · env | `packages/remote-config`                             |
-| 산출물 파일명 · URL 조립 | 같은 패키지의 `MF_FILES` · `*Url()` · `stylesPath()` |
-| remote 모듈 타입         | `packages/contracts` 의 `RemoteModuleMap`            |
-| 런타임 공유 상태         | `packages/store` — 도메인별 폴더(`cart/`)            |
+| 무엇                     | 어디                                                                 |
+| ------------------------ | -------------------------------------------------------------------- |
+| remote 이름 · 포트 · env | `packages/remote-config`                                             |
+| 산출물 파일명 · URL 조립 | 같은 패키지의 `MF_FILES` · `*Url()` · `versionedPath()`              |
+| React external 목록      | 같은 패키지의 `SSR_EXTERNALS` (remote 빌드 · host 셰임이 같이 본다)  |
+| 매니페스트 서명 페이로드 | 같은 패키지의 `signedPayload()` (stamp 와 host 검증이 같이 본다)     |
+| 빌드 버전 · dist 경로    | `@mfa/remote-config/node` — `readBuildVersion()` · `versionedDist()` |
+| remote 모듈 타입         | `packages/contracts` 의 `RemoteModuleMap`                            |
+| 런타임 공유 상태         | `packages/store` — 도메인별 폴더(`cart/`)                            |
+| 레이어를 넘는 host 상태  | `apps/host/src/mf/global-state.ts` 의 `globalCell()`                 |
+
+`@mfa/remote-config` 는 **진입점이 둘**이다. `index.ts` 는 host 의 브라우저 번들에 실리므로
+node builtin 을 넣을 수 없고, node 전용 코드는 전부 `node.ts`(`@mfa/remote-config/node`) 로 간다.
+그 경계는 `tsconfig.json`(`types: []`)과 `tsconfig.node.json`(`types: ["node"]`)이 강제한다.
 
 상대 import 경로에는 **확장자를 붙이지 않는다**(저장소 전역 규칙). 모든 소비가 번들러를
 거치기 때문이다 — host 는 `transpilePackages` 로 `@mfa/ui`·`@mfa/contracts` 를 직접 번들하고,
 remote 는 Vite·Rsbuild 가 번들한다. 예외는 `packages/remote-config` 하나로, 이건 Node 가
-직접 읽으므로 확장자가 **필수**다(지금은 상대 import 자체가 없다). 근거: known-issues D-1.
+직접 읽으므로 확장자가 **필수**다 — `node.ts` 가 `./index.ts` 를 그렇게 부른다. 빼면
+`ERR_MODULE_NOT_FOUND` 로 빌드가 죽는다(15차에 실제로 밟았다). 근거: known-issues D-1.
 
 경로 문자열(`/mf-server.cjs`, `/style.css`, `/v<version>/…`)을 호출부에서 **직접 조립하지 않는다.**
 번들러별 디렉터리 규칙이 계약에 새면 catalog(Vite)와 cart(Rsbuild)가 갈라진다.

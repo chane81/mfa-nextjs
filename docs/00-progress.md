@@ -1,5 +1,103 @@
 # 진행 상황
 
+## 2026-08-22 (15차) — 여러 곳에 흩어진 것들을 SSOT 로 모으고 죽은 표면을 걷어냈다
+
+전체 소스(6.5k 줄)를 훑어 "같은 지식이 두 곳 이상에 적혀 있는 자리"를 찾았다.
+아홉 군데가 나왔고, 그중 **둘은 이미 갈라져 있었다** — 즉 잠재 버그였지 취향 문제가 아니었다.
+
+### 이미 갈라져 있던 둘
+
+- **서명 페이로드.** `scripts/stamp-remote-version.ts` 와 host `mf/remote-trust.ts` 가
+  `JSON.stringify([remote, version, ssrEntry, webEntry, ssrIntegrity, webIntegrity])` 를
+  각자 손으로 적고, 주석으로 "양쪽이 같은 형식" 이라고만 적어 두었다. 사람이 지키는 계약이다.
+  갈라지면 매니페스트는 멀쩡히 만들어지고 배포도 성공하는데 **host 의 검증만 실패**하고,
+  원인이 두 파일의 배열 차이라는 게 어느 로그에도 안 남는다
+- **`.mf-version` 빈 파일 판정.** `rsbuild.config.ts` 는 `existsSync` 만 봤고
+  `rsbuild.server.config.ts` 는 빈 값까지 걸렀다(`|| ''`). 빈 `.mf-version` 이면
+  웹 번들은 `dist/v` 로, SSR 번들은 `dist` 로 나가고 stamp 가 한쪽을 못 찾는다
+
+### 한 일 — 뽑아낸 것
+
+- [x] `@mfa/remote-config` 에 `signedPayload` · `SignedManifestFields` · `SsrExternal`.
+      서명은 host ↔ remote 배포 파이프라인 사이의 계약이라 배치 SSOT 가 자리다.
+      host 쪽은 재-export 만 남긴다 (신뢰 검사 함수들과 같이 쓰이므로)
+- [x] `SSR_EXTERNALS` — React external 목록이 **네 곳**에 있었다(두 remote 의 SSR 빌드 설정,
+      host 의 `INJECTED` 셰임, 그리고 브라우저 `shared`). 어긋나는 방향이 둘이고 증상이 다르다:
+      remote 가 external 로 안 남기면 서버에서 React 가 2벌, host 가 주입 안 하면
+      `예상 밖 모듈을 require 했습니다`. `INJECTED` 는 이제 `Record<SsrExternal, unknown>` 이라
+      키가 하나라도 빠지면 컴파일 타임에 걸린다
+- [x] `versionedPath(file, version)` — `/v<ver>/<파일>` 조립이 stamp·`stylesPath` 등에 흩어져 있었다
+- [x] **신규 `@mfa/remote-config/node` 서브패스** — `readBuildVersion` · `versionedDist` ·
+      `assetBase` · `createMfDevMiddleware`.
+      `index.ts` 는 host 의 **브라우저 번들에 실리므로**(`stylesPath`·`MF_FILES`) `node:fs` 를
+      섞을 수 없다. 그래서 진입점을 나눴고, `tsconfig.json`(`types: []`)과
+      `tsconfig.node.json`(`types: ["node"]`)으로 **검사도 나눴다** — 실수로 `index.ts` 에
+      node 전용 코드를 넣으면 typecheck 가 잡는다
+- [x] dev·preview 미들웨어 공용화. vite·rsbuild config 가 **글자 그대로 같은 60줄**
+      (서빙 대상 목록, 404 JSON 본문, MIME 분기, CORS, `no-store`)을 각자 갖고 있었다.
+      번들러 타입을 import 하지 않고 node `http` 최소 표면만 받는다 — remote 가 번들러를
+      갈아타도 이 파일은 안 바뀐다
+- [x] host `mf/global-state.ts` 의 `globalCell(name, create)` — RSC/SSR 레이어를 넘는
+      globalThis 홀더가 **네 벌**이었다(로더 계측 1 + `remote-version.ts` 3). 각자 키·Holder
+      타입·`??=` 게터를 반복했다. `Symbol.for` 레지스트리 하나 안에서 이름으로 가른다.
+      `@mfa/store` 의 `globalSingleton` 은 쓰지 않는다 — 그건 브라우저 런타임 상태용이고
+      `'use client'` 그래프에 묶여 있어 ADR-015 가 떼어낸 걸 도로 붙이게 된다
+- [x] 각 remote 의 `src/origin.tsx` — `origin` 라벨 + `originHue` 리터럴 쌍이 expose 마다
+      복사돼 있었다. 이건 "이 UI 를 어느 앱이 그렸나"를 판별하는 **관측 수단**이라,
+      하나만 어긋나면 관측이 거짓말을 한다
+- [x] catalog `components/StockBadge.tsx` — 품절 판정과 그 색(`hue 0` vs `140`)이 짝인데
+      `ProductCard`·`ProductDetail` 두 벌이었다. 한쪽만 고치면 "빨간데 재고 3" 이 나온다
+- [x] `byRemote()` reduce 패턴 3곳 → `remote-endpoints.ts` 의 export 하나
+
+### 한 일 — 걷어낸 것
+
+- [x] 호출부 0 인 export 넷 삭제: `loaderStats.loadCount` · `warmServerBundle` ·
+      `invalidateRemoteCache` · `webEntryUrl`. warm 성공 판정이 `isBundleReady` 로 바뀌면서
+      남은 잔재들이다
+- [x] `runtime.ts` 의 `shared` 다섯 항목 — `version`·`scope`·`shareConfig` 가 전부 같은 값이라
+      표(`SHARED_MODULES`) + `Object.fromEntries` 로. 하나만 다르게 적히면 그 모듈만 조용히
+      싱글턴에서 빠지고, 증상은 훅이 깨지는 것이다
+- [x] `pinnedEntry`/`pinnedVersion` 의 globalThis 접근 중복 → `injectedEntry()` 하나
+- [x] `server-loader.ts` 에 **같은 내용의 주석 블록이 두 개** 연달아 있던 것 정리
+- [x] `/`·`/cart`·`/checkout` 의 `instant = false` 주석 15줄이 세 번 복붙돼 있던 것 →
+      3줄 + `[[cart-cookie]]` 참조. **값 자체는 리터럴로 남는다** — 라우트 세그먼트 설정은
+      정적 분석 대상이라 re-export 로 공유할 수 없다(14차에 확인한 그대로)
+
+−506 / +360 줄. 순감 146줄인데 주석을 늘린 자리가 있어서, 실제 로직 감소폭은 그보다 크다.
+
+### 밟은 함정 — `remote-config` 의 상대 import 는 확장자가 필수다
+
+`node.ts` 에서 `import { MF_FILES } from './index'` 로 적었더니 빌드가 죽었다.
+
+    Error [ERR_MODULE_NOT_FOUND]: Cannot find module
+      packages/remote-config/src/index imported from packages/remote-config/src/node.ts
+
+이 패키지만 **번들러 없이 Node 가 직접 읽는다**(`exports` 가 소스 `.ts` 를 가리킨다).
+저장소 전역 규칙은 확장자 생략이고 여기가 유일한 예외다 —
+`.claude/rules/mf-runtime.md` 가 "지금은 상대 import 자체가 없다"고 적어둔 자리였는데,
+이번에 그 첫 상대 import 를 만들면서 정확히 그 함정을 밟았다. `./index.ts` 로 고쳤다.
+
+### 검증
+
+`typecheck` 11/11 · `lint` 11/11 · `build` 통과.
+**라우트 표가 14차 기록과 동일하다** — `/`·`/cart`·`/checkout` = ƒ, `/lab` 계열 = ◐.
+ADR-014 의 성질(장바구니가 첫 HTML 에 들어가고, 캐시 실험은 프리렌더를 유지)이 그대로다.
+
+서명은 가장 위험한 변경이라 왕복을 따로 확인했다 — Ed25519 키쌍을 만들어 stamp 쪽 경로로
+서명하고 host 쪽 경로(WebCrypto, base64 SPKI)로 검증해 통과, 필드 하나를 바꾼 페이로드는
+거부. 직렬화 결과 문자열도 리팩터 전과 바이트 동일하다.
+
+### 남겨둔 것 — `runtime.ts` 의 주석과 코드가 어긋나 있다
+
+`shared` 위 주석은 "`react`/`react-dom` **루트만** 공유한다 · 서브엔트리를 공유 목록에서
+빼는 것이 근본 해결이다" 라고 적혀 있는데, 실제 `shared` 에는 `react-dom/client` ·
+`react/jsx-runtime` · `react/jsx-dev-runtime` 이 **들어 있다.**
+
+이번 리팩터는 동작을 바꾸지 않는 범위라 코드를 그대로 두고 표로만 옮겼다. 둘 중 하나다 —
+주석이 낡았거나(서브엔트리를 도로 넣어야 했던 이유가 따로 있었거나), 목록이 잘못됐거나.
+`_jsxDEV is not a function` 재발 이력이 걸려 있는 자리라 **실측 없이 건드리면 안 된다.**
+다음 회차에 서브엔트리를 뺀 상태로 dev 콜드 로드를 반복해 보고 결론을 ADR 로 남긴다.
+
 ## 2026-08-22 (14차) — 장바구니 초기값 통로는 유지하고 중복만 걷어낸다
 
 "페이지마다 `readCartLines()` 를 `initialLines` props 로 넘기는 구조인데, zustand
