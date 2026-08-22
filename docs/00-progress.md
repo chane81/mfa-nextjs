@@ -65,21 +65,36 @@
 
 −506 / +360 줄. 순감 146줄인데 주석을 늘린 자리가 있어서, 실제 로직 감소폭은 그보다 크다.
 
-### 밟은 함정 — `remote-config` 의 상대 import 는 확장자가 필수다
+### 밟은 함정 — `remote-config` 안에서는 상대 import 자체가 막힌 길이다
 
-`node.ts` 에서 `import { MF_FILES } from './index'` 로 적었더니 빌드가 죽었다.
+`node.ts` 가 `index.ts` 의 `MF_FILES` 를 써야 하는데, 상대 경로로는 **양쪽이 다 막힌다.**
+
+확장자를 빼면 Node 가 못 찾는다. 이 패키지만 번들러 없이 Node 가 직접 읽기 때문이다
+(`exports` 가 소스 `.ts` 를 가리킨다).
 
     Error [ERR_MODULE_NOT_FOUND]: Cannot find module
       packages/remote-config/src/index imported from packages/remote-config/src/node.ts
 
-이 패키지만 **번들러 없이 Node 가 직접 읽는다**(`exports` 가 소스 `.ts` 를 가리킨다).
-저장소 전역 규칙은 확장자 생략이고 여기가 유일한 예외다 —
-`.claude/rules/mf-runtime.md` 가 "지금은 상대 import 자체가 없다"고 적어둔 자리였는데,
-이번에 그 첫 상대 import 를 만들면서 정확히 그 함정을 밟았다. `./index.ts` 로 고쳤다.
+붙이면 이번엔 tsc 가 막는다.
+
+    error TS5097: An import path can only end with a '.ts' extension
+                  when 'allowImportingTsExtensions' is enabled.
+
+그 플래그를 켜는 건 답이 아니다. **이 패키지는 빌드 산출물이 없어서 소비처의 tsc 가
+이 소스를 직접 검사하므로**, 소비처 전부가 같은 플래그를 켜야 한다 — 그중엔 dist 를
+emit 하는 프로젝트가 있어서 켤 수 없다.
+
+답은 **자기 참조**였다. `import { MF_FILES } from '@mfa/remote-config'` — Node 는
+`exports` 를 가진 패키지가 자기 이름을 부르는 걸 지원하고(v12.16+), tsc 는 소비처와
+똑같은 경로로 해석한다. 확장자 문제 자체가 사라진다. 빌드와 typecheck 양쪽에서 확인했다.
+
+**과정 기록:** `./index.ts` 로 고친 뒤 빌드만 돌리고 typecheck 를 다시 안 돌려서,
+TS5097 을 못 본 채 커밋 하나가 나갔다. 되돌리지 않고 다음 커밋에서 고쳤다.
+빌드가 통과했다고 검사가 통과한 게 아니다 — 이 저장소에서 그 둘은 서로를 대신하지 못한다.
 
 ### 검증
 
-`typecheck` 11/11 · `lint` 11/11 · `build` 통과.
+`typecheck` 11/11 · `lint` 11/11 · `format:check` 통과 · `build` 통과.
 **라우트 표가 14차 기록과 동일하다** — `/`·`/cart`·`/checkout` = ƒ, `/lab` 계열 = ◐.
 ADR-014 의 성질(장바구니가 첫 HTML 에 들어가고, 캐시 실험은 프리렌더를 유지)이 그대로다.
 

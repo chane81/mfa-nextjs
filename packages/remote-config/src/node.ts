@@ -1,10 +1,22 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-// ⚠️ 확장자가 **필수**다. 이 패키지만 Node 가 번들러 없이 직접 읽는다
-// (`exports` 가 소스 `.ts` 를 가리킨다). 저장소 전역 규칙은 확장자 생략이고,
-// 여기가 유일한 예외다 — 빼면 `ERR_MODULE_NOT_FOUND` 로 빌드가 죽는다.
-import { MF_FILES } from './index.ts';
+/**
+ * ⚠️ 상대 경로가 아니라 **자기 패키지 이름**으로 부른다.
+ *
+ * 이 패키지는 번들러 없이 Node 가 직접 읽으므로(`exports` 가 소스 `.ts` 를 가리킨다)
+ * 상대 import 에는 확장자가 필수다. 그런데 `./index.ts` 라고 적으면 이번엔 tsc 가 막는다 —
+ * `allowImportingTsExtensions` 는 이 소스를 검사하는 **모든 소비처**가 켜야 하는 플래그고,
+ * 그중엔 dist 를 emit 하는 프로젝트가 있어서 켤 수 없다.
+ *
+ *   error TS5097: An import path can only end with a '.ts' extension
+ *                 when 'allowImportingTsExtensions' is enabled.
+ *
+ * 자기 참조(self-reference)는 양쪽을 다 만족한다. Node 는 `exports` 를 가진 패키지가
+ * 자기 이름을 부르는 걸 지원하고(v12.16+), tsc 는 소비처와 똑같은 경로로 해석한다.
+ * 확장자 문제 자체가 사라진다.
+ */
+import { MF_FILES } from '@mfa/remote-config';
 
 /**
  * `@mfa/remote-config` 의 **node 전용 표면.**
