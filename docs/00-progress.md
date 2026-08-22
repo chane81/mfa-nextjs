@@ -1,5 +1,34 @@
 # 진행 상황
 
+## 2026-08-22 (14차) — 장바구니 초기값 통로는 유지하고 중복만 걷어낸다
+
+"페이지마다 `readCartLines()` 를 `initialLines` props 로 넘기는 구조인데, zustand
+Provider 로 바꿀 수 없나"에서 출발했다. 검토 결과 **통로는 못 바꾼다** — Provider 는
+루트 레이아웃에 놓여야 하고, 그러면 쿠키 읽는 자리가 layout 으로 올라가 전 라우트가
+프리렌더에서 빠진다(ADR-014 가 정확히 그걸 피한 것이다). 근거와 기각한 대안은 ADR-016.
+
+바꿀 수 있는 건 **중복**이었고, 두 군데였다.
+
+### 한 일
+
+- [x] `packages/store/src/cart/use-cart-lines.ts` — `useCartLines(initialLines)`.
+      탭 동기화 · 하이드레이션 경계 · 경계 전후 값 선택을 훅 하나가 쥔다.
+      `CartPanel` · `CartBadge` · `CheckoutFlow` 가 같은 네 줄을 복붙하고 있었다
+- [x] `useCartSync` 를 배럴에서 내렸다(내부 구현으로 강등). 둘 다 공개하면
+      "탭 동기화를 누가 거는가"가 화면마다 갈린다. `useHydrated` 는 도메인에 안 묶인
+      범용 훅이라 `hooks/` 표면에 그대로 둔다
+- [x] host `components/CartSlot.tsx` · `CheckoutSlot.tsx` — `SiteHeaderSlot` 과 같은 꼴의
+      서버 껍데기. 쿠키를 읽어 client 섹션에 넘기는 일만 한다
+- [x] `/` · `/cart` · `/checkout` 에서 `readCartLines` 호출을 걷어냈다. 페이지에 남는 건
+      **라우트 정책뿐**이다(`instant = false` — 세그먼트 설정은 정적 분석 대상이라
+      다른 모듈에서 re-export 로 공유할 수 없다. 주석에 명시)
+- [x] ADR-016
+
+remote 파일 3개에서 −44줄, host 페이지 3개가 각각 본문 한 줄로 줄었다.
+
+검증: `typecheck` · `lint` 11/11, `build` 통과 — **라우트 표가 그대로다**
+(`/`·`/cart`·`/checkout` = ƒ, `/lab` 계열 = ◐). ADR-014 의 성질이 유지됐다는 뜻이다.
+
 ## 2026-08-20 (13차) — 장바구니 저장소를 쿠키로 옮긴다
 
 새로고침 때 장바구니가 깜빡였다. 파 보니 저장소가 느린 게 아니라 **서버가 장바구니를

@@ -579,6 +579,64 @@
   - ⭕ 저장 표현을 바꾸는 변경이 `cart/` 폴더 안에서 끝난다.
   - ⭕ contracts 가 다시 props 계약 + 공유 도메인 데이터만 담는다.
 
+## ADR-016 — 장바구니 초기값은 props 로 내려보낸다. zustand Provider 는 쓰지 않는다
+
+- 상태: 채택 (2026-08-22)
+- 맥락: ADR-014 이후 `/`·`/cart`·`/checkout` 과 헤더가 각각 `readCartLines()` 를 부르고
+  `initialLines` 를 remote 까지 내려보낸다. "props 드릴링처럼 보이는데 zustand 의
+  Provider(context) 패턴으로 걷어낼 수 없나"를 검토했다.
+
+- 결정: **걷어내지 않는다.** props 가 이 구조에서 서버 → 클라이언트의 유일한 통로다.
+  대신 **중복만** 없앤다(아래 "대신 한 것").
+
+- 왜 Provider 가 안 되나 — 제약 세 개가 동시에 걸린다.
+  1. **번들 경계.** host·catalog·cart 가 `@mfa/store` 사본을 각자 가진다. 스토어는
+     `globalSingleton` 으로 realm 당 하나여야 한다(ADR-004 · ADR-012). context 를 쓰면
+     **context 객체 자체도** 싱글턴으로 싸야 한다 — 전역 하나 줄이려다 하나 는다.
+  2. **서버는 스토어를 못 쓴다.** 모듈 싱글턴 스토어에 서버가 값을 심으면 동시 요청끼리
+     장바구니가 샌다. zustand 5 의 Next 가이드가 "전역 스토어 금지 / RSC 는 스토어를
+     읽지도 쓰지도 마라"라고 쓰는 게 정확히 이것이다. 지금은 서버에서 persist 가 통째로
+     스킵되어 스토어가 **항상 비어 있다** — 우연이 아니라 이게 안전장치다.
+  3. **ADR-014.** 첫 HTML 에 장바구니가 들어가야 전이가 없다. 그래서 쿠키를 `<Suspense>`
+     밖에서 읽고 그 라우트만 프리렌더를 포기한다.
+
+  Provider 는 **모든 소비자보다 위**에 있어야 하는데 소비자가 두 군데다 — 헤더 배지는
+  `layout.tsx`, 패널·주문서는 `children`. 둘을 덮으려면 루트 레이아웃이고, 그러면:
+
+  | Provider 배치       | 결과                                                              |
+  | ------------------- | ----------------------------------------------------------------- |
+  | layout, Suspense 밖 | **전 라우트** 프리렌더 사망. `/lab` 캐시 실험까지 죽는다          |
+  | layout, Suspense 안 | children 을 감싸야 하므로 페이지 전체가 스트리밍 뒤로 → 전이 부활 |
+  | 페이지마다 Provider | 헤더 배지가 밖 → 스토어 인스턴스 2개 → 담아도 배지가 안 변한다    |
+
+  즉 Provider 는 `initialLines` 를 없애는 게 아니라 **layout 으로 옮기는 것**이고,
+  그 대가가 ADR-014 다.
+
+- 기각한 대안:
+  - **remote 가 직접 쿠키를 읽는다** → remote 는 Vite · Rsbuild 앱이라 `next/headers` 를
+    못 쓴다. SSR 번들이 host 서버에서 돌긴 하지만 요청 컨텍스트에 닿는 배선이 없다.
+    그 배선이 곧 props 다.
+  - **서버에서 전역 스토어를 seed 한다** → 위 2번. 요청 간 상태 누출이다.
+  - **AsyncLocalStorage 로 요청 스코프 주입** → `.run()` 으로 렌더를 감쌀 자리가 없다
+    (proxy/middleware 는 렌더와 다른 런타임이다).
+
+- 대신 한 것 — 통로는 두고 **중복**을 없앴다.
+  - `useCartLines(initialLines)` (`packages/store/src/cart/use-cart-lines.ts`).
+    탭 동기화(`useCartSync`) · 하이드레이션 경계(`useHydrated`) · 경계 전후 값 선택을
+    한 훅이 쥔다. remote 세 곳이 같은 네 줄을 복붙하고 있었다. `useCartSync` 는 배럴에서
+    내렸다 — 둘 다 공개하면 "탭 동기화를 누가 거는가"가 화면마다 갈린다.
+  - host 의 `CartSlot` · `CheckoutSlot`(`SiteHeaderSlot` 과 같은 꼴). 쿠키를 읽는 서버
+    껍데기가 client 섹션을 감싼다. 페이지에는 **라우트 정책만** 남는다(`instant = false`).
+
+- 대가:
+  - ❌ `initialLines` 는 그대로 contracts 의 props 계약에 남는다. remote 는 여전히
+    "서버가 넘겨준 초기값"이라는 개념을 안다 — 다만 그걸 **어떻게 쓰는지**는 모른다.
+  - ❌ `instant = false` 는 라우트마다 리터럴로 반복된다. 세그먼트 설정은 정적 분석
+    대상이라 `export { instant } from ...` 로 공유할 수 없다.
+  - ⭕ 하이드레이션 경계 규칙이 `@mfa/store` 한 파일에만 있다. 경계가 바뀌면 고칠 자리도 하나다.
+  - ⭕ 장바구니를 어디서 읽는지가 라우트 수만큼 흩어지지 않는다 — 슬롯 셋뿐이다.
+  - ⭕ ADR-014 의 라우트 표가 그대로다(`/`·`/cart`·`/checkout` = ƒ, `/lab` = ◐).
+
 ## 경계 설계 원칙
 
 | 책임                  | 소유자                           | 이유                                                       |
