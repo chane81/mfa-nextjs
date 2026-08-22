@@ -9,6 +9,7 @@ import {
 import { Button, Panel } from '@mfa/ui';
 
 import { ProductCard } from '../components/ProductCard';
+import { ORIGIN } from '../origin';
 
 /** host 에 노출되는 모듈: `catalog/ProductGrid` */
 export default function ProductGrid({
@@ -27,8 +28,7 @@ export default function ProductGrid({
 
   return (
     <Panel
-      origin="remote: catalog · vite"
-      originHue={280}
+      {...ORIGIN}
       title="상품 목록"
       actions={
         <div className="flex flex-wrap gap-2">

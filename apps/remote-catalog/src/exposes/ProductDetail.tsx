@@ -6,6 +6,9 @@ import {
 import { useCart } from '@mfa/store';
 import { Badge, Button, ErrorBox, Panel } from '@mfa/ui';
 
+import { StockBadge } from '../components/StockBadge';
+import { ORIGIN, ORIGIN_HUE } from '../origin';
+
 /** host 에 노출되는 모듈: `catalog/ProductDetail` */
 export default function ProductDetail({ productId }: ProductDetailProps) {
   const add = useCart((state) => state.add);
@@ -21,7 +24,7 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
   }
 
   return (
-    <Panel origin="remote: catalog · vite" originHue={280} title="상품 상세">
+    <Panel {...ORIGIN} title="상품 상세">
       <div className="flex flex-wrap gap-6">
         <div className="text-[96px] leading-none">{product.emoji}</div>
         <div className="flex flex-[1_1_260px] flex-col gap-3">
@@ -30,11 +33,9 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
             {product.description}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Badge hue={280}>{product.category}</Badge>
+            <Badge hue={ORIGIN_HUE}>{product.category}</Badge>
             <Badge hue={45}>★ {product.rating.toFixed(1)}</Badge>
-            <Badge hue={product.stock === 0 ? 0 : 140}>
-              {product.stock === 0 ? '품절' : `재고 ${product.stock}`}
-            </Badge>
+            <StockBadge stock={product.stock} />
           </div>
           <strong className="text-[22px] text-text">
             {formatKRW(product.price)}

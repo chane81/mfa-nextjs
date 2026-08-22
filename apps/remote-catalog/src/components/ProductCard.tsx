@@ -2,6 +2,10 @@ import { formatKRW, type Product } from '@mfa/contracts';
 import { useCart } from '@mfa/store';
 import { Badge, Button } from '@mfa/ui';
 
+import { ORIGIN_HUE } from '../origin';
+
+import { StockBadge } from './StockBadge';
+
 export interface ProductCardProps {
   product: Product;
   onSelect?: (product: Product) => void;
@@ -30,10 +34,8 @@ export function ProductCard({ product, onSelect }: ProductCardProps) {
       </div>
       {/* Badge 는 줄바꿈하지 않는다(pill 이 무너진다). 넘칠 자리는 여기서 만든다 */}
       <div className="flex flex-wrap items-center gap-2">
-        <Badge hue={280}>{product.category}</Badge>
-        <Badge hue={soldOut ? 0 : 140}>
-          {soldOut ? '품절' : `재고 ${product.stock}`}
-        </Badge>
+        <Badge hue={ORIGIN_HUE}>{product.category}</Badge>
+        <StockBadge stock={product.stock} />
         <Badge hue={45}>★ {product.rating.toFixed(1)}</Badge>
       </div>
       <div className="mt-auto flex items-center justify-between">

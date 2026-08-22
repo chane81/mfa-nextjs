@@ -2,6 +2,8 @@ import { formatKRW, type CartPanelProps } from '@mfa/contracts';
 import { cartTotals, useCart, useCartLines } from '@mfa/store';
 import { Button, Panel } from '@mfa/ui';
 
+import { ORIGIN } from '../origin';
+
 /** host 에 노출되는 모듈: `cart/CartPanel` */
 export default function CartPanel({
   onCheckout,
@@ -19,8 +21,7 @@ export default function CartPanel({
 
   return (
     <Panel
-      origin="remote: cart · rsbuild"
-      originHue={150}
+      {...ORIGIN}
       title="장바구니"
       actions={
         lines.length > 0 ? (
