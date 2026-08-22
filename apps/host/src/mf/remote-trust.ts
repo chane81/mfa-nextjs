@@ -1,6 +1,19 @@
 import type { RemoteName } from '@mfa/contracts';
 
 /**
+ * 서명 페이로드 직렬화는 **여기서 정의하지 않는다.**
+ *
+ * 서명하는 쪽은 remote 의 빌드 파이프라인(`scripts/stamp-remote-version.ts`)이고
+ * 검증하는 쪽이 여기다. 두 파일이 각자 배열을 적으면 갈라졌을 때 증상이 나쁘다 —
+ * 매니페스트는 멀쩡히 만들어지고 배포도 성공하는데 **검증만 실패**하고, 원인이
+ * 두 파일의 차이라는 게 로그에 안 남는다. 원본은 배치 SSOT 인 `@mfa/remote-config` 다.
+ *
+ * 소비처 편의를 위해 여기서 다시 내보낸다 — 이 모듈을 쓰는 쪽은 신뢰 검사 함수들과
+ * 이 직렬화를 거의 항상 같이 쓴다.
+ */
+export { signedPayload, type SignedManifestFields } from '@mfa/remote-config';
+
+/**
  * remote 신뢰 경계.
  *
  * host **서버**가 remote 의 코드를 받아 `new Function` 으로 실행한다. 브라우저에서 remote
@@ -175,31 +188,6 @@ export function integrityRequired(): boolean {
 /** 서명 검증을 강제할지. 키 배포가 필요하므로 명시적으로 켠다. */
 export function signatureRequired(): boolean {
   return process.env.MF_REQUIRE_SIGNATURE === '1';
-}
-
-/**
- * 서명 대상 페이로드.
- *
- * 매니페스트 전체가 아니라 **신뢰 판단에 쓰이는 필드만** 고정 순서로 직렬화한다.
- * 필드가 늘어도 서명이 깨지지 않게 하려는 게 아니라, 서명이 무엇을 보장하는지
- * 읽는 사람이 한눈에 알게 하려는 것이다.
- */
-export function signedPayload(fields: {
-  remote: string;
-  version: string;
-  ssrEntry: string;
-  webEntry: string;
-  ssrIntegrity?: string;
-  webIntegrity?: string;
-}): string {
-  return JSON.stringify([
-    fields.remote,
-    fields.version,
-    fields.ssrEntry,
-    fields.webEntry,
-    fields.ssrIntegrity ?? '',
-    fields.webIntegrity ?? '',
-  ]);
 }
 
 /**

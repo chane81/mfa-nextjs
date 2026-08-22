@@ -2,6 +2,7 @@ import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
 import { MF_FILES } from '@mfa/remote-config';
 
 import { REMOTE_FETCH_TIMEOUT_MS } from './constants';
+import { globalCell } from './global-state';
 import { SSR_ENTRIES } from './remote-endpoints';
 import {
   assertAllowedOrigin,
@@ -61,30 +62,22 @@ export function trustedOrigins(): string[] {
 }
 
 /**
- * 마지막으로 확인된 버전.
+ * 마지막으로 확인된 **공표된** 버전 — remote 가 `mf-version.json` 에서 뭐라고 말했는지.
  *
- * globalThis 인 이유는 RSC 레이어와 SSR 레이어가 모듈 인스턴스를 공유하지 않기 때문이다.
- * 버전을 **조회**하는 쪽(RSC: 레이아웃)과 그걸로 캐시 키를 만드는 쪽(SSR: 클라이언트
- * 컴포넌트 렌더)이 서로 다른 레이어라 이 값만 전역으로 공유한다.
+ * 조회하는 쪽(RSC 레이아웃)과 그걸로 캐시 키를 만드는 쪽(SSR 레이어)이 서로 다른
+ * 모듈 그래프라 레이어를 넘는 저장소여야 한다. 근거는 `[[global-state]]`.
  */
-const KEY = '__mfaRemoteVersions';
-
-type Holder = typeof globalThis & {
-  [KEY]?: Partial<Record<RemoteName, RemoteVersion>>;
-};
-
-function store(): Partial<Record<RemoteName, RemoteVersion>> {
-  const g = globalThis as Holder;
-  g[KEY] ??= {};
-  return g[KEY];
-}
+const known = globalCell(
+  'remote-versions',
+  () => ({}) as Partial<Record<RemoteName, RemoteVersion>>,
+);
 
 export function knownVersion(remote: RemoteName): RemoteVersion | null {
-  return store()[remote] ?? null;
+  return known.value[remote] ?? null;
 }
 
 export function rememberVersion(remote: RemoteName, info: RemoteVersion): void {
-  store()[remote] = info;
+  known.value[remote] = info;
 }
 
 /**
@@ -94,36 +87,30 @@ export function rememberVersion(remote: RemoteName, info: RemoteVersion): void {
  * 이건 **적재된** 버전(우리가 실제로 평가해 둔 게 뭔지)이다. 둘은 다를 수 있고,
  * warm 이 성공했는지는 정확히 "둘이 같아졌는가"로 판정한다.
  *
- * 로드는 SSR 레이어에서 일어나고 판정은 RSC 레이어(Route Handler)에서 하므로 globalThis 다.
+ * 적재는 SSR 레이어에서 일어나고 판정은 RSC 레이어(Route Handler)에서 한다 — 방향만
+ * 반대일 뿐 위와 같은 이유로 레이어를 넘는다.
  */
-const READY_KEY = '__mfaReadyVersions';
-
 interface ReadyState {
   version: string;
   /** 적재된 시점의 warm 세대. "언제 적재했는지"까지 봐야 warm 이 증명이 된다. */
   epoch: number;
 }
 
-type ReadyHolder = typeof globalThis & {
-  [READY_KEY]?: Partial<Record<RemoteName, ReadyState>>;
-};
-
-function ready(): Partial<Record<RemoteName, ReadyState>> {
-  const g = globalThis as ReadyHolder;
-  g[READY_KEY] ??= {};
-  return g[READY_KEY];
-}
+const ready = globalCell(
+  'ready-versions',
+  () => ({}) as Partial<Record<RemoteName, ReadyState>>,
+);
 
 export function markBundleReady(
   remote: RemoteName,
   version: string,
   epoch: number,
 ): void {
-  ready()[remote] = { version, epoch };
+  ready.value[remote] = { version, epoch };
 }
 
 export function readyVersion(remote: RemoteName): string | null {
-  return ready()[remote]?.version ?? null;
+  return ready.value[remote]?.version ?? null;
 }
 
 /**
@@ -137,7 +124,7 @@ export function isBundleReady(
   version: string,
   epoch: number,
 ): boolean {
-  const state = ready()[remote];
+  const state = ready.value[remote];
   return state?.version === version && state.epoch === epoch;
 }
 
@@ -148,32 +135,22 @@ export function isBundleReady(
  * 정상 배포에서는 버전이 늘 바뀌므로 그런 상황은 변조이거나 깨진 파이프라인이고,
  * warm 은 그걸 잡아내야 의미가 있다. 그래서 warm 은 캐시를 믿지 않는다.
  */
-const EPOCH_KEY = '__mfaWarmEpoch';
-
-type EpochHolder = typeof globalThis & { [EPOCH_KEY]?: number };
+const epoch = globalCell('warm-epoch', () => 0);
 
 export function warmEpoch(): number {
-  return (globalThis as EpochHolder)[EPOCH_KEY] ?? 0;
+  return epoch.value;
 }
 
 export function bumpWarmEpoch(): number {
-  const next = warmEpoch() + 1;
-  (globalThis as EpochHolder)[EPOCH_KEY] = next;
-  return next;
+  return (epoch.value += 1);
 }
 
 export function knownVersions(): Partial<Record<RemoteName, string>> {
   const out: Partial<Record<RemoteName, string>> = {};
-  for (const [remote, info] of Object.entries(store())) {
+  for (const [remote, info] of Object.entries(known.value)) {
     out[remote as RemoteName] = info.version;
   }
   return out;
-}
-
-/** 브라우저가 쓸 절대 URL. 서버가 이 HTML 을 만들 때 쓴 버전과 같은 값이다. */
-export function webEntryUrl(remote: RemoteName): string | null {
-  const info = knownVersion(remote);
-  return info ? `${remoteOrigin(remote)}${info.webEntry}` : null;
 }
 
 /**

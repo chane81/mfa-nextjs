@@ -34,16 +34,13 @@ import {
  * `publicOrigin` 안에서 `||` 로 처리한다. 기록: docs/03-setup/04-dokploy.md
  */
 
-function byRemote(
+/** remote 이름 → 값 표를 만든다. 순회는 `REMOTE_NAMES` 가 정한다 */
+export function byRemote(
   resolve: (remote: RemoteName) => string,
 ): Record<RemoteName, string> {
-  return REMOTE_NAMES.reduce(
-    (acc, remote) => {
-      acc[remote] = resolve(remote);
-      return acc;
-    },
-    {} as Record<RemoteName, string>,
-  );
+  return Object.fromEntries(
+    REMOTE_NAMES.map((remote) => [remote, resolve(remote)]),
+  ) as Record<RemoteName, string>;
 }
 
 /**

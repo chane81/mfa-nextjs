@@ -54,6 +54,37 @@ const REACT_VERSION = '19.2.8';
  * 루트 두 개는 방어적으로 형태를 정규화해서 넘긴다.
  */
 
+/**
+ * 브라우저 MF `shared` 목록. **모듈 하나에 다른 건 프로브뿐**이라 표로 적는다.
+ *
+ * `version` · `scope` · `shareConfig` 는 다섯 항목이 전부 같은 값이었고, 손으로 다섯 번
+ * 반복하면 하나만 다르게 적혀도 그 모듈만 조용히 싱글턴에서 빠진다 — 증상은 훅이
+ * 깨지는 것이고 원인은 설정 한 글자다.
+ *
+ * 프로브는 "이 네임스페이스가 진짜 모듈인지" 판별하는 데 쓴다. `import * as X` 의 결과
+ * 모양이 번들러·모드·대상(CJS·ESM)에 따라 `{jsx}` 이기도 `{default:{jsx}}` 이기도
+ * 해서다 — 근거는 `[[interop]]`.
+ */
+const SHARED_MODULES = [
+  ['react', React, 'useState'],
+  ['react-dom', ReactDOM, 'createPortal'],
+  ['react-dom/client', ReactDOMClient, 'createRoot'],
+  ['react/jsx-runtime', ReactJSXRuntime, 'jsx'],
+  ['react/jsx-dev-runtime', ReactJSXDevRuntime, 'jsxDEV'],
+] as const;
+
+const SHARED = Object.fromEntries(
+  SHARED_MODULES.map(([id, mod, probe]) => [
+    id,
+    {
+      version: REACT_VERSION,
+      scope: 'default',
+      lib: () => normalizeModule(mod, probe),
+      shareConfig: { singleton: true, requiredVersion: '^19.0.0' },
+    },
+  ]),
+);
+
 let initialized = false;
 
 /**
@@ -71,6 +102,13 @@ interface InjectedEntry {
   entry: string;
 }
 
+/** 서버가 심어준 값 하나. 없으면 `undefined` — 폴백 판단은 부르는 쪽이 한다. */
+function injectedEntry(remote: RemoteName): InjectedEntry | undefined {
+  return (
+    globalThis as { __MFA_REMOTE_VERSIONS__?: Record<string, InjectedEntry> }
+  ).__MFA_REMOTE_VERSIONS__?.[remote];
+}
+
 /**
  * ⚠️ 폴백(`WEB_ENTRIES`)은 **dev 에서만 실재하는 주소**다.
  *
@@ -82,18 +120,12 @@ interface InjectedEntry {
  * remote 를 부르는 쪽은 전부 이 함수를 거쳐야 한다. 진단 화면도 마찬가지다.
  */
 export function pinnedEntry(remote: RemoteName): string {
-  const injected = (
-    globalThis as { __MFA_REMOTE_VERSIONS__?: Record<string, InjectedEntry> }
-  ).__MFA_REMOTE_VERSIONS__;
-  return injected?.[remote]?.entry ?? WEB_ENTRIES[remote];
+  return injectedEntry(remote)?.entry ?? WEB_ENTRIES[remote];
 }
 
 /** 버전 핀이 실제로 꽂혔는지. 진단이 "폴백을 보고 있다"를 구분해 보여주는 데 쓴다. */
 export function pinnedVersion(remote: RemoteName): string | null {
-  const injected = (
-    globalThis as { __MFA_REMOTE_VERSIONS__?: Record<string, InjectedEntry> }
-  ).__MFA_REMOTE_VERSIONS__;
-  return injected?.[remote]?.version ?? null;
+  return injectedEntry(remote)?.version ?? null;
 }
 
 function ensureInit(): void {
@@ -103,38 +135,7 @@ function ensureInit(): void {
     name: 'host',
     remotes: REMOTE_NAMES.map((name) => ({ name, entry: pinnedEntry(name) })),
     // host 가 이미 가진 React 를 remote 에 주입 → remote 번들의 React 는 로드되지 않는다
-    shared: {
-      react: {
-        version: REACT_VERSION,
-        scope: 'default',
-        lib: () => normalizeModule(React, 'useState'),
-        shareConfig: { singleton: true, requiredVersion: '^19.0.0' },
-      },
-      'react-dom': {
-        version: REACT_VERSION,
-        scope: 'default',
-        lib: () => normalizeModule(ReactDOM, 'createPortal'),
-        shareConfig: { singleton: true, requiredVersion: '^19.0.0' },
-      },
-      'react-dom/client': {
-        version: REACT_VERSION,
-        scope: 'default',
-        lib: () => normalizeModule(ReactDOMClient, 'createRoot'),
-        shareConfig: { singleton: true, requiredVersion: '^19.0.0' },
-      },
-      'react/jsx-runtime': {
-        version: REACT_VERSION,
-        scope: 'default',
-        lib: () => normalizeModule(ReactJSXRuntime, 'jsx'),
-        shareConfig: { singleton: true, requiredVersion: '^19.0.0' },
-      },
-      'react/jsx-dev-runtime': {
-        version: REACT_VERSION,
-        scope: 'default',
-        lib: () => normalizeModule(ReactJSXDevRuntime, 'jsxDEV'),
-        shareConfig: { singleton: true, requiredVersion: '^19.0.0' },
-      },
-    },
+    shared: SHARED,
   });
 
   initialized = true;
@@ -167,12 +168,6 @@ export function loadRemoteModule<K extends RemoteModuleId>(
 ): Promise<RemoteModuleMap[K]> {
   if (typeof window === 'undefined') return loadRemoteModuleOnServer(id);
   return loadOnClient(id);
-}
-
-/** HMR / 재시도 시 브라우저 캐시를 비운다 */
-export function invalidateRemoteCache(id?: RemoteModuleId): void {
-  if (id) clientCache.delete(id);
-  else clientCache.clear();
 }
 
 /**
