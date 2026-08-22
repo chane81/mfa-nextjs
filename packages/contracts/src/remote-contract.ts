@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 
+import type { CartLine } from './cart';
 import type { Product, ProductCategory } from './product';
 
 /**
@@ -17,17 +18,32 @@ export interface ProductDetailProps {
   productId: string;
 }
 
-export interface CartPanelProps {
+/**
+ * host 가 요청 쿠키에서 읽어 넘기는 장바구니.
+ *
+ * **서버 렌더와 하이드레이션 렌더가 쓰는 값이다.** 스토어는 브라우저에만 있고
+ * 그 서버 스냅샷은 빈 장바구니라, 이 값이 없으면 첫 HTML 이 항상 비어 있게 된다.
+ * 커밋 이후에는 스토어가 쥔다 — 둘 다 같은 쿠키에서 나오므로 화면은 바뀌지 않는다.
+ * **단일 탭 기준이다.** 서버가 HTML 을 보내는 사이 다른 탭이 쿠키를 바꾸면 그 한 번은
+ * 값이 갈린다. 좁은 창이고, 포커스가 돌아올 때 `useCartSync` 가 수렴시킨다.
+ *
+ * remote 는 여전히 쿠키를 모른다. **읽는 건 host, 쓰는 건 store** 고 remote 는 받는다.
+ */
+interface CartInitialLines {
+  initialLines?: readonly CartLine[];
+}
+
+export interface CartPanelProps extends CartInitialLines {
   /** 결제 진입은 host 의 라우팅 책임 (remote 는 라우터를 모른다) */
   onCheckout?: () => void;
   compact?: boolean;
 }
 
-export interface CartBadgeProps {
+export interface CartBadgeProps extends CartInitialLines {
   label?: string;
 }
 
-export interface CheckoutFlowProps {
+export interface CheckoutFlowProps extends CartInitialLines {
   /** 주문 완료 후 host 가 어디로 보낼지 결정 */
   onDone?: () => void;
   onContinueShopping?: () => void;

@@ -56,15 +56,15 @@ remote 자산은 **버전 디렉터리 아래 불변 경로**에 올라가고, �
 
 ## 공유 패키지
 
-| 패키지                   | 역할                                                                       |
-| ------------------------ | -------------------------------------------------------------------------- |
-| `@mfa/contracts`         | 도메인 타입 · 목 데이터 · **remote 모듈 타입 계약**                        |
-| `@mfa/store`             | **런타임 공유 상태 SSOT** — 도메인별 폴더, 밖으로는 훅만 내보낸다          |
-| `@mfa/remote-config`     | **remote 배치의 SSOT** — 이름 · 포트 · env 이름 · 산출물 파일명 · URL 조립 |
-| `@mfa/tailwind-config`   | **디자인 토큰 SSOT** — Tailwind v4 `@theme` + PostCSS 설정 원본            |
-| `@mfa/ui`                | 공용 컴포넌트 — Tailwind 클래스만 내보내고 CSS 는 만들지 않는다            |
-| `@mfa/eslint-config`     | ESLint 10 flat config (base / react / next)                                |
-| `@mfa/typescript-config` | tsconfig 프리셋 (base / nextjs / react-library / vite)                     |
+| 패키지                   | 역할                                                                        |
+| ------------------------ | --------------------------------------------------------------------------- |
+| `@mfa/contracts`         | 도메인 타입 · 목 데이터 · **remote 모듈 타입 계약** (쿠키 포맷은 여기 없다) |
+| `@mfa/store`             | **런타임 공유 상태 SSOT** — 도메인별 폴더. 훅 + 쿠키 코덱(`/cart-cookie`)   |
+| `@mfa/remote-config`     | **remote 배치의 SSOT** — 이름 · 포트 · env 이름 · 산출물 파일명 · URL 조립  |
+| `@mfa/tailwind-config`   | **디자인 토큰 SSOT** — Tailwind v4 `@theme` + PostCSS 설정 원본             |
+| `@mfa/ui`                | 공용 컴포넌트 — Tailwind 클래스만 내보내고 CSS 는 만들지 않는다             |
+| `@mfa/eslint-config`     | ESLint 10 flat config (base / react / next)                                 |
+| `@mfa/typescript-config` | tsconfig 프리셋 (base / nextjs / react-library / vite)                      |
 
 `@mfa/remote-config` 만 **빌드 산출물이 없다**. `exports` 가 소스 `.ts` 를 직접 가리킨다.
 번들러 config(`vite.config.ts` · `rsbuild.config.ts`)가 프로세스 시작 즉시 이 모듈을 읽는데,
@@ -81,7 +81,7 @@ catalog 는 `@tailwindcss/vite`). 공유 CSS 를 한 번 빌드해 배포하면 
 ### 왜 `@mfa/contracts` 가 아니라 별도 패키지인가
 
 contracts 는 **타입 계약**이다 — remote 가 무엇을 노출하고 props 모양이 어떤지.
-장바구니 스토어는 **런타임 상태**다. 값이 시간에 따라 변하고 구독자가 있고 localStorage 를
+장바구니 스토어는 **런타임 상태**다. 값이 시간에 따라 변하고 구독자가 있고 쿠키를
 만진다. 둘을 한 패키지에 두면 타입만 필요한 소비처(host 의 `RemoteModuleMap`)까지
 zustand 와 DOM 타입을 끌고 온다. 실제로 contracts 의 tsconfig 에는 스토어 때문에 넣은
 `lib: ["DOM", ...]` 이 있었고, 분리하면서 지웠다.
@@ -241,16 +241,25 @@ catalog remote              cart remote                 cart remote
   (@mfa/store)                     (@mfa/store)
       │
       ▼
-  globalSingleton('cart', …)      ──persist 미들웨어──▶  localStorage["mfa-nextjs:cart"]
-  (@mfa/store 내부 — zustand/vanilla createStore)
+  globalSingleton('cart', …)      ──persist 미들웨어──▶  document.cookie["mfa-cart"]
+  (@mfa/store 내부 — zustand/vanilla createStore)          ▲ 최소 표현 [{id, q}]
+                                                           │
+                                            요청마다 실려 감 │
+                                                           ▼
+  host 서버   cookies() → parseCartCookie() ──initialLines props──▶ cart remote
 ```
 
 - 전부 host 페이지 안이므로 **소프트 내비게이션 중 상태가 메모리에 그대로 남는다.**
-- `localStorage` 는 새로고침 복원용이지 경계 통신 수단이 아니다.
-  (Multi-Zones 였다면 경계마다 이 왕복이 강제됐다)
-- SSR 스냅샷은 항상 빈 장바구니 → hydration mismatch 없음.
-  `useStore` 가 서버 스냅샷으로 `getInitialState()` 를 쓰고, 그 값은 **스토어 생성 시점에
-  캐시**되므로 persist 가 복원한 값이 섞이지 않는다.
+- 쿠키는 새로고침 복원용이자 **서버가 읽을 수 있는 통로**다. 경계 통신 수단은 아니다 —
+  remote 끼리는 여전히 메모리 안의 스토어 하나를 본다.
+  (Multi-Zones 였다면 경계마다 왕복이 강제됐다)
+- 저장하는 건 `[{id, q}]` 뿐이다. 이름·가격·이모지는 `findProduct` 로 복원한다 —
+  쿠키는 요청마다 전송되고, 저장된 사본은 카탈로그가 바뀌면 낡는다.
+- SSR 스냅샷은 여전히 빈 장바구니지만, **화면이 쓰는 값은 `initialLines` 다.**
+  `useStore` 의 서버 스냅샷(`getInitialState()`)은 스토어 생성 시점에 캐시된 초기 상태라
+  쿠키 복원값이 섞이지 않는다. 그래서 하이드레이션 커밋 전까지는 host 가 넘겨준
+  `initialLines` 를 쓰고, 커밋 후 스토어로 넘어간다 — **둘 다 같은 쿠키에서 나오므로
+  화면은 바뀌지 않는다**(ADR-014).
 - 상태는 `lines` 하나뿐이다. 합계는 순수 함수 `cartTotals(lines)` 가 렌더 중에 계산한다.
 - 구독할 조각은 호출부가 정한다 — `useCart((state) => state.lines)`.
   비교는 훅이 `shallow` 로 못 박는다(구현은 `useStoreWithEqualityFn`,

@@ -1,17 +1,20 @@
 import { formatKRW, type CartPanelProps } from '@mfa/contracts';
-import { cartTotals, useCart } from '@mfa/store';
+import { cartTotals, useCart, useCartLines } from '@mfa/store';
 import { Button, Panel } from '@mfa/ui';
 
 /** host 에 노출되는 모듈: `cart/CartPanel` */
 export default function CartPanel({
   onCheckout,
   compact = false,
+  initialLines,
 }: CartPanelProps) {
-  const lines = useCart((state) => state.lines);
+  /** 무엇을 그릴지는 `@mfa/store` 가 정한다 — 하이드레이션 경계도 탭 동기화도 그 안이다 */
+  const lines = useCartLines(initialLines);
   const { clear, setQuantity } = useCart((state) => ({
     clear: state.clear,
     setQuantity: state.setQuantity,
   }));
+
   const { totalQuantity, totalPriceLabel } = cartTotals(lines);
 
   return (

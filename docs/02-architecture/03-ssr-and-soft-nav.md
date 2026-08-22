@@ -128,8 +128,14 @@ $ curl -s localhost:3000/checkout | grep -c "주문서"
 
 장바구니 상태는 서버 스냅샷을 빈 값으로 두어 SSR/CSR 불일치를 원천 차단했다.
 zustand 의 `useStore` 는 서버 스냅샷으로 `getInitialState()` 를 쓰는데, 이 값은 스토어를
-만든 시점에 캐시된 초기 상태다 — persist 가 localStorage 에서 복원한 값이 여기 섞이지 않는다.
+만든 시점에 캐시된 초기 상태다 — persist 가 복원한 값이 여기 섞이지 않는다.
 그래서 `skipHydration` + 수동 `rehydrate()` 없이도 hydration 이 안전하다.
+
+**그런데 이 안전성의 대가가 깜빡임이었다.** 서버가 장바구니를 모르니 첫 HTML 이 항상
+비어 있었고, 하이드레이션 커밋에서 실제 값으로 한 프레임에 바뀌었다. 저장소를 쿠키로
+옮겨 서버가 읽게 하고, 그 값을 `initialLines` props 로 remote 에 넘긴다. 하이드레이션
+렌더까지는 그 props 를, 커밋 후에는 스토어를 쓴다 — 둘 다 같은 쿠키에서 나오므로
+바뀌는 값이 없다. 대가는 `/`·`/cart`·`/checkout` 의 정적 셸이다(ADR-014).
 
 ## 3. 캐시는 끄는 게 아니라 무효화 경로를 만든다
 

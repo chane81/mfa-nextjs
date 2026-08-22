@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense, type ReactNode } from 'react';
 
-import { SiteHeader } from '@/components/SiteHeader';
+import { SiteHeaderSlot } from '@/components/SiteHeaderSlot';
 import { RemoteVersionSync } from '@/mf/RemoteVersionSync';
 
 import './globals.css';
@@ -32,9 +32,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           cacheComponents 를 켜면 `usePathname()` 같은 client hook 이 prerender 를 막는다
           (digest: CLIENT_HOOK_DYNAMIC). Suspense 로 감싸 셸 뒤로 스트리밍시킨다.
           MFA 와 무관한 일반적인 Next 16 이행 비용이다.
+
+          장바구니 쿠키를 읽는 자리도 **이 경계 안**이다(`SiteHeaderSlot`). 밖에서 읽으면
+          레이아웃이라 모든 라우트가 프리렌더에서 빠진다 — `/lab` 의 캐시 실험까지 죽는다.
         */}
         <Suspense fallback={<div className="h-[57px]" />}>
-          <SiteHeader />
+          <SiteHeaderSlot />
         </Suspense>
         <main className="mx-auto flex max-w-[1120px] flex-col gap-6 px-6 py-8">
           {children}

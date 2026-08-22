@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { formatKRW, type CheckoutFlowProps } from '@mfa/contracts';
-import { cartTotals, useCart } from '@mfa/store';
+import { cartTotals, useCart, useCartLines } from '@mfa/store';
 import { Badge, Button, Panel } from '@mfa/ui';
 
 /**
@@ -14,8 +14,10 @@ import { Badge, Button, Panel } from '@mfa/ui';
 export default function CheckoutFlow({
   onDone,
   onContinueShopping,
+  initialLines,
 }: CheckoutFlowProps) {
-  const lines = useCart((state) => state.lines);
+  /** 무엇을 그릴지는 `@mfa/store` 가 정한다 — 하이드레이션 경계도 탭 동기화도 그 안이다 */
+  const lines = useCartLines(initialLines);
   const clear = useCart((state) => state.clear);
   const { totalPriceLabel, totalQuantity } = cartTotals(lines);
   const [placed, setPlaced] = useState(false);

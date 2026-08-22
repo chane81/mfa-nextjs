@@ -1,11 +1,25 @@
 /**
- * `@mfa/store` 의 cart 도메인이 내보내는 것 — **훅 하나, 순수 함수 하나, 타입.**
+ * `@mfa/store` 의 cart 도메인이 내보내는 것 — **훅 · 순수 함수 · 타입.**
  *
  * 스토어 인스턴스(`cartStore`)와 팩토리는 내보내지 않는다. 인스턴스를 공개하면
  * "어디서든 `getState()` 로 건드릴 수 있는 전역"이 하나 더 생긴다.
  * 무엇을 구독할지는 `useCart(selector)` 로 호출부가 정한다.
+ *
+ * `useCartSync` 도 내보내지 않는다. 줄을 그리는 화면은 `useCartLines` 가 이미 그걸
+ * 안에서 부르고, 둘 다 공개하면 "탭 동기화를 누가 거는가"가 화면마다 갈린다 —
+ * 실제로 remote 세 곳이 같은 네 줄을 복붙하고 있었다. 규칙은 훅 하나가 쥔다.
+ *
+ * 훅과 순수 함수(`totals` · `cookie-codec`)가 같이 있다. 이 배럴은 `'use client'` 모듈을
+ * 재수출하므로 **서버(RSC) 코드가 여기를 타면 안 된다** — 서버에서 평가되진 않지만
+ * 클라이언트 참조로 브라우저 번들에 실린다(실측 zustand + 스토어 21.8KB).
+ *
+ * 그래서 서버용 표면은 `src/server.ts` 가 따로 모으고, `package.json` 의 `react-server`
+ * 조건이 RSC 그래프를 그쪽으로 보낸다. 소비처의 import 문(`@mfa/store`)은 그대로다.
+ * 근거: ADR-015
  */
 export { useCart } from './create-store';
+export { useCartLines } from './use-cart-lines';
 export * from './totals';
 
 export type { CartLine, CartState } from './create-store';
+export * from './cookie-codec';

@@ -1,5 +1,154 @@
 # 진행 상황
 
+## 2026-08-22 (14차) — 장바구니 초기값 통로는 유지하고 중복만 걷어낸다
+
+"페이지마다 `readCartLines()` 를 `initialLines` props 로 넘기는 구조인데, zustand
+Provider 로 바꿀 수 없나"에서 출발했다. 검토 결과 **통로는 못 바꾼다** — Provider 는
+루트 레이아웃에 놓여야 하고, 그러면 쿠키 읽는 자리가 layout 으로 올라가 전 라우트가
+프리렌더에서 빠진다(ADR-014 가 정확히 그걸 피한 것이다). 근거와 기각한 대안은 ADR-016.
+
+바꿀 수 있는 건 **중복**이었고, 두 군데였다.
+
+### 한 일
+
+- [x] `packages/store/src/cart/use-cart-lines.ts` — `useCartLines(initialLines)`.
+      탭 동기화 · 하이드레이션 경계 · 경계 전후 값 선택을 훅 하나가 쥔다.
+      `CartPanel` · `CartBadge` · `CheckoutFlow` 가 같은 네 줄을 복붙하고 있었다
+- [x] `useCartSync` 를 배럴에서 내렸다(내부 구현으로 강등). 둘 다 공개하면
+      "탭 동기화를 누가 거는가"가 화면마다 갈린다. `useHydrated` 는 도메인에 안 묶인
+      범용 훅이라 `hooks/` 표면에 그대로 둔다
+- [x] host `components/CartSlot.tsx` · `CheckoutSlot.tsx` — `SiteHeaderSlot` 과 같은 꼴의
+      서버 껍데기. 쿠키를 읽어 client 섹션에 넘기는 일만 한다
+- [x] `/` · `/cart` · `/checkout` 에서 `readCartLines` 호출을 걷어냈다. 페이지에 남는 건
+      **라우트 정책뿐**이다(`instant = false` — 세그먼트 설정은 정적 분석 대상이라
+      다른 모듈에서 re-export 로 공유할 수 없다. 주석에 명시)
+- [x] ADR-016
+
+remote 파일 3개에서 −44줄, host 페이지 3개가 각각 본문 한 줄로 줄었다.
+
+검증: `typecheck` · `lint` 11/11, `build` 통과 — **라우트 표가 그대로다**
+(`/`·`/cart`·`/checkout` = ƒ, `/lab` 계열 = ◐). ADR-014 의 성질이 유지됐다는 뜻이다.
+
+### 같은 회차 — dev 콘솔 에러 두 개를 한 줄로 잡았다
+
+dev 에서 `Encountered a script tag while rendering React component` 가 `/`·`/cart`·
+`/checkout` 에만 떴다. 레이아웃의 `RemoteVersionSync` 를 가리키고 있었지만 **원인은
+거기가 아니었다** — `packages/store/src/server.ts` 1행에 `'use client'` 가 박혀 있었다
+(13차 `a7738db` 부터). 서버 표면이 통째로 클라이언트 모듈이었다.
+
+- [x] 그 한 줄 삭제. RSC 에러(`parseCartCookie is on the client`)가 전 라우트에서 0 이 됐고,
+      스크립트 태그 경고도 같이 사라졌다 — 프리페치 패스가 실패해 레이아웃이 클라이언트에서
+      렌더되던 게 경고의 정체였다. 자세한 인과는 known-issues E-5
+- [x] `packages/store/eslint.config.js` — `src/server.ts` 한정으로 `'use client'` 금지.
+      ADR-015 가 "이 불변식을 지키는 건 주석뿐"이라고 적어둔 자리를 메웠다.
+      디렉티브를 도로 넣어 error 가 나는 것까지 확인했다
+- [x] known-issues E-5 + 증상 색인 2줄
+
+검증: 첫 HTML 에 장바구니가 실린다(쿠키 `kb-001×3` → `/`·`/cart`·`/checkout` 각 2회 —
+헤더 배지 + 본문). 브라우저 콘솔 에러 0(4개 라우트). `build` 통과, 라우트 표 그대로.
+ADR-015 의 실측도 유지 — `grep -rl zustand apps/host/.next/static` **0건**.
+
+## 2026-08-20 (13차) — 장바구니 저장소를 쿠키로 옮긴다
+
+새로고침 때 장바구니가 깜빡였다. 파 보니 저장소가 느린 게 아니라 **서버가 장바구니를
+모른다**는 게 원인이었다. localStorage 는 브라우저에만 있으니 첫 HTML 이 반드시 비고,
+하이드레이션 커밋에서 한 프레임에 값이 바뀐다. 가려서 될 문제가 아니라 **저장 위치**를 바꿨다.
+
+### 한 일
+
+- [x] 쿠키 포맷·복원을 `@mfa/store` 의 `cart/cookie-codec.ts` 로(처음엔 `@mfa/contracts`
+      에 뒀다가 ADR-015 에서 옮겼다). `CartLine` 만 contracts 에 남는다 —
+      remote props(`initialLines`)에 나타나는 **진짜** 계약이라서다
+- [x] `packages/store/src/utils/cookie-storage.ts` — `createCookieStorage()`.
+      쿠키 배관(읽기·쓰기·속성 조립·persist 봉투)만 맡는 **범용** 장치다.
+      값의 표현은 도메인이 `read`·`write` 로 주입한다
+- [x] `packages/store/src/cart/cookie-storage.ts` — 그 위의 **설정만**.
+      담는 건 `[{id, q}]` 뿐이고 이름·가격은 `findProduct` 로 복원. 코덱은 이웃 파일
+      `cookie-codec` 하나라 host 의 읽기 경로와 **같은 규칙**을 쓴다
+- [x] `useHydrated()` 신설(`packages/store/src/hooks/`). 스토어의 서버 스냅샷은 여전히
+      빈 장바구니라, 커밋 전에는 `initialLines` 를 쓰고 커밋 후 스토어로 넘어간다.
+      **둘 다 같은 쿠키에서 나오므로 화면은 안 바뀐다**
+- [x] host: `lib/cart-cookie.ts`(`cookies()` → `parseCartCookie`),
+      `components/SiteHeaderSlot.tsx`(레이아웃 Suspense 안에서 읽는 서버 껍데기),
+      `/`·`/cart`·`/checkout` 이 본문에서 읽어 `initialLines` 를 내린다
+- [x] 세 라우트에 `export const instant = false` — Cache Components 의 정적 셸 검증에서
+      빼는 공식 통로다. 루트 레이아웃이 아니라 그 페이지에만 건다
+- [x] ADR-014, known-issues E-1 · E-2 · E-3(+ 증상 색인 3줄), 토폴로지 · SSR 문서 갱신
+
+### 리뷰 반영 (같은 회차)
+
+`/review` 로 교차 검토(Claude 구조화 + Codex 적대적)한 뒤 6건을 고쳤다. CRITICAL 은
+없었다 — 가격을 카탈로그에서 복원하는 설계가 변조 표면을 이미 막아 놨다. 남은 건 전부
+**신뢰 경계 입력 검증**과 **경계 표시**였다.
+
+- [x] **서버만 쿠키를 두 번 벗기고 있었다.** Next 의 `cookies().get().value` 는 이미
+      `decodeURIComponent` 된 값인데(`@edge-runtime/cookies`) 코덱이 또 벗겼다. 값에 `%` 가
+      없어 안 터졌을 뿐이고, 하나라도 들어오면 서버는 `URIError` → 빈 장바구니, 브라우저는
+      정상 파싱 — **없애려던 깜빡임이 그 모양으로 돌아온다.** 퍼센트 인코딩을 전송 규약으로
+      보고 저장 매체(`readCookie` / `setItem`)로 내렸다. 나가는 바이트는 그대로라 기존
+      쿠키가 계속 읽힌다
+- [x] **중복 상품 줄 병합.** 조작된 쿠키가 같은 `id` 를 두 줄 넣으면 화면이 같은 React key 를
+      두 번 쓰고 `setQuantity`·`remove` 가 두 줄을 동시에 건드렸다. `Map` 으로 모아 합산
+      (삽입 순서 보존이라 줄 순서는 유지)
+- [x] **수량 상한 `MAX_CART_QUANTITY = 99`.** `q: 1e308` 이 `Number.isFinite` 를 통과해
+      합계가 `Infinity` → `∞원` 이 됐다
+- [x] **쿠키 쓰기 실패 감지.** `document.cookie = ...` 는 크기 초과·차단·정책 거부에서
+      전부 조용히 실패한다. 4096바이트 사전 검사 + 쓰고 되읽기. 이름당 한 번만 경고하고
+      던지지 않는다(저장 실패로 화면이 죽는 쪽이 나쁘다)
+- [x] **탭 간 덮어쓰기.** 탭 A 가 담은 뒤 탭 B 에서 수량을 바꾸면 B 의 낡은 전체 상태가
+      쿠키를 덮어썼다. localStorage 시절에도 같았지만 성질이 바뀌었다 — 이제 서버가 맞는
+      값을 `initialLines` 로 내려보내는데 클라이언트가 그걸 계속 버린다. `useCartSync` +
+      `useRevalidateOnFocus` 로 포커스 복귀 때 쿠키 원문이 바뀌었을 때만 `rehydrate()`
+- [x] **"화면은 바뀌지 않는다" 에 단일 탭 조건 명시**(주석 4곳 + ADR-014)
+- [x] **ADR-015** — 코덱을 `@mfa/store` 의 `cart/cookie-codec.ts` 로 옮겼다. 배럴로
+      내보냈다가 host 브라우저 번들에 zustand 21.8KB 가 실리는 걸 실측으로 잡았고
+      (known-issues E-4), `package.json` 의 **`react-server` 조건**으로 갈랐다 — 진입점은
+      여전히 `"."` 하나고 소비처 import 문도 그대로다. 조건을 뺀 대조군까지 돌려 인과 확정
+
+검증: `typecheck` · `lint` 10/10, `build` 통과(라우트 표 변화 없음), 코덱 순수 함수
+22케이스(바이트 호환 · 서버/브라우저 동치 · 중복 · 클램프 · 방어 입력) 전부 통과.
+
+⚠️ 테스트 러너가 아직 없어서 그 22케이스가 저장소에 남아 있지 않다. `cookie-codec` 은
+의존성 없는 순수 함수라 러너만 붙이면 그대로 테이블 테스트가 된다 — 다음 회차 후보.
+
+### 실측 (CDP 로 rAF 마다 표본, 프로덕션 빌드)
+
+| 자리          | localStorage             | 쿠키                       |
+| ------------- | ------------------------ | -------------------------- |
+| 헤더 배지 폭  | 97.8 → 187.6px 한 프레임 | 188.4px 고정               |
+| 패널 높이     | 0 → 206.5px 한 프레임    | 366.5px 고정               |
+| 변하는 프레임 | 1                        | **0** (91프레임 전부 동일) |
+
+서버 HTML 을 직접 확인해도 값이 들어 있다 — 쿠키 없이 요청하면 `담긴 상품이 없습니다`,
+쿠키를 실으면 상품명과 `🛒 장바구니 3 627,000원` 이 첫 응답에 그대로 있다.
+
+### 라우트 렌더 방식 변화
+
+| 라우트                      | 전  | 후  | 이유                                 |
+| --------------------------- | --- | --- | ------------------------------------ |
+| `/` · `/cart` · `/checkout` | ○   | ƒ   | 본문에서 쿠키를 읽는다 (의도한 대가) |
+| 그 외                       | ○   | ◐   | 레이아웃 헤더만 쿠키를 읽는다        |
+
+`/lab` 의 캐시 실험은 셸 프리렌더를 유지한다 — 헤더를 레이아웃의 기존 `<Suspense>`
+**안쪽**에서 읽기 때문이다. 밖에서 읽으면 모든 라우트가 같이 죽는다.
+
+### 판단
+
+- **왜 가리지 않았나.** 스켈레톤도 색 없는 자리표시자도 먼저 해 봤고 둘 다 더 나빴다.
+  한 프레임짜리에 로딩 UI 를 붙이면 번쩍임이 되고, **줄 수를 서버도 첫 렌더도 모르니**
+  자리 크기를 맞추는 게 원리상 불가능하다
+- **왜 전환 애니메이션이 아닌가.** 깜빡임은 없앨 수 있지만 **첫 화면이 여전히 틀린 값**이고
+  정착까지 300ms 가 걸린다. 값이 맞는 쪽이 낫다
+- **왜 최소 표현인가.** 쿠키는 요청마다 전송된다. 한글 상품명은 URL 인코딩되면 글자당
+  9바이트다. 부수 효과로 카탈로그가 바뀌어도 저장된 사본이 낡지 않는다
+- **쿠키 이름에 `:` 를 못 쓴다.** RFC 6265 의 구분자다. 옛 키(`mfa-nextjs:cart`)와
+  이름이 달라 옛 값은 딸려오지 않는다 — 저장 매체가 바뀌었으니 그게 맞다
+
+### 다음
+
+- 쿠키를 서버에서 **쓰는** 경로는 없다. 담기·비우기는 전부 브라우저에서 일어난다.
+  서버 액션으로 담는 흐름이 생기면 그때 `serializeCartCookie` 의 소비처가 는다
+
 ## 2026-08-20 (12차) — 구조 해부도 `docs/anatomy.html` 추가
 
 배포 파이프라인과 host↔remote 런타임을 그림으로 설명하는 단독 HTML 문서를 넣었다.

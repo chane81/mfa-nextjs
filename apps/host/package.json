@@ -15,6 +15,7 @@
   "dependencies": {
     "@mfa/contracts": "workspace:*",
     "@mfa/remote-config": "workspace:*",
+    "@mfa/store": "workspace:*",
     "@mfa/tailwind-config": "workspace:*",
     "@mfa/ui": "workspace:*",
     "@module-federation/runtime": "^2.8.2",

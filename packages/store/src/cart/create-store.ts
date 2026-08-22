@@ -8,17 +8,18 @@ import {
 } from 'zustand/traditional';
 import { type StoreApi } from 'zustand/vanilla';
 
-import { type Product } from '@mfa/contracts';
+import { type CartLine, type Product } from '@mfa/contracts';
 
 import { globalSingleton } from '../utils';
 
-export interface CartLine {
-  readonly productId: string;
-  readonly name: string;
-  readonly emoji: string;
-  readonly unitPrice: number;
-  readonly quantity: number;
-}
+import { cartCookieStorage, CART_STORAGE_KEY } from './cookie-storage';
+
+/**
+ * 줄의 모양은 `@mfa/contracts` 가 정한다 — 쿠키 포맷과 remote props(`initialLines`)에
+ * 같이 나타나는 타입이라, 계약 쪽에 있어야 한 곳만 고치면 된다. 소비처 편의를 위해
+ * 여기서 다시 내보낸다(`@mfa/store` 하나만 알면 되게).
+ */
+export type { CartLine };
 
 export interface CartState {
   readonly lines: readonly CartLine[];
@@ -31,12 +32,20 @@ export interface CartState {
 /**
  * 스토어이자 훅이다. `createWithEqualityFn` 의 반환값은 `StoreApi` 에
  * `<U>(selector, equalityFn?) => U` 호출 시그니처가 붙은 형태다.
+ *
+ * `persist` 표면을 손으로 적는 이유: zustand 5.0.15 는 그 타입(`StorePersist`)을
+ * **공개하지 않는다**(`middleware.d.ts` 의 export 목록에 없다). 미들웨어가 실제로 붙이는
+ * 것 중 이 패키지가 쓰는 것만 좁혀 적는다 — `use-cart-sync` 가 `rehydrate()` 를 쓴다.
  */
-export type CartStore = UseBoundStoreWithEqualityFn<StoreApi<CartState>>;
+export type CartStore = UseBoundStoreWithEqualityFn<StoreApi<CartState>> & {
+  readonly persist: {
+    rehydrate(): Promise<void> | void;
+    hasHydrated(): boolean;
+  };
+};
 
 /** 전역 레지스트리 안에서의 이름. 도메인 폴더 이름과 맞춘다 */
 const STORE_NAME = 'cart';
-const STORAGE_KEY = 'mfa-nextjs:cart';
 
 /**
  * 격리된 인스턴스를 만든다. **직접 부르지 않는다** — 아래 `useCart` 를 쓴다.
@@ -101,18 +110,26 @@ const createCartStore = (): CartStore =>
         },
       }),
       {
-        name: STORAGE_KEY,
-        version: 1,
+        name: CART_STORAGE_KEY,
         /**
-         * 서버에는 저장소가 없다. getter 가 던지면 `createJSONStorage` 가 `undefined` 를
-         * 돌려주고 persist 는 복원·저장을 통째로 건너뛴다(zustand 5 규약).
+         * `version` · `migrate` 를 두지 않는다. 쿠키 저장소는 봉투에 버전을 싣지 않고
+         * (근거는 `utils/cookie-storage` 주석), 저장 표현이 바뀌면 `parseCartCookie` 가
+         * 옛 모양을 알아본다. 여기 숫자를 적으면 동작하지 않는 장치가 배선된 것처럼 보인다.
+         */
+        /**
+         * 저장소는 **쿠키**다. 서버가 읽을 수 있어야 첫 HTML 부터 값이 맞기 때문이고,
+         * 근거는 `cookie-storage.ts` 주석과 ADR-014 에 있다.
+         *
+         * 서버에는 `document` 가 없다. getter 가 던지면 `createJSONStorage` 가
+         * `undefined` 를 돌려주고 persist 는 복원·저장을 통째로 건너뛴다(zustand 5 규약).
          * 이 모듈은 remote 의 SSR 번들 안에서도 평가되므로 이 경로가 실제로 쓰인다.
+         * 서버가 아는 장바구니는 스토어가 아니라 `initialLines` props 로 내려간다.
          */
         storage: createJSONStorage(() => {
-          if (typeof window === 'undefined') {
-            throw new Error('서버에는 localStorage 가 없다');
+          if (typeof document === 'undefined') {
+            throw new Error('서버에는 document 가 없다');
           }
-          return window.localStorage;
+          return cartCookieStorage;
         }),
         /** 액션은 저장하지 않는다. 저장 대상은 lines 뿐 */
         partialize: (state) => ({ lines: state.lines }),
