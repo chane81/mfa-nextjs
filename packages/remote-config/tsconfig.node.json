@@ -1,0 +1,21 @@
+{
+  "extends": "@mfa/typescript-config/base.json",
+  "compilerOptions": {
+    /**
+     * `src/node.ts` 전용 검사.
+     *
+     * 옆의 `tsconfig.json` 은 `types: []` 로 **브라우저 안전성을 강제한다** — 그 설정이
+     * `src/index.ts` 가 node 전역에 기대는 순간 typecheck 를 깨뜨려 준다(그 파일은
+     * host 의 브라우저 번들에 실린다). 그 보호를 잃지 않으려고 프로젝트를 둘로 나눈다.
+     *
+     * 이 쪽만 `@types/node` 를 붙인다. `src/node.ts` 를 부르는 곳은 번들러 config 와
+     * 빌드 스크립트뿐이고 전부 node 다 — 근거는 그 파일 상단 주석.
+     */
+    "noEmit": true,
+    "erasableSyntaxOnly": true,
+    "types": ["node"],
+    "tsBuildInfoFile": "./.turbo/tsconfig.node.tsbuildinfo"
+  },
+  "include": ["src/node.ts"],
+  "exclude": ["node_modules"]
+}
