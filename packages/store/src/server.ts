@@ -1,5 +1,3 @@
-'use client';
-
 /**
  * `@mfa/store` 의 **서버(RSC) 표면.**
  *
