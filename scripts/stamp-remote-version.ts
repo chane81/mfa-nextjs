@@ -28,7 +28,13 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { MF_FILES, assertRemoteName } from '@mfa/remote-config';
+import {
+  MF_FILES,
+  assertRemoteName,
+  signedPayload,
+  versionedPath,
+} from '@mfa/remote-config';
+import { readBuildVersion } from '@mfa/remote-config/node';
 
 const [remoteArg, distArg] = process.argv.slice(2);
 if (!remoteArg) {
@@ -45,17 +51,18 @@ const remote = assertRemoteName(remoteArg);
 const cwd = process.cwd();
 const dist = resolve(cwd, distArg ?? 'dist');
 
+/**
+ * 버전 판정은 번들러 config 와 **같은 함수**를 쓴다. 여기서 따로 읽으면 "빈 파일을
+ * 어떻게 볼 것인가" 같은 판단이 갈라지고, 그러면 stamp 가 찾는 디렉터리와 빌드가
+ * 만든 디렉터리가 어긋난다.
+ */
 const versionFile = resolve(cwd, '.mf-version');
-if (!existsSync(versionFile)) {
-  console.error(
-    '[stamp] .mf-version 이 없습니다. 빌드 전에 mf-build-version.ts 가 돌아야 합니다.',
-  );
-  process.exit(1);
-}
-const version = readFileSync(versionFile, 'utf8').trim();
+const version = readBuildVersion(cwd);
 if (!version) {
   console.error(
-    '[stamp] .mf-version 이 비어 있습니다. mf-build-version.ts 가 버전을 못 정했습니다.',
+    existsSync(versionFile)
+      ? '[stamp] .mf-version 이 비어 있습니다. mf-build-version.ts 가 버전을 못 정했습니다.'
+      : '[stamp] .mf-version 이 없습니다. 빌드 전에 mf-build-version.ts 가 돌아야 합니다.',
   );
   process.exit(1);
 }
@@ -91,9 +98,9 @@ const payload = {
   remote,
   version,
   /** host 서버가 받아 실행하는 node 번들 */
-  ssrEntry: `/v${version}/${MF_FILES.ssrBundle}`,
+  ssrEntry: versionedPath(MF_FILES.ssrBundle, version),
   /** 브라우저 MF 런타임이 읽는 매니페스트 */
-  webEntry: `/v${version}/${MF_FILES.webManifest}`,
+  webEntry: versionedPath(MF_FILES.webManifest, version),
   ssrIntegrity: integrity(ssrBundle),
   webIntegrity: integrity(manifest),
 };
@@ -103,17 +110,12 @@ const payload = {
  * 오리진이 주는 해시와 오리진이 주는 번들을 대조하는 것만으로는 못 막는다.
  *
  * 키가 없으면 서명 없이 내보낸다. host 쪽에서 `MF_REQUIRE_SIGNATURE=1` 로 강제할 수 있다.
- * 서명 대상은 신뢰 판단에 쓰이는 필드만, 고정 순서로 (host 의 signedPayload 와 같은 형식).
+ *
+ * **직렬화는 `@mfa/remote-config` 의 `signedPayload` 가 한다.** 예전에는 이 파일과 host 의
+ * `remote-trust.ts` 가 같은 배열을 각자 적고 주석으로 "같은 형식" 이라고만 적어 뒀다.
+ * 갈라지면 매니페스트는 멀쩡히 만들어지고 배포도 성공하는데 **host 의 검증만 실패**하고,
+ * 원인이 두 파일의 배열 차이라는 게 어느 로그에도 안 남는다.
  */
-const signedPayload = JSON.stringify([
-  payload.remote,
-  payload.version,
-  payload.ssrEntry,
-  payload.webEntry,
-  payload.ssrIntegrity,
-  payload.webIntegrity,
-]);
-
 let signature = null;
 if (process.env.MF_SIGNING_KEY) {
   const key = createPrivateKey({
@@ -121,9 +123,11 @@ if (process.env.MF_SIGNING_KEY) {
     format: 'der',
     type: 'pkcs8',
   });
-  signature = sign(null, Buffer.from(signedPayload, 'utf8'), key).toString(
-    'base64',
-  );
+  signature = sign(
+    null,
+    Buffer.from(signedPayload(payload), 'utf8'),
+    key,
+  ).toString('base64');
 }
 
 writeFileSync(
