@@ -41,16 +41,18 @@
 
 ### SSR · hydration
 
-| 증상                                                    | 항목                                                                            |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| 초기 HTML 에 remote 마크업이 없음                       | [0-4](#0-4-dev-에서-ssr-번들이-안-내려옴) + [진단 체크리스트](#진단-체크리스트) |
-| `/` 만 스켈레톤이 먼저 나감                             | [0-6](#0-6-만-스켈레톤이-먼저-나가는-현상)                                      |
-| hydration 불일치                                        | [A-8](#a-8-버전-스크립트가-suspense-안에-있으면-hydration-이-깨진다)            |
-| 서버 로더에 node builtin 을 썼더니 브라우저 번들이 깨짐 | [0-2](#0-2-서버-로더에-node-builtin-을-쓰면-브라우저-번들이-깨진다)             |
-| 새로고침하면 장바구니 영역이 한 번 깜빡임               | [E-1](#e-1-새로고침-때-장바구니가-깜빡인다--저장소가-느린-게-아니다)            |
-| 깜빡임을 자리표시자로 가렸더니 더 심해짐                | [E-2](#e-2-자리표시자로-가리면-더-나빠진다)                                     |
-| `blocking-prerender-dynamic` 빌드 에러                  | [E-3](#e-3-쿠키를-suspense-밖에서-읽으면-빌드가-멈춘다)                         |
-| 안 쓰는 패키지가 브라우저 번들에 실림                   | [E-4](#e-4-use-client-를-재수출하는-배럴은-서버에서-써도-브라우저로-따라온다)   |
+| 증상                                                           | 항목                                                                            |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 초기 HTML 에 remote 마크업이 없음                              | [0-4](#0-4-dev-에서-ssr-번들이-안-내려옴) + [진단 체크리스트](#진단-체크리스트) |
+| `/` 만 스켈레톤이 먼저 나감                                    | [0-6](#0-6-만-스켈레톤이-먼저-나가는-현상)                                      |
+| hydration 불일치                                               | [A-8](#a-8-버전-스크립트가-suspense-안에-있으면-hydration-이-깨진다)            |
+| 서버 로더에 node builtin 을 썼더니 브라우저 번들이 깨짐        | [0-2](#0-2-서버-로더에-node-builtin-을-쓰면-브라우저-번들이-깨진다)             |
+| 새로고침하면 장바구니 영역이 한 번 깜빡임                      | [E-1](#e-1-새로고침-때-장바구니가-깜빡인다--저장소가-느린-게-아니다)            |
+| 깜빡임을 자리표시자로 가렸더니 더 심해짐                       | [E-2](#e-2-자리표시자로-가리면-더-나빠진다)                                     |
+| `blocking-prerender-dynamic` 빌드 에러                         | [E-3](#e-3-쿠키를-suspense-밖에서-읽으면-빌드가-멈춘다)                         |
+| 안 쓰는 패키지가 브라우저 번들에 실림                          | [E-4](#e-4-use-client-를-재수출하는-배럴은-서버에서-써도-브라우저로-따라온다)   |
+| `Encountered a script tag while rendering React component`     | [E-5](#e-5-서버-표면에-use-client-가-붙으면-dev-콘솔에서만-터진다)              |
+| `Attempted to call X() from the server but X is on the client` | [E-5](#e-5-서버-표면에-use-client-가-붙으면-dev-콘솔에서만-터진다)              |
 
 ### 스타일 · CSS
 
@@ -195,6 +197,51 @@ grep -rl "zustand" apps/host/.next/static --include='*.js'
 ⚠️ 이 방식은 서버 코드에서 훅을 import 해도 **`tsc` 를 통과한다**(타입은 `default` 조건으로
 해석된다). `next build` 가 `Export useCart doesn't exist in target module ... [app-rsc]` 로
 잡는다. 근거: ADR-015
+
+### E-5. 서버 표면에 `'use client'` 가 붙으면 dev 콘솔에서만 터진다
+
+E-4 를 고치며 만든 `packages/store/src/server.ts` **1행에 `'use client'` 가 박혀 있었다.**
+파일 자신의 주석이 "여기서는 `'use client'` 모듈을 재수출하지 않는다"인데 정작 자기가
+클라이언트 모듈이었다. 결과는 브라우저 콘솔의 이 두 줄이다.
+
+```
+Attempted to call parseCartCookie() from the server but parseCartCookie is on the client.
+  #1 [Server Component]: ./apps/host/src/lib/cart-cookie.ts → SiteHeaderSlot → layout.tsx
+
+Encountered a script tag while rendering React component.
+Scripts inside React components are never executed when rendering on the client.
+  src/app/layout.tsx (29:9) @ RootLayout    ← <RemoteVersionSync />
+```
+
+**두 번째 줄이 첫 번째 줄의 증상이다.** 순서는 이렇다.
+
+1. 서버 표면이 클라이언트 모듈이라 `readCartLines()` 가 프리페치 렌더 패스(`env: "Prefetch"`)
+   에서 던진다.
+2. 그 패스가 실패한 라우트는 셸을 못 만들고 **레이아웃 subtree 가 클라이언트에서 렌더**된다.
+3. `RemoteVersionSync` 가 내보내는 인라인 `<script>` 가 클라이언트에서 만들어진다.
+   React 는 그런 스크립트를 실행하지 않으므로 경고를 낸다.
+
+그래서 **`instant = false` 인 동적 라우트(`/`·`/cart`·`/checkout`)에만** 스크립트 경고가
+보였고, PPR 로 프리렌더되는 `/lab`·`/debug` 는 조용했다. 스크립트 경고만 보고
+`RemoteVersionSync` 나 `next/script` 를 고치려 들면 **엉뚱한 곳을 판다** — 원인은
+레이아웃이 아니라 패키지의 export 표면이다.
+
+증상으로 구분하는 법: 라우트마다 첫 HTML 을 받아 RSC 에러가 실려 있는지 본다.
+
+```bash
+curl -s http://localhost:3000/lab | grep -c "is on the client"
+```
+
+`/lab` 처럼 **경고가 안 보이는 라우트에서도** 이 수는 0 이 아니었다. 콘솔 경고는 증상이
+드러난 라우트에만 나지만 원인은 전 라우트에 있었다는 뜻이다.
+
+**왜 오래 안 보였나** — 타입 · 린트 · `pnpm build` 가 전부 통과한다. 빌드가 잡는 건
+반대 방향(서버 표면에 **없는** export 를 서버에서 부르는 경우)뿐이다. 이쪽은 export 가
+있긴 있고 종류만 클라이언트 참조라 정적 검사에 안 걸린다.
+
+고친 방법은 그 한 줄을 지우는 것이고, 재발은 **린트로 막았다** —
+`packages/store/eslint.config.js` 가 `src/server.ts` 한정으로 그 디렉티브를 금지한다.
+ADR-015 가 "이 불변식을 지키는 건 주석뿐"이라고 적어둔 자리를 메운 것이다.
 
 ## D. (11차) 상태 패키지(`@mfa/store`)에서 밟은 것
 

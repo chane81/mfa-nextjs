@@ -574,7 +574,10 @@
   - ❌ 표면이 둘이 됐다(`index.ts` · `server.ts`). 진입점은 하나지만 "무엇이 서버에
     안전한가"를 **사람이 유지해야 한다.** 누가 `server.ts` 에 `'use client'` 모듈을
     재수출하면 타입 · 린트 · 빌드가 전부 통과하고 브라우저 번들에만 나타난다 —
-    지금 이 불변식을 지키는 건 주석뿐이다(known-issues E-4).
+    이 불변식은 이제 **린트가 지킨다**(`packages/store/eslint.config.js`) — 실제로
+    `server.ts` 에 `'use client'` 가 박혀 dev 콘솔에서만 터진 적이 있다(known-issues E-5).
+    다만 린트가 막는 건 그 파일의 디렉티브 하나고, `'use client'` 모듈을 **재수출**하는
+    경우는 여전히 사람이 본다(known-issues E-4).
   - ❌ 서버 코드에서 훅을 import 해도 `tsc` 는 통과한다. `next build` 가 잡는다.
   - ⭕ 저장 표현을 바꾸는 변경이 `cart/` 폴더 안에서 끝난다.
   - ⭕ contracts 가 다시 props 계약 + 공유 도메인 데이터만 담는다.

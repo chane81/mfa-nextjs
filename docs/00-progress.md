@@ -29,6 +29,25 @@ remote 파일 3개에서 −44줄, host 페이지 3개가 각각 본문 한 줄�
 검증: `typecheck` · `lint` 11/11, `build` 통과 — **라우트 표가 그대로다**
 (`/`·`/cart`·`/checkout` = ƒ, `/lab` 계열 = ◐). ADR-014 의 성질이 유지됐다는 뜻이다.
 
+### 같은 회차 — dev 콘솔 에러 두 개를 한 줄로 잡았다
+
+dev 에서 `Encountered a script tag while rendering React component` 가 `/`·`/cart`·
+`/checkout` 에만 떴다. 레이아웃의 `RemoteVersionSync` 를 가리키고 있었지만 **원인은
+거기가 아니었다** — `packages/store/src/server.ts` 1행에 `'use client'` 가 박혀 있었다
+(13차 `a7738db` 부터). 서버 표면이 통째로 클라이언트 모듈이었다.
+
+- [x] 그 한 줄 삭제. RSC 에러(`parseCartCookie is on the client`)가 전 라우트에서 0 이 됐고,
+      스크립트 태그 경고도 같이 사라졌다 — 프리페치 패스가 실패해 레이아웃이 클라이언트에서
+      렌더되던 게 경고의 정체였다. 자세한 인과는 known-issues E-5
+- [x] `packages/store/eslint.config.js` — `src/server.ts` 한정으로 `'use client'` 금지.
+      ADR-015 가 "이 불변식을 지키는 건 주석뿐"이라고 적어둔 자리를 메웠다.
+      디렉티브를 도로 넣어 error 가 나는 것까지 확인했다
+- [x] known-issues E-5 + 증상 색인 2줄
+
+검증: 첫 HTML 에 장바구니가 실린다(쿠키 `kb-001×3` → `/`·`/cart`·`/checkout` 각 2회 —
+헤더 배지 + 본문). 브라우저 콘솔 에러 0(4개 라우트). `build` 통과, 라우트 표 그대로.
+ADR-015 의 실측도 유지 — `grep -rl zustand apps/host/.next/static` **0건**.
+
 ## 2026-08-20 (13차) — 장바구니 저장소를 쿠키로 옮긴다
 
 새로고침 때 장바구니가 깜빡였다. 파 보니 저장소가 느린 게 아니라 **서버가 장바구니를
