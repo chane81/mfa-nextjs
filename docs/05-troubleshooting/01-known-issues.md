@@ -34,6 +34,8 @@
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `_jsxDEV is not a function` (dev, catalog 첫 로드)         | [0-4c](#0-4c-콜드-dev-첫-로드에서-_jsxdev-is-not-a-function)                                                                                      |
 | `Invalid hook call` / React 2벌 로드                       | [0-3](#0-3-remote-서버-번들이-자기-react-를-들고-오면-서버에서도-훅이-깨진다), [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) |
+| `Failed to bridge external shared module` / `#RUNTIME-015` | [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) — host 의 `shared` 에서 서브엔트리를 뺐다                                      |
+| host 의 `shared` 를 고쳤는데 뭘 확인해야 하나              | [0-4e](#0-4e-shared-를-고쳤을-때의-dev-검증-절차) — 빌드만으로는 부족하다                                                                         |
 | `예상 밖 모듈을 require 했습니다`                          | 번들러 externals — [0-5](#0-5-shared-모듈-네임스페이스-interop)                                                                                   |
 | `[ dynamic-remote-type-hints-plugin ] err: [object Event]` | [0-4b](#0-4b-dynamic-remote-type-hints-plugin-err-object-event)                                                                                   |
 | `SSR 번들을 가져오지 못했습니다` / `ECONNREFUSED` (dev)    | remote 미기동. 살아있는데도 나면 [0-4](#0-4-dev-에서-ssr-번들이-안-내려옴)                                                                        |
@@ -935,6 +937,60 @@ host 가 그걸 제공하지 않으면 bridge 단계에서 실패한다.
 $ node -p "require('./apps/remote-catalog/dist/mf-manifest.json').shared.map(s=>s.name).join()"
 react,react-dom,react/jsx-runtime,react-dom/client
 ```
+
+#### 재확인 (15차, Vite 8 · `@module-federation/vite` 1.20.7)
+
+같은 성질이 유지되고 있고, **두 remote 가 서로 다르다**는 점이 새로 드러났다.
+
+| remote         | config 에 선언한 shared | 매니페스트에 실제로 오른 것                                 |
+| -------------- | ----------------------- | ----------------------------------------------------------- |
+| catalog (Vite) | `react`, `react-dom`    | **넷** — `react/jsx-runtime` · `react-dom/client` 자동 추가 |
+| cart (Rsbuild) | `react`, `react-dom`    | 둘. 자동 추가 없음                                          |
+
+즉 host 의 서브엔트리 공유는 **catalog 쪽 플러그인 하나 때문에** 필요하다. cart 만 보고
+"안 쓰는데 왜 있지" 하고 지우면 catalog 이 `#RUNTIME-015` 로 죽는다.
+
+`react/jsx-dev-runtime` 은 **프로덕션 매니페스트에 없다** — dev 그래프에만 나타난다(0-4c).
+그래서 프로덕션 빌드만 돌려서는 이 항목이 필요한지 알 수 없다.
+
+⚠️ **`host` 의 `shared` 를 건드렸으면 dev 콜드 로드까지 돌린다.** 15차에 그 블록을 표로
+리팩터하고 typecheck·lint·build 만으로 끝낼 뻔했다. 실제 확인 절차는 아래 0-4e.
+
+### 0-4e. `shared` 를 고쳤을 때의 dev 검증 절차
+
+0-4d 의 교훈("프로덕션 빌드만으로 부족하다")을 절차로 굳힌다. 이 목록이 깨지는 방식은
+**빌드가 아니라 브라우저 런타임**에 나타나므로 tsc·eslint·`next build` 는 전부 통과한다.
+
+콜드 조건을 먼저 만든다 — 0-4c 의 재현 조건이 "dev 재시작 + **새 브라우저 세션**" 이다.
+
+```bash
+rm -rf apps/remote-catalog/node_modules/.vite apps/host/.next
+pnpm dev
+```
+
+확인할 것 넷. 앞의 둘만 보면 부족하다 — 렌더는 되는데 훅만 죽는 경우가 실재한다(0-3).
+
+| 무엇                    | 어떻게                                              | 통과 기준                                            |
+| ----------------------- | --------------------------------------------------- | ---------------------------------------------------- |
+| 브라우저 콘솔           | 새 세션으로 `/` 콜드 로드                           | `_jsxDEV is not a function` · `#RUNTIME-015` 가 없다 |
+| remote 가 실제로 그렸나 | `RemoteBoundary` 에러 박스와 남은 스켈레톤을 센다   | 에러 박스 0, 상품 카드 8                             |
+| **훅이 도나**           | catalog 에서 "담기" → **cart 의 배지**가 반응하는지 | 0 → 1, 합계가 갱신된다                               |
+| 저장까지 갔나           | `document.cookie`                                   | `mfa-cart=[{"id":…,"q":1}]`                          |
+
+셋째 줄이 핵심이다. **번들 세 개(host · catalog · cart)를 넘나드는 유일한 경로**라,
+React 싱글턴이 깨졌거나 스토어 인스턴스가 갈라졌으면 여기서만 드러난다.
+마크업은 멀쩡히 나오므로 앞의 두 줄로는 안 잡힌다.
+
+서버가 쿠키를 읽는 성질(ADR-014)까지 같이 보려면 첫 HTML 을 직접 확인한다.
+
+```bash
+C='mfa-cart=%5B%7B%22id%22%3A%22kb-001%22%2C%22q%22%3A1%7D%5D'
+curl -s -H "Cookie: $C" localhost:3000/cart | grep -c '189,000'   # 0 이면 회귀다
+curl -s              localhost:3000/cart | grep -c '189,000'      # 0 이어야 정상
+```
+
+15차 실측: 넷 다 통과, `/`·`/cart`·`/checkout` 첫 HTML 에 장바구니 포함,
+쿠키 없으면 미포함, `/lab/isr` 프리렌더 HTML 에 remote 마크업 8개.
 
 ### 0-5. shared 모듈 네임스페이스 interop
 
