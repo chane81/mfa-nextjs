@@ -4,6 +4,8 @@ import { formatKRW, type CheckoutFlowProps } from '@mfa/contracts';
 import { cartTotals, useCart, useCartLines } from '@mfa/store';
 import { Badge, Button, Panel } from '@mfa/ui';
 
+import { ORIGIN, ORIGIN_HUE } from '../origin';
+
 /**
  * host 에 노출되는 모듈: `cart/CheckoutFlow`
  *
@@ -24,7 +26,7 @@ export default function CheckoutFlow({
 
   if (placed) {
     return (
-      <Panel origin="remote: cart · rsbuild" originHue={150} title="주문 완료">
+      <Panel {...ORIGIN} title="주문 완료">
         <p className="m-0 text-sm text-text">
           주문이 접수되었습니다. 장바구니를 비웠습니다.
         </p>
@@ -39,10 +41,9 @@ export default function CheckoutFlow({
 
   return (
     <Panel
-      origin="remote: cart · rsbuild"
-      originHue={150}
+      {...ORIGIN}
       title="주문서"
-      actions={<Badge hue={150}>{totalQuantity}개</Badge>}
+      actions={<Badge hue={ORIGIN_HUE}>{totalQuantity}개</Badge>}
     >
       {lines.length === 0 ? (
         <p className="m-0 text-[13px] text-muted">

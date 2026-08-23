@@ -1,11 +1,16 @@
-import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { federation } from '@module-federation/vite';
 import { MF_FILES, REMOTES, publicOrigin } from '@mfa/remote-config';
+import {
+  assetBase,
+  createMfDevMiddleware,
+  readBuildVersion,
+  versionedDist,
+} from '@mfa/remote-config/node';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig, type Connect, type Plugin } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 
 const REMOTE = REMOTES.catalog;
 const PORT = REMOTE.devPort;
@@ -23,56 +28,13 @@ const PORT = REMOTE.devPort;
 const PUBLIC_URL = publicOrigin(REMOTE.name);
 
 /**
- * 빌드 버전. `scripts/mf-build-version.mjs` 가 빌드 직전에 써 둔다.
+ * dev · preview 서버가 SSR 번들(과 preview 에서는 버전 공표까지)을 디스크에서 내려준다.
  *
- * 이 값이 자산 URL 접두사와 출력 디렉터리를 동시에 결정한다. 그래서 **웹 자산까지**
- * `/v<version>/` 아래 불변 경로로 나가고, 재배포가 기존 URL 을 덮어쓰지 않는다.
- * (버전이 내용 해시가 아니라 빌드 ID 인 이유는 mf-build-version.mjs 주석 참고)
+ * 서빙 대상 목록과 응답 규칙은 `@mfa/remote-config/node` 가 쥔다 — cart(Rsbuild)와
+ * **글자 그대로 같은 로직**이었고, 갈라지면 remote 별로 dev 동작이 달라진다.
+ * 여기 남는 건 "어느 훅이 어느 종류의 서버인가" 하나다.
  *
- * dev 서버는 버전 경로를 쓰지 않는다 — 매 저장마다 경로가 바뀌면 의미가 없다.
- */
-function buildVersion(): string | null {
-  const file = resolve(process.cwd(), '.mf-version');
-  if (!existsSync(file)) return null;
-  return readFileSync(file, 'utf8').trim();
-}
-
-/**
- * SSR 번들을 dev 서버에서 내려준다.
- * 웹 번들은 dev 에서 메모리로 서빙되지만 SSR 번들은 watch 빌드가 디스크에 쓰므로 직접 읽는다.
- *
- * dev 전용이다. 빌드 산출물은 `scripts/serve-remote-dist.mjs` 가 서빙한다.
- *   /mf-server.cjs — dev watch 빌드가 디스크에 쓰는 버전 없는 번들
- *
- * **`mf-version.json` 은 일부러 빼 둔다.** dev 는 버전 경로로 배포하지 않는데,
- * 직전 `pnpm build` 가 남긴 파일을 내려주면 하지도 않은 배포를 공표하게 된다.
- * 그러면 host 가 `/v<ver>/mf-server.cjs` 를 요청하고, dev 서버는 그 경로를 모르니
- * SPA 폴백(200)을 돌려주며, 그 바이트가 공표된 해시와 달라 무결성 검사에서 죽는다.
- *
- *   Error: remote 'catalog' 번들 무결성 불일치 (공표=sha384-…, 실제=sha384-…)
- *
- * 안 내려주면 host 는 버전을 모르는 상태가 되어 버전 없는 엔트리로 폴백한다.
- * 그게 dev 에서 의도된 경로다(`server-loader.ts` 의 `resolveEntry` 주석).
- */
-const SERVED = new Set([`/${MF_FILES.ssrBundle}`]);
-
-/** preview 는 빌드 산출물을 서빙하는 자리라 버전 공표도 의미가 있다 */
-const SERVED_IN_PREVIEW = new Set([
-  `/${MF_FILES.ssrBundle}`,
-  `/${MF_FILES.versionManifest}`,
-]);
-
-/**
- * dev 에 존재하지 않는 배포 개념. 그냥 next() 로 흘리면 Vite 의 SPA 폴백이
- * `index.html` 을 200 으로 돌려주고, host 는 그걸 매니페스트로 파싱하려다 실패한다.
- * 결과는 같지만(폴백) 원인이 로그에서 사라진다. 여기서 명시적으로 404 를 준다.
- */
-const NOT_IN_DEV = new Set([`/${MF_FILES.versionManifest}`]);
-
-/**
- * 이 미들웨어가 어느 서버에 붙었는지.
- *
- * env 로 판별하지 않는다. Vite 가 `configureServer` 는 dev 서버에만,
+ * env 로 판별하지 않는 이유: Vite 가 `configureServer` 는 dev 서버에만,
  * `configurePreviewServer` 는 preview 에만 부르므로 **훅 자체가 판별자**다.
  * 다른 방법은 전부 이 구분을 못 한다.
  *
@@ -80,57 +42,16 @@ const NOT_IN_DEV = new Set([`/${MF_FILES.versionManifest}`]);
  *                          `pnpm dev` 는 `vite dev` 와 `vite build --watch` 를 동시에 돌린다
  *   command === "serve"  — dev 와 preview 가 둘 다 serve 다 (구분 불가)
  */
-type ServerKind = 'dev' | 'preview';
-
 function serveSsrBundle(): Plugin {
-  const middlewareFor =
-    (kind: ServerKind): Connect.NextHandleFunction =>
-    (req, res, next) => {
-      const path = req.url?.split('?')[0] ?? '';
-      const dev = kind === 'dev';
-
-      if (dev && NOT_IN_DEV.has(path)) {
-        res.statusCode = 404;
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.end(
-          '{"error":"dev 에는 버전 공표가 없습니다. host 는 버전 없는 엔트리로 폴백합니다."}',
-        );
-        return;
-      }
-
-      if (!(dev ? SERVED : SERVED_IN_PREVIEW).has(path)) return next();
-
-      try {
-        const body = readFileSync(
-          resolve(process.cwd(), `dist${path}`),
-          'utf8',
-        );
-        res.setHeader(
-          'Content-Type',
-          path.endsWith('.json')
-            ? 'application/json; charset=utf-8'
-            : 'application/javascript; charset=utf-8',
-        );
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        // 버전 경로는 불변이라 오래 캐시해도 되지만, 로컬 실험에서는 혼동만 키운다
-        res.setHeader('Cache-Control', 'no-store');
-        res.end(body);
-      } catch {
-        res.statusCode = 404;
-        res.end(
-          '// 아직 없습니다. `pnpm build` (stamp 포함) 또는 dev watch 빌드를 확인하세요.',
-        );
-      }
-    };
+  const dist = resolve(process.cwd(), 'dist');
 
   return {
     name: 'mfa-serve-ssr-bundle',
     configureServer: (server) => {
-      server.middlewares.use(middlewareFor('dev'));
+      server.middlewares.use(createMfDevMiddleware({ dist, kind: 'dev' }));
     },
     configurePreviewServer: (server) => {
-      server.middlewares.use(middlewareFor('preview'));
+      server.middlewares.use(createMfDevMiddleware({ dist, kind: 'preview' }));
     },
   };
 }
@@ -194,8 +115,9 @@ export default defineConfig(({ command }) => {
    * dev 는 버전 경로를 쓰지 않는다. 매 저장마다 경로가 바뀌면 의미가 없고,
    * dev 서버는 메모리에서 서빙하므로 불변성도 필요 없다.
    */
-  const version = command === 'build' ? buildVersion() : null;
-  const base = version ? `${PUBLIC_URL}/v${version}/` : `${PUBLIC_URL}/`;
+  const version = command === 'build' ? readBuildVersion() : null;
+  // Vite 의 `base` 는 뒤 슬래시가 있어야 마지막 세그먼트를 디렉터리로 본다
+  const base = assetBase(PUBLIC_URL, version, { trailingSlash: true });
 
   return {
     plugins: [
@@ -327,7 +249,7 @@ export default defineConfig(({ command }) => {
     base,
     build: {
       // 웹 자산 전체를 버전 디렉터리로 내보낸다 → 배포된 URL 은 다시 바뀌지 않는다
-      outDir: version ? `dist/v${version}` : 'dist',
+      outDir: versionedDist(version),
       // Module Federation 은 top-level await 를 사용한다
       target: 'chrome89',
       minify: false,

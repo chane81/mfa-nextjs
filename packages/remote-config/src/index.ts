@@ -226,7 +226,7 @@ export function ssrBundleUrl(remote: RemoteName): string {
  * 서빙하므로 그때는 그게 맞는 주소다.
  */
 export function stylesPath(version?: string | null): string {
-  return version ? `/v${version}/${MF_FILES.styles}` : `/${MF_FILES.styles}`;
+  return versionedPath(MF_FILES.styles, version);
 }
 
 /**
@@ -243,4 +243,96 @@ export function stylesPath(version?: string | null): string {
 export function publicOrigin(remote: RemoteName): string {
   const configured = process.env[REMOTES[remote].env.publicUrl];
   return (configured || devOrigin(remote)).replace(/\/+$/, '');
+}
+
+/**
+ * remote 의 SSR 번들이 **external 로 남기는** 모듈. host 가 자기 인스턴스를 주입한다.
+ *
+ * ## 왜 SSOT 여야 하나
+ *
+ * 이 목록은 원래 네 군데에 흩어져 있었다 — 두 remote 의 SSR 빌드 설정
+ * (`vite.config.server.ts` 의 `rollupOptions.external`,
+ * `rsbuild.server.config.ts` 의 `output.externals`), host 의 require 셰임
+ * (`server-loader.ts` 의 `INJECTED`), 그리고 브라우저용 MF `shared`(`runtime.ts`).
+ *
+ * 어긋나는 방향이 둘이고 증상이 서로 다르다.
+ *
+ *   remote 가 external 로 안 남김 → React 가 서버에서 2벌이 된다. 훅이 깨진다.
+ *   host 가 주입 안 함           → `remote 'x' 서버 번들이 예상 밖 모듈을 require 했습니다`
+ *
+ * 목록이 한 곳이면 둘 다 구조적으로 안 생긴다.
+ *
+ * ## 브라우저 `shared` 와는 다르다
+ *
+ * 브라우저 쪽은 **루트만** 공유한다(`runtime.ts` 주석 참고 — 서브엔트리까지 공유하면
+ * 네임스페이스 모양이 갈려 `_jsxDEV is not a function` 이 난다). 서버 번들은 반대로
+ * `require("react/jsx-runtime")` 을 그대로 호출하므로 서브엔트리도 넘겨야 한다.
+ * 그래서 이 상수는 **서버 경로 전용**이고, 브라우저 `shared` 목록과 합치지 않는다.
+ */
+export const SSR_EXTERNALS = [
+  'react',
+  'react-dom',
+  'react/jsx-runtime',
+  'react/jsx-dev-runtime',
+] as const;
+
+/**
+ * host 가 주입하는 셰임의 키 타입. **하나라도 빠지면 컴파일 타임에 걸린다** —
+ * 빠진 채로 배포되면 `예상 밖 모듈을 require 했습니다` 로 remote 가 통째로 안 뜬다.
+ */
+export type SsrExternal = (typeof SSR_EXTERNALS)[number];
+
+/**
+ * 버전 디렉터리 아래의 경로. `/v<version>/<파일>` — **오리진은 붙이지 않는다.**
+ *
+ * 오리진을 안 붙이는 이유는 `stylesPath` 주석과 같다. 이 값을 쓰는 자리 중에
+ * host 의 **브라우저 번들**이 있고, 거기서는 `publicOrigin` 이 못 쓴다.
+ *
+ * `version` 이 없으면(dev) 버전 없는 루트 경로로 떨어진다. dev 서버는 자산을 루트로
+ * 서빙하므로 그때는 그게 맞는 주소다.
+ */
+export function versionedPath(file: string, version?: string | null): string {
+  return version ? `/v${version}/${file}` : `/${file}`;
+}
+
+/**
+ * 매니페스트 서명이 **덮는 필드**와 그 순서.
+ *
+ * ## 왜 여기 있나
+ *
+ * 서명하는 쪽(`scripts/stamp-remote-version.ts`)과 검증하는 쪽
+ * (`apps/host/src/mf/remote-trust.ts`)이 이 배열을 각자 손으로 적고 있었다.
+ * 주석으로 "양쪽이 같은 형식" 이라고 적어 사람이 지키는 계약이었다.
+ *
+ * 갈라졌을 때의 증상이 나쁘다. 매니페스트는 멀쩡히 만들어지고 배포도 성공하는데
+ * **host 의 서명 검증만 실패**한다 — `MF_REQUIRE_SIGNATURE=1` 이면 remote 가 통째로
+ * 안 뜨고, 아니면 조용히 서명 없이 통과한 것과 같아진다. 어느 쪽이든 원인이
+ * 이 두 파일의 배열 차이라는 게 로그에 안 나온다.
+ *
+ * 서명은 host ↔ remote 배포 파이프라인 사이의 계약이므로 배치 SSOT 인 여기가 자리다.
+ *
+ * ## 왜 매니페스트 전체가 아닌가
+ *
+ * **신뢰 판단에 실제로 쓰이는 필드만** 고정 순서로 직렬화한다. 필드가 늘어도 서명이
+ * 안 깨지게 하려는 게 아니라, 서명이 무엇을 보장하는지 읽는 사람이 한눈에 알게 하려는 것이다.
+ * `contentHash` 같은 메타는 신뢰 판단에 안 쓰이므로 여기 없다.
+ */
+export interface SignedManifestFields {
+  remote: string;
+  version: string;
+  ssrEntry: string;
+  webEntry: string;
+  ssrIntegrity?: string;
+  webIntegrity?: string;
+}
+
+export function signedPayload(fields: SignedManifestFields): string {
+  return JSON.stringify([
+    fields.remote,
+    fields.version,
+    fields.ssrEntry,
+    fields.webEntry,
+    fields.ssrIntegrity ?? '',
+    fields.webIntegrity ?? '',
+  ]);
 }

@@ -1,5 +1,158 @@
 # 진행 상황
 
+## 2026-08-22 (15차) — 여러 곳에 흩어진 것들을 SSOT 로 모으고 죽은 표면을 걷어냈다
+
+전체 소스(6.5k 줄)를 훑어 "같은 지식이 두 곳 이상에 적혀 있는 자리"를 찾았다.
+아홉 군데가 나왔고, 그중 **둘은 이미 갈라져 있었다** — 즉 잠재 버그였지 취향 문제가 아니었다.
+
+### 이미 갈라져 있던 둘
+
+- **서명 페이로드.** `scripts/stamp-remote-version.ts` 와 host `mf/remote-trust.ts` 가
+  `JSON.stringify([remote, version, ssrEntry, webEntry, ssrIntegrity, webIntegrity])` 를
+  각자 손으로 적고, 주석으로 "양쪽이 같은 형식" 이라고만 적어 두었다. 사람이 지키는 계약이다.
+  갈라지면 매니페스트는 멀쩡히 만들어지고 배포도 성공하는데 **host 의 검증만 실패**하고,
+  원인이 두 파일의 배열 차이라는 게 어느 로그에도 안 남는다
+- **`.mf-version` 빈 파일 판정.** `rsbuild.config.ts` 는 `existsSync` 만 봤고
+  `rsbuild.server.config.ts` 는 빈 값까지 걸렀다(`|| ''`). 빈 `.mf-version` 이면
+  웹 번들은 `dist/v` 로, SSR 번들은 `dist` 로 나가고 stamp 가 한쪽을 못 찾는다
+
+### 한 일 — 뽑아낸 것
+
+- [x] `@mfa/remote-config` 에 `signedPayload` · `SignedManifestFields` · `SsrExternal`.
+      서명은 host ↔ remote 배포 파이프라인 사이의 계약이라 배치 SSOT 가 자리다.
+      host 쪽은 재-export 만 남긴다 (신뢰 검사 함수들과 같이 쓰이므로)
+- [x] `SSR_EXTERNALS` — React external 목록이 **네 곳**에 있었다(두 remote 의 SSR 빌드 설정,
+      host 의 `INJECTED` 셰임, 그리고 브라우저 `shared`). 어긋나는 방향이 둘이고 증상이 다르다:
+      remote 가 external 로 안 남기면 서버에서 React 가 2벌, host 가 주입 안 하면
+      `예상 밖 모듈을 require 했습니다`. `INJECTED` 는 이제 `Record<SsrExternal, unknown>` 이라
+      키가 하나라도 빠지면 컴파일 타임에 걸린다
+- [x] `versionedPath(file, version)` — `/v<ver>/<파일>` 조립이 stamp·`stylesPath` 등에 흩어져 있었다
+- [x] **신규 `@mfa/remote-config/node` 서브패스** — `readBuildVersion` · `versionedDist` ·
+      `assetBase` · `createMfDevMiddleware`.
+      `index.ts` 는 host 의 **브라우저 번들에 실리므로**(`stylesPath`·`MF_FILES`) `node:fs` 를
+      섞을 수 없다. 그래서 진입점을 나눴고, `tsconfig.json`(`types: []`)과
+      `tsconfig.node.json`(`types: ["node"]`)으로 **검사도 나눴다** — 실수로 `index.ts` 에
+      node 전용 코드를 넣으면 typecheck 가 잡는다
+- [x] dev·preview 미들웨어 공용화. vite·rsbuild config 가 **글자 그대로 같은 60줄**
+      (서빙 대상 목록, 404 JSON 본문, MIME 분기, CORS, `no-store`)을 각자 갖고 있었다.
+      번들러 타입을 import 하지 않고 node `http` 최소 표면만 받는다 — remote 가 번들러를
+      갈아타도 이 파일은 안 바뀐다
+- [x] host `mf/global-state.ts` 의 `globalCell(name, create)` — RSC/SSR 레이어를 넘는
+      globalThis 홀더가 **네 벌**이었다(로더 계측 1 + `remote-version.ts` 3). 각자 키·Holder
+      타입·`??=` 게터를 반복했다. `Symbol.for` 레지스트리 하나 안에서 이름으로 가른다.
+      `@mfa/store` 의 `globalSingleton` 은 쓰지 않는다 — 그건 브라우저 런타임 상태용이고
+      `'use client'` 그래프에 묶여 있어 ADR-015 가 떼어낸 걸 도로 붙이게 된다
+- [x] 각 remote 의 `src/origin.tsx` — `origin` 라벨 + `originHue` 리터럴 쌍이 expose 마다
+      복사돼 있었다. 이건 "이 UI 를 어느 앱이 그렸나"를 판별하는 **관측 수단**이라,
+      하나만 어긋나면 관측이 거짓말을 한다
+- [x] catalog `components/StockBadge.tsx` — 품절 판정과 그 색(`hue 0` vs `140`)이 짝인데
+      `ProductCard`·`ProductDetail` 두 벌이었다. 한쪽만 고치면 "빨간데 재고 3" 이 나온다
+- [x] `byRemote()` reduce 패턴 3곳 → `remote-endpoints.ts` 의 export 하나
+
+### 한 일 — 걷어낸 것
+
+- [x] 호출부 0 인 export 넷 삭제: `loaderStats.loadCount` · `warmServerBundle` ·
+      `invalidateRemoteCache` · `webEntryUrl`. warm 성공 판정이 `isBundleReady` 로 바뀌면서
+      남은 잔재들이다
+- [x] `runtime.ts` 의 `shared` 다섯 항목 — `version`·`scope`·`shareConfig` 가 전부 같은 값이라
+      표(`SHARED_MODULES`) + `Object.fromEntries` 로. 하나만 다르게 적히면 그 모듈만 조용히
+      싱글턴에서 빠지고, 증상은 훅이 깨지는 것이다
+- [x] `pinnedEntry`/`pinnedVersion` 의 globalThis 접근 중복 → `injectedEntry()` 하나
+- [x] `server-loader.ts` 에 **같은 내용의 주석 블록이 두 개** 연달아 있던 것 정리
+- [x] `/`·`/cart`·`/checkout` 의 `instant = false` 주석 15줄이 세 번 복붙돼 있던 것 →
+      3줄 + `[[cart-cookie]]` 참조. **값 자체는 리터럴로 남는다** — 라우트 세그먼트 설정은
+      정적 분석 대상이라 re-export 로 공유할 수 없다(14차에 확인한 그대로)
+
+−506 / +360 줄. 순감 146줄인데 주석을 늘린 자리가 있어서, 실제 로직 감소폭은 그보다 크다.
+
+### 밟은 함정 — `remote-config` 안에서는 상대 import 자체가 막힌 길이다
+
+`node.ts` 가 `index.ts` 의 `MF_FILES` 를 써야 하는데, 상대 경로로는 **양쪽이 다 막힌다.**
+
+확장자를 빼면 Node 가 못 찾는다. 이 패키지만 번들러 없이 Node 가 직접 읽기 때문이다
+(`exports` 가 소스 `.ts` 를 가리킨다).
+
+    Error [ERR_MODULE_NOT_FOUND]: Cannot find module
+      packages/remote-config/src/index imported from packages/remote-config/src/node.ts
+
+붙이면 이번엔 tsc 가 막는다.
+
+    error TS5097: An import path can only end with a '.ts' extension
+                  when 'allowImportingTsExtensions' is enabled.
+
+그 플래그를 켜는 건 답이 아니다. **이 패키지는 빌드 산출물이 없어서 소비처의 tsc 가
+이 소스를 직접 검사하므로**, 소비처 전부가 같은 플래그를 켜야 한다 — 그중엔 dist 를
+emit 하는 프로젝트가 있어서 켤 수 없다.
+
+답은 **자기 참조**였다. `import { MF_FILES } from '@mfa/remote-config'` — Node 는
+`exports` 를 가진 패키지가 자기 이름을 부르는 걸 지원하고(v12.16+), tsc 는 소비처와
+똑같은 경로로 해석한다. 확장자 문제 자체가 사라진다. 빌드와 typecheck 양쪽에서 확인했다.
+
+**과정 기록:** `./index.ts` 로 고친 뒤 빌드만 돌리고 typecheck 를 다시 안 돌려서,
+TS5097 을 못 본 채 커밋 하나가 나갔다. 되돌리지 않고 다음 커밋에서 고쳤다.
+빌드가 통과했다고 검사가 통과한 게 아니다 — 이 저장소에서 그 둘은 서로를 대신하지 못한다.
+
+### 검증
+
+`typecheck` 11/11 · `lint` 11/11 · `format:check` 통과 · `build` 통과.
+**라우트 표가 14차 기록과 동일하다** — `/`·`/cart`·`/checkout` = ƒ, `/lab` 계열 = ◐.
+ADR-014 의 성질(장바구니가 첫 HTML 에 들어가고, 캐시 실험은 프리렌더를 유지)이 그대로다.
+
+서명은 가장 위험한 변경이라 왕복을 따로 확인했다 — Ed25519 키쌍을 만들어 stamp 쪽 경로로
+서명하고 host 쪽 경로(WebCrypto, base64 SPKI)로 검증해 통과, 필드 하나를 바꾼 페이로드는
+거부. 직렬화 결과 문자열도 리팩터 전과 바이트 동일하다.
+
+### 이어서 — `runtime.ts` 의 주석이 낡았던 것을 정정했다 (같은 날)
+
+`shared` 위 주석은 "루트만 공유한다 · 서브엔트리를 빼는 것이 근본 해결" 이라고 적혀 있는데
+실제 목록에는 서브엔트리 셋이 들어 있었다. **코드가 맞고 주석이 틀렸다** — 8차에 정정된
+오진(0-4c 를 shared 문제로 잘못 짚은 것)의 잔재가 주석에만 남아 있었다.
+
+서브엔트리를 뺀 상태를 다시 실험할 필요는 없었다. 8차가 이미 돌렸고 결과가 0-4d 에 있다.
+
+    [Module Federation] Failed to bridge external shared module "react-dom/client"
+    [ Federation Runtime ]: Remote container initialization failed. #RUNTIME-015
+
+대신 **그 근거가 현재 버전에서도 유효한지**를 확인했고, 새 사실이 하나 나왔다 —
+두 remote 가 서로 다르다.
+
+| remote         | config 에 선언한 shared | 매니페스트에 실제로 오른 것                                 |
+| -------------- | ----------------------- | ----------------------------------------------------------- |
+| catalog (Vite) | `react`, `react-dom`    | **넷** — `react/jsx-runtime` · `react-dom/client` 자동 추가 |
+| cart (Rsbuild) | `react`, `react-dom`    | 둘. 자동 추가 없음                                          |
+
+host 의 서브엔트리 공유는 **catalog 쪽 플러그인 하나 때문에** 필요하다. cart 만 보고
+"안 쓰는데 왜 있지" 하고 지우면 catalog 이 죽는다. 그리고 `react/jsx-dev-runtime` 은
+프로덕션 매니페스트에 아예 없다 — dev 그래프에만 있으므로 **빌드만으로는 그 항목이 필요한지
+알 수 없다.** 주석을 이 내용으로 갈아끼웠다.
+
+### dev 콜드 로드 검증 — 15차가 빠뜨렸던 것
+
+0-4d 의 교훈이 정확히 "shared 검증은 프로덕션 빌드만으로 부족하다" 인데, 정작 15차에
+그 블록을 표로 리팩터해놓고 typecheck·lint·build 로 끝냈다. 뒤늦게 돌렸다.
+
+콜드 조건(vite 사전 번들 캐시 + `.next` 삭제, 새 브라우저 세션)에서 넷을 확인했다.
+
+- [x] 브라우저 콘솔 — 에러 0. vite·rsbuild HMR 클라이언트가 **둘 다** 붙었다
+      = 두 remote 번들이 브라우저에서 실제로 평가됐다는 뜻
+- [x] 렌더 — 에러 박스 0, 남은 스켈레톤 0, 상품 카드 8, origin 라벨 둘 다 정상
+      (15차에 새로 만든 `ORIGIN` 상수가 실제로 맞게 렌더된다는 확인이기도 하다)
+- [x] **훅** — catalog 에서 "담기" → **cart 의 배지**가 `0` → `1 · 189,000원`.
+      번들 세 개를 넘나드는 유일한 경로라 React 싱글턴이나 스토어 인스턴스가 갈라졌으면
+      여기서만 드러난다. 마크업은 멀쩡히 나오므로 앞의 두 줄로는 안 잡힌다
+- [x] 저장 — `mfa-cart=[{"id":"kb-001","q":1}]`. cookie-codec 의 최소 표현 그대로
+- [x] `/debug` — 두 remote `ok`, exposes 전부 노출, dev 라 "버전 핀 없음(폴백 엔트리)"
+      (15차에 `injectedEntry()` 로 합친 경로가 정상 동작한다는 확인)
+
+서버 쪽 성질도 같이 봤다 — `/`·`/cart`·`/checkout` 첫 HTML 에 `189,000원` 이 들어 있고
+쿠키를 빼면 안 들어 있다(ADR-014). `/lab/isr` 프리렌더 HTML 에도 remote 마크업 8개.
+
+이 절차를 known-issues **0-4e** 로 굳혔다. 다음에 `shared` 를 건드리는 사람이 같은 걸
+빠뜨리지 않게, 증상 색인에도 `#RUNTIME-015` 와 "shared 고쳤는데 뭘 확인하나" 두 줄을 넣었다.
+
+**ADR 은 쓰지 않는다.** 설계 판단이 바뀐 게 없다 — 8차의 결론이 그대로 맞았고, 낡은 주석과
+빠진 검증 절차를 고쳤을 뿐이다.
+
 ## 2026-08-22 (14차) — 장바구니 초기값 통로는 유지하고 중복만 걷어낸다
 
 "페이지마다 `readCartLines()` 를 `initialLines` props 로 넘기는 구조인데, zustand

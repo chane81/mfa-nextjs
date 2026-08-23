@@ -3,14 +3,15 @@ import * as ReactJSXDevRuntime from 'react/jsx-dev-runtime';
 import * as ReactJSXRuntime from 'react/jsx-runtime';
 import * as ReactDOM from 'react-dom';
 
-import {
-  REMOTE_NAMES,
-  type RemoteModuleId,
-  type RemoteModuleMap,
-  type RemoteName,
+import type {
+  RemoteModuleId,
+  RemoteModuleMap,
+  RemoteName,
 } from '@mfa/contracts';
+import type { SsrExternal } from '@mfa/remote-config';
 
 import { REMOTE_FETCH_TIMEOUT_MS } from './constants';
+import { byRemote } from './remote-endpoints';
 import { normalizeModule } from './interop';
 import { recordEval, recordFetch, recordLoad } from './loader-stats';
 import {
@@ -51,8 +52,12 @@ import { assertAllowedOrigin, assertIntegrity } from './remote-trust';
  * 브라우저 쪽 MF shared 와 달리 여기서는 서브엔트리도 직접 넘겨야 한다.
  * remote 의 node 번들이 `require("react/jsx-runtime")` 를 그대로 호출하기 때문이다.
  * 네임스페이스 모양이 `{ default: {...} }` 로 올 수 있어 프로브로 정규화한다.
+ *
+ * **키 목록은 `SSR_EXTERNALS` 가 정한다.** 그 상수는 remote 두 곳의 SSR 빌드 설정이
+ * external 로 남기는 목록과 같은 값이라, 타입이 여기서 하나라도 빠지는 걸 막는다 —
+ * 빠지면 `예상 밖 모듈을 require 했습니다` 로 remote 가 통째로 안 뜬다.
  */
-const INJECTED: Record<string, unknown> = {
+const INJECTED: Record<SsrExternal, unknown> = {
   react: normalizeModule(React, 'useState'),
   'react-dom': normalizeModule(ReactDOM, 'createPortal'),
   'react/jsx-runtime': normalizeModule(ReactJSXRuntime, 'jsx'),
@@ -185,14 +190,6 @@ async function loadServerBundle(
   recordFetch(remote);
 
   /**
-   * `fetch` 자체가 던지는 경우를 여기서 잡는다.
-   *
-   * 아래 `throw` 들은 전부 **응답이 돌아온 뒤**의 이야기다. 그런데 로컬에서 가장 흔한
-   * 실패는 응답이 아예 없는 쪽이다 — remote 를 안 띄웠거나 포트가 다르거나. 그때 Node 가
-   * 주는 건 `TypeError: fetch failed` 와 `code: 'ECONNREFUSED'` 뿐이라 어느 remote 인지,
-   * 어느 URL 인지가 로그에 남지 않는다. 그 두 가지를 붙여서 다시 던진다.
-   */
-  /**
    * fetch **와 본문 읽기**를 같이 감싼다.
    *
    * 아래 `throw` 들은 전부 바이트를 다 받은 뒤의 이야기다. 정작 흔한 실패 둘은 그 앞에 있다.
@@ -240,7 +237,9 @@ async function loadServerBundle(
   const code = new TextDecoder().decode(bytes);
 
   const requireShim = (id: string): unknown => {
-    const injected = INJECTED[id];
+    // 선언은 `SSR_EXTERNALS` 로 좁혀 두고(빠진 키를 컴파일 타임에 잡는다),
+    // 조회는 넓힌다 — `id` 는 remote 번들이 주는 임의의 문자열이다
+    const injected = (INJECTED as Record<string, unknown>)[id];
     if (injected) return injected;
     throw new Error(
       `remote '${remote}' 서버 번들이 예상 밖 모듈을 require 했습니다: '${id}'. ` +
@@ -298,21 +297,6 @@ async function getServerBundle(remote: RemoteName): Promise<ExposeMap> {
   return exposes;
 }
 
-/**
- * remote 번들을 미리 받아 평가해둔다 (warm).
- *
- * **이 함수를 호출한 레이어의 캐시만** 데워진다. 그게 요점이다 —
- * 페이지 캐시를 무효화하기 **전에** SSR 레이어를 데워두면, 재생성 렌더가
- * 네트워크를 기다리지 않고 즉시 remote 마크업을 만들어낸다.
- *
- * warm 없이 무효화하면 재생성 렌더가 remote 를 기다리다 Suspense fallback 상태로
- * 캐시에 굳을 수 있다(실측 기록: docs/04-experiments/03-cache-modes.md 발견 6).
- */
-export async function warmServerBundle(remote: RemoteName): Promise<number> {
-  const exposes = await getServerBundle(remote);
-  return Object.keys(exposes).length;
-}
-
 /** 서버에서 remote 모듈 하나를 가져온다. 반환 형태는 브라우저 로더와 동일하다. */
 export async function loadRemoteModuleOnServer<K extends RemoteModuleId>(
   id: K,
@@ -333,14 +317,10 @@ export async function loadRemoteModuleOnServer<K extends RemoteModuleId>(
 
 /** 진단용 — 지금 이 인스턴스가 어느 엔트리를 보고 있는지 */
 export function ssrEntrySnapshot(): Record<RemoteName, string> {
-  return REMOTE_NAMES.reduce(
-    (acc, remote) => {
-      const info = knownVersion(remote);
-      acc[remote] = info
-        ? `${remoteOrigin(remote)}${info.ssrEntry}`
-        : fallbackSsrEntry(remote);
-      return acc;
-    },
-    {} as Record<RemoteName, string>,
-  );
+  return byRemote((remote) => {
+    const info = knownVersion(remote);
+    return info
+      ? `${remoteOrigin(remote)}${info.ssrEntry}`
+      : fallbackSsrEntry(remote);
+  });
 }
