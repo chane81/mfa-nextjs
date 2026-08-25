@@ -37,6 +37,8 @@
  * 시간 안에 못 뜨면 **막지 않고 경고만 남기고 통과**한다. remote 없이 host 만 띄우는
  * 것도 정당한 작업 방식이고(진단 화면 등), dev 가 영영 안 뜨는 쪽이 더 나쁘다.
  */
+import { pathToFileURL } from 'node:url';
+
 import { REMOTE_LIST, ssrBundleUrl, webManifestUrl } from '@mfa/remote-config';
 
 const TIMEOUT_MS = Number(process.env.WAIT_FOR_REMOTES_TIMEOUT ?? 60_000);
@@ -81,7 +83,7 @@ async function fetchOk(url: string): Promise<Response | null> {
  * 나머지를 적어두면 스펙이 바뀔 때마다 쓰지도 않는 필드 때문에 이 파일을 고치게 된다.
  * catalog(Vite)와 cart(Rsbuild)가 서로 다른 번들러인데도 이 필드들은 똑같이 채운다.
  */
-interface MfManifest {
+export interface MfManifest {
   metaData?: {
     publicPath?: string;
     remoteEntry?: { name?: string; path?: string };
@@ -97,7 +99,7 @@ interface MfManifest {
  *
  * `publicPath` 가 절대 URL 이 아닌 경우(`auto` 등)를 대비해 매니페스트 URL 을 기준으로 푼다.
  */
-function remoteEntryUrl(
+export function remoteEntryUrl(
   manifest: MfManifest | null,
   manifestUrl: string,
 ): string | null {
@@ -183,4 +185,15 @@ async function waitFor({ label, url, isReady }: Probe): Promise<boolean> {
   return false;
 }
 
-await Promise.all(PROBES.map(waitFor));
+/**
+ * **직접 실행될 때만** 폴링한다.
+ *
+ * 가드가 없으면 `import` 하는 것만으로 최대 60초 동안 네트워크를 두드린다 —
+ * 위의 순수 파서(`remoteEntryUrl`)를 테스트에서 들일 방법이 없어진다.
+ */
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  await Promise.all(PROBES.map(waitFor));
+}
