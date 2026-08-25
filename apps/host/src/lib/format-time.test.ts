@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { formatKst } from './format-time';
 
@@ -48,11 +48,15 @@ describe('formatKst', () => {
 });
 
 describe('실행 환경에 기대지 않는다', () => {
-  const original = process.env.TZ;
-  afterEach(() => {
-    process.env.TZ = original;
-  });
-
+  /**
+   * ⚠️ `process.env.TZ = original` 로 되돌리면 안 된다. 이 기계처럼 TZ 가 애초에
+   * 안 잡혀 있으면 `original` 이 `undefined` 이고, node 는 env 값을 문자열로 강제해
+   * **`"undefined"` 라는 값을 심는다** — 그때부터 이 워커의 프로세스 타임존이 UTC 로
+   * 굳어 뒤에 도는 테스트까지 끌고 간다.
+   *
+   * `vi.stubEnv` 는 원래 값이 `undefined` 면 복원 시 **키를 지운다**.
+   * `vitest.config.ts` 의 `unstubEnvs: true` 가 매 테스트 앞에서 그걸 돌린다.
+   */
   it('프로세스 타임존이 무엇이든 같은 문자열을 만든다', async () => {
     // 컨테이너는 UTC 로 돌고 개발자 기계는 대개 KST 다. 여기가 갈리면
     // 서버 HTML 과 하이드레이션 결과가 달라진다.
@@ -64,7 +68,7 @@ describe('실행 환경에 기대지 않는다', () => {
       'Asia/Seoul',
       'Pacific/Kiritimati',
     ]) {
-      process.env.TZ = tz;
+      vi.stubEnv('TZ', tz);
       vi.resetModules();
       const { formatKst: fresh } = await import('./format-time');
       seen.add(fresh(UTC));
