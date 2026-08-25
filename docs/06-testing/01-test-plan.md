@@ -143,7 +143,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 
 - [x] 33. `scripts/serve-remote-dist.ts` → `createHandler(dist)` 추출. **경로 탈출 방어**(`%2e%2e%2f` 포함) / `/v*/` 캐시 헤더 / MIME
 - [x] 34. `scripts/wait-for-remotes.ts` → `remoteEntryUrl` 추출. `publicPath` 절대·`auto`·누락 / 슬래시 트리밍
-- [x] 35. `scripts/stamp-remote-version.ts` → `integrity()` · payload 조립 · **KEEP=3 정리 경계** 추출
+- [x] 35. `scripts/stamp-remote-version.ts` → `integrity()` · payload 조립 · **정리 대상 경계**(현재 버전만 남긴다 / `v` 접두사 밖은 안 건드린다) 추출
 - [x] 36. `apps/host/src/app/api/mf-revalidate/route.ts` → `selfOrigin()` export
 - [x] 37. `apps/host/src/mf/RemoteComponent.tsx` → `remoteCacheKey()` export
 
