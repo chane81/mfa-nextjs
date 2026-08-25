@@ -87,7 +87,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 
 ### Phase 1 — 순수 로직 (node, 모킹 0)
 
-- [x] 1. `packages/remote-config/src/index.ts` — `publicOrigin` env 폴백·후행 슬래시 / `versionedPath` falsy / `assertRemoteName` throw / **`signedPayload` 필드 순서** / `MF_FILES` 조립 불변식 / `REMOTES` 키·포트 유일성
+- [x] 1. `packages/remote-config/src/index.ts` — `publicOrigin` env 폴백·후행 슬래시 / `versionedPath` falsy / `assertRemoteName` throw / **`signedPayload` 필드 순서** / `MF_FILES` 조립 불변식 / **`REMOTE_NAMES` 가 `REMOTES` 키 순서를 따른다**(ADR-017) / 포트·env 키 유일성
 - [x] 2. `packages/contracts/src/product.ts` — `findProduct` / `formatKRW` / `PRODUCTS` 데이터 무결성
 - [x] 3. `packages/contracts/src/remote-contract.ts` — `REMOTE_NAMES` ↔ `RemoteModuleMap` 접두사 일치 (계약 드리프트)
 - [x] 4. `packages/store/src/cart/cookie-codec.ts` — 수량 강제변환·클램프 99·중복 병합·방어 파싱·퍼센트 디코딩 안 함·라운드트립

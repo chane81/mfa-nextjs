@@ -76,10 +76,12 @@
 
 ### 환경변수 · turbo 캐시
 
-| 증상                                      | 항목                                                                                                                                                      |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| env 를 바꿨는데 조용히 무시됨             | `turbo.json` 의 `globalEnv` 미등록 — [A-10](#a-10-turbo-가-등록-안-된-환경변수를-걸러낸다), [B-8](#b-8-a-10-을-또-밟았다-wait_for_remotes_timeout-미등록) |
-| `.env.local` 을 바꿨는데 옛 빌드가 복원됨 | [B-7](#b-7-envlocal-을-바꿔도-turbo-캐시가-안-깨진다)                                                                                                     |
+| 증상                                                                        | 항목                                                                                                                                                      |
+| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| env 를 바꿨는데 조용히 무시됨                                               | `turbo.json` 의 `globalEnv` 미등록 — [A-10](#a-10-turbo-가-등록-안-된-환경변수를-걸러낸다), [B-8](#b-8-a-10-을-또-밟았다-wait_for_remotes_timeout-미등록) |
+| `.env.local` 을 바꿨는데 옛 빌드가 복원됨                                   | [B-7](#b-7-envlocal-을-바꿔도-turbo-캐시가-안-깨진다)                                                                                                     |
+| turbo 가 `turbo.json` 을 파싱하다 죽음 (`expected \`:\` but instead found`) | [F-2](#f-2-turbojson-블록-주석에-글롭을-적으면-파서가-깨진다)                                                                                             |
+| 캐시된 PASS 가 재생돼 깨진 코드를 못 잡음                                   | inputs 가 실제 프로그램과 다르다 — [F-3](#f-3-turbo-inputs-가-tsc-프로그램과-어긋나면-stale-pass-를-재생한다)                                             |
 
 ### lint · 툴체인
 
@@ -88,6 +90,96 @@
 | `eslint-plugin-react` 가 ESLint 10 에서 크래시  | [4](#4-eslint-plugin-react-7375-가-eslint-10-에서-크래시)                             |
 | `react-hooks@7` 이 렌더 중 컴포넌트 생성을 막음 | [5](#5-react-hooks7-렌더-중-컴포넌트-생성-금지)                                       |
 | `@next/next/no-html-link-for-pages` 오탐        | [6](#6-multi-zone-경계에서-nextnextno-html-link-for-pages-오탐-앱-삭제됨) (앱 삭제됨) |
+
+### 테스트
+
+| 증상                                                           | 항목                                                                    |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련) | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다) |
+
+## F. (18차) 테스트와 turbo 설정에서 밟은 것
+
+17차에서 넣은 테스트 스위트를 리뷰하다 나온 것들이다. 셋 다 **테스트는 전부 초록인 채로**
+숨어 있었다 — 초록이 곧 옳다는 뜻이 아니라는 사례.
+
+### F-1. `process.env.X = original` 복원은 `"undefined"` 라는 문자열을 심는다
+
+`format-time.test.ts` 가 프로세스 타임존을 바꿔가며 `formatKst` 의 TZ 무관함을 확인한 뒤
+직접 되돌리고 있었다.
+
+```ts
+const original = process.env.TZ; // TZ 가 안 잡힌 기계에서는 undefined
+afterEach(() => {
+  process.env.TZ = original;
+});
+```
+
+node 는 env 값을 문자열로 강제한다. 그래서 저 복원은 키를 지우는 게 아니라 값을 심는다.
+
+```
+$ node -e 'const o=process.env.TZ; process.env.TZ="UTC"; process.env.TZ=o;
+           console.log(JSON.stringify(process.env.TZ));
+           console.log(new Date("2026-01-02T03:04:05Z").toString())'
+"undefined"
+Fri Jan 02 2026 03:04:05 GMT+0000 (GMT+00:00)
+```
+
+`"undefined"` 는 유효한 타임존이 아니라 node 가 UTC 로 떨어진다. 그때부터 **그 vitest 워커의
+프로세스 타임존이 UTC 로 굳어** 뒤에 도는 테스트까지 끌고 간다. 이 저장소는 아직 로컬
+타임존에 기대는 테스트가 없어 잠복 상태였다.
+
+해결: `vi.stubEnv('TZ', tz)`. vitest 의 `unstubAllEnvs` 는 원래 값이 `undefined` 면
+**키를 지운다**(구현 확인). `vitest.config.ts` 에 `unstubEnvs: true` 가 이미 켜져 있어
+`afterEach` 자체가 필요 없다.
+
+검증일: 2026-08-25
+
+### F-2. `turbo.json` 블록 주석에 글롭을 적으면 파서가 깨진다
+
+turbo inputs 를 왜 이렇게 뒀는지 주석에 적으면서 글롭을 그대로 붙였더니 이렇게 죽었다.
+
+```
+x expected `:` but instead found `src`
+   ,-[turbo.json:205:52]
+205 |      * inputs 에 `apps/**/src/**` 를 넣지 않는다
+   :                                        ^^^
+x expected `,` but instead found `"//#typecheck:tests"`
+```
+
+글롭 안의 `**/` 에 `*/` 가 들어 있다. turbo 의 JSONC 파서가 거기서 블록 주석을 끝내고
+나머지를 JSON 으로 읽으려다 통째로 깨진다. `pnpm typecheck` 와 `pnpm lint` 가 **둘 다**
+같은 에러로 죽어서 원인이 tsc 나 eslint 처럼 보인다.
+
+해결: 주석에서는 글롭을 풀어 쓴다("앱·패키지의 src 글롭"). 별표를 꼭 써야 하면 `//` 줄 주석에.
+
+검증일: 2026-08-25
+
+### F-3. turbo inputs 가 tsc 프로그램과 어긋나면 stale PASS 를 재생한다
+
+`//#typecheck:scripts` 의 inputs 는 `["scripts/**/*.ts", "tsconfig.json"]` 이었다. 그런데
+`scripts/*.test.ts` 가 `@tests/helpers/*` 를 import 하므로 그 헬퍼가 프로그램 안에 들어온다.
+
+```
+$ tsc -p tsconfig.json --noEmit --listFiles | grep mfa-nextjs/tests/
+.../tests/helpers/http.ts
+.../tests/helpers/signing.ts
+```
+
+inputs 에 없으니 헬퍼를 깨도 turbo 가 캐시된 PASS 를 재생한다. 실측 — 헬퍼에 한 줄 넣고 재실행:
+
+```
+고치기 전:  //:typecheck:scripts: cache hit, replaying logs
+고친 뒤:    //:typecheck:scripts: cache miss, executing
+```
+
+반대 방향도 있었다. `//#typecheck:tests` 의 inputs 에 앱·패키지 소스 글롭이 있었는데
+`tsconfig.test.json` 은 그쪽 파일을 하나도 안 본다(`--listFiles` 확인). 소스를 고칠 때마다
+영향받을 수 없는 검사의 캐시가 날아갔다.
+
+**진단법:** `tsc -p <config> --listFiles` 로 실제 프로그램을 뽑아 inputs 와 대조한다.
+`include` 만 보면 `paths` 로 끌려온 파일을 놓친다.
+
+검증일: 2026-08-25
 
 ## E. (13차) 장바구니를 쿠키로 옮기며 밟은 것
 

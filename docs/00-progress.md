@@ -1,5 +1,60 @@
 # 진행 상황
 
+## 2026-08-25 (18차) — 17차를 리뷰하고, remote 이름의 SSOT 를 하나로 줄였다
+
+17차 diff 를 리뷰했다. 테스트 616개는 전부 초록이었지만 **테스트가 못 보는 자리**에 네 건이
+있었다. 그리고 리뷰 중에 `packages/remote-config` 의 중복 하나가 드러났다.
+
+### 테스트가 잡아주지 못한 것 — 함정 셋
+
+전부 **616개가 초록인 채로** 숨어 있었다. 상세·로그·진단법은
+[F-1 · F-2 · F-3](./05-troubleshooting/01-known-issues.md#f-18차-테스트와-turbo-설정에서-밟은-것).
+
+| 무엇                                               | 증상                                                  | 해결                                       |
+| -------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------ |
+| `process.env.TZ = original` 복원                   | `"undefined"` 문자열을 심어 워커 타임존이 UTC 로 굳음 | `vi.stubEnv('TZ', tz)` (`unstubEnvs` 활용) |
+| `//#typecheck:scripts` inputs 에 `tests/**` 누락   | 헬퍼를 깨도 캐시된 PASS 재생                          | inputs 에 추가                             |
+| `//#typecheck:tests` inputs 에 앱·패키지 소스 글롭 | 소스 고칠 때마다 무관한 검사 캐시 증발                | 제거                                       |
+| `globalEnv: ["TZ"]`                                | 전체 태스크 캐시를 깬다                               | 제거 — `pnpm test` 는 turbo 를 안 탄다     |
+
+앞의 셋은 `tsc --listFiles` 와 turbo 캐시 로그로 고치기 전/후를 각각 재현해 확인했다.
+`TZ` 를 `globalEnv` 에 넣은 이유였던 `turbo/no-undeclared-env-vars` 경고는 첫 줄을 고치면서
+같이 사라졌다.
+
+### 리팩터가 조용히 넓힌 타입
+
+`buildPayload` 를 함수로 떼면서 반환 타입을 `SignedManifestFields` 로 적었는데, 그 타입은
+두 integrity 를 optional 로 둔다(host 가 서명 없는 매니페스트도 읽어야 해서). stamp 는 항상
+둘 다 채우므로 호출부에 `payload.ssrIntegrity!` 가 붙어 있었다 — 나중에 진짜로 안 채우게 됐을 때
+타입이 안 잡아주는 상태다. `Required<SignedManifestFields>` 로 좁히고 `!` 를 뗐다.
+`remote` 파라미터도 `string` 이 아니라 `RemoteName` 이다.
+
+### remote 이름을 세 번 적고 있었다 → ADR-017
+
+`REMOTE_NAMES` 원소 · `REMOTES` 키 · `REMOTES[x].name` 필드. 그중 **키와 필드가 어긋나는 건
+타입이 못 잡았다** — `satisfies Record<RemoteName, …>` 는 키 집합만 보고, 필드 타입이
+`RemoteName` 이라 `catalog: { name: 'cart' }` 도 통과한다(실측).
+
+`REMOTES` 를 원본으로 삼고 `RemoteName` · `REMOTE_NAMES` · `REMOTE_LIST` 를 전부 파생하게 바꿨다.
+근거와 기각한 대안은 ADR-017.
+
+### 곁가지
+
+- `packages/remote-config` 의 node 전용 파일 경계를 파일명 나열에서 `src/node.*` 글롭으로.
+  node 전용 파일이 하나 더 생기면 조용히 브라우저 쪽 프로젝트(`types: []`)에 섞였다.
+- `eslint.config.js` 주석이 `tests/dom/**` 을 가리켰다 — 테스트를 소스 옆으로 옮기기 전
+  배치가 주석에만 남아 있었다.
+
+### 검증
+
+```
+pnpm test          39 files / 616 tests
+pnpm typecheck     12/12
+pnpm lint          12/12
+pnpm format:check  clean
+pnpm build         6/6 — host 프리렌더가 remote SSR 번들을 실제로 실행
+```
+
 ## 2026-08-24 (17차) — 테스트를 넣었다. 코드는 다섯 군데만 고쳤다
 
 `pnpm build` 는 이 저장소의 유일한 주장("Next 16 에서 런타임 MF + remote SSR 이 된다")을

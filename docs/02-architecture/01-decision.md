@@ -640,6 +640,68 @@
   - ⭕ 장바구니를 어디서 읽는지가 라우트 수만큼 흩어지지 않는다 — 슬롯 셋뿐이다.
   - ⭕ ADR-014 의 라우트 표가 그대로다(`/`·`/cart`·`/checkout` = ƒ, `/lab` = ◐).
 
+## ADR-017 — remote 이름의 원본은 `REMOTES` 의 키 하나다
+
+- 상태: 채택 (2026-08-25)
+- 맥락: `packages/remote-config` 가 remote 이름을 **세 번** 적고 있었다.
+
+  ```ts
+  export const REMOTE_NAMES = ['catalog', 'cart'] as const; // ①
+  export const REMOTES = {
+    catalog: {
+      // ② 키
+      name: 'catalog', // ③ 필드
+  ```
+
+  주석은 `satisfies Record<RemoteName, RemoteDefinition>` 가 "불일치를 컴파일 타임에
+  잡는다"고 적고 있었는데 **반만 맞다.** `satisfies` 는 키 집합만 본다. `name` 필드 타입이
+  `RemoteName` 이라 아래가 `tsc --strict` 를 그대로 통과한다(실측).
+
+  ```ts
+  catalog: { name: 'cart', devPort: 3001 },   // 에러 없음
+  ```
+
+  잡아주는 건 런타임 테스트 하나뿐이었다(`index.test.ts`, `REMOTE_LIST.map(r=>r.name)`).
+
+- 결정: **`REMOTES` 를 원본으로 삼고 나머지를 파생한다.** `name` 필드를 지우고,
+  `RemoteName` 과 `REMOTE_NAMES` 를 `REMOTES` 에서 뽑는다.
+
+  ```ts
+  export const REMOTES = { catalog: {…}, cart: {…} } as const satisfies Record<string, RemoteConfig>;
+  export type RemoteName = keyof typeof REMOTES;
+  export const REMOTE_NAMES = Object.keys(REMOTES) as readonly RemoteName[];
+  export const REMOTE_LIST = REMOTE_NAMES.map((name) => ({ name, ...REMOTES[name] }));
+  ```
+
+  remote 를 추가하려면 `REMOTES` 에 항목 하나를 넣는 것이 전부다. "이름만 추가하고 정의를
+  빠뜨린" 상태도, "키와 필드가 어긋난" 상태도 **성립하지 않는다.**
+
+- 왜 반대 방향(`REMOTE_NAMES` 를 원본으로)이 아닌가: `name` 필드를 남긴 채로
+  `RemoteName = keyof typeof REMOTES` 를 쓰면 `RemoteDefinition.name: RemoteName` 이
+  순환이 된다. 필드를 지우면 그 순환이 사라진다 — 지우는 쪽이 곧 원본을 하나로 만드는 쪽이다.
+
+- 대안으로 검토하고 기각한 것: 매핑 타입으로 키와 필드를 묶는 방법.
+
+  ```ts
+  } as const satisfies { readonly [N in RemoteName]: RemoteDefinition<N> };
+  ```
+
+  어긋남은 컴파일 에러로 잡힌다(실측 확인). 하지만 이름은 여전히 세 번 적힌다 —
+  **어긋날 수 없게** 만들 뿐 **중복을 없애지는** 못한다. 이 저장소의 SSOT 규칙은 후자다.
+
+- 대가:
+  - ❌ `REMOTE_NAMES` 순서가 `Object.keys` 의 삽입 순서에 달린다. 문자열 키라 스펙상
+    보장되지만(정수 인덱스 키가 아니라 재정렬되지 않는다) 배열 리터럴로 **눈에 보이던**
+    계약이 코드에서 사라졌다. `index.test.ts` 에 회귀 테스트로 남겼다.
+  - ❌ `as const` 튜플성을 잃어 `REMOTE_NAMES.length` 가 `2` 리터럴이 아니라 `number` 다.
+    리터럴 length 를 타입으로 쓰는 소비처는 없다(확인함).
+  - ❌ `REMOTE_LIST` 항목이 `REMOTES[name]` 참조가 아니라 새 객체다. 참조 동일성에 기대는
+    코드는 없다 — 소비처는 `name` · `devPort` · `env.publicUrl` 만 읽는다.
+  - ⭕ 이름이 한 군데. remote 추가가 반쯤 된 채로 넘어갈 수 없다.
+  - ⭕ 번들러 config 두 곳(`vite.config.ts` · `rsbuild.config.ts`)이 `REMOTES.catalog` 로
+    이름을 이미 리터럴로 적고 `REMOTE.name` 으로 되읽던 것이 `const NAME = 'catalog'` 하나로
+    줄었다. 오타는 `REMOTES[NAME]` 이 잡는다.
+
 ## 경계 설계 원칙
 
 | 책임                  | 소유자                           | 이유                                                       |
