@@ -1,4 +1,4 @@
-# 검증 — 빠른 정적 검사와 빌드를 따로 돌린다.
+# 검증 — 정적 검사 · 테스트 · 빌드를 각각 따로 돌린다.
 #
 # ## 왜 build 가 여기 있나
 #
@@ -7,9 +7,18 @@
 # 그래서 빌드가 통과한다는 건 "Next 16 에서 런타임 MF + SSR 이 된다"는 이 저장소의 유일한
 # 주장이 아직 참이라는 뜻이다. 빌드를 빼면 그 주장이 깨져도 PR 이 초록으로 통과한다.
 #
-# 두 job 으로 나눈 이유는 피드백 속도다. lint·typecheck·format 은 분 단위로 끝나고,
-# build 는 네이티브 바이너리(rspack·swc)를 받느라 훨씬 오래 걸린다. 붙여두면 빠른 신호가
-# 느린 신호를 기다리게 된다.
+# ## 왜 세 job 인가
+#
+# 나눈 이유는 피드백 속도와 **실패 원인의 분리**다.
+#
+# | job     | 무엇                              | 대략 |
+# | ------- | --------------------------------- | ---- |
+# | verify  | lint · typecheck · format:check   | 짧다 |
+# | test    | vitest 단위 · 통합 (39파일 616개) | 중간 |
+# | build   | remote → host, 프리렌더가 SSR 실행 | 길다 |
+#
+# 셋은 서로 의존하지 않아 동시에 돈다. 붙여두면 빠른 신호가 느린 신호를 기다리고,
+# 무엇보다 체크 이름만 보고는 "포맷이 틀렸나 테스트가 깨졌나"를 구분할 수 없다.
 #
 # remote → host 순서와 빌드 중 dist 서빙은 turbo 와 host 의 build 스크립트가 처리한다.
 # 배경: docs/03-setup/01-getting-started.md 의 "host 빌드는 remote 가 떠 있어야 끝난다"
@@ -40,13 +49,28 @@ jobs:
       # 여기서 ERR_PNPM_UNSUPPORTED_ENGINE 으로 죽는다.
       - run: node -v && pnpm -v
 
+      # `lint` · `typecheck` 는 루트 스크립트가 turbo 로 패키지 태스크와 루트 태스크
+      # (`lint:scripts` · `lint:tests` · `typecheck:scripts` · `typecheck:tests`)를
+      # 함께 돌린다 — 테스트 코드의 타입·린트도 여기서 걸린다.
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm format:check
 
-      # 단위 · 통합 테스트. 워크스페이스 패키지의 src 를 alias 로 직접 가리키므로
-      # 빌드 없이 돈다 — 그래서 느린 build job 이 아니라 여기 붙는다.
-      # 목록과 배경: docs/06-testing/01-test-plan.md
+  # 단위 · 통합 테스트. 워크스페이스 패키지의 src 를 alias 로 직접 가리키므로 빌드 없이
+  # 돈다 — build job 에 얹을 이유가 없다. 목록과 배경: docs/06-testing/01-test-plan.md
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # 세 job 이 같은 캐시 키를 공유한다(같은 lockfile · 같은 Node 범위).
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@^24.19.0
+          cache: true
+
+      # `pnpm test` 는 일부러 turbo 를 안 탄다 — 패키지별 대응 태스크가 없어 얻는 게
+      # 캐시뿐인데, 그 대가로 `--project=dom` 같은 러너 플래그가 turbo 에 먹힌다.
       - run: pnpm test
 
   build:
@@ -54,7 +78,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # verify 와 캐시 키를 공유한다 — 저장 경합 경고는 verify job 쪽 주석 참고.
       - uses: pnpm/setup@v2
         with:
           runtime: node@^24.19.0
