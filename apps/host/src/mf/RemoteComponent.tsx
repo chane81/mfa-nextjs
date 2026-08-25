@@ -32,13 +32,22 @@ type PropsOf<K extends RemoteModuleId> =
  */
 const lazyCache = new Map<string, ComponentType<Record<string, unknown>>>();
 
+/**
+ * lazy 캐시 키. **버전이 키에 들어가는 것이 핵심**이라 규칙을 함수로 떼어 둔다 —
+ * 여기가 조용히 바뀌면 재배포해도 옛 컴포넌트가 프로세스 수명 내내 고정된다.
+ */
+export function remoteCacheKey(id: RemoteModuleId, reloadKey?: string): string {
+  const remote = id.split('/')[0] as RemoteName;
+  // 브라우저에는 서버가 심어준 버전이 있고(RemoteVersionSync), 없으면 unversioned 로 고정된다
+  const version = knownVersion(remote)?.version ?? 'unversioned';
+  return `${id}@${version}${reloadKey ? `#${reloadKey}` : ''}`;
+}
+
 function getLazyRemote(
   id: RemoteModuleId,
   reloadKey?: string,
 ): ComponentType<Record<string, unknown>> {
-  const remote = id.split('/')[0] as RemoteName;
-  // 브라우저에는 서버가 심어준 버전이 있고(RemoteVersionSync), 없으면 unversioned 로 고정된다
-  const key = `${id}@${knownVersion(remote)?.version ?? 'unversioned'}${reloadKey ? `#${reloadKey}` : ''}`;
+  const key = remoteCacheKey(id, reloadKey);
 
   const cached = lazyCache.get(key);
   if (cached) return cached;

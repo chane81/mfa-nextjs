@@ -18,15 +18,15 @@
 
 ### `pnpm build` 실패
 
-| 증상                                                                 | 항목                                                                                                                           |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `Error occurred prerendering page` + `fetch failed` / `ECONNREFUSED` | [B-1](#b-1-host-빌드는-remote-가-떠-있어야-끝난다), [1](#1-next-build-프리렌더가-mf-런타임을-호출해서-죽음)                    |
-| `매니페스트에 무결성 값이 없습니다`                                  | 그 포트에 dev 서버가 떠 있다 — [B-4](#b-4-dev-서버가-떠-있으면-포트-충돌조차-안-난다)                                          |
-| 빌드가 안 끝나고 매달림 (사이드카가 안 죽음)                         | [B-2](#b-2-turbo-의-with-사이드카로는-build-를-못-끝낸다), [B-3](#b-3-그-게이트를-host-이미지가-타면-안-된다-끊는-건-이름으로) |
-| `new URL("")` / `Invalid URL`                                        | 빈 문자열 env — [B-5](#b-5-빈-문자열-env-가-new-url-로-터질-자리가-남아-있었다)                                                |
-| Turbopack 이 상대경로 `.js` 를 못 찾음                               | [2](#2-turbopack-이-상대경로-js-확장자를-못-찾음)                                                                              |
-| `@mfa/contracts` 빌드가 `window` 를 못 찾음                          | [7](#7-mfacontracts-빌드가-window-를-못-찾음)                                                                                  |
-| 배포 빌드만 다른 경로로 통과함                                       | [B-6](#b-6-배포-빌드는-문서에-없는-경로로-통과하고-있었다)                                                                     |
+| 증상                                                                 | 항목                                                                                                                            |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `Error occurred prerendering page` + `fetch failed` / `ECONNREFUSED` | [B-1](#b-1-host-빌드는-remote-가-떠-있어야-끝난다), [1](#1-next-build-프리렌더가-mf-런타임을-호출해서-죽음)                     |
+| `매니페스트에 무결성 값이 없습니다`                                  | 그 포트에 dev 서버가 떠 있다 — [B-4](#b-4-dev-서버가-떠-있으면-포트-충돌조차-안-난다)                                           |
+| 빌드가 안 끝나고 매달림 (사이드카가 안 죽음)                         | [B-2](#b-2-turbo-의-with-사이드카로는-build-를-못-끝낸다), [B-3](#b-3-그-게이트를-host-이미지가-타면-안-된다--끊는-건-이름으로) |
+| `new URL("")` / `Invalid URL`                                        | 빈 문자열 env — [B-5](#b-5-빈-문자열-env-가-new-url-로-터질-자리가-남아-있었다)                                                 |
+| Turbopack 이 상대경로 `.js` 를 못 찾음                               | [2](#2-turbopack-이-상대경로-js-확장자를-못-찾음)                                                                               |
+| `@mfa/contracts` 빌드가 `window` 를 못 찾음                          | [7](#7-mfacontracts-빌드가-window-를-못-찾음)                                                                                   |
+| 배포 빌드만 다른 경로로 통과함                                       | [B-6](#b-6-배포-빌드는-문서에-없는-경로로-통과하고-있었다)                                                                      |
 
 ### remote 가 안 뜨거나 깨짐
 
@@ -37,7 +37,7 @@
 | `Failed to bridge external shared module` / `#RUNTIME-015` | [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) — host 의 `shared` 에서 서브엔트리를 뺐다                                      |
 | host 의 `shared` 를 고쳤는데 뭘 확인해야 하나              | [0-4e](#0-4e-shared-를-고쳤을-때의-dev-검증-절차) — 빌드만으로는 부족하다                                                                         |
 | `예상 밖 모듈을 require 했습니다`                          | 번들러 externals — [0-5](#0-5-shared-모듈-네임스페이스-interop)                                                                                   |
-| `[ dynamic-remote-type-hints-plugin ] err: [object Event]` | [0-4b](#0-4b-dynamic-remote-type-hints-plugin-err-object-event)                                                                                   |
+| `[ dynamic-remote-type-hints-plugin ] err: [object Event]` | [0-4b](#0-4b--dynamic-remote-type-hints-plugin--err-object-event)                                                                                 |
 | `SSR 번들을 가져오지 못했습니다` / `ECONNREFUSED` (dev)    | remote 미기동. 살아있는데도 나면 [0-4](#0-4-dev-에서-ssr-번들이-안-내려옴)                                                                        |
 | 배럴 import 가 Server Component 를 오염                    | [3](#3-공유-ui-패키지-배럴이-server-component-를-오염시킴)                                                                                        |
 
@@ -46,7 +46,7 @@
 | 증상                                                           | 항목                                                                            |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | 초기 HTML 에 remote 마크업이 없음                              | [0-4](#0-4-dev-에서-ssr-번들이-안-내려옴) + [진단 체크리스트](#진단-체크리스트) |
-| `/` 만 스켈레톤이 먼저 나감                                    | [0-6](#0-6-만-스켈레톤이-먼저-나가는-현상)                                      |
+| `/` 만 스켈레톤이 먼저 나감                                    | [0-6](#0-6--만-스켈레톤이-먼저-나가는-현상)                                     |
 | hydration 불일치                                               | [A-8](#a-8-버전-스크립트가-suspense-안에-있으면-hydration-이-깨진다)            |
 | 서버 로더에 node builtin 을 썼더니 브라우저 번들이 깨짐        | [0-2](#0-2-서버-로더에-node-builtin-을-쓰면-브라우저-번들이-깨진다)             |
 | 새로고침하면 장바구니 영역이 한 번 깜빡임                      | [E-1](#e-1-새로고침-때-장바구니가-깜빡인다--저장소가-느린-게-아니다)            |
@@ -76,18 +76,110 @@
 
 ### 환경변수 · turbo 캐시
 
-| 증상                                      | 항목                                                                                                                                                      |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| env 를 바꿨는데 조용히 무시됨             | `turbo.json` 의 `globalEnv` 미등록 — [A-10](#a-10-turbo-가-등록-안-된-환경변수를-걸러낸다), [B-8](#b-8-a-10-을-또-밟았다-wait_for_remotes_timeout-미등록) |
-| `.env.local` 을 바꿨는데 옛 빌드가 복원됨 | [B-7](#b-7-envlocal-을-바꿔도-turbo-캐시가-안-깨진다)                                                                                                     |
+| 증상                                                                        | 항목                                                                                                                                                       |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| env 를 바꿨는데 조용히 무시됨                                               | `turbo.json` 의 `globalEnv` 미등록 — [A-10](#a-10-turbo-가-등록-안-된-환경변수를-걸러낸다), [B-8](#b-8-a-10-을-또-밟았다--wait_for_remotes_timeout-미등록) |
+| `.env.local` 을 바꿨는데 옛 빌드가 복원됨                                   | [B-7](#b-7-envlocal-을-바꿔도-turbo-캐시가-안-깨진다)                                                                                                      |
+| turbo 가 `turbo.json` 을 파싱하다 죽음 (`expected \`:\` but instead found`) | [F-2](#f-2-turbojson-블록-주석에-글롭을-적으면-파서가-깨진다)                                                                                              |
+| 캐시된 PASS 가 재생돼 깨진 코드를 못 잡음                                   | inputs 가 실제 프로그램과 다르다 — [F-3](#f-3-turbo-inputs-가-tsc-프로그램과-어긋나면-stale-pass-를-재생한다)                                              |
 
 ### lint · 툴체인
 
 | 증상                                            | 항목                                                                                  |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------- |
 | `eslint-plugin-react` 가 ESLint 10 에서 크래시  | [4](#4-eslint-plugin-react-7375-가-eslint-10-에서-크래시)                             |
-| `react-hooks@7` 이 렌더 중 컴포넌트 생성을 막음 | [5](#5-react-hooks7-렌더-중-컴포넌트-생성-금지)                                       |
+| `react-hooks@7` 이 렌더 중 컴포넌트 생성을 막음 | [5](#5-react-hooks7--렌더-중-컴포넌트-생성-금지)                                      |
 | `@next/next/no-html-link-for-pages` 오탐        | [6](#6-multi-zone-경계에서-nextnextno-html-link-for-pages-오탐-앱-삭제됨) (앱 삭제됨) |
+
+### 테스트
+
+| 증상                                                           | 항목                                                                    |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련) | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다) |
+
+## F. (18차) 테스트와 turbo 설정에서 밟은 것
+
+17차에서 넣은 테스트 스위트를 리뷰하다 나온 것들이다. 셋 다 **테스트는 전부 초록인 채로**
+숨어 있었다 — 초록이 곧 옳다는 뜻이 아니라는 사례.
+
+### F-1. `process.env.X = original` 복원은 `"undefined"` 라는 문자열을 심는다
+
+`format-time.test.ts` 가 프로세스 타임존을 바꿔가며 `formatKst` 의 TZ 무관함을 확인한 뒤
+직접 되돌리고 있었다.
+
+```ts
+const original = process.env.TZ; // TZ 가 안 잡힌 기계에서는 undefined
+afterEach(() => {
+  process.env.TZ = original;
+});
+```
+
+node 는 env 값을 문자열로 강제한다. 그래서 저 복원은 키를 지우는 게 아니라 값을 심는다.
+
+```
+$ node -e 'const o=process.env.TZ; process.env.TZ="UTC"; process.env.TZ=o;
+           console.log(JSON.stringify(process.env.TZ));
+           console.log(new Date("2026-01-02T03:04:05Z").toString())'
+"undefined"
+Fri Jan 02 2026 03:04:05 GMT+0000 (GMT+00:00)
+```
+
+`"undefined"` 는 유효한 타임존이 아니라 node 가 UTC 로 떨어진다. 그때부터 **그 vitest 워커의
+프로세스 타임존이 UTC 로 굳어** 뒤에 도는 테스트까지 끌고 간다. 이 저장소는 아직 로컬
+타임존에 기대는 테스트가 없어 잠복 상태였다.
+
+해결: `vi.stubEnv('TZ', tz)`. vitest 의 `unstubAllEnvs` 는 원래 값이 `undefined` 면
+**키를 지운다**(구현 확인). `vitest.config.ts` 에 `unstubEnvs: true` 가 이미 켜져 있어
+`afterEach` 자체가 필요 없다.
+
+검증일: 2026-08-25
+
+### F-2. `turbo.json` 블록 주석에 글롭을 적으면 파서가 깨진다
+
+turbo inputs 를 왜 이렇게 뒀는지 주석에 적으면서 글롭을 그대로 붙였더니 이렇게 죽었다.
+
+```
+x expected `:` but instead found `src`
+   ,-[turbo.json:205:52]
+205 |      * inputs 에 `apps/**/src/**` 를 넣지 않는다
+   :                                        ^^^
+x expected `,` but instead found `"//#typecheck:tests"`
+```
+
+글롭 안의 `**/` 에 `*/` 가 들어 있다. turbo 의 JSONC 파서가 거기서 블록 주석을 끝내고
+나머지를 JSON 으로 읽으려다 통째로 깨진다. `pnpm typecheck` 와 `pnpm lint` 가 **둘 다**
+같은 에러로 죽어서 원인이 tsc 나 eslint 처럼 보인다.
+
+해결: 주석에서는 글롭을 풀어 쓴다("앱·패키지의 src 글롭"). 별표를 꼭 써야 하면 `//` 줄 주석에.
+
+검증일: 2026-08-25
+
+### F-3. turbo inputs 가 tsc 프로그램과 어긋나면 stale PASS 를 재생한다
+
+`//#typecheck:scripts` 의 inputs 는 `["scripts/**/*.ts", "tsconfig.json"]` 이었다. 그런데
+`scripts/*.test.ts` 가 `@tests/helpers/*` 를 import 하므로 그 헬퍼가 프로그램 안에 들어온다.
+
+```
+$ tsc -p tsconfig.json --noEmit --listFiles | grep mfa-nextjs/tests/
+.../tests/helpers/http.ts
+.../tests/helpers/signing.ts
+```
+
+inputs 에 없으니 헬퍼를 깨도 turbo 가 캐시된 PASS 를 재생한다. 실측 — 헬퍼에 한 줄 넣고 재실행:
+
+```
+고치기 전:  //:typecheck:scripts: cache hit, replaying logs
+고친 뒤:    //:typecheck:scripts: cache miss, executing
+```
+
+반대 방향도 있었다. `//#typecheck:tests` 의 inputs 에 앱·패키지 소스 글롭이 있었는데
+`tsconfig.test.json` 은 그쪽 파일을 하나도 안 본다(`--listFiles` 확인). 소스를 고칠 때마다
+영향받을 수 없는 검사의 캐시가 날아갔다.
+
+**진단법:** `tsc -p <config> --listFiles` 로 실제 프로그램을 뽑아 inputs 와 대조한다.
+`include` 만 보면 `paths` 로 끌려온 파일을 놓친다.
+
+검증일: 2026-08-25
 
 ## E. (13차) 장바구니를 쿠키로 옮기며 밟은 것
 

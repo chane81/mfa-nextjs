@@ -2,7 +2,9 @@
   "extends": "@mfa/typescript-config/nextjs.json",
   "compilerOptions": {
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      // 테스트가 공유하는 셋업·헬퍼 (`vitest.config.ts` 의 alias 와 같은 대상)
+      "@tests/*": ["../../tests/*"]
     }
   },
   "include": [

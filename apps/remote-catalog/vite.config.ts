@@ -12,7 +12,9 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
-const REMOTE = REMOTES.catalog;
+// 이름이 `REMOTES` 의 키다. 상수로 뽑아 두면 오타는 `REMOTES[NAME]` 이 잡는다.
+const NAME = 'catalog';
+const REMOTE = REMOTES[NAME];
 const PORT = REMOTE.devPort;
 
 /**
@@ -25,7 +27,7 @@ const PORT = REMOTE.devPort;
  * `@mfa/remote-config` 가 들고 있다. 빌드 시점에 산출물에 굳는 값이라
  * 배포 파이프라인에서 빌드 인자로 넘겨야 한다. (docs/03-setup/04-dokploy.md)
  */
-const PUBLIC_URL = publicOrigin(REMOTE.name);
+const PUBLIC_URL = publicOrigin(NAME);
 
 /**
  * dev · preview 서버가 SSR 번들(과 preview 에서는 버전 공표까지)을 디스크에서 내려준다.
@@ -126,7 +128,7 @@ export default defineConfig(({ command }) => {
       serveSsrBundle(),
       serveDevStylesheet(),
       federation({
-        name: REMOTE.name,
+        name: NAME,
         filename: 'remoteEntry.js',
         // mf-manifest.json 을 내보내야 host 런타임이 포맷/공유 정보를 자동 판별한다
         manifest: true,

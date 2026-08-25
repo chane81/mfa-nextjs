@@ -28,9 +28,13 @@
  * 포트 지식이 호출부마다 복사되는 걸 막으면서(이름 경로), 이미지의 자립성도 지킨다(숫자 경로).
  */
 import { createReadStream, existsSync, statSync } from 'node:fs';
-import { createServer } from 'node:http';
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from 'node:http';
 import { extname, join, normalize, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 interface Target {
   label: string;
@@ -76,18 +80,16 @@ async function resolveTarget(
   }
 
   const { REMOTES, assertRemoteName } = await import('@mfa/remote-config');
-  const remote = REMOTES[assertRemoteName(first)];
+  const name = assertRemoteName(first);
+  const remote = REMOTES[name];
   return {
-    label: `${remote.name} `,
+    label: `${name} `,
     port: remote.devPort,
     dist: second
       ? resolve(process.cwd(), second)
       : resolve(repoRoot(), remote.workspaceDir, 'dist'),
   };
 }
-
-const [firstArg, secondArg] = process.argv.slice(2);
-const { label, port, dist } = await resolveTarget(firstArg, secondArg);
 
 const TYPES: Record<string, string> = {
   '.js': 'application/javascript; charset=utf-8',
@@ -108,37 +110,65 @@ const TYPES: Record<string, string> = {
  */
 const VERSIONED = /^\/v[^/]+\//;
 
-createServer((req, res) => {
-  const path = decodeURIComponent((req.url ?? '/').split('?')[0]!);
+/**
+ * 요청 핸들러. **`createServer` 밖으로 빼두는 이유는 테스트다** —
+ * 경로 탈출 방어와 캐시 헤더 분기는 서버를 띄우지 않고도 확인할 수 있어야 한다.
+ *
+ * 파일을 나누지는 않는다. 런타임 이미지가 이 파일 **하나만** 복사하므로(위 주석),
+ * 다른 모듈을 만들면 그 자체로 컨테이너가 깨진다.
+ */
+export function createHandler(dist: string) {
+  return (req: IncomingMessage, res: ServerResponse): void => {
+    const path = decodeURIComponent((req.url ?? '/').split('?')[0]!);
 
-  // `..` 로 dist 밖을 못 나가게 한다
-  const target = join(dist, normalize(path).replace(/^(\.\.[/\\])+/, ''));
-  if (!target.startsWith(dist)) {
-    res.statusCode = 403;
-    res.end('forbidden');
-    return;
-  }
+    // `..` 로 dist 밖을 못 나가게 한다
+    const target = join(dist, normalize(path).replace(/^(\.\.[/\\])+/, ''));
+    if (!target.startsWith(dist)) {
+      res.statusCode = 403;
+      res.end('forbidden');
+      return;
+    }
 
-  const file =
-    existsSync(target) && statSync(target).isDirectory()
-      ? join(target, 'index.html')
-      : target;
-  if (!existsSync(file)) {
-    res.statusCode = 404;
-    res.end('not found');
-    return;
-  }
+    const file =
+      existsSync(target) && statSync(target).isDirectory()
+        ? join(target, 'index.html')
+        : target;
+    if (!existsSync(file)) {
+      res.statusCode = 404;
+      res.end('not found');
+      return;
+    }
 
-  res.setHeader(
-    'Content-Type',
-    TYPES[extname(file)] ?? 'application/octet-stream',
+    res.setHeader(
+      'Content-Type',
+      TYPES[extname(file)] ?? 'application/octet-stream',
+    );
+    // host(3000) 가 교차 출처로 remoteEntry 를 받아야 한다
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader(
+      'Cache-Control',
+      VERSIONED.test(path) ? 'public, max-age=31536000, immutable' : 'no-store',
+    );
+
+    createReadStream(file).pipe(res);
+  };
+}
+
+/**
+ * **직접 실행될 때만** 서버를 띄운다.
+ *
+ * 이 가드가 없으면 `import` 하는 순간 인자를 파싱하고 포트를 잡는다 — 테스트가
+ * 이 파일을 들일 방법이 사라진다. 컨테이너 진입점은 이 파일을 직접 실행하므로
+ * (`node serve-remote-dist.ts "$PORT" "$DATA_DIR"`) 그 경로는 그대로다.
+ */
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  const [firstArg, secondArg] = process.argv.slice(2);
+  const { label, port, dist } = await resolveTarget(firstArg, secondArg);
+
+  createServer(createHandler(dist)).listen(port, () =>
+    console.log(`[serve-dist] ${label}:${port} → ${dist}`),
   );
-  // host(3000) 가 교차 출처로 remoteEntry 를 받아야 한다
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader(
-    'Cache-Control',
-    VERSIONED.test(path) ? 'public, max-age=31536000, immutable' : 'no-store',
-  );
-
-  createReadStream(file).pipe(res);
-}).listen(port, () => console.log(`[serve-dist] ${label}:${port} → ${dist}`));
+}

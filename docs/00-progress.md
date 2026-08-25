@@ -1,5 +1,143 @@
 # 진행 상황
 
+## 2026-08-25 (18차) — 17차를 리뷰하고, remote 이름의 SSOT 를 하나로 줄였다
+
+17차 diff 를 리뷰했다. 테스트 616개는 전부 초록이었지만 **테스트가 못 보는 자리**에 네 건이
+있었다. 그리고 리뷰 중에 `packages/remote-config` 의 중복 하나가 드러났다.
+
+### 테스트가 잡아주지 못한 것 — 함정 셋
+
+전부 **616개가 초록인 채로** 숨어 있었다. 상세·로그·진단법은
+[F-1 · F-2 · F-3](./05-troubleshooting/01-known-issues.md#f-18차-테스트와-turbo-설정에서-밟은-것).
+
+| 무엇                                               | 증상                                                  | 해결                                       |
+| -------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------ |
+| `process.env.TZ = original` 복원                   | `"undefined"` 문자열을 심어 워커 타임존이 UTC 로 굳음 | `vi.stubEnv('TZ', tz)` (`unstubEnvs` 활용) |
+| `//#typecheck:scripts` inputs 에 `tests/**` 누락   | 헬퍼를 깨도 캐시된 PASS 재생                          | inputs 에 추가                             |
+| `//#typecheck:tests` inputs 에 앱·패키지 소스 글롭 | 소스 고칠 때마다 무관한 검사 캐시 증발                | 제거                                       |
+| `globalEnv: ["TZ"]`                                | 전체 태스크 캐시를 깬다                               | 제거 — `pnpm test` 는 turbo 를 안 탄다     |
+
+앞의 셋은 `tsc --listFiles` 와 turbo 캐시 로그로 고치기 전/후를 각각 재현해 확인했다.
+`TZ` 를 `globalEnv` 에 넣은 이유였던 `turbo/no-undeclared-env-vars` 경고는 첫 줄을 고치면서
+같이 사라졌다.
+
+### 리팩터가 조용히 넓힌 타입
+
+`buildPayload` 를 함수로 떼면서 반환 타입을 `SignedManifestFields` 로 적었는데, 그 타입은
+두 integrity 를 optional 로 둔다(host 가 서명 없는 매니페스트도 읽어야 해서). stamp 는 항상
+둘 다 채우므로 호출부에 `payload.ssrIntegrity!` 가 붙어 있었다 — 나중에 진짜로 안 채우게 됐을 때
+타입이 안 잡아주는 상태다. `Required<SignedManifestFields>` 로 좁히고 `!` 를 뗐다.
+`remote` 파라미터도 `string` 이 아니라 `RemoteName` 이다.
+
+### remote 이름을 세 번 적고 있었다 → ADR-017
+
+`REMOTE_NAMES` 원소 · `REMOTES` 키 · `REMOTES[x].name` 필드. 그중 **키와 필드가 어긋나는 건
+타입이 못 잡았다** — `satisfies Record<RemoteName, …>` 는 키 집합만 보고, 필드 타입이
+`RemoteName` 이라 `catalog: { name: 'cart' }` 도 통과한다(실측).
+
+`REMOTES` 를 원본으로 삼고 `RemoteName` · `REMOTE_NAMES` · `REMOTE_LIST` 를 전부 파생하게 바꿨다.
+근거와 기각한 대안은 ADR-017.
+
+### 곁가지
+
+- `packages/remote-config` 의 node 전용 파일 경계를 파일명 나열에서 `src/node.*` 글롭으로.
+  node 전용 파일이 하나 더 생기면 조용히 브라우저 쪽 프로젝트(`types: []`)에 섞였다.
+- `eslint.config.js` 주석이 `tests/dom/**` 을 가리켰다 — 테스트를 소스 옆으로 옮기기 전
+  배치가 주석에만 남아 있었다.
+- 트러블슈팅의 깨진 앵커 링크 다섯 개. 구두점 양옆에 공백이 있으면 GitHub 앵커에 하이픈이
+  **둘** 나오는데 하나로 적혀 있었다(`— ` · `@ ` · `/ `). 같은 파일에 이미 이중 하이픈을
+  쓰는 링크가 셋 있어 규칙이 확정됐다. `.claude/rules/docs.md` 에 표로 남기고, 저장소 전체
+  152개 링크를 훑어 확인했다.
+
+### 검증
+
+```
+pnpm test          39 files / 616 tests
+pnpm typecheck     12/12
+pnpm lint          12/12
+pnpm format:check  clean
+pnpm build         6/6 — host 프리렌더가 remote SSR 번들을 실제로 실행
+```
+
+## 2026-08-24 (17차) — 테스트를 넣었다. 코드는 다섯 군데만 고쳤다
+
+`pnpm build` 는 이 저장소의 유일한 주장("Next 16 에서 런타임 MF + remote SSR 이 된다")을
+지키지만 **런타임 분기는 하나도 지키지 못한다.** 신뢰 경계, 서명 계약, 사용자가 고칠 수 있는
+쿠키, 조용히 실패하는 경로 — 전부 무방비였다. 목록과 진척도 전문:
+`docs/06-testing/01-test-plan.md`
+
+결과는 615개 테스트, 39개 파일. e2e 는 넣지 않았다.
+
+### 러너 — Vitest 4, 테스트는 소스 옆에
+
+환경은 **확장자**로 가른다. `*.test.ts` 는 node, `*.test.tsx` 는 jsdom 이다. 대상이 `.ts` 여도
+DOM 이 필요하면 테스트는 `.tsx` 다 — 규칙이 하나뿐이라 파일을 열지 않고도 어느 환경에서
+도는지 안다. Vitest 4 에서 `vitest.workspace.ts` 는 없어졌고 루트 config 의 `test.projects` 가
+그 자리를 대신한다.
+
+두 가지를 설정으로 막아뒀다.
+
+- **테스트가 배포 산출물에 들어가는 것.** `packages/{store,contracts,ui}` 는 `outDir: dist` 로
+  emit 하므로 소스 옆의 테스트가 그대로 `dist/` 에 컴파일돼 들어간다. 각 패키지 tsconfig 의
+  `exclude` 에 넣고, 대신 루트 `tsconfig.test.json` 이 저장소 전체 테스트를 한 프로그램으로 본다.
+- **빌드 없이 못 도는 것.** 워크스페이스 `exports` 는 `dist` 를 가리키는데 `vitest.config.ts` 의
+  alias 가 `src` 를 직접 가리킨다. turbo 태스크에 `^build` 를 걸 필요가 없어졌다.
+
+`test` 는 일부러 turbo 에 안 태웠다. 패키지별 대응 태스크가 없어 얻는 게 캐시뿐인데,
+그 대가로 `pnpm test --project=dom` 같은 러너 플래그가 turbo 에 먹힌다.
+
+### 테스트를 위해 고친 프로덕션 코드는 다섯 군데뿐이다
+
+전부 **top-level 실행을 함수 뒤로 옮기고 `import.meta.url === pathToFileURL(process.argv[1]).href`
+가드를 씌운 것**이거나 `export` 하나를 더한 것이다. 동작은 안 바뀐다.
+
+| 파일                              | 무엇을                                                             |
+| --------------------------------- | ------------------------------------------------------------------ |
+| `scripts/serve-remote-dist.ts`    | 요청 핸들러를 `createHandler(dist)` 로. 파일은 안 나눴다           |
+| `scripts/wait-for-remotes.ts`     | `remoteEntryUrl` export + 폴링에 가드                              |
+| `scripts/stamp-remote-version.ts` | `integrity` · `buildPayload` · `signManifest` · `staleVersionDirs` |
+| `api/mf-revalidate/route.ts`      | `selfOrigin` export                                                |
+| `mf/RemoteComponent.tsx`          | lazy 캐시 키를 `remoteCacheKey` 로                                 |
+
+`serve-remote-dist.ts` 를 **파일로 나누지 않은 게 중요하다.** 각 remote 의 Dockerfile runner 는
+이 파일 하나만 복사하고 `node_modules` 를 두지 않는다 — 모듈을 하나라도 만들면 그 자체로
+컨테이너가 부팅에 실패한다.
+
+### 테스트가 밝혀낸 것 두 가지
+
+**① 다른 탭이 쿠키를 지워도 이 탭의 장바구니는 안 비워진다.** `useCartSync` 는 변경을
+감지해 `rehydrate()` 를 부르지만, persist 는 저장소가 `null` 을 주면 현재 상태를 그대로 둔다
+(zustand 5.0.15). 이 훅이 막으려는 건 "낡은 상태가 남의 변경을 덮어쓰는 것" 이고 쿠키가
+사라진 경우는 그 시나리오가 아니라 그대로 뒀다 — 테스트에 근거를 적어 고정했다.
+
+**② `serve-remote-dist` 의 불변 캐시 판정은 `v` 로 시작하는 첫 세그먼트 전부다.**
+`/^\/v[^/]+\//` 하나로 판정하므로 `/version/` 같은 이름도 immutable 로 나간다. SSOT 를 못 읽는
+경로(컨테이너)에서도 돌아야 해서 형태로만 판정하는 설계의 대가다. dist 최상위에 `v` 로
+시작하는 디렉터리를 새로 만들 일이 생기면 알고 있어야 한다.
+
+### 밟은 함정
+
+- **테스트를 패키지 tsconfig 에서 빼면 편집기만 빨개진다.** 러너는 루트
+  `tsconfig.test.json` 으로 멀쩡히 돌지만, TS 서버는 그 파일을 어느 프로젝트에도 못 넣어
+  `@tests/*` · `@mfa/*` 를 전부 `ts(2307)` 로 뱉는다. 테스트를 포함하는 쪽으로 되돌리고,
+  emit 하는 세 패키지만 `tsconfig.build.json` 을 따로 두어 거기서만 뺐다.
+- **`vi.mock` 팩토리로 만든 mock 은 `resetModules()` 로 초기화되지 않는다.** 호출 기록이
+  파일 전체에 쌓여 "몇 번 불렸나" 단언이 전부 무의미해진다. `vi.clearAllMocks()` 가 필요하다.
+- **`restoreMocks: true` 는 모듈 스코프 spy 를 첫 테스트 뒤에 되돌린다.** `console.warn` 스파이를
+  파일 맨 위에 한 번만 걸면 두 번째 테스트부터 진짜 콘솔이 불린다.
+- **React 19 의 `precedence` 링크는 `<head>` 로 호이스팅되어 테스트 사이에 살아남는다.**
+  손으로 지우면 리소스 레지스트리와 DOM 이 어긋나 **다시 삽입되지 않는다.** 개수를 절대값으로
+  세지 말고 "그 주소가 붙었는가" 만 본다.
+- **클라이언트 렌더에서 `useCartLines` 는 스토어를 본다.** `initialLines` 만 넘긴 컴포넌트
+  테스트는 전부 빈 장바구니를 그린다 — 브라우저 동작을 보려면 스토어를 채워야 한다.
+- **응답 스트림을 안 기다리면 임시 디렉터리 삭제가 ENOENT 로 튄다.** `pipe(res)` 가 테스트
+  종료 뒤에 파일을 연다. 가짜 응답을 `Writable` 로 만들고 `finish` 를 기다린다.
+
+### 다음에 할 것
+
+- e2e (브라우저 실제 동작 · 하드 내비게이션 · 캐시 HIT 육안 판정)
+- `RemoteVersionSync` — `'use cache'` 컴파일러 변환이 필요해 지금은 제외했다
+
 ## 2026-08-23 (16차) — 부분 프리페칭을 실측하고 켜지 않기로 했다
 
 "부분 프리페칭이 이전과 뭐가 다른가"에서 출발했다. 문서만 읽어서는 안 잡혀서 `main` 에서

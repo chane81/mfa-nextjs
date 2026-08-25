@@ -48,8 +48,10 @@ import { remoteBundleTag, remoteCacheTag } from '@/mf/server-loader';
  * warm 대상은 정의상 이 프로세스 자신이라 프록시를 탈 이유가 없다. 루프백으로
  * 고정하면 프록시 설정·인증서·헤어핀 NAT 과 무관해지고 왕복도 짧아진다.
  * 컨테이너 밖(별도 인스턴스)을 데워야 하는 구성이면 `MF_SELF_ORIGIN` 으로 덮는다.
+ *
+ * 우선순위 세 단계가 이 함수의 전부다 — 그래서 export 해 두고 테스트가 직접 본다.
  */
-function selfOrigin(): string {
+export function selfOrigin(): string {
   return (
     process.env.MF_SELF_ORIGIN || `http://127.0.0.1:${process.env.PORT || 3000}`
   );

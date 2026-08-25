@@ -1,7 +1,11 @@
 {
   "extends": "@mfa/typescript-config/vite.json",
   "compilerOptions": {
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node"],
+    // 테스트가 공유하는 셋업·헬퍼 (`vitest.config.ts` 의 alias 와 같은 대상)
+    "paths": {
+      "@tests/*": ["../../tests/*"]
+    }
   },
   "include": ["src/**/*", "vite.config.ts", "vite.config.server.ts"],
   "exclude": ["dist", "node_modules"]

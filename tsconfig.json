@@ -15,7 +15,16 @@
      */
     "erasableSyntaxOnly": true,
     "types": ["node"],
-    "tsBuildInfoFile": "./.turbo/tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "./.turbo/tsconfig.tsbuildinfo",
+    /**
+     * 소스 옆 테스트를 이 프로그램이 함께 검사한다 — 빼두면 편집기의 TS 서버가 그 파일을
+     * 어느 프로젝트에도 못 넣어 alias 를 잃는다(`ts(2307)`).
+     * `vitest.config.ts` 의 alias 와 같은 대상을 가리킨다.
+     */
+    "paths": {
+      "@tests/*": ["./tests/*"],
+      "@/*": ["./apps/host/src/*"]
+    }
   },
   "include": ["scripts/**/*.ts"],
   "exclude": ["node_modules"]

@@ -11,7 +11,9 @@ import {
 import { defineConfig } from '@rsbuild/core';
 import { pluginReact } from '@rsbuild/plugin-react';
 
-const REMOTE = REMOTES.cart;
+// 이름이 `REMOTES` 의 키다. 상수로 뽑아 두면 오타는 `REMOTES[NAME]` 이 잡는다.
+const NAME = 'cart';
+const REMOTE = REMOTES[NAME];
 const PORT = REMOTE.devPort;
 const DIST = resolve(process.cwd(), 'dist');
 /**
@@ -24,7 +26,7 @@ const DIST = resolve(process.cwd(), 'dist');
  * `@mfa/remote-config` 가 들고 있다. 빌드 시점에 굳는 값이라 배포 파이프라인에서
  * 빌드 인자로 넘긴다. (docs/03-setup/04-dokploy.md)
  */
-const PUBLIC_URL = publicOrigin(REMOTE.name);
+const PUBLIC_URL = publicOrigin(NAME);
 
 /**
  * 빌드 버전과 그로부터 파생되는 경로들.
@@ -47,7 +49,7 @@ export default defineConfig({
   plugins: [
     pluginReact(),
     pluginModuleFederation({
-      name: REMOTE.name,
+      name: NAME,
       filename: 'remoteEntry.js',
       exposes: {
         './CartPanel': './src/exposes/CartPanel.tsx',
