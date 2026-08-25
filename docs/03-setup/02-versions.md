@@ -1,6 +1,6 @@
 # 버전 고정 근거
 
-조회일: 2026-08-14 (npm registry 직접 조회) · Tailwind 항목은 2026-08-19 조회
+조회일: 2026-08-14 (npm registry 직접 조회) · Tailwind 항목은 2026-08-19 · 테스트 도구는 2026-08-24 조회
 
 ## 채택 버전
 
@@ -26,6 +26,27 @@
 | `eslint-plugin-react-hooks`         | 7.1.1  | **7.1.1**    | eslint 10 OK                  |
 | `zustand`                           | 5.0.15 | **5.0.15**   | `@mfa/store` 전용             |
 | `use-sync-external-store`           | 1.6.0  | **1.6.0**    | `zustand/traditional` 의 peer |
+
+## 테스트 도구 (2026-08-24 추가)
+
+| 패키지                        | 최신   | 채택       | 비고                                      |
+| ----------------------------- | ------ | ---------- | ----------------------------------------- |
+| `vitest`                      | 4.1.11 | **4.1.11** | v4 에서 `vitest.workspace.ts` 는 없어졌다 |
+| `@vitest/coverage-v8`         | 4.1.11 | **4.1.11** | 러너와 같은 버전을 맞춘다                 |
+| `jsdom`                       | 30.0.1 | **30.0.1** | `dom` 프로젝트 환경                       |
+| `@testing-library/react`      | 16.3.2 | **16.3.2** | React 19                                  |
+| `@testing-library/dom`        | 10.4.1 | **10.4.1** | 위의 peer                                 |
+| `@testing-library/user-event` | 14.6.6 | **14.6.6** | 클릭 · 입력                               |
+| `@testing-library/jest-dom`   | 7.0.1  | **7.0.1**  | `toBeInTheDocument` 등 DOM 매처           |
+| `@vitejs/plugin-react`        | 6.0.5  | **6.0.5**  | remote-catalog 와 같은 버전               |
+
+전부 **루트 devDependency** 다. 테스트는 소스 옆에 두지만 러너·매처 설정은 루트
+`vitest.config.ts` · `tsconfig.test.json` 한 곳에만 있다 — 근거는
+`docs/06-testing/01-test-plan.md`.
+
+`react` · `react-dom` · `@types/react*` 도 루트에 추가했다. Testing Library 를 루트에서
+해석해야 하기 때문이고, pnpm 이 같은 버전을 같은 실체로 링크하므로 인스턴스는 하나다
+(`vitest.config.ts` 의 `resolve.dedupe` 가 그 가정을 명시한다).
 
 ## ⚠️ TypeScript 7 을 안 쓴 이유
 

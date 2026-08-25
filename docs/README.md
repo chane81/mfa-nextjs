@@ -13,6 +13,7 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 | [03-setup](./03-setup/)                     | 실행 방법, 버전 고정 근거(Node·pnpm·TS), **환경변수**, Dokploy 컨테이너 배포                              |
 | [04-experiments](./04-experiments/)         | 실험 A(런타임 MF) / B(Multi-Zones·기각) / **C(ISR·Cache Components)** / D(부분 프리페칭·기각) 결과와 비교 |
 | [05-troubleshooting](./05-troubleshooting/) | 구축 중 실제로 터진 문제와 해결책                                                                         |
+| [06-testing](./06-testing/)                 | **테스트 계획과 진척도** — 무엇을 왜 테스트하는가, 러너 구조, 테스트를 쓸 때의 함정                       |
 
 ## 6줄 요약
 

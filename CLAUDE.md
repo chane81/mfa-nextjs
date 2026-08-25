@@ -45,6 +45,7 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 | ---------------- | --------------------------------------------------------------------- |
 | `pnpm dev`       | 프로세스 5개(host 1 + remote 2 × web·ssr). host 는 remote 를 기다린다 |
 | `pnpm build`     | 전체 빌드. **host 프리렌더가 remote SSR 번들을 실제로 실행한다**      |
+| `pnpm test`      | Vitest 4. `--project=unit`(node) / `--project=dom`(jsdom) 로 좁힌다   |
 | `pnpm lint`      | ESLint 10 flat config                                                 |
 | `pnpm typecheck` | 네트워크 없이 돈다 (DTS 를 끈 이유)                                   |
 | `pnpm format`    | prettier                                                              |
@@ -67,6 +68,7 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 | 스타일링 전략                       | `docs/02-architecture/05-styling.md`            |
 | 부분 프리페칭을 켤까 (실측·기각)    | `docs/04-experiments/04-partial-prefetching.md` |
 | 버전 고정 근거                      | `docs/03-setup/02-versions.md`                  |
+| 테스트를 어디에 어떻게 쓰나         | `docs/06-testing/01-test-plan.md`               |
 
 **추측하기 전에 먼저 트러블슈팅 문서의 "증상으로 찾기" 표를 본다.** 여기 있는 문제는
 대부분 한 번 이상 밟은 것이고, 재현 조건과 오진 기록까지 남아 있다.
@@ -81,5 +83,6 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 | 함정을 밟았다        | `docs/05-troubleshooting/01-known-issues.md` — 본문 + **증상 색인 한 줄** |
 | 설계 판단을 바꿨다   | `docs/02-architecture/01-decision.md` 에 ADR                              |
 | 의존성 버전을 올렸다 | `docs/03-setup/02-versions.md`                                            |
+| 테스트를 추가했다    | `docs/06-testing/01-test-plan.md` 의 체크박스                             |
 
 문서 커밋은 코드 커밋과 분리한다(`docs:` 접두사).
