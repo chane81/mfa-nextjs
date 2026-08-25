@@ -31,6 +31,7 @@ import { pathToFileURL } from 'node:url';
 
 import {
   MF_FILES,
+  type RemoteName,
   type SignedManifestFields,
   assertRemoteName,
   signedPayload,
@@ -53,12 +54,20 @@ export function integrity(file: string): string {
 /**
  * 서명이 덮는 필드를 만든다. 순서와 정규화는 `signedPayload` 가 맡고,
  * 여기서는 **무엇을 담을지**만 정한다.
+ *
+ * 반환 타입이 `Required<…>` 인 이유: `SignedManifestFields` 는 두 integrity 를 optional 로
+ * 둔다(host 가 서명 없는 매니페스트도 읽어야 해서). 하지만 stamp 는 **항상 둘 다 채운다** —
+ * 그냥 `SignedManifestFields` 로 두면 호출부가 `payload.ssrIntegrity!` 로 `!` 를 달게 되고,
+ * 그러면 나중에 진짜로 안 채우게 됐을 때 타입이 잡아주지 못한다.
+ *
+ * `remote` 는 `RemoteName` 이다. `string` 으로 두면 `assertRemoteName` 을 안 거친 값이
+ * 서명 페이로드의 **첫 필드**로 들어갈 수 있다 — 그 오타는 host 의 서명 검증에서야 터진다.
  */
 export function buildPayload(
-  remote: string,
+  remote: RemoteName,
   version: string,
   versionDir: string,
-): SignedManifestFields {
+): Required<SignedManifestFields> {
   return {
     remote,
     version,
@@ -195,7 +204,7 @@ function main(): void {
   );
 
   console.log(
-    `[stamp] 무결성 ${payload.ssrIntegrity!.slice(0, 20)}… / 서명 ${signature ? '있음' : '없음'}`,
+    `[stamp] 무결성 ${payload.ssrIntegrity.slice(0, 20)}… / 서명 ${signature ? '있음' : '없음'}`,
   );
 
   for (const stale of staleVersionDirs(dist, version)) {
