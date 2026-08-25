@@ -27,15 +27,24 @@ remote 는 host 와 **따로 배포된다.** 그래서 단일 앱이라면 빌�
 ## 산출물 배치
 
 ```
-apps/remote-catalog/dist/
-├── mf-version.json              ← 현재 버전 공표 (no-store)
-├── v<version>/                  ← 불변. 배포된 뒤 내용이 바뀌지 않는다
-│   ├── mf-manifest.json         ← 브라우저 MF 런타임
-│   ├── remoteEntry.js
-│   ├── assets/…
-│   └── mf-server.cjs            ← host **서버** 가 받아 실행
-└── v<이전 버전>/ …               ← 3개까지 보존 (롤백 + 캐시된 HTML 의 hydration)
+apps/remote-catalog/dist/          ← 빌드 산출. 최신 한 벌만 남는다
+├── mf-version.json                ← 현재 버전 공표 (no-store)
+└── v<version>/                    ← 불변. 배포된 뒤 내용이 바뀌지 않는다
+    ├── mf-manifest.json           ← 브라우저 MF 런타임
+    ├── remoteEntry.js
+    ├── assets/…
+    └── mf-server.cjs              ← host **서버** 가 받아 실행
+        ↓ 컨테이너 부팅 시 복사 (no-clobber)
+/data/                             ← 서빙 볼륨. 여기에 옛 버전이 쌓인다
+├── mf-version.json                ← 항상 최신으로 교체
+├── v<version>/
+└── v<이전 버전>/ …                 ← REMOTE_KEEP_VERSIONS 만큼 보존 (기본 5)
 ```
+
+**보존 개수를 정하는 자리는 볼륨 쪽 하나다.** 빌드 dist 는 `stamp` 가 최신 한 벌만 남기고
+정리한다 — 어차피 배포는 이 디렉터리를 볼륨으로 복사하는 것이고, 롤백에 필요한 옛 버전과
+캐시된 HTML 이 참조하는 옛 청크는 볼륨에 있다. 예전에는 `stamp` 도 자체 보존 개수를 세었는데,
+대상도 수명도 다른 두 값이 이름만 닮아 있어 어느 쪽이 롤백 범위를 정하는지 읽히지 않았다.
 
 `mf-version.json`:
 

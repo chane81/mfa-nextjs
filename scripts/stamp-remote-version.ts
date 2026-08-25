@@ -23,7 +23,6 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -38,13 +37,6 @@ import {
   versionedPath,
 } from '@mfa/remote-config';
 import { readBuildVersion } from '@mfa/remote-config/node';
-
-/**
- * 옛 버전 디렉터리를 몇 개까지 남길지.
- * 0개면 롤백이 불가능하고, 무제한이면 dist 가 계속 부푼다.
- * 실제 배포라면 CDN 보존 정책이 할 일이라 여기서는 로컬 실험용 최소치만 둔다.
- */
-export const KEEP_VERSIONS = 3;
 
 /** SRI 형식. host 가 받은 바이트를 평가 **전에** 이 값과 대조한다. */
 export function integrity(file: string): string {
@@ -108,28 +100,28 @@ export function signManifest(
 }
 
 /**
- * 지워야 할 옛 버전 디렉터리. **오래된 것부터**, 현재 버전은 절대 포함하지 않는다.
+ * 지워야 할 버전 디렉터리 — **현재 버전을 뺀 전부**.
  *
- * 버전 문자열은 정렬 가능한 형식이 아니라 mtime 으로 줄을 세운다. 남길 개수는 전체
- * 디렉터리 수에서 세므로, 현재 버전도 그 `keep` 안에 든다.
+ * 빌드 산출 dist 는 방금 만든 한 벌만 들고 있으면 된다. 배포는 이 디렉터리를 서빙 볼륨으로
+ * **복사**하는 것이고(`scripts/docker/remote-entrypoint.sh`), 롤백에 필요한 옛 버전은
+ * 거기에 쌓인다. 그러니 보존 개수를 정하는 자리는 볼륨 쪽 `REMOTE_KEEP_VERSIONS` 하나다.
+ *
+ * 예전에는 이 파일도 자체 보존 개수(`KEEP_VERSIONS`)를 세었다. 대상도 수명도 다른 두 값이
+ * 이름만 닮아 있어서 **어느 쪽이 롤백 범위를 정하는지 읽히지 않았고**, `0` 의 의미까지
+ * 정반대였다(여기서는 "전부 삭제", 볼륨 쪽에서는 "정리 안 함").
+ *
+ * `v` 로 시작하는 디렉터리만 본다. 빌드가 중간에 죽어 남은 껍데기도 같이 지운다 —
+ * 남길 게 최신 한 벌뿐이라 온전한 버전인지 따로 셀 이유가 없다.
  */
 export function staleVersionDirs(
   dist: string,
   currentVersion: string,
-  keep: number = KEEP_VERSIONS,
 ): string[] {
-  const dirs = readdirSync(dist, { withFileTypes: true })
+  return readdirSync(dist, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.startsWith('v'))
     .map((entry) => entry.name)
-    .filter((name) => existsSync(join(dist, name, MF_FILES.ssrBundle)))
-    .sort(
-      (a, b) =>
-        statSync(join(dist, a)).mtimeMs - statSync(join(dist, b)).mtimeMs,
-    );
-
-  return dirs
     .filter((name) => name !== `v${currentVersion}`)
-    .slice(0, Math.max(0, dirs.length - keep));
+    .sort();
 }
 
 function main(): void {
