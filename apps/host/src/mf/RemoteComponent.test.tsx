@@ -12,30 +12,41 @@ import { clearGlobalRegistries } from '@tests/helpers/globals';
  *
  * `runtime.ts` 는 `@module-federation/runtime` 을 초기화하므로 통째로 모킹한다.
  * 여기서 검증할 것은 MF 런타임이 아니라 이 컴포넌트의 조립이다.
+ *
+ * ## 픽스처 오리진을 `vi.hoisted` 에 두는 이유
+ *
+ * `vi.mock` 팩토리는 파일 맨 위로 호이스팅되어 **바깥 `const` 를 못 본다.** `vi.hoisted` 에
+ * 두면 팩토리와 테스트 본문이 같은 값을 본다.
+ *
+ * 오리진은 세 자리가 **같은 값이어야** 의미가 있는 픽스처다 — `REMOTE_ENTRIES` 목,
+ * env 스텁, 스타일시트 주소 단언. 한 곳이라도 갈라지면 테스트는 자기들끼리만 맞는
+ * 상태로 초록이 된다. 로더 목도 같이 둬서 `(id) => loadRemoteModule(id)` 래퍼를 없앴다.
  */
-const loadRemoteModule = vi.fn();
-
-vi.mock('./runtime', () => ({
-  loadRemoteModule: (id: string) => loadRemoteModule(id),
-  REMOTE_ENTRIES: {
-    catalog: 'https://catalog.example.com/mf-manifest.json',
-    cart: 'https://cart.example.com/mf-manifest.json',
-  },
+const { CATALOG_ORIGIN, CART_ORIGIN, loadRemoteModule } = vi.hoisted(() => ({
+  CATALOG_ORIGIN: 'https://catalog.example.com',
+  CART_ORIGIN: 'https://cart.example.com',
+  loadRemoteModule: vi.fn(),
 }));
 
-const ORIGIN = 'https://catalog.example.com';
+vi.mock('./runtime', () => ({
+  loadRemoteModule,
+  REMOTE_ENTRIES: {
+    catalog: `${CATALOG_ORIGIN}/${MF_FILES.webManifest}`,
+    cart: `${CART_ORIGIN}/${MF_FILES.webManifest}`,
+  },
+}));
 
 beforeEach(() => {
   clearGlobalRegistries();
   vi.resetModules();
   loadRemoteModule.mockReset();
-  vi.stubEnv('REMOTE_CATALOG_PUBLIC_URL', ORIGIN);
-  vi.stubEnv('REMOTE_CART_PUBLIC_URL', 'https://cart.example.com');
+  vi.stubEnv('REMOTE_CATALOG_PUBLIC_URL', CATALOG_ORIGIN);
+  vi.stubEnv('REMOTE_CART_PUBLIC_URL', CART_ORIGIN);
   vi.stubEnv(
     'MFA_REMOTE_WEB_ENTRIES',
     JSON.stringify({
-      catalog: `${ORIGIN}/${MF_FILES.webManifest}`,
-      cart: `https://cart.example.com/${MF_FILES.webManifest}`,
+      catalog: `${CATALOG_ORIGIN}/${MF_FILES.webManifest}`,
+      cart: `${CART_ORIGIN}/${MF_FILES.webManifest}`,
     }),
   );
 });
@@ -133,7 +144,7 @@ describe('스타일시트', () => {
 
     render(<RemoteComponent module="catalog/ProductGrid" />);
 
-    await expectLinked(`${ORIGIN}${stylesPath()}`);
+    await expectLinked(`${CATALOG_ORIGIN}${stylesPath()}`);
   });
 
   it('버전을 알면 불변 경로를 가리킨다', async () => {
@@ -148,7 +159,7 @@ describe('스타일시트', () => {
 
     render(<RemoteComponent module="catalog/ProductGrid" />);
 
-    await expectLinked(`${ORIGIN}${stylesPath('t1abc')}`);
+    await expectLinked(`${CATALOG_ORIGIN}${stylesPath('t1abc')}`);
   });
 
   it('remote 마다 오리진이 다르다', async () => {
@@ -157,7 +168,7 @@ describe('스타일시트', () => {
 
     render(<RemoteComponent module="cart/CartBadge" />);
 
-    await expectLinked(`https://cart.example.com${stylesPath()}`);
+    await expectLinked(`${CART_ORIGIN}${stylesPath()}`);
   });
 
   it('head 로 호이스팅된다 — precedence 를 붙인 결과다', async () => {
@@ -170,7 +181,7 @@ describe('스타일시트', () => {
 
     render(<RemoteComponent module="catalog/ProductGrid" />);
 
-    const href = `${ORIGIN}${stylesPath()}`;
+    const href = `${CATALOG_ORIGIN}${stylesPath()}`;
     await expectLinked(href);
     expect(document.head.querySelector(`link[href="${href}"]`)).not.toBeNull();
   });
@@ -184,7 +195,7 @@ describe('스타일시트', () => {
 
     // 아직 스켈레톤 상태인데 link 는 이미 있다
     expect(screen.getByText(/불러오는 중/)).toBeInTheDocument();
-    await expectLinked(`${ORIGIN}${stylesPath()}`);
+    await expectLinked(`${CATALOG_ORIGIN}${stylesPath()}`);
   });
 });
 
@@ -216,7 +227,7 @@ describe('실패', () => {
     render(<RemoteComponent module="catalog/ProductGrid" />);
 
     expect(await screen.findByText(/entry:/)).toHaveTextContent(
-      `${ORIGIN}/${MF_FILES.webManifest}`,
+      `${CATALOG_ORIGIN}/${MF_FILES.webManifest}`,
     );
     error.mockRestore();
   });
