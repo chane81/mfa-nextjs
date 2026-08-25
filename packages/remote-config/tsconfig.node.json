@@ -14,8 +14,12 @@
     "noEmit": true,
     "erasableSyntaxOnly": true,
     "types": ["node"],
-    "tsBuildInfoFile": "./.turbo/tsconfig.node.tsbuildinfo"
+    "tsBuildInfoFile": "./.turbo/tsconfig.node.tsbuildinfo",
+    // 테스트가 공유하는 셋업·헬퍼 (`vitest.config.ts` 의 alias 와 같은 대상)
+    "paths": {
+      "@tests/*": ["../../tests/*"]
+    }
   },
-  "include": ["src/node.ts"],
+  "include": ["src/node.ts", "src/node.test.ts"],
   "exclude": ["node_modules"]
 }

@@ -18,7 +18,11 @@
      * 필요한 `process` 한 조각은 `src/index.ts` 에서 좁게 선언한다.
      */
     "types": [],
-    "tsBuildInfoFile": "./.turbo/tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "./.turbo/tsconfig.tsbuildinfo",
+    // 테스트가 공유하는 셋업·헬퍼 (`vitest.config.ts` 의 alias 와 같은 대상)
+    "paths": {
+      "@tests/*": ["../../tests/*"]
+    }
   },
   "include": ["src/**/*.ts"],
   /**
@@ -26,5 +30,5 @@
    * 여기 남겨두면 위의 `types: []` 에 걸려 `node:fs` 를 못 찾는다 — 그리고 그 설정이
    * 바로 이 프로젝트가 지키려는 것이다(브라우저 소비처가 이 소스를 직접 검사한다).
    */
-  "exclude": ["node_modules", "src/node.ts"]
+  "exclude": ["node_modules", "src/node.ts", "src/node.test.ts"]
 }

@@ -1,10 +1,29 @@
 {
   "extends": "@mfa/typescript-config/base.json",
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+    /**
+     * **검사 전용 설정.** 편집기의 TS 서버와 `pnpm typecheck` 가 이걸 본다.
+     *
+     * emit 옵션(`outDir` · `rootDir` · `declaration`)은 전부 `tsconfig.build.json` 으로 옮겼다.
+     * 여기 두면 소스 옆 테스트가 루트 `tests/` 의 헬퍼를 import 하는 순간
+     * `TS6059: not under rootDir` 로 죽는다 — 그 파일은 `src` 밖에 있다.
+     */
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "tsBuildInfoFile": "./.turbo/tsconfig.tsbuildinfo",
+    /**
+     * 테스트가 공유하는 셋업·헬퍼. 테스트는 소스 옆에 있어 상대 경로로는 깊이가
+     * 파일마다 달라진다 — `vitest.config.ts` 의 alias 와 **같은 대상**을 가리켜야 한다.
+     */
+    "paths": {
+      "@tests/*": ["../../tests/*"]
+    }
   },
+  /**
+   * 테스트도 포함한다. 빼면 편집기의 TS 서버가 그 파일을 **어느 프로젝트에도 넣지 못해**
+   * `@tests/*` · `@mfa/*` 를 통째로 못 찾는다(`ts(2307)`).
+   */
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules"]
 }
