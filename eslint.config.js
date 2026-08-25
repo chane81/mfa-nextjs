@@ -13,8 +13,12 @@ export default defineConfig([
   baseConfig,
   {
     /**
-     * `tests/dom/**` 은 컴포넌트를 렌더한다. React 규칙과 브라우저 globals 가 없으면
+     * 루트 `tests/` 는 `dom` 프로젝트의 셋업(`setup/dom.ts`)과 렌더 헬퍼를 담는다.
+     * React 규칙과 브라우저 globals 가 없으면 여기 `.tsx` 헬퍼가 생기는 순간
      * JSX 가 `no-undef` 로 걸리고 훅 규칙도 안 돈다.
+     *
+     * 정작 컴포넌트를 렌더하는 `*.test.tsx` 는 **소스 옆에** 있어 각 패키지의
+     * eslint.config.js 가 본다. 여기 규칙은 그 대칭을 맞춰두는 것이다.
      */
     files: ['tests/**/*.{ts,tsx}'],
     extends: [reactConfig],

@@ -20,6 +20,8 @@
       "@tests/*": ["../../tests/*"]
     }
   },
-  "include": ["src/node.ts", "src/node.test.ts"],
+  // 옆 `tsconfig.json` 의 exclude 와 **같은 글롭**이어야 한다. 갈라지면 어느 프로젝트에도
+  // 안 속하는 파일이 생기고, 편집기는 alias 를 잃고(`ts(2307)`) CI 는 그 파일을 안 본다.
+  "include": ["src/node.*"],
   "exclude": ["node_modules"]
 }
