@@ -44,6 +44,11 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm format:check
 
+      # 단위 · 통합 테스트. 워크스페이스 패키지의 src 를 alias 로 직접 가리키므로
+      # 빌드 없이 돈다 — 그래서 느린 build job 이 아니라 여기 붙는다.
+      # 목록과 배경: docs/06-testing/01-test-plan.md
+      - run: pnpm test
+
   build:
     runs-on: ubuntu-latest
     steps:
