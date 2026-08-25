@@ -80,9 +80,10 @@ async function resolveTarget(
   }
 
   const { REMOTES, assertRemoteName } = await import('@mfa/remote-config');
-  const remote = REMOTES[assertRemoteName(first)];
+  const name = assertRemoteName(first);
+  const remote = REMOTES[name];
   return {
-    label: `${remote.name} `,
+    label: `${name} `,
     port: remote.devPort,
     dist: second
       ? resolve(process.cwd(), second)

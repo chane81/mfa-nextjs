@@ -97,15 +97,6 @@ export const MF_FILES = {
 } as const;
 
 /**
- * remote 이름. host 가 `catalog/ProductGrid` 처럼 이 이름으로 모듈을 지목한다.
- *
- * `@mfa/contracts` 가 이 값을 재-export 한다. 소비처는 그쪽 이름으로 계속 import 해도 되고,
- * 여기가 원본이다.
- */
-export const REMOTE_NAMES = ['catalog', 'cart'] as const;
-export type RemoteName = (typeof REMOTE_NAMES)[number];
-
-/**
  * remote 주소를 바꾸는 환경변수의 **이름** (값이 아니다).
  *
  * remote 하나당 **하나**다. 예전에는 셋이었다 — 브라우저용 매니페스트 URL,
@@ -127,14 +118,26 @@ export interface RemoteEnvKeys {
   readonly publicUrl: string;
 }
 
-export interface RemoteDefinition {
-  readonly name: RemoteName;
+/**
+ * remote 하나의 배치 정보. **이름은 여기 없다** — `REMOTES` 의 키가 곧 이름이다.
+ *
+ * 예전에는 `name` 필드가 있었고, 그래서 이름이 remote 하나당 세 번(`REMOTE_NAMES` 원소 ·
+ * `REMOTES` 키 · 이 필드) 적혔다. 그중 키와 필드가 어긋나는 건 **타입이 못 잡았다**
+ * (`satisfies Record<RemoteName, …>` 는 키 집합만 보고, 필드 타입이 `RemoteName` 이라
+ * `catalog: { name: 'cart' }` 도 통과했다 — 실측). 이름을 한 군데로 줄여 그 상태를 없앤다.
+ */
+export interface RemoteConfig {
   readonly packageName: string;
   /** 리포지터리 루트 기준 경로. 스크립트가 dist 위치를 파생할 때 쓴다. */
   readonly workspaceDir: string;
   /** dev 서버 · `pnpm start` 정적 서버가 잡는 포트 */
   readonly devPort: number;
   readonly env: RemoteEnvKeys;
+}
+
+/** 순회용 항목. `REMOTE_LIST` 가 키를 `name` 으로 되붙여 만든다. */
+export interface RemoteDefinition extends RemoteConfig {
+  readonly name: RemoteName;
 }
 
 /**
@@ -148,12 +151,12 @@ export interface RemoteDefinition {
  * `apps/host/next.config.ts` 가 node 에서 이 목록을 순회해 값을 다 꺼낸 뒤 번들에 굽고,
  * host 코드는 그 결과 하나만 읽는다. 덕분에 host 쪽에는 remote 이름이 남지 않는다.
  *
- * `satisfies` 가 **`REMOTE_NAMES` 와의 불일치를 컴파일 타임에 잡는다.** 이름만 추가하고
- * 정의를 빠뜨리면 여기서 에러가 난다 — remote 추가가 반쯤 된 채로 넘어가지 못한다.
+ * **이 객체가 remote 이름의 원본이다.** `RemoteName` 도 `REMOTE_NAMES` 도 여기서 파생된다 —
+ * remote 를 추가하려면 여기 항목 하나를 넣는 것이 전부고, "이름만 추가하고 정의를 빠뜨린"
+ * 상태가 성립하지 않는다.
  */
 export const REMOTES = {
   catalog: {
-    name: 'catalog',
     packageName: '@mfa/remote-catalog',
     workspaceDir: 'apps/remote-catalog',
     devPort: 3001,
@@ -162,7 +165,6 @@ export const REMOTES = {
     },
   },
   cart: {
-    name: 'cart',
     packageName: '@mfa/remote-cart',
     workspaceDir: 'apps/remote-cart',
     devPort: 3002,
@@ -170,11 +172,29 @@ export const REMOTES = {
       publicUrl: 'REMOTE_CART_PUBLIC_URL',
     },
   },
-} as const satisfies Record<RemoteName, RemoteDefinition>;
+} as const satisfies Record<string, RemoteConfig>;
 
-/** 순회용. `REMOTE_NAMES` 순서를 따른다. */
+/**
+ * remote 이름. host 가 `catalog/ProductGrid` 처럼 이 이름으로 모듈을 지목한다.
+ *
+ * `@mfa/contracts` 가 이 둘을 재-export 한다. 소비처는 그쪽 이름으로 계속 import 해도 되고,
+ * 여기가 원본이다.
+ */
+export type RemoteName = keyof typeof REMOTES;
+
+/**
+ * 순회용 이름 목록.
+ *
+ * ⚠️ 순서는 **`REMOTES` 의 키 선언 순서**다. 문자열 키의 열거 순서는 삽입 순서로
+ * 스펙에 고정돼 있고(정수 인덱스 키가 아니므로 재정렬되지 않는다), `index.test.ts` 가
+ * 그 성질을 회귀 테스트로 지킨다. 배열 리터럴로 따로 적던 때보다 눈에 덜 보이는 계약이라
+ * 테스트를 남겨 둔다.
+ */
+export const REMOTE_NAMES = Object.keys(REMOTES) as readonly RemoteName[];
+
+/** 순회용. 키를 `name` 으로 되붙인다. `REMOTE_NAMES` 순서를 따른다. */
 export const REMOTE_LIST: readonly RemoteDefinition[] = REMOTE_NAMES.map(
-  (name) => REMOTES[name],
+  (name) => ({ name, ...REMOTES[name] }),
 );
 
 /** 인자로 받은 문자열이 remote 이름인지 확인하고 좁혀준다 */

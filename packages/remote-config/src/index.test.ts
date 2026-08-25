@@ -25,12 +25,25 @@ describe('배치 상수', () => {
     expect(MF_SSR_BUNDLE.extension).toBe('.cjs');
   });
 
-  it('REMOTES 의 키는 REMOTE_NAMES 와 정확히 일치한다', () => {
-    expect(Object.keys(REMOTES).sort()).toEqual([...REMOTE_NAMES].sort());
+  it('REMOTE_NAMES 는 REMOTES 의 키 선언 순서를 그대로 따른다', () => {
+    /**
+     * `REMOTE_NAMES` 는 이제 `Object.keys(REMOTES)` 다. 문자열 키의 열거 순서는 삽입
+     * 순서로 스펙에 고정돼 있지만(정수 인덱스 키가 아니므로 재정렬 안 된다), 배열
+     * 리터럴로 적던 때보다 **눈에 안 보이는 계약**이 됐다. 여기서 붙잡는다.
+     *
+     * 순서가 중요한 이유: `REMOTE_LIST` 가 이 순서를 따르고, `wait-for-remotes` 와
+     * `next.config.ts` 가 그걸 순회한다.
+     */
+    expect([...REMOTE_NAMES]).toEqual(Object.keys(REMOTES));
+    expect(REMOTE_LIST.map((r) => r.name)).toEqual([...REMOTE_NAMES]);
   });
 
-  it('REMOTE_LIST 는 REMOTE_NAMES 순서를 따른다', () => {
-    expect(REMOTE_LIST.map((r) => r.name)).toEqual([...REMOTE_NAMES]);
+  it('REMOTE_LIST 항목은 키를 name 으로 되붙인다', () => {
+    // 이름의 원본은 `REMOTES` 의 키 하나뿐이다. 되붙이는 자리가 어긋나면
+    // 순회하는 쪽(next.config.ts · wait-for-remotes)이 엉뚱한 remote 를 가리킨다.
+    for (const entry of REMOTE_LIST) {
+      expect(entry).toEqual({ name: entry.name, ...REMOTES[entry.name] });
+    }
   });
 
   it('devPort 는 remote 마다 다르다', () => {
