@@ -4,8 +4,8 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
 /**
- * 테스트 러너 설정. 테스트 코드는 전부 루트 `tests/` 에 있다 — 배경과 진척도는
- * `docs/06-testing/01-test-plan.md`.
+ * 테스트 러너 설정. 테스트는 대상 소스 옆에 두고 공유 자산만 루트 `tests/` 에 있다 —
+ * 배경과 진척도는 `docs/06-testing/01-test-plan.md`.
  *
  * ## 왜 alias 로 `src` 를 직접 가리키나
  *
@@ -71,6 +71,18 @@ export default defineConfig({
     restoreMocks: true,
     unstubEnvs: true,
     unstubGlobals: true,
+
+    /**
+     * CI 로그는 **파일 한 줄씩만** 찍는다.
+     *
+     * 기본 리포터는 `slowTestThreshold`(기본 300ms)를 넘긴 테스트의 이름을 파일 줄 밑에
+     * 따로 나열한다(근거: vitest v4.1.6 `docs/config/slowtestthreshold.md`). 러너 한 대의
+     * 부하에 따라 300ms 언저리 테스트가 실행마다 들락거려서, **같은 커밋인데 로그 모양이
+     * 달라진다** — 두 실행을 나란히 놓고 비교할 수가 없다.
+     *
+     * 로컬은 기본값 그대로 둔다. 거기서는 그 목록이 "뭐가 느린가"를 바로 짚어주는 신호다.
+     */
+    slowTestThreshold: process.env.CI ? Number.MAX_SAFE_INTEGER : 300,
 
     /**
      * 테스트 파일은 **대상 소스 옆에** 둔다(`cookie-codec.ts` → `cookie-codec.test.ts`).
