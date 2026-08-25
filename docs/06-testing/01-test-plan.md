@@ -83,7 +83,8 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] `turbo.json` — `//#typecheck:tests` · `//#lint:tests` 루트 태스크.
       `test` 는 일부러 turbo 를 안 태운다 — 패키지별 대응 태스크가 없어 얻는 게 캐시뿐인데,
       그 대가로 `pnpm test --project=dom` 같은 러너 플래그가 turbo 에 먹힌다
-- [x] `.github/workflows/ci.yml` — `verify` job 에 `pnpm test`
+- [x] `.github/workflows/ci.yml` — `pnpm test` 는 **`test` job 단독**. `verify`(lint · typecheck ·
+      format:check) · `build` 와 의존 없이 동시에 돈다 — 체크 이름이 곧 실패 원인이다
 
 ### Phase 1 — 순수 로직 (node, 모킹 0)
 
