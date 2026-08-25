@@ -9,13 +9,15 @@ import { generateSigningKeyPair, signPayload } from '@tests/helpers/signing';
  * `remote-endpoints` 는 import 시점에 env 를 굽는다. 그래서 매번 레지스트리를 비우고
  * 모듈을 새로 들인다 — 둘 중 하나만 하면 앞 테스트의 상태가 새어 들어온다.
  */
-const ORIGIN = 'https://catalog.example.com';
+const CATALOG_ORIGIN = 'https://catalog.example.com';
+// env 스텁과 `trustedOrigins` 단언이 같은 값을 봐야 한다
+const CART_ORIGIN = 'https://cart.example.com';
 
 beforeEach(() => {
   clearGlobalRegistries();
   vi.resetModules();
-  vi.stubEnv('REMOTE_CATALOG_PUBLIC_URL', ORIGIN);
-  vi.stubEnv('REMOTE_CART_PUBLIC_URL', 'https://cart.example.com');
+  vi.stubEnv('REMOTE_CATALOG_PUBLIC_URL', CATALOG_ORIGIN);
+  vi.stubEnv('REMOTE_CART_PUBLIC_URL', CART_ORIGIN);
   vi.stubEnv('MF_REMOTE_PUBLIC_KEY', undefined);
   vi.stubEnv('MF_REQUIRE_SIGNATURE', undefined);
 });
@@ -37,12 +39,14 @@ const okResponse = (body: unknown) =>
 describe('주소 조립', () => {
   it('remoteOrigin 은 SSR 엔트리에서 오리진만 뽑는다', async () => {
     const { remoteOrigin } = await load();
-    expect(remoteOrigin('catalog')).toBe(ORIGIN);
+    expect(remoteOrigin('catalog')).toBe(CATALOG_ORIGIN);
   });
 
   it('fallbackSsrEntry 는 버전 없는 엔트리다', async () => {
     const { fallbackSsrEntry } = await load();
-    expect(fallbackSsrEntry('catalog')).toBe(`${ORIGIN}/${MF_FILES.ssrBundle}`);
+    expect(fallbackSsrEntry('catalog')).toBe(
+      `${CATALOG_ORIGIN}/${MF_FILES.ssrBundle}`,
+    );
   });
 
   it('remoteVersionTag 는 remote 마다 다르다', async () => {
@@ -54,7 +58,7 @@ describe('주소 조립', () => {
   it('trustedOrigins 기본값은 설정된 remote 오리진뿐이다', async () => {
     vi.stubEnv('REMOTE_ALLOWED_ORIGINS', undefined);
     const { trustedOrigins } = await load();
-    expect(trustedOrigins()).toEqual([ORIGIN, 'https://cart.example.com']);
+    expect(trustedOrigins()).toEqual([CATALOG_ORIGIN, CART_ORIGIN]);
   });
 });
 
@@ -173,7 +177,7 @@ describe('fetchRemoteVersion', () => {
     await fetchRemoteVersion('catalog');
 
     expect(fetchMock.mock.calls[0]![0]).toBe(
-      `${ORIGIN}/${MF_FILES.versionManifest}`,
+      `${CATALOG_ORIGIN}/${MF_FILES.versionManifest}`,
     );
   });
 

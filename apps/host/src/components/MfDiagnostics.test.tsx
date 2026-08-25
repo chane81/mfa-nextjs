@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 
 import { REMOTE_NAMES } from '@mfa/contracts';
+import { MF_FILES, versionedPath } from '@mfa/remote-config';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,22 +11,36 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * **진단이 거짓말을 하면 없는 장애를 쫓게 된다.** 한동안 여기만 폴백 엔트리를 찔러서,
  * 배포에서 두 remote 가 멀쩡한데도 `Failed to fetch` 로 빨갛게 떴다. 그래서 이 파일이
  * 지키는 첫 번째 계약은 "MF 런타임이 실제로 쓰는 URL(`pinnedEntry`)을 찌른다" 이다.
+ *
+ * 그래서 폴백 주소와 핀 주소가 **같은 오리진에서 갈라져 나와야** 그 구분이 진짜 구분이 된다.
+ * 오리진을 리터럴로 각각 적으면 한쪽만 고쳐도 테스트는 초록인 채로 의미를 잃는다.
+ * `vi.mock` 팩토리는 호이스팅되어 바깥 `const` 를 못 보므로 오리진과 목을 `vi.hoisted` 에 둔다.
  */
-const pinnedEntry = vi.fn();
-const pinnedVersion = vi.fn();
+const { CATALOG_ORIGIN, CART_ORIGIN, pinnedEntry, pinnedVersion } = vi.hoisted(
+  () => ({
+    CATALOG_ORIGIN: 'https://catalog.example.com',
+    CART_ORIGIN: 'https://cart.example.com',
+    pinnedEntry: vi.fn(),
+    pinnedVersion: vi.fn(),
+  }),
+);
+
+/** 버전 핀이 없을 때 쓰이는 주소. 이걸 찌르면 진단이 거짓말을 한 것이다. */
+const FALLBACK = {
+  catalog: `${CATALOG_ORIGIN}/${MF_FILES.webManifest}`,
+  cart: `${CART_ORIGIN}/${MF_FILES.webManifest}`,
+} as const;
 
 vi.mock('@/mf/runtime', () => ({
-  pinnedEntry: (remote: string) => pinnedEntry(remote),
-  pinnedVersion: (remote: string) => pinnedVersion(remote),
-  REMOTE_ENTRIES: {
-    catalog: 'https://catalog.example.com/mf-manifest.json',
-    cart: 'https://cart.example.com/mf-manifest.json',
-  },
+  pinnedEntry,
+  pinnedVersion,
+  REMOTE_ENTRIES: FALLBACK,
 }));
 
+/** MF 런타임이 실제로 쓰는 주소. 경로 조립은 `versionedPath` 가 한다. */
 const PINNED = {
-  catalog: 'https://catalog.example.com/vt1abc/mf-manifest.json',
-  cart: 'https://cart.example.com/vt2def/mf-manifest.json',
+  catalog: `${CATALOG_ORIGIN}${versionedPath(MF_FILES.webManifest, 't1abc')}`,
+  cart: `${CART_ORIGIN}${versionedPath(MF_FILES.webManifest, 't2def')}`,
 } as const;
 
 beforeEach(() => {
@@ -112,9 +127,7 @@ describe('MfDiagnostics', () => {
     render(<MfDiagnostics />);
 
     expect(screen.getAllByText('pending')).toHaveLength(REMOTE_NAMES.length);
-    expect(
-      screen.getByText('https://catalog.example.com/mf-manifest.json'),
-    ).toBeInTheDocument();
+    expect(screen.getByText(FALLBACK.catalog)).toBeInTheDocument();
   });
 
   it('성공하면 exposes 목록을 보여준다', async () => {

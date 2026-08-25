@@ -31,12 +31,21 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-const loadRemoteModule = vi.fn();
+/**
+ * 오리진은 목(`REMOTE_ENTRIES`) · env 스텁 · web 엔트리 셋이 **같은 값이어야** 의미가 있다.
+ * `vi.mock` 팩토리는 호이스팅되어 바깥 `const` 를 못 보므로 `vi.hoisted` 에 둔다.
+ */
+const { CATALOG_ORIGIN, CART_ORIGIN, loadRemoteModule } = vi.hoisted(() => ({
+  CATALOG_ORIGIN: 'https://catalog.example.com',
+  CART_ORIGIN: 'https://cart.example.com',
+  loadRemoteModule: vi.fn(),
+}));
+
 vi.mock('@/mf/runtime', () => ({
-  loadRemoteModule: (id: string) => loadRemoteModule(id),
+  loadRemoteModule,
   REMOTE_ENTRIES: {
-    catalog: 'https://catalog.example.com/mf-manifest.json',
-    cart: 'https://cart.example.com/mf-manifest.json',
+    catalog: `${CATALOG_ORIGIN}/${MF_FILES.webManifest}`,
+    cart: `${CART_ORIGIN}/${MF_FILES.webManifest}`,
   },
 }));
 
@@ -46,13 +55,13 @@ beforeEach(() => {
   pathname = '/';
   loadRemoteModule.mockReset();
   loadRemoteModule.mockReturnValue(new Promise(() => {}));
-  vi.stubEnv('REMOTE_CATALOG_PUBLIC_URL', 'https://catalog.example.com');
-  vi.stubEnv('REMOTE_CART_PUBLIC_URL', 'https://cart.example.com');
+  vi.stubEnv('REMOTE_CATALOG_PUBLIC_URL', CATALOG_ORIGIN);
+  vi.stubEnv('REMOTE_CART_PUBLIC_URL', CART_ORIGIN);
   vi.stubEnv(
     'MFA_REMOTE_WEB_ENTRIES',
     JSON.stringify({
-      catalog: `https://catalog.example.com/${MF_FILES.webManifest}`,
-      cart: `https://cart.example.com/${MF_FILES.webManifest}`,
+      catalog: `${CATALOG_ORIGIN}/${MF_FILES.webManifest}`,
+      cart: `${CART_ORIGIN}/${MF_FILES.webManifest}`,
     }),
   );
 });

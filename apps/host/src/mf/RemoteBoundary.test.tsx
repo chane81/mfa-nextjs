@@ -18,12 +18,12 @@ beforeEach(() => {
   error = vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
+/** prop 으로 넣는 값과 에러 상자에서 다시 읽는 값이 **같아야** 이 테스트가 의미를 가진다. */
+const CATALOG_ENTRY = 'https://catalog.example.com/mf-manifest.json';
+
 const boundary = (children: React.ReactNode) =>
   render(
-    <RemoteBoundary
-      remoteName="catalog"
-      entry="https://catalog.example.com/mf-manifest.json"
-    >
+    <RemoteBoundary remoteName="catalog" entry={CATALOG_ENTRY}>
       {children}
     </RemoteBoundary>,
   );
@@ -46,9 +46,7 @@ describe('RemoteBoundary', () => {
     boundary(<Boom message="ECONNREFUSED 127.0.0.1:3001" />);
 
     const detail = screen.getByText(/entry:/);
-    expect(detail).toHaveTextContent(
-      'entry: https://catalog.example.com/mf-manifest.json',
-    );
+    expect(detail).toHaveTextContent(`entry: ${CATALOG_ENTRY}`);
     expect(detail).toHaveTextContent('ECONNREFUSED 127.0.0.1:3001');
   });
 
