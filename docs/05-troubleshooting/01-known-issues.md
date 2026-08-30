@@ -15,6 +15,7 @@
 | `ERR_PNPM_UNSUPPORTED_ENGINE` / `Expected version: >=24.19.0 <25`  | Node 가 범위 밖이다 — [실행 방법 › 요구사항](../03-setup/01-getting-started.md#요구사항)                                                                                            |
 | 포트가 안 비어서 기동 실패 / 옛 빌드가 계속 응답                   | [0-1](#0-1-pkill--f-next-start-가-안-먹혀서-옛-빌드를-계속-테스트함), [B-4](#b-4-dev-서버가-떠-있으면-포트-충돌조차-안-난다), [B-4b](#b-4b-pnpm-start-가-자기-자신과-포트를-다툰다) |
 | `Directory import … is not supported` / `Cannot find module './x'` | dist 를 raw Node 로 로드했다 — [D-1](#d-1-확장자-없는-상대-경로는-번들러에서만-풀린다)                                                                                              |
+| `ERR_PNPM_FROZEN_LOCKFILE_WITH_OUTDATED_LOCKFILE`                  | 실행 중인 pnpm 이 락파일에 기록된 `packageManager` 핀과 다르다 — [버전 › Node / 패키지 매니저](../03-setup/02-versions.md#node--패키지-매니저)                                      |
 
 ### `pnpm build` 실패
 

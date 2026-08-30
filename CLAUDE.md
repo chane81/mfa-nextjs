@@ -30,7 +30,7 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 
 ## 절대 규칙
 
-- Node `>=24.19.0 <25`, pnpm 11.x. 범위 밖이면 `pnpm install` 이 먼저 막는다.
+- Node `>=24.19.0 <25`, pnpm 12.x. 범위 밖이면 `pnpm install` 이 먼저 막는다.
 - 문서 · 주석 · 커밋 메시지는 **한글**. 변수 · 함수명은 영문.
 - 라이브러리 API 는 기억으로 쓰지 않는다. `package.json` 의 실제 버전 확인 → context7 조회 → 근거 밝히기.
 - 마크다운 · 코드를 고쳤으면 `pnpm format`. CI 가 `format:check` 로 막는다.

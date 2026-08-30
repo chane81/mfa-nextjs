@@ -1,5 +1,42 @@
 # 진행 상황
 
+## 2026-08-30 (22차) — pnpm 을 12.1.0 으로 올렸다
+
+`brew upgrade pnpm` 이 11.24.0 에서 안 올라가는 데서 시작했다. brew 문제가 아니었다 —
+npm `latest` dist-tag 가 아직 11.24.0 이고, 12.0.0(2026-08-26) · 12.1.0(2026-08-29) 은
+`next-12` 태그에만 있다. Homebrew formula 는 `latest` 타르볼을 따라가므로 승격 전까지 못 받는다.
+
+그리고 brew 버전은 이 저장소가 쓰는 버전이 아니다. 실측:
+
+```
+/tmp   에서 pnpm -v → 11.24.0   (brew 바이너리)
+저장소 에서 pnpm -v → 11.22.0   (package.json packageManager 필드)
+```
+
+pnpm 이 `packageManager` 를 보고 그 버전을 스스로 받아 실행한다. 그래서 올릴 자리는
+`packageManager` 한 곳이고, brew 는 안 건드렸다.
+
+### 12 에서 실제로 바뀐 것 중 이 저장소에 닿는 것
+
+- **`packageManager` 핀이 락파일에 기록된다.** `pnpm-lock.yaml` 앞에 env 문서가 붙어
+  `packageManagerDependencies.pnpm: 12.1.0` 을 적는다(+2.8KB). `--frozen-lockfile` 은 이
+  값이 실행 중인 pnpm 과 어긋나면 `ERR_PNPM_FROZEN_LOCKFILE_WITH_OUTDATED_LOCKFILE` 로
+  죽는다. 그래서 Dockerfile 세 개의 `npm install -g pnpm@…` 도 같이 올렸다 — 안 올렸으면
+  로컬·CI 는 통과하고 **이미지 빌드만** 깨졌을 것이다. CI 는 `pnpm/setup@v2` 가
+  `packageManager` 를 읽으므로 손댈 게 없다.
+- **`pnpm-workspace.yaml` 의 미인식 설정이 에러다**(`ERR_PNPM_UNRECOGNIZED_WORKSPACE_SETTINGS`).
+  버전 핀이 있는 저장소에서는 경고가 아니라 실패다. 우리 키(`engineStrict` ·
+  `minimumReleaseAgeExclude` · `onlyBuiltDependencies`)는 전부 인식됐다.
+- **`engineStrict` 가 더 엄해졌다.** optional 서브트리 안의 정규 `dependencies` 로 닿는
+  비호환 패키지도 이제 실패다(11 은 경고). 설치에 걸린 건 없었다.
+- `minimumReleaseAge` 기본값 1440 은 11 과 같다(pnpm.io 설정 문서 확인). Dockerfile 의
+  `trust_lockfile` 근거는 그대로 유효하다.
+
+### 확인
+
+`install` → `lint` → `typecheck` → `format:check` → `test`(614개) → `build` 전부 통과.
+빌드가 통과했으니 host 프리렌더가 remote SSR 번들을 실제로 실행한 것도 그대로다.
+
 ## 2026-08-28 (21차) — 부분 프리페칭 실험을 저장소에서 걷어냈다
 
 `docs/04-experiments/04-partial-prefetching.md` 와 16차 기록을 지웠다. 코드 · 설정에는

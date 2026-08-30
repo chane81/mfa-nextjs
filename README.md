@@ -30,7 +30,7 @@ curl -s https://mfa-catalog.lakegreen.net/mf-version.json
 
 ## 로컬에서 돌리기
 
-**Node `>=24.19.0 <25`, pnpm 11.x** 가 필요하다. `.nvmrc` 가 있으니 nvm · fnm 을 쓰면
+**Node `>=24.19.0 <25`, pnpm 12.x** 가 필요하다. `.nvmrc` 가 있으니 nvm · fnm 을 쓰면
 `nvm use` 한 줄이면 된다. 안 맞으면 `pnpm install` 이 `ERR_PNPM_UNSUPPORTED_ENGINE`
 으로 먼저 막는다.
 
