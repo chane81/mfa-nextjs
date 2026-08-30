@@ -19,7 +19,7 @@ ARG NODE_VERSION=24-slim
 FROM node:${NODE_VERSION} AS base
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
-RUN npm install -g pnpm@11.22.0
+RUN npm install -g pnpm@12.1.0
 # Node 는 DNS 응답에서 AAAA 를 먼저 고른다. 이 호스트에서 IPv6 경로가 블랙홀이라
 # registry.npmjs.org 연결이 에러도 없이 매달렸다(도커 이미지 pull 은 dockerd 라 무사했다).
 ENV NODE_OPTIONS=--dns-result-order=ipv4first
