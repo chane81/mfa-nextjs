@@ -14,7 +14,7 @@ import { ORIGIN } from '../origin';
  *
  * 가장 중요한 계약은 **상세 이동이 링크가 아니라 콜백**이라는 것이다(ADR-013).
  * host 가 라우팅을 소유하므로 remote 는 라우터를 모른다 — 그 대가로 이 자리에서는
- * 프리페치 · 새 탭 · 링크 복사를 잃는다(실측: docs/04-experiments/04-partial-prefetching.md).
+ * 프리페치 · 새 탭 · 링크 복사를 잃는다.
  */
 const A = PRODUCTS[0]!;
 const SOLD_OUT = { ...A, id: 'so-001', name: '품절된 상품', stock: 0 };
