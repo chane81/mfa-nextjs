@@ -98,13 +98,23 @@ npm view tailwindcss version
 
 ```
 node    v24.19.0  (이 저장소 요구: >=24.19.0 <25)
-pnpm    11.22.0
+pnpm    12.1.0
 ```
 
 `.nvmrc` 에 `24.19.0` 을 적어 뒀다 — 버전 매니저가 셸에서 알아서 맞춘다.
 
-`packageManager` 필드로 pnpm 11.22.0 을 고정했다. 이미지 셋도 같은 버전을
+`packageManager` 필드로 pnpm 12.1.0 을 고정했다. 이미지 셋도 같은 버전을
 `npm install -g` 로 깐다 — corepack 을 안 쓰는 이유는 각 Dockerfile 주석 참고.
+
+**12 부터는 이 두 자리를 같이 안 올리면 이미지 빌드가 깨진다.** pnpm 12 는 `packageManager`
+핀을 `pnpm-lock.yaml` 의 `packageManagerDependencies` 에 기록하고, `--frozen-lockfile` 은
+그 값이 실행 중인 pnpm 과 어긋나면 `ERR_PNPM_FROZEN_LOCKFILE_WITH_OUTDATED_LOCKFILE` 로
+실패한다(11 은 기록도 검사도 안 했다). CI 는 `pnpm/setup@v2` 가 `packageManager` 를 읽으므로
+따라오지만, Dockerfile 의 `npm install -g pnpm@…` 는 손으로 맞춰야 한다.
+
+brew 로는 아직 12 를 못 받는다 — npm `latest` dist-tag 가 11.24.0 이고 12 는 `next-12`
+태그에만 있다(2026-08-30 확인). Homebrew formula 는 `latest` 타르볼을 따라간다. 저장소는
+`packageManager` 핀만 보므로 brew 버전과 무관하게 12.1.0 으로 돈다.
 
 node 요구가 next 16 의 `>=20.9.0` 보다 높은 이유는 `packages/remote-config` 다.
 빌드 산출물 없이 `.ts` 를 그대로 export 해서 Node 의 타입 스트리핑에 기댄다

@@ -187,4 +187,4 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
   `docs/guide/projects.md` 조회 결과.
 - jsdom 30.0.1 / @testing-library/react 16.3.2 / @testing-library/dom 10.4.1 /
   @testing-library/jest-dom 7.0.1 / @vitejs/plugin-react 6.0.5.
-- 검증일: 2026-08-24. Node v24.19.0, pnpm 11.22.0.
+- 검증일: 2026-08-30. Node v24.19.0, pnpm 12.1.0 (614개 전부 통과).
