@@ -34,6 +34,12 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# 이 저장소는 공개다. fork 가 연 PR 도 여기서 `pnpm build` 를 돌린다 —
+# 그 워크플로가 받는 GITHUB_TOKEN 이 무엇을 할 수 있는지 기본값에 맡기지 않는다.
+# CI 는 코드를 읽기만 하면 된다. 쓰기 권한은 mf-revalidate 쪽에도 필요 없다(시크릿만 쓴다).
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
