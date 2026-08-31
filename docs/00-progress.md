@@ -1,5 +1,63 @@
 # 진행 상황
 
+## 2026-08-31 (23차) — 저장소를 public 으로 열기 전 점검
+
+공개 전환은 되돌릴 수 없다(포크·크롤러·검색 인덱스). 그래서 먼저 훑었다.
+
+### 시크릿 — 나온 게 없다
+
+커밋 154개 전량 + 작업 트리를 봤다.
+
+| 검사                                                             | 결과                                       |
+| ---------------------------------------------------------------- | ------------------------------------------ |
+| 토큰 패턴 (`ghp_` · `sk-` · `AKIA` · `xox` · `AIza` · PEM · JWT) | 0건                                        |
+| `.env*` 커밋 이력                                                | 없음                                       |
+| `apps/host/.env.local`                                           | gitignore 됨 + 안의 값도 주석 처리 상태    |
+| 문서의 `x-mf-secret` 예시                                        | 전부 `$MF_REVALIDATE_SECRET`, 리터럴 없음  |
+| Dockerfile · scripts 에 구운 시크릿                              | 없음                                       |
+| `/Users/...` 절대경로                                            | 없음                                       |
+| LICENSE · `private: true`                                        | MIT 있음, package.json 11개 전부 `private` |
+
+### 고친 것
+
+- **`DELETE /api/lab/stats` 를 배포본에서 닫았다.** 저장소 전체에서 **인증 없이 서버
+  상태를 바꾸는 유일한 경로**였고, 공개되면 경로까지 문서로 공개된다.
+  `proxy.ts` 가 렌더 앞에서 404 를 내고, 라우트 핸들러도 같은 조건을 다시 본다
+  (`/internal/*` 과 같은 이중 방어).
+- **`ci.yml` 에 `permissions: contents: read`.** 공개 저장소에서는 fork 의 PR 도 이
+  워크플로를 돌린다. 그 실행이 받는 `GITHUB_TOKEN` 의 권한을 기본값에 맡기지 않는다.
+- **`docs/00-progress.md` 의 맥 LAN IP 를 `$MFA_HOST_IP` 로 바꿨다.** 사설 대역이라
+  위험은 낮지만 기록에 남겨둘 이유도 없다.
+
+### 리셋은 `pnpm dev` 에서만 쓴다
+
+캐시 모드 실험(`04-experiments/03-cache-modes.md`)은 `next start` 로 도는데, 그건
+`NODE_ENV=production` 이라 리셋도 같이 막힌다. 옵트인 환경변수로 열어주는 안을
+만들었다가 **뺐다** — 스위치 하나에 코드·테스트·문서 네 곳이 붙는데, 이 저장소에서
+리셋을 반복하는 실험은 dev 에서 돌리면 그만이고 프로덕션 빌드에서는 서버 재시작이
+곧 리셋이다(계측이 인메모리다). 닫는 조건은 `NODE_ENV === 'production'` 하나로 둔다.
+
+### 열어둔 것과 그 근거
+
+`/debug` 와 `GET /api/lab/stats` 는 그대로 둔다. 노출값이 remote 의 entry·exposes·버전인데
+**remote 가 `mf-version.json` 으로 이미 공개하는 값**이라 추가 노출이 없다. 오히려 이쪽이
+이 저장소의 시연 대상이다 — README 가 `/debug` 를 라이브 링크로 걸고 있고,
+`02-architecture/04-remote-lifecycle.md` 의 배포 검증 절차가 프로덕션 `$HOST_URL` 상대로
+`GET ...?refresh=1` 을 호출한다.
+
+### 공개하면 같이 드러나는 것 (남겨두기로 한 것)
+
+- 커밋 이메일 — 154개 커밋 전부에 박혀 있다. 바꾸려면 히스토리 재작성이 필요하다.
+- 실서비스 도메인 3개(`mfa*.lakegreen.net`) — 워크플로 기본값 · README · `anatomy.html`.
+  배포 파이프라인 구조가 문서로 상세히 공개된다는 뜻이기도 하다.
+
+### 다음에 할 것
+
+- [ ] public 전환 **후** Settings → Actions → General 의
+      `Fork pull request workflows from outside collaborators` 를 확인한다.
+      이 섹션은 **공개 저장소에서만 보인다** — private 상태에서는 아예 안 뜬다.
+      기본값은 `Require approval for first-time contributors`.
+
 ## 2026-08-30 (22차) — pnpm 을 12.1.0 으로 올렸다
 
 `brew upgrade pnpm` 이 11.24.0 에서 안 올라가는 데서 시작했다. brew 문제가 아니었다 —
@@ -886,16 +944,16 @@ exposes 는 automatic JSX runtime 이라 `jsxDEV` 를 **정적 import** 하고, 
 
 ### 검증
 
-| 항목                                | 결과                                                   |
-| ----------------------------------- | ------------------------------------------------------ |
-| `turbo run typecheck` / `lint`      | ✅ 16/16                                               |
-| `pnpm build` (host 프리렌더 포함)   | ✅ `next build exited with code 0`                     |
-| 후행 슬래시 정규화 / 빈 `ARG` 폴백  | ✅ node 로 직접 확인                                   |
-| `docker-host-local.sh` 전 구간      | ✅ EXIT=0                                              |
-| 컨테이너 → 맥 LAN IP 도달성         | ✅ 빌드 프리렌더가 `192.168.68.50:3001` 에서 수신      |
-| 컨테이너 런타임 remote SSR          | ✅ `/checkout` 에 `주문서`, ErrorBox 없음              |
-| 서버가 심은 버전 경로 엔트리        | ✅ `http://192.168.68.50:3001/v<ver>/mf-manifest.json` |
-| compose 변수 보간 (`MFA_HOST_IP:?`) | ✅ 미설정 시 메시지와 함께 exit 1, 설정 시 정상 해석   |
+| 항목                                | 결과                                                  |
+| ----------------------------------- | ----------------------------------------------------- |
+| `turbo run typecheck` / `lint`      | ✅ 16/16                                              |
+| `pnpm build` (host 프리렌더 포함)   | ✅ `next build exited with code 0`                    |
+| 후행 슬래시 정규화 / 빈 `ARG` 폴백  | ✅ node 로 직접 확인                                  |
+| `docker-host-local.sh` 전 구간      | ✅ EXIT=0                                             |
+| 컨테이너 → 맥 LAN IP 도달성         | ✅ 빌드 프리렌더가 `$MFA_HOST_IP:3001` 에서 수신      |
+| 컨테이너 런타임 remote SSR          | ✅ `/checkout` 에 `주문서`, ErrorBox 없음             |
+| 서버가 심은 버전 경로 엔트리        | ✅ `http://$MFA_HOST_IP:3001/v<ver>/mf-manifest.json` |
+| compose 변수 보간 (`MFA_HOST_IP:?`) | ✅ 미설정 시 메시지와 함께 exit 1, 설정 시 정상 해석  |
 
 `docker compose up` 전체 기동은 안 돌렸다 — `docker-host-local.sh` 가 같은 경로(빌드 컨테이너
 → 맥 LAN IP → 퍼블리시된 포트)를 이미 통과했고, compose 쪽은 파일 보간까지만 확인했다.

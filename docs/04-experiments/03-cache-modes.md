@@ -426,6 +426,11 @@ MF_REVALIDATE_SECRET=lab-secret pnpm --filter @mfa/host start
 
 브라우저에서 `/lab` 인덱스로 세 모드 비교.
 계측은 `GET /api/lab/stats`, 리셋은 `DELETE /api/lab/stats`.
+
+`DELETE` 는 이 프로덕션 빌드에서 404 다 — 인증 없이 서버 상태를 바꾸는 경로라
+`NODE_ENV=production` 이면 닫힌다(`02-architecture/02-topology.md`). 여기서 카운터를
+0 으로 만들려면 **서버를 다시 띄운다**. 계측은 인메모리라 재시작이 곧 리셋이다.
+리셋을 반복해야 하는 실험은 `pnpm dev` 에서 돌린다.
 무효화는 `POST /api/mf-revalidate` (`x-mf-secret` 헤더 + `{"remote":"catalog"}`).
 
 ## 팀 설득용 한 줄
