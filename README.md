@@ -155,4 +155,4 @@ CI(`.github/workflows/ci.yml`)는 두 job 이다. `lint` · `typecheck` · `form
 
 ## 라이선스
 
-[MIT](./LICENSE) — 가져다 쓰고, 고치고, 사내 코드에 넣어도 된다.
+MIT
