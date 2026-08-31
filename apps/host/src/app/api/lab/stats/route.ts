@@ -7,7 +7,7 @@ import { ssrEntrySnapshot } from '@/mf/server-loader';
 /**
  * 로더 계측과 이 인스턴스가 보고 있는 remote 버전을 읽는다.
  *
- * 실험 절차:
+ * 실험 절차(리셋이 필요하므로 `pnpm dev` 에서 돌린다 — 아래 `DELETE` 주석 참고):
  *   1. `DELETE /api/lab/stats` 로 0 으로 리셋
  *   2. 대상 페이지를 N 번 요청
  *   3. `GET /api/lab/stats` 로 fetch/eval 횟수 확인
@@ -30,7 +30,16 @@ export async function GET(req: Request) {
   });
 }
 
+/**
+ * 계측 리셋. 인증 없이 서버 상태를 바꾸므로 **프로덕션에는 없다.**
+ *
+ * `proxy.ts` 가 이미 렌더 앞에서 404 를 낸다. 여기서 다시 보는 건 matcher 가
+ * 틀어져도 뚫리지 않게 하기 위한 것이다 — `/internal/*` 과 같은 이중 방어다.
+ */
 export function DELETE() {
+  if (process.env.NODE_ENV === 'production')
+    return new Response('not found', { status: 404 });
+
   resetLoaderStats();
   return Response.json({ ok: true, stats: getLoaderStats() });
 }

@@ -119,9 +119,9 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 14. `apps/host/src/mf/remote-version.ts` — `isBundleReady` **epoch 불일치 → false** / `fetchRemoteVersion` 6분기
 - [x] 15. `apps/host/src/mf/server-loader.ts` — id 파싱 / 오리진·HTTP·타임아웃·무결성 분기 / requireShim / `default` 언랩 / 통계 순서 / 캐시(재사용·재로드·**실패 promise 제거**)
 - [x] 16. `apps/host/src/app/api/mf-revalidate/route.ts` — 401 / 400 / `warm=0` / 502 + **태그 미무효화** / `cause` 언래핑 / 성공 호출 순서 / `paths=1`
-- [x] 17. `apps/host/src/proxy.ts` — 시크릿 없으면 **401 이 아니라 404** / `config.matcher`
+- [x] 17. `apps/host/src/proxy.ts` — 시크릿 없으면 **401 이 아니라 404** / `config.matcher` / `/api/lab/*` 은 **DELETE 만** 프로덕션에서 닫힘
 - [x] 18. `apps/host/src/lib/cart-cookie.ts` — 쿠키 없음 → `[]` / 이중 디코딩 안 함
-- [x] 19. `apps/host/src/app/api/lab/stats/route.ts` — `refresh=1` 일 때만 fetch / 응답 형태 / `DELETE`
+- [x] 19. `apps/host/src/app/api/lab/stats/route.ts` — `refresh=1` 일 때만 fetch / 응답 형태 / `DELETE` / **배포본에서 DELETE 는 404** (proxy 와 별개의 이중 방어)
 - [x] 20. `apps/host/src/mf/remote-endpoints.ts` — `MFA_REMOTE_WEB_ENTRIES` 파싱 실패 삼킴 / 주입 / `REMOTE_ORIGINS`
 - [x] 21. `packages/remote-config/src/node.ts` — `readBuildVersion` / `assetBase` 4조합 / `createMfDevMiddleware` 상태코드·헤더·dev↔preview 차이
 
@@ -187,4 +187,4 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
   `docs/guide/projects.md` 조회 결과.
 - jsdom 30.0.1 / @testing-library/react 16.3.2 / @testing-library/dom 10.4.1 /
   @testing-library/jest-dom 7.0.1 / @vitejs/plugin-react 6.0.5.
-- 검증일: 2026-08-30. Node v24.19.0, pnpm 12.1.0 (614개 전부 통과).
+- 검증일: 2026-08-31. Node v24.19.0, pnpm 12.1.0 (619개 전부 통과).

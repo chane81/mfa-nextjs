@@ -98,7 +98,7 @@ describe('DELETE', () => {
     recordFetch('catalog');
     recordEval();
 
-    const body = await (await DELETE()).json();
+    const body = await DELETE().json();
 
     expect(body).toEqual({
       ok: true,
@@ -107,11 +107,24 @@ describe('DELETE', () => {
     expect((await (await GET(get())).json()).stats.fetches).toBe(0);
   });
 
+  it('프로덕션에서는 404 다 — 무인증 변경 동작을 남겨두지 않는다', async () => {
+    // proxy 가 이미 렌더 앞에서 자른다. 여기 검사는 matcher 가 틀어졌을 때의 이중 방어라
+    // proxy 를 거치지 않는 이 단위 테스트에서 따로 확인한다.
+    const { DELETE, recordFetch, GET } = await setup();
+    recordFetch('catalog');
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const res = DELETE();
+
+    expect(res.status).toBe(404);
+    expect((await (await GET(get())).json()).stats.fetches).toBe(1);
+  });
+
   it('버전 정보는 지우지 않는다 — 리셋 대상은 계측뿐이다', async () => {
     const { DELETE, GET } = await setup();
     await GET(get('?refresh=1'));
 
-    await DELETE();
+    DELETE();
 
     expect((await (await GET(get())).json()).versions).toEqual({
       catalog: 't1cat',

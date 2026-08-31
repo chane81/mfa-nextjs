@@ -32,12 +32,19 @@
      │    └── /lab/cache      → "use cache" + cacheTag(remote) — 태그 무효화
      ├── /internal/mf-warm    → 무효화 직후 remote 선 warm (시크릿 필요)
      ├── /api/mf-revalidate   → remote 재배포 웹훅 수신 → 태그 만료
-     └── /api/lab/stats       → 실험 패널이 읽는 로더 카운터
+     └── /api/lab/stats       → 실험 패널이 읽는 로더 카운터 (DELETE 는 로컬 전용)
 ```
 
 `/internal/*` 은 `apps/host/src/proxy.ts` 가 시크릿 헤더로 막는다. Next 16 에서
 `middleware` 파일 규약이 `proxy` 로 바뀌었고, 렌더 파이프라인 **앞**에서 도는 덕에
 진짜 404 를 낼 수 있다(페이지 안 `notFound()` 는 200 으로 나간다 — 실측).
+
+같은 proxy 가 `DELETE /api/lab/stats` 도 프로덕션에서 404 로 자른다. 이 저장소는
+공개라 경로도 공개되는데, 그건 **인증 없이 서버 상태(로더 카운터)를 바꾸는** 유일한
+경로였다. 리셋이 필요한 실험은 로컬에서 돌리므로 배포본에 남길 이유가 없다.
+읽기(`GET`)는 그대로 둔다 — 노출값이 remote 의 entry·버전인데 remote 가
+`mf-version.json` 으로 이미 공개하는 것이고, `/lab` 화면과 배포 검증 절차
+(`04-remote-lifecycle.md`)가 쓴다. `/debug` 도 같은 이유로 열려 있다.
 
 ## 앱 목록
 
