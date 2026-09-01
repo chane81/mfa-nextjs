@@ -1,41 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  REMOTE_NAMES,
-  type RemoteModuleId,
-  type RemoteName,
-} from './remote-contract';
+import { MODULE_IDS, REMOTE_NAMES, exposedNames } from './remote-contract';
 
 /**
- * remote 계약 드리프트 감지.
+ * remote 계약의 성질.
  *
- * `RemoteModuleMap` 은 타입이라 런타임에 키를 셀 수 없다. 대신 목록을 한 번 적고
- * **양방향으로** 타입에 묶는다 — `satisfies` 가 잘못된 id 를 막고, 아래 `_Exhaustive`
- * 가 맵에만 추가되고 여기 안 적힌 id 를 막는다. 둘 중 하나라도 어긋나면
- * `pnpm typecheck` 가 먼저 죽는다.
+ * **전에 여기 있던 드리프트 검사는 사라졌다.** `RemoteModuleMap` 과 `MODULE_IDS` 가
+ * 같은 id 를 두 번 적던 시절에는 둘을 묶는 장치(`satisfies` · 전수 검사)가 필요했는데,
+ * 지금은 둘 다 `MODULES` 객체 하나에서 파생되므로 갈라질 수가 없다. 키 형태
+ * (`<remote>/<모듈>`)도 그 객체의 `satisfies` 가 선언 자리에서 막는다.
+ *
+ * 남은 건 타입으로 표현되지 않는 것들이다.
  */
-const MODULE_IDS = [
-  'catalog/ProductGrid',
-  'catalog/ProductDetail',
-  'cart/CartPanel',
-  'cart/CartBadge',
-  'cart/CheckoutFlow',
-] as const satisfies readonly RemoteModuleId[];
-
-type _Exhaustive =
-  Exclude<RemoteModuleId, (typeof MODULE_IDS)[number]> extends never
-    ? true
-    : never;
-const _exhaustive: _Exhaustive = true;
-
-/** 모듈 id 의 접두사는 반드시 remote 이름이어야 한다 (타입 수준) */
-type Prefix<T> = T extends `${infer P}/${string}` ? P : never;
-type _PrefixIsRemoteName =
-  Prefix<RemoteModuleId> extends RemoteName ? true : never;
-const _prefixIsRemoteName: _PrefixIsRemoteName = true;
-
 describe('remote 계약', () => {
   it('모듈 id 의 접두사는 전부 REMOTE_NAMES 안에 있다', () => {
+    // 타입은 `${RemoteName}/${string}` 까지만 보장한다. REMOTE_NAMES 는 런타임 배열이라
+    // 타입과 값이 갈리는 경우(패키지 버전이 섞이는 등)를 여기서 한 번 더 본다.
     for (const id of MODULE_IDS) {
       expect(REMOTE_NAMES).toContain(id.split('/')[0]);
     }
@@ -44,11 +24,17 @@ describe('remote 계약', () => {
   it('모든 remote 가 최소 한 개의 모듈을 노출한다', () => {
     // 아무것도 노출하지 않는 remote 가 배치에만 남아 있으면 dev 가 그걸 기다린다.
     for (const name of REMOTE_NAMES) {
-      expect(MODULE_IDS.some((id) => id.startsWith(`${name}/`))).toBe(true);
+      expect(exposedNames(name).length).toBeGreaterThan(0);
     }
   });
 
-  it('타입 수준 검사가 살아 있다', () => {
-    expect(_exhaustive && _prefixIsRemoteName).toBe(true);
+  it('MODULE_IDS 는 런타임에 실제로 채워진다', () => {
+    // 타입에서 파생된 값이라 빌드가 바뀌면 조용히 비어도 이상하지 않다.
+    // 비면 각 remote 의 expose 계약 테스트가 전부 "통과" 해버린다.
+    expect(MODULE_IDS.length).toBeGreaterThan(0);
+  });
+
+  it('exposedNames 는 접두사를 떼고 이름만 준다', () => {
+    expect(exposedNames('catalog')).toEqual(['ProductGrid', 'ProductDetail']);
   });
 });
