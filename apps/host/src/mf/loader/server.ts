@@ -10,19 +10,17 @@ import type {
 } from '@mfa/contracts';
 import type { SsrExternal } from '@mfa/remote-config';
 
-import { REMOTE_FETCH_TIMEOUT_MS } from './constants';
-import { byRemote } from './remote-endpoints';
-import { normalizeModule } from './interop';
-import { recordEval, recordFetch, recordLoad } from './loader-stats';
 import {
-  fallbackSsrEntry,
-  fetchRemoteVersion,
-  announcedVersion,
-  remoteOrigin,
-  trustedOrigins,
-} from './versions/server';
-import { markBundleReady, warmEpoch } from './warm-state';
-import { assertAllowedOrigin, assertIntegrity } from './remote-trust';
+  byRemote,
+  REMOTE_FETCH_TIMEOUT_MS,
+  SSR_ENTRIES,
+  ssrOrigin,
+} from '../config';
+import { recordEval, recordFetch, recordLoad } from '../state/loader-stats';
+import { markBundleReady, warmEpoch } from '../state/warm';
+import { assertAllowedOrigin, assertIntegrity, trustedOrigins } from '../trust';
+import { announcedVersion, fetchRemoteVersion } from '../versions/server';
+import { normalizeShared } from './react-modules';
 
 /**
  * remote 를 **서버에서** 로드하는 로더.
@@ -50,18 +48,22 @@ import { assertAllowedOrigin, assertIntegrity } from './remote-trust';
  *
  * 브라우저 쪽 MF shared 와 달리 여기서는 서브엔트리도 직접 넘겨야 한다.
  * remote 의 node 번들이 `require("react/jsx-runtime")` 를 그대로 호출하기 때문이다.
- * 네임스페이스 모양이 `{ default: {...} }` 로 올 수 있어 프로브로 정규화한다.
+ * 정규화 프로브는 `./react-modules` 의 표가 정한다 — 브라우저 경로와 같은 표라,
+ * 한쪽만 프로브가 어긋나는 일이 생기지 않는다. 네임스페이스는 여기서 직접 import 한다:
+ * 이 모듈은 Route Handler 에서도 닿아 RSC 그래프에 들어가므로 `react-dom/client` 를
+ * 볼 수 없다(그래서 표에는 있고 여기에는 없다).
  *
  * **키 목록은 `SSR_EXTERNALS` 가 정한다.** 그 상수는 remote 두 곳의 SSR 빌드 설정이
  * external 로 남기는 목록과 같은 값이라, 타입이 여기서 하나라도 빠지는 걸 막는다 —
  * 빠지면 `예상 밖 모듈을 require 했습니다` 로 remote 가 통째로 안 뜬다.
+ * `satisfies Record<SsrExternal, unknown>` 이 그 대조를 컴파일 타임에 한다.
  */
-const INJECTED: Record<SsrExternal, unknown> = {
-  react: normalizeModule(React, 'useState'),
-  'react-dom': normalizeModule(ReactDOM, 'createPortal'),
-  'react/jsx-runtime': normalizeModule(ReactJSXRuntime, 'jsx'),
-  'react/jsx-dev-runtime': normalizeModule(ReactJSXDevRuntime, 'jsxDEV'),
-};
+const INJECTED = normalizeShared({
+  react: React,
+  'react-dom': ReactDOM,
+  'react/jsx-runtime': ReactJSXRuntime,
+  'react/jsx-dev-runtime': ReactJSXDevRuntime,
+} satisfies Record<SsrExternal, unknown>);
 
 type ExposeMap = Record<string, unknown>;
 
@@ -108,7 +110,7 @@ export function remoteCacheTag(remote: RemoteName): string {
  * remote 재배포를 통보받아도 페이지를 실제로 렌더하는 SSR 레이어의 Map 은 그대로이기 때문이다.
  *
  * 그래서 캐시는 레이어별로 두고, **버전 문자열만 globalThis 로 공유한다**
- * (`remote-version.ts`). 버전이 바뀌면 각 레이어가 다음 접근에서 스스로 캐시를 버린다.
+ * (`../versions/server.ts`). 버전이 바뀌면 각 레이어가 다음 접근에서 스스로 캐시를 버린다.
  *
  * 프로세스 안 카운터가 아니라 remote 가 공표한 버전을 쓰는 이유는 멀티 인스턴스다.
  * 카운터는 웹훅이 닿은 인스턴스에만 오르지만, 버전은 모든 인스턴스가 같은 출처에서 읽는다.
@@ -167,9 +169,9 @@ async function resolveEntry(
    * 아무것도 모르는 콜드 상태에서만 직접 읽는다.
    */
   const info = announcedVersion(remote) ?? (await fetchRemoteVersion(remote));
-  if (!info) return { url: fallbackSsrEntry(remote), version: UNVERSIONED };
+  if (!info) return { url: SSR_ENTRIES[remote], version: UNVERSIONED };
   return {
-    url: `${remoteOrigin(remote)}${info.ssrEntry}`,
+    url: `${ssrOrigin(remote)}${info.ssrEntry}`,
     version: info.version,
     integrity: info.ssrIntegrity,
   };
@@ -318,8 +320,6 @@ export async function loadRemoteModuleOnServer<K extends RemoteModuleId>(
 export function ssrEntrySnapshot(): Record<RemoteName, string> {
   return byRemote((remote) => {
     const info = announcedVersion(remote);
-    return info
-      ? `${remoteOrigin(remote)}${info.ssrEntry}`
-      : fallbackSsrEntry(remote);
+    return info ? `${ssrOrigin(remote)}${info.ssrEntry}` : SSR_ENTRIES[remote];
   });
 }

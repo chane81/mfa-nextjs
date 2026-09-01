@@ -11,6 +11,22 @@ paths:
 host 는 번들러 플러그인 없이 `@module-federation/runtime` 만 쓴다. 브라우저는 웹 매니페스트로,
 서버는 CJS 번들(`mf-server.cjs`)을 받아 **평가해서** remote 를 렌더한다.
 
+## `src/mf` 는 목적축 여섯 폴더다
+
+| 폴더          | 답하는 질문                       |
+| ------------- | --------------------------------- |
+| `config/`     | remote 주소는? 호출 예산은?       |
+| `versions/`   | 지금 가리켜야 할 버전이 무엇인가? |
+| `state/`      | 이 프로세스가 지금 뭘 들고 있나?  |
+| `trust/`      | 이 remote 를 믿어도 되나?         |
+| `loader/`     | 어떻게 가져와서 실행하나?         |
+| `components/` | 화면에 어떻게 붙나?               |
+
+의존은 한 방향이다: `components/` → `loader/` → `versions/` → `trust/` → `config/`
+(`state/` 는 어디서든 부른다). 역방향 import 를 쓰게 됐다면 그 값이 잘못된 폴더에 있다.
+테스트는 대상 소스 옆에 그대로 둔다. 배치 근거와 옛 경로 대응표:
+`docs/02-architecture/06-host-mf-layout.md`.
+
 ## SSOT 를 지킨다
 
 | 무엇                     | 어디                                                                 |
@@ -22,7 +38,7 @@ host 는 번들러 플러그인 없이 `@module-federation/runtime` 만 쓴다. 
 | 빌드 버전 · dist 경로    | `@mfa/remote-config/node` — `readBuildVersion()` · `versionedDist()` |
 | remote 모듈 타입         | `packages/contracts` 의 `RemoteModuleMap`                            |
 | 런타임 공유 상태         | `packages/store` — 도메인별 폴더(`cart/`)                            |
-| 레이어를 넘는 host 상태  | `apps/host/src/mf/global-state.ts` 의 `globalCell()`                 |
+| 레이어를 넘는 host 상태  | `apps/host/src/mf/state/cell.ts` 의 `globalCell()`                   |
 
 `@mfa/remote-config` 는 **진입점이 둘**이다. `index.ts` 는 host 의 브라우저 번들에 실리므로
 node builtin 을 넣을 수 없고, node 전용 코드는 전부 `node.ts`(`@mfa/remote-config/node`) 로 간다.
@@ -50,21 +66,21 @@ Node 의 타입 스트리핑에 기댄다. 그래서 이 패키지에는 런타�
 `publicOrigin()` 은 `process.env[이름]` 을 **동적으로** 읽으므로 Next 가 치환하지 못한다.
 브라우저 번들에서 쓰면 배포에서 조용히 `localhost` 로 떨어진다.
 
-| 쓰는 곳              | 써야 할 것                                                         |
-| -------------------- | ------------------------------------------------------------------ |
-| 서버(SSR 로더 등)    | `SSR_ENTRIES` · `publicOrigin()`                                   |
-| 브라우저에 나가는 값 | `REMOTE_ORIGINS` · `WEB_ENTRIES` (`next.config.ts` 가 구워 넣는다) |
+| 쓰는 곳              | 써야 할 것                                                      |
+| -------------------- | --------------------------------------------------------------- |
+| 서버(SSR 로더 등)    | `SSR_ENTRIES` · `ssrOrigin()` · `publicOrigin()`                |
+| 브라우저에 나가는 값 | `WEB_ORIGINS` · `WEB_ENTRIES` (`next.config.ts` 가 구워 넣는다) |
 
 같은 성질이 **`globalThis` 에 사는 값**에도 있다. 그래서 버전 코드는
 `apps/host/src/mf/versions/` 에서 **값이 어디서 유효한지로** 갈라 둔다.
 
-| 파일                  | 값이 사는 곳                                 | 누가 import 하나                 |
-| --------------------- | -------------------------------------------- | -------------------------------- |
-| `versions/server.ts`  | remote 가 **공표한** 값 (`announcedVersion`) | RSC 레이아웃 · SSR 로더 · 라우트 |
-| `versions/browser.ts` | 서버가 **심어준** 값 (`injectedEntry`)       | `runtime.ts`(엔트리 URL) · 진단  |
-| `versions/index.ts`   | — 둘 중 있는 쪽 (`remoteVersion`)            | **렌더 코드 전부**               |
+| 파일                  | 값이 사는 곳                                 | 누가 import 하나                     |
+| --------------------- | -------------------------------------------- | ------------------------------------ |
+| `versions/server.ts`  | remote 가 **공표한** 값 (`announcedVersion`) | RSC 레이아웃 · SSR 로더 · 라우트     |
+| `versions/browser.ts` | 서버가 **심어준** 값 (`injectedEntry`)       | `loader/index.ts`(엔트리 URL) · 진단 |
+| `versions/index.ts`   | — 둘 중 있는 쪽 (`remoteVersion`)            | **렌더 코드 전부**                   |
 
-적재 상태와 warm 세대는 버전이 아니라 "그 버전으로 뭘 했나" 라서 `mf/warm-state.ts` 에 있다.
+적재 상태와 warm 세대는 버전이 아니라 "그 버전으로 뭘 했나" 라서 `mf/state/warm.ts` 에 있다.
 
 이름은 위치가 아니라 **출처**로 짓는다(공표된 / 심어준). 그래야 합치는 줄에서 두 항이
 같은 모양이 되고, 같은 종류의 값이라는 게 보인다.

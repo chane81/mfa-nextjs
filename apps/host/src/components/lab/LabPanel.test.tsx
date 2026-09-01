@@ -26,7 +26,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 /**
- * 오리진은 목(`REMOTE_ENTRIES`) · env 스텁 · web 엔트리 셋이 **같은 값이어야** 의미가 있다.
+ * 오리진은 env 스텁과 web 엔트리가 **같은 값이어야** 의미가 있다.
  * `vi.mock` 팩토리는 호이스팅되어 바깥 `const` 를 못 보므로 `vi.hoisted` 에 둔다.
  */
 const { CATALOG_ORIGIN, CART_ORIGIN, loadRemoteModule } = vi.hoisted(() => ({
@@ -35,13 +35,7 @@ const { CATALOG_ORIGIN, CART_ORIGIN, loadRemoteModule } = vi.hoisted(() => ({
   loadRemoteModule: vi.fn(),
 }));
 
-vi.mock('@/mf/runtime', () => ({
-  loadRemoteModule,
-  REMOTE_ENTRIES: {
-    catalog: `${CATALOG_ORIGIN}/${MF_FILES.webManifest}`,
-    cart: `${CART_ORIGIN}/${MF_FILES.webManifest}`,
-  },
-}));
+vi.mock('@/mf/loader', () => ({ loadRemoteModule }));
 
 const RENDERED_AT = '2026-01-02T03:04:05.000Z';
 

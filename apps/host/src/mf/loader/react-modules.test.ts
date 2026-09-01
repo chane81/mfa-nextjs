@@ -7,7 +7,7 @@ import {
   vi,
 } from 'vitest';
 
-import { normalizeModule } from './interop';
+import { normalizeModule } from './react-modules';
 
 /**
  * `import * as X` 의 결과 모양은 번들러 · 모드 · 대상(CJS·ESM)에 따라 달라진다.

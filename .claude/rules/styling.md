@@ -28,7 +28,7 @@ paths:
 
 `RemoteComponent` 한 곳에서 `<link rel="stylesheet" precedence="mfa-remote">` 를 건다.
 remote 쪽 expose 마다 선언하지 않는다 — expose 를 추가할 때 잊으면 스타일 없는 화면이 조용히 나온다.
-주소는 `REMOTE_ORIGINS[remote] + stylesPath(version)` 로 만든다(브라우저에서도 맞는 값).
+주소는 `WEB_ORIGINS[remote] + stylesPath(version)` 로 만든다(브라우저에서도 맞는 값).
 
 ## 인라인 스타일은 런타임 값만
 

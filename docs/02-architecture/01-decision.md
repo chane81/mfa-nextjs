@@ -117,7 +117,7 @@
   문자열로 복제하고 있던 셈이다.
 - 결과:
   - ⭕ remote 추가/삭제 시 고칠 파일이 하나다. `satisfies` 가 누락을 컴파일 타임에 잡는다.
-  - ⭕ host 코드에 remote 이름이 남지 않는다(`remote-endpoints.ts` 에 한 줄도 없다).
+  - ⭕ host 코드에 remote 이름이 남지 않는다(`config/index.ts` 에 한 줄도 없다).
   - ❌ `engines.node >= 24.19.0` 이 하드 요구사항이 된다. 그 아래에서는 패키지가 로드조차 안 된다.
   - ⚠️ `docker-compose.yml` 만 예외다. 정적 YAML 이라 이 모듈을 읽을 수 없어 손으로 맞춘다.
 - 상세: [03-setup/03-environment.md](../03-setup/03-environment.md)
@@ -717,3 +717,33 @@
 remote 는 **props 와 콜백으로만** host 와 대화한다.
 `onSelect(product)` → host 가 `router.push` 를 수행. remote 는 라우터를 모른다.
 이 규칙 덕분에 remote 를 어느 라우트로 옮겨도 소프트 내비게이션이 유지된다.
+
+## ADR-018 — `src/mf` 는 레이어가 아니라 **목적**으로 나눈다
+
+- 상태: 채택 (2026-09-01, 26차)
+- 맥락: `apps/host/src/mf/` 가 평면이었다. 소스 15개 + 테스트 12개가 한 층에 있고,
+  파일을 열기 전에는 그게 주소 조립인지 버전 해석인지 신뢰 검증인지 이름으로 구분되지
+  않았다. 새 값을 어디에 둘지도 매번 다시 판단해야 했다.
+- 대안 검토:
+  - **`server/` · `client/` 로 나눈다** → 기각. 이 코드베이스에서 레이어는 파일의
+    성질이 아니라 **값의 성질**이다. `versions/` 는 server·browser·합치는 창구 셋이
+    같이 있어야 규칙이 성립하고, `loader/index.ts` 는 isomorphic 이라 어느 쪽도 아니며,
+    `trust/` 는 서버가 쓰지만 client component 트리에 실려 브라우저 번들에도 들어간다
+    (그래서 WebCrypto 다). 레이어로 쪼개면 이 제약들이 폴더 이름에 가려진다.
+  - **배럴 `mf/index.ts` 하나로 공개 표면을 만든다** → 기각. 서버 전용 모듈이
+    브라우저 그래프로 딸려 들어간다. 실제로 같은 성질의 사고를 H-1 에서 밟았다.
+    소비처는 지금처럼 깊은 경로를 그대로 쓴다 — 경로가 곧 "무엇을 쓰는지" 다.
+- 결정: **그 폴더가 답하는 질문**으로 나눈다 — `config/`(주소·예산) ·
+  `versions/`(버전이 무엇인가) · `state/`(프로세스가 뭘 들고 있나) · `trust/`(믿어도 되나) ·
+  `loader/`(어떻게 가져와 실행하나) · `components/`(화면에 어떻게 붙나).
+  의존은 `components/ → loader/ → versions/ → trust/ → config/` 한 방향이고
+  `state/` 는 어디서든 부른다. 테스트는 저장소 규칙대로 대상 소스 옆에 그대로 둔다.
+- 결과:
+  - ⭕ 고칠 파일과 열 테스트가 같은 폴더에 있다.
+  - ⭕ 역방향 import 가 생기면 "값이 잘못된 폴더에 있다"는 신호가 된다.
+  - ⭕ 이 참에 중복 5건을 걷어냈다(프로브 표 두 벌, `REMOTE_ENTRIES` 별칭,
+    `fallbackSsrEntry` 래퍼, 상수 하나짜리 `constants.ts`, 버전 파일 안의 `trustedOrigins`).
+  - ❌ 26차 이전 기록의 경로가 전부 옛 이름이다. 대응표를
+    [06-host-mf-layout.md](./06-host-mf-layout.md#옛-경로--새-경로) 에 둔다.
+  - ❌ `REMOTE_ORIGINS` → `WEB_ORIGINS`, `remoteOrigin()` → `ssrOrigin()` 이름이 바뀌었다.
+    값이 같고 출처만 다른 위험한 쌍이라 축을 이름에 드러냈다.

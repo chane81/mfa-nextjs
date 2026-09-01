@@ -8,8 +8,8 @@ import {
   announcedVersion,
   remoteVersionTag,
 } from '@/mf/versions/server';
-import { isBundleReady, readyVersion, warmEpoch } from '@/mf/warm-state';
-import { remoteBundleTag, remoteCacheTag } from '@/mf/server-loader';
+import { isBundleReady, readyVersion, warmEpoch } from '@/mf/state/warm';
+import { remoteBundleTag, remoteCacheTag } from '@/mf/loader/server';
 
 /**
  * remote 배포 파이프라인이 host 캐시를 깨우는 엔드포인트.

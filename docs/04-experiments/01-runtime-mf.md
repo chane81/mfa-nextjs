@@ -16,7 +16,7 @@ Next.js 16(Turbopack) host 에 **번들러 플러그인 없이** `@module-federa
 
 `apps/host/next.config.ts` 에 MF 관련 설정이 **하나도 없다**. 전부 런타임 코드다.
 
-`apps/host/src/mf/runtime.ts`:
+`apps/host/src/mf/loader/index.ts`:
 
 ```ts
 init({

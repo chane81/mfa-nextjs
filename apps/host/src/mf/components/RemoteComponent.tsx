@@ -10,9 +10,9 @@ import type {
 import { stylesPath } from '@mfa/remote-config';
 import { Skeleton } from '@mfa/ui';
 
-import { REMOTE_ORIGINS } from './remote-endpoints';
-import { REMOTE_ENTRIES, loadRemoteModule } from './runtime';
-import { remoteVersion } from './versions';
+import { WEB_ENTRIES, WEB_ORIGINS } from '../config';
+import { loadRemoteModule } from '../loader';
+import { remoteVersion } from '../versions';
 import { RemoteBoundary } from './RemoteBoundary';
 
 type PropsOf<K extends RemoteModuleId> =
@@ -116,7 +116,7 @@ export function RemoteComponent<K extends RemoteModuleId>({
   fallbackLabel,
   reloadKey,
 }: RemoteComponentProps<K>) {
-  const remoteName = moduleId.split('/')[0] as keyof typeof REMOTE_ENTRIES;
+  const remoteName = moduleId.split('/')[0] as RemoteName;
   const placeholder = (
     <Skeleton label={fallbackLabel ?? `${moduleId} 불러오는 중…`} />
   );
@@ -126,7 +126,7 @@ export function RemoteComponent<K extends RemoteModuleId>({
   const Remote = getLazyRemote(moduleId, reloadKey);
 
   return (
-    <RemoteBoundary remoteName={remoteName} entry={REMOTE_ENTRIES[remoteName]}>
+    <RemoteBoundary remoteName={remoteName} entry={WEB_ENTRIES[remoteName]}>
       {/*
         버전은 서버가 심어준 값을 그대로 쓴다(`RemoteVersionSync` → `remoteVersion`).
         없으면 버전 없는 경로로 떨어지는데, 그건 dev 서버가 자산을 서빙하는 주소라
@@ -134,7 +134,7 @@ export function RemoteComponent<K extends RemoteModuleId>({
       */}
       <link
         rel="stylesheet"
-        href={`${REMOTE_ORIGINS[remoteName]}${stylesPath(remoteVersion(remoteName))}`}
+        href={`${WEB_ORIGINS[remoteName]}${stylesPath(remoteVersion(remoteName))}`}
         precedence="mfa-remote"
       />
       <Suspense fallback={placeholder}>

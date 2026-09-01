@@ -11,7 +11,7 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-const load = async () => (await import('./global-state')).globalCell;
+const load = async () => (await import('./cell')).globalCell;
 
 describe('globalCell', () => {
   it('같은 이름은 create 를 한 번만 부른다', async () => {

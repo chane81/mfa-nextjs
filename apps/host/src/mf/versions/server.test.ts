@@ -6,11 +6,10 @@ import { generateSigningKeyPair, signPayload } from '@tests/helpers/signing';
 
 /**
  * 이 모듈은 `globalCell` 세 개를 **모듈 스코프에 캐시**하고, 전이 의존하는
- * `remote-endpoints` 는 import 시점에 env 를 굽는다. 그래서 매번 레지스트리를 비우고
+ * `config` 는 import 시점에 env 를 굽는다. 그래서 매번 레지스트리를 비우고
  * 모듈을 새로 들인다 — 둘 중 하나만 하면 앞 테스트의 상태가 새어 들어온다.
  */
 const CATALOG_ORIGIN = 'https://catalog.example.com';
-// env 스텁과 `trustedOrigins` 단언이 같은 값을 봐야 한다
 const CART_ORIGIN = 'https://cart.example.com';
 
 beforeEach(() => {
@@ -36,29 +35,13 @@ const manifest = (version = 't1abc') => ({
 const okResponse = (body: unknown) =>
   ({ ok: true, json: async () => body }) as Response;
 
-describe('주소 조립', () => {
-  it('remoteOrigin 은 SSR 엔트리에서 오리진만 뽑는다', async () => {
-    const { remoteOrigin } = await load();
-    expect(remoteOrigin('catalog')).toBe(CATALOG_ORIGIN);
-  });
-
-  it('fallbackSsrEntry 는 버전 없는 엔트리다', async () => {
-    const { fallbackSsrEntry } = await load();
-    expect(fallbackSsrEntry('catalog')).toBe(
-      `${CATALOG_ORIGIN}/${MF_FILES.ssrBundle}`,
-    );
-  });
-
+// 주소 조립은 `config`, 오리진 허용 판단은 `trust` 의 테스트가 맡는다 —
+// 이 파일은 "remote 가 공표한 버전" 하나만 본다.
+describe('캐시 태그', () => {
   it('remoteVersionTag 는 remote 마다 다르다', async () => {
     const { remoteVersionTag } = await load();
     expect(remoteVersionTag('catalog')).toBe('mf-remote-version:catalog');
     expect(remoteVersionTag('catalog')).not.toBe(remoteVersionTag('cart'));
-  });
-
-  it('trustedOrigins 기본값은 설정된 remote 오리진뿐이다', async () => {
-    vi.stubEnv('REMOTE_ALLOWED_ORIGINS', undefined);
-    const { trustedOrigins } = await load();
-    expect(trustedOrigins()).toEqual([CATALOG_ORIGIN, CART_ORIGIN]);
   });
 });
 
@@ -262,7 +245,7 @@ describe('fetchRemoteVersion', () => {
       vi.stubEnv('MF_REMOTE_PUBLIC_KEY', publicKey);
       vi.stubEnv('MF_REQUIRE_SIGNATURE', '1');
 
-      const { signedPayload } = await import('../remote-trust');
+      const { signedPayload } = await import('../trust');
       const body = manifest();
       const signature = signPayload(
         signedPayload({ remote: 'catalog', ...body }),

@@ -117,7 +117,7 @@ remote 가 env 로 받는 값은 `REMOTE_*_PUBLIC_URL` 하나뿐이고, 그건 *
 | 파생값                  | 조립                          | 읽는 곳                                |
 | ----------------------- | ----------------------------- | -------------------------------------- |
 | 브라우저 매니페스트 URL | `${오리진}/mf-manifest.json`  | `apps/host/next.config.ts`             |
-| host 서버 SSR 번들 URL  | `${오리진}/mf-server.cjs`     | `host/src/mf/remote-endpoints.ts`      |
+| host 서버 SSR 번들 URL  | `${오리진}/mf-server.cjs`     | `host/src/mf/config/index.ts`          |
 | remote 자산 접두사      | `${오리진}` (+ `/v<version>`) | `vite.config.ts` / `rsbuild.config.ts` |
 
 > 예전에는 이 셋이 각각 환경변수였다(`NEXT_PUBLIC_REMOTE_*_ENTRY`, `REMOTE_*_SSR_ENTRY`,
@@ -163,9 +163,9 @@ node -e "console.log(require('node:crypto').randomBytes(24).toString('base64url'
 | 이름                   | 읽는 곳                           | 설정 위치          | 기본값                          |
 | ---------------------- | --------------------------------- | ------------------ | ------------------------------- |
 | `MF_SIGNING_KEY`       | `scripts/stamp-remote-version.ts` | **셸** (remote CI) | 없음 → 서명 안 붙임             |
-| `MF_REMOTE_PUBLIC_KEY` | `host/src/mf/remote-trust.ts`     | host `.env.local`  | 없음                            |
-| `MF_REQUIRE_SIGNATURE` | `host/src/mf/remote-trust.ts`     | host `.env.local`  | 꺼짐 (`"1"` 일 때만 켜짐)       |
-| `MF_REQUIRE_INTEGRITY` | `host/src/mf/remote-trust.ts`     | host `.env.local`  | `NODE_ENV=production` 이면 켜짐 |
+| `MF_REMOTE_PUBLIC_KEY` | `host/src/mf/trust/index.ts`      | host `.env.local`  | 없음                            |
+| `MF_REQUIRE_SIGNATURE` | `host/src/mf/trust/index.ts`      | host `.env.local`  | 꺼짐 (`"1"` 일 때만 켜짐)       |
+| `MF_REQUIRE_INTEGRITY` | `host/src/mf/trust/index.ts`      | host `.env.local`  | `NODE_ENV=production` 이면 켜짐 |
 
 ```bash
 node scripts/gen-signing-key.ts

@@ -191,7 +191,7 @@ export function loadRemoteModule<K extends RemoteModuleId>(
 | 경로                                                | DTS 적용                 |
 | --------------------------------------------------- | ------------------------ |
 | 브라우저 (`loadRemote`)                             | ⭕ 모듈 확장이 먹는다    |
-| 서버 (`server-loader.ts` 의 fetch + `new Function`) | ❌ MF 가 존재조차 모른다 |
+| 서버 (`loader/server.ts` 의 fetch + `new Function`) | ❌ MF 가 존재조차 모른다 |
 
 SSR 경로는 우리가 직접 만든 로더다. DTS 는 여기에 아무 타입도 못 준다.
 그런데 **호출부는 `loadRemoteModule` 하나로 통일돼 있어서**, 결국 타입은

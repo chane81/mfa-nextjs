@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react';
 import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
 import { Badge, Panel } from '@mfa/ui';
 
-import { REMOTE_ENTRIES, pinnedEntry } from '@/mf/runtime';
+import { WEB_ENTRIES } from '@/mf/config';
+import { pinnedEntry } from '@/mf/loader';
 import { injectedEntry } from '@/mf/versions/browser';
 
 interface ProbeResult {
@@ -34,7 +35,7 @@ export function MfDiagnostics() {
   const [results, setResults] = useState<ProbeResult[]>(() =>
     REMOTE_NAMES.map((remote) => ({
       remote,
-      entry: REMOTE_ENTRIES[remote],
+      entry: WEB_ENTRIES[remote],
       version: null,
       status: 'pending' as const,
       detail: '확인 중…',

@@ -1,6 +1,6 @@
 import type { RemoteName } from '@mfa/contracts';
 
-import { globalCell } from './global-state';
+import { globalCell } from './cell';
 
 /**
  * warm 상태 — "이 프로세스가 지금 무엇을 들고 있고, 언제 들었는가."
@@ -12,13 +12,13 @@ import { globalCell } from './global-state';
  * 축이 달라서 한 파일에 두면 "버전 파일에 warm 세대가 왜 있지" 가 된다.
  *
  * 둘 다 `globalCell` 을 쓰는 건 같은 이유다 — RSC 레이어와 SSR 레이어가 모듈 그래프를
- * 달리해서, 한쪽이 쓰고 다른 쪽이 읽는 값은 모듈 스코프에 둘 수 없다(`[[global-state]]`).
+ * 달리해서, 한쪽이 쓰고 다른 쪽이 읽는 값은 모듈 스코프에 둘 수 없다(`[[state/cell]]`).
  */
 
 /**
  * "이 프로세스가 지금 어느 버전의 번들을 실제로 들고 있는가."
  *
- * `announcedVersion`(`versions/server.ts`)은 **공표된** 버전(remote 가 뭐라고 말하는지),
+ * `announcedVersion`(`../versions/server.ts`)은 **공표된** 버전(remote 가 뭐라고 말하는지),
  * 이건 **적재된** 버전(우리가 실제로 평가해 둔 게 뭔지)이다. 둘은 다를 수 있고,
  * warm 이 성공했는지는 정확히 "둘이 같아졌는가"로 판정한다.
  *

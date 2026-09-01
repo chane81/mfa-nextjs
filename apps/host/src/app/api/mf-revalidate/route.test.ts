@@ -71,7 +71,7 @@ const world = async (options: WorldOptions = {}) => {
     warmLoadsBundle = true,
   } = options;
 
-  const warmState = await import('@/mf/warm-state');
+  const warmState = await import('@/mf/state/warm');
 
   const fetchMock = vi.fn(async (input: string | URL, _init?: RequestInit) => {
     const url = String(input);
@@ -202,7 +202,7 @@ describe('성공 경로 — warm-then-revalidate', () => {
     const { POST, fetchMock, revalidateTag } = await world();
     const { remoteVersionTag } = await import('@/mf/versions/server');
     const { remoteBundleTag, remoteCacheTag } = await import(
-      '@/mf/server-loader'
+      '@/mf/loader/server'
     );
 
     await POST(request());
@@ -290,7 +290,7 @@ describe('성공 경로 — warm-then-revalidate', () => {
 
   it('응답에 결과 요약을 담는다', async () => {
     const { POST } = await world();
-    const { remoteCacheTag } = await import('@/mf/server-loader');
+    const { remoteCacheTag } = await import('@/mf/loader/server');
 
     const body = await (await POST(request())).json();
 
@@ -348,7 +348,7 @@ describe('?warm=0', () => {
 describe('중단 — 페이지 캐시를 건드리지 않는다', () => {
   it('버전 매니페스트를 못 읽으면 502 다', async () => {
     const { POST, revalidateTag } = await world({ version: null });
-    const { remoteCacheTag } = await import('@/mf/server-loader');
+    const { remoteCacheTag } = await import('@/mf/loader/server');
 
     const res = await POST(request());
 
@@ -416,11 +416,11 @@ describe('중단 — 페이지 캐시를 건드리지 않는다', () => {
 
   it('예전 세대에 적재해 둔 것을 성공으로 오인하지 않는다', async () => {
     // 버전만 비교하면 이 구멍으로 변조된 배포가 웹훅 200 을 받아낸다.
-    const warmState = await import('@/mf/warm-state');
+    const warmState = await import('@/mf/state/warm');
     warmState.markBundleReady('catalog', VERSION, warmState.warmEpoch());
 
     const { POST } = await world({ warmLoadsBundle: false });
-    const { bumpWarmEpoch } = await import('@/mf/warm-state');
+    const { bumpWarmEpoch } = await import('@/mf/state/warm');
     bumpWarmEpoch();
 
     expect((await POST(request())).status).toBe(502);

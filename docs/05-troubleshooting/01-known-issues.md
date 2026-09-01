@@ -26,6 +26,7 @@
 | 빌드가 안 끝나고 매달림 (사이드카가 안 죽음)                         | [B-2](#b-2-turbo-의-with-사이드카로는-build-를-못-끝낸다), [B-3](#b-3-그-게이트를-host-이미지가-타면-안-된다--끊는-건-이름으로) |
 | `new URL("")` / `Invalid URL`                                        | 빈 문자열 env — [B-5](#b-5-빈-문자열-env-가-new-url-로-터질-자리가-남아-있었다)                                                 |
 | Turbopack 이 상대경로 `.js` 를 못 찾음                               | [2](#2-turbopack-이-상대경로-js-확장자를-못-찾음)                                                                               |
+| `You're importing a component that imports react-dom/client`         | 공유 모듈 파일이 RSC 그래프에 딸려 들어갔다 — [H-1](#h-1-공유-모듈-표에-react-domclient-실체를-담으면-rsc-그래프가-막는다)      |
 | `@mfa/contracts` 빌드가 `window` 를 못 찾음                          | [7](#7-mfacontracts-빌드가-window-를-못-찾음)                                                                                   |
 | 배포 빌드만 다른 경로로 통과함                                       | [B-6](#b-6-배포-빌드는-문서에-없는-경로로-통과하고-있었다)                                                                      |
 
@@ -99,6 +100,45 @@
 | -------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련) | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다) |
 
+## H. (26차) `src/mf` 폴더 재배치 중에 밟은 것
+
+### H-1. 공유 모듈 표에 `react-dom/client` 실체를 담으면 RSC 그래프가 막는다
+
+증상: `pnpm build` 가 Turbopack 단계에서 죽는다.
+
+```
+./apps/host/src/mf/loader/react-modules.ts:5:1
+Error: You're importing a component that imports react-dom/client. It only works in a
+Client Component but none of its parents are marked with "use client", so they're
+Server Components by default.
+
+Import traces:
+  App Route:
+    ./apps/host/src/mf/loader/react-modules.ts
+    ./apps/host/src/mf/loader/server.ts
+    ./apps/host/src/app/api/mf-revalidate/route.ts
+```
+
+원인: 브라우저 경로(`loader/index.ts`)와 서버 경로(`loader/server.ts`)에 **같은 React 모듈
+표가 두 벌** 적혀 있어서 한 파일로 합쳤다. 그런데 그 파일은 두 경로가 다 import 하고,
+서버 경로는 **Route Handler 에서도 닿는다** — 즉 RSC 그래프다. `react-dom/client` 는
+클라이언트 전용이라 Next 가 그 그래프에서 막는다.
+
+브라우저 경로에만 `react-dom/client` 가 필요한 건 우연이 아니다. catalog(Vite)의 MF
+플러그인이 서브엔트리를 매니페스트에 자동으로 올리기 때문에 브라우저 `shared` 는 다섯 개고
+(0-4c 참조), SSR 은 `SSR_EXTERNALS` 그대로 넷이다.
+
+고침: 합치는 단위를 **실체가 아니라 프로브 표**로 낮췄다. `loader/react-modules.ts` 는
+이름과 정규화 프로브(`{ 'react-dom/client': 'createRoot', … }`)만 들고, `import * as X` 는
+각 경로가 자기 그래프에서 한다. 드리프트가 위험했던 건 프로브였지 네임스페이스가 아니다 —
+프로브가 한쪽만 어긋나면 그 모듈만 조용히 싱글턴에서 빠지고 증상은 훅이 깨지는 것으로만 나온다.
+
+목록이 빠지는 건 `satisfies` 가 잡는다. 브라우저는 `Record<SharedModuleId, unknown>`,
+서버는 `Record<SsrExternal, unknown>` 이다.
+
+**교훈: 중복을 합칠 때 "무엇이 실제로 드리프트하는가"를 먼저 본다.** 여기서 합쳐야 했던
+것은 값 하나(프로브)였고, 모듈 실체까지 끌어오는 순간 그래프 제약을 어겼다.
+
 ## G. (24차) 배포본에서 remote `style.css` 만 404
 
 ### G-1. 브라우저 렌더가 서버 전용 버전 저장소를 읽어 CSS 만 404 였다
@@ -124,7 +164,7 @@ throw 하지 않는다). 그래서 **네트워크 탭을 열어보기 전까지 
 href 가 서버 것과 다르니 React 19 의 `precedence` 중복 제거도 안 걸려 `<link>` 가 하나 더 생긴다.
 
 브라우저가 버전을 아예 모르는 건 아니었다. `RemoteVersionSync` 가 인라인 스크립트로 심어주고
-있었는데, 그 값을 읽는 코드가 `runtime.ts` 안에 있어서 **MF 엔트리 URL 만** 혜택을 봤다.
+있었는데, 그 값을 읽는 코드가 `loader/index.ts` 안에 있어서 **MF 엔트리 URL 만** 혜택을 봤다.
 같은 이유로 `remoteCacheKey` 도 브라우저에서 늘 `@unversioned` 였다(A-2 가 막으려던 것이
 브라우저 쪽에서는 반쯤 열려 있었다).
 
@@ -151,8 +191,8 @@ export function remoteVersion(remote: RemoteName): string | null {
 위치로 부르던 때(`browserVersion` ?? `knownVersion`)는 왼쪽만 `?.version` 이 없어
 대칭이 깨졌고, 그 비대칭이 "두 값이 같은 종류인가" 를 흐렸다.
 
-주입값 읽기를 `runtime.ts` 에 두고 거기서 import 할 수는 없다 — `versions/server` →
-`runtime` → `server-loader` → `versions/server` 순환이 된다. `versions/browser.ts` 는
+주입값 읽기를 `loader/index.ts` 에 두고 거기서 import 할 수는 없다 — `versions/server` →
+`loader` → `loader/server` → `versions/server` 순환이 된다. `versions/browser.ts` 는
 **아무것도 import 하지 않는 잎**이라 그 문제가 없고, 전역 이름(`__MFA_REMOTE_VERSIONS__`)도
 거기 한 곳에만 있다(심는 쪽인 `RemoteVersionSync` 가 같은 상수를 쓴다).
 
@@ -183,7 +223,7 @@ export function remoteVersion(remote: RemoteName): string | null {
 지금은 **버전이 실제로 바뀐 remote 만** `revalidateTag(…, { expire: 0 })` 로 만료시킨다.
 
 교훈: **"브라우저 안전한 값" 판정은 오리진에서 끝나지 않는다.** C-3 에서 오리진을
-`REMOTE_ORIGINS` 로 고쳤을 때 같은 표현식 안의 버전은 서버 전용인 채로 남았다.
+`WEB_ORIGINS` 로 고쳤을 때 같은 표현식 안의 버전은 서버 전용인 채로 남았다.
 `process.env` 뿐 아니라 **`globalThis` 에 사는 값도 레이어마다 다른 실체**다.
 
 ---
@@ -538,13 +578,13 @@ pnpm 워크스페이스 링크라 앱 입장에서 `node_modules` 안에 있다.
 `process.env.X` 만 치환하므로 브라우저 번들에서는 값이 남지 않고 로컬 기본값으로 떨어진다.
 `SSR_ENTRIES` 에서 오리진을 뽑는 경로도 같은 이유로 서버 전용이다.
 
-해결: `RemoteComponent` 는 `REMOTE_ORIGINS` 를 쓴다. 이 값은 `next.config.ts` 가 node 에서
+해결: `RemoteComponent` 는 `WEB_ORIGINS` 를 쓴다. 이 값은 `next.config.ts` 가 node 에서
 꺼내 번들에 구워 넣은 `WEB_ENTRIES` 에서 나오므로 브라우저에서도 배포 오리진을 가리키고,
 서버 렌더와 값이 같아 하이드레이션도 어긋나지 않는다.
 
 ```tsx
-// apps/host/src/mf/RemoteComponent.tsx
-href={`${REMOTE_ORIGINS[remoteName]}${stylesPath(remoteVersion(remoteName))}`}
+// apps/host/src/mf/components/RemoteComponent.tsx
+href={`${WEB_ORIGINS[remoteName]}${stylesPath(remoteVersion(remoteName))}`}
 ```
 
 ⚠️ 오리진만 브라우저 안전 값으로 바꾸면 절반만 고친 것이다. **버전도 같은 성질을 갖는다** —
@@ -559,7 +599,7 @@ href={`${REMOTE_ORIGINS[remoteName]}${stylesPath(remoteVersion(remoteName))}`}
 ```
 Error occurred prerendering page "/_not-found"
 TypeError: fetch failed
-    at async E (src/mf/server-loader.ts:167:15)
+    at async E (src/mf/loader/server.ts:167:15)
   [cause]: AggregateError: ... code: 'ECONNREFUSED'
 ```
 
@@ -871,7 +911,7 @@ done
 
 ### 0-2. 서버 로더에 node builtin 을 쓰면 브라우저 번들이 깨진다
 
-`server-loader.ts` 는 client component 트리에서 import 되므로 **브라우저 번들에도 들어간다.**
+`loader/server.ts` 는 client component 트리에서 import 되므로 **브라우저 번들에도 들어간다.**
 `node:vm` / `node:fs` 를 넣는 순간 Turbopack 이 브라우저 번들에서 터진다.
 
 해결: `fetch` + `new Function` 만 쓴다. 둘 다 양쪽 런타임에 존재하고,
@@ -1188,7 +1228,7 @@ curl -s              localhost:3000/cart | grep -c '189,000'      # 0 이어야 
 번들러 조합이 바뀌면 언제든 터질 수 있는 지점이라 방어 코드를 남겼다.
 
 ```ts
-// apps/host/src/mf/interop.ts
+// apps/host/src/mf/loader/react-modules.ts
 export function normalizeModule<T>(mod: T, probe: string): T {
   const ns = mod as Record<string, unknown> | undefined;
   if (ns && typeof ns[probe] === 'function') return mod;
@@ -1233,8 +1273,8 @@ Fizz 가 경계 크기에 따라 셸 플러시 시점을 다르게 잡을 뿐이
 ```
 Error occurred prerendering page "/"
 Error: Module Federation 런타임은 브라우저에서만 초기화할 수 있습니다
-    at src/mf/runtime.ts:33:11
-    at src/mf/RemoteComponent.tsx:32:22
+    at src/mf/loader/index.ts:33:11
+    at src/mf/components/RemoteComponent.tsx:32:22
 ```
 
 **원인**: `"use client"` 컴포넌트라도 SSR/프리렌더 단계에서 한 번 렌더된다.
@@ -1257,7 +1297,7 @@ Error: Module Federation 런타임은 브라우저에서만 초기화할 수 있
 ## 2. Turbopack 이 상대경로 `.js` 확장자를 못 찾음
 
 ```
-./apps/host/src/mf/RemoteComponent.tsx:8:1
+./apps/host/src/mf/components/RemoteComponent.tsx:8:1
 Error: Module not found: Can't resolve './runtime.js'
 ```
 

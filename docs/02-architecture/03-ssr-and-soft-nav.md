@@ -76,7 +76,7 @@ export function loadRemoteModule(id) {
 }
 ```
 
-### 서버 로더 (`apps/host/src/mf/server-loader.ts`)
+### 서버 로더 (`apps/host/src/mf/loader/server.ts`)
 
 1. remote 의 `mf-server.cjs` 를 HTTP 로 가져온다
 2. **host 의 React 를 `require` 셰임으로 주입하며** 평가한다

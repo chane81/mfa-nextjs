@@ -2,7 +2,7 @@
 
 import type { RemoteName } from '@mfa/contracts';
 
-import { RemoteComponent } from '@/mf/RemoteComponent';
+import { RemoteComponent } from '@/mf/components/RemoteComponent';
 
 /**
  * remote 를 **SSR 레이어에서** 한 번 렌더해 번들 캐시를 데운다.

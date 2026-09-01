@@ -66,6 +66,7 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 | SSR · 소프트 내비게이션 설계        | `docs/02-architecture/03-ssr-and-soft-nav.md` |
 | 버전 공표 · 캐시 무효화 · 신뢰 경계 | `docs/02-architecture/04-remote-lifecycle.md` |
 | 스타일링 전략                       | `docs/02-architecture/05-styling.md`          |
+| **host `src/mf` 폴더 배치**         | `docs/02-architecture/06-host-mf-layout.md`   |
 | 버전 고정 근거                      | `docs/03-setup/02-versions.md`                |
 | 테스트를 어디에 어떻게 쓰나         | `docs/06-testing/01-test-plan.md`             |
 

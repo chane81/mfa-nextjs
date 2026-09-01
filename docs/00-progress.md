@@ -1,5 +1,65 @@
 # 진행 상황
 
+## 2026-09-01 (26차) — `src/mf` 를 목적축 여섯 폴더로 나눴다
+
+`apps/host/src/mf/` 가 평면이었다. 소스 15 + 테스트 12 가 한 층에 나란히 있어서, 파일을
+열기 전에는 그게 주소 조립인지 버전 해석인지 신뢰 검증인지 이름으로 구분되지 않았다.
+새 값을 어디 둘지도 매번 다시 판단해야 했다.
+
+### 나눈 축 — 레이어가 아니라 "그 폴더가 답하는 질문"
+
+| 폴더          | 답하는 질문                       | 파일                                                       |
+| ------------- | --------------------------------- | ---------------------------------------------------------- |
+| `config/`     | remote 주소는? 호출 예산은?       | `index.ts`                                                 |
+| `versions/`   | 지금 가리켜야 할 버전이 무엇인가? | `index.ts` · `browser.ts` · `server.ts`                    |
+| `state/`      | 이 프로세스가 지금 뭘 들고 있나?  | `cell.ts` · `warm.ts` · `loader-stats.ts`                  |
+| `trust/`      | 이 remote 를 믿어도 되나?         | `index.ts`                                                 |
+| `loader/`     | 어떻게 가져와서 실행하나?         | `index.ts` · `server.ts` · `react-modules.ts`              |
+| `components/` | 화면에 어떻게 붙나?               | `RemoteComponent` · `RemoteBoundary` · `RemoteVersionSync` |
+
+`server/`·`client/` 안은 검토하고 기각했다 — `versions/` 는 셋이 같이 있어야 규칙이
+성립하고, `loader/index.ts` 는 isomorphic 이며, `trust/` 는 서버 로직인데 브라우저 번들에도
+실린다. 근거와 "새 파일을 어디에 두나"는 ADR-018 과 `docs/02-architecture/06-host-mf-layout.md`.
+**옛 경로 → 새 경로 대응표도 거기 있다** (이 문서의 25차 이하 기록은 옛 이름 그대로다).
+
+### 같이 걷어낸 중복 5건
+
+- **React 공유 모듈 프로브 표가 두 벌.** 브라우저용(`runtime.ts`)과 서버용
+  (`server-loader.ts`)에 `'react/jsx-dev-runtime' → 'jsxDEV'` 같은 짝이 각각 적혀 있었다.
+  한쪽만 어긋나면 그 모듈만 조용히 싱글턴에서 빠지고 증상은 훅이 깨지는 것뿐이다.
+  → `loader/react-modules.ts` 의 `SHARED_PROBES` 하나.
+- **`export { WEB_ENTRIES as REMOTE_ENTRIES }`** — 같은 값에 이름이 둘이었다. 별칭을 없애고
+  진단 화면·렌더 경로가 `config` 에서 직접 읽는다.
+- **`fallbackSsrEntry(remote)`** — `SSR_ENTRIES[remote]` 를 그대로 돌려주는 래퍼.
+- **`constants.ts`** — 상수 하나짜리 파일. `config/` 가 remote 접근 설정을 다 들고 있다.
+- **`trustedOrigins()` 가 `versions/server.ts` 에** 있었다. 신뢰 판단이므로 `trust/` 로.
+  `versions/server.ts` 는 177 → 179줄이지만 내용은 "공표 버전" 하나로 좁아졌고,
+  매니페스트 fetch·검증이 `fetchManifest` / `assertTrusted` 로 갈렸다(즉시실행 async IIFE 제거).
+
+이름도 둘 바꿨다. `REMOTE_ORIGINS` → `WEB_ORIGINS`, `remoteOrigin()` → `ssrOrigin()`.
+값이 같고 **출처만 다른** 위험한 쌍인데(하나는 브라우저에서도 맞고 하나는 서버 전용) 이름이
+그 차이를 안 드러냈다. 이제 `WEB_ENTRIES`/`WEB_ORIGINS` 와 `SSR_ENTRIES`/`ssrOrigin()` 이 짝이다.
+
+### 밟은 것 — 프로브 표를 합치다 빌드가 깨졌다
+
+모듈 **실체까지** 한 파일에 담았더니 `pnpm build` 가 죽었다.
+
+```
+You're importing a component that imports react-dom/client. It only works in a
+Client Component but none of its parents are marked with "use client" …
+  ./apps/host/src/mf/loader/react-modules.ts → loader/server.ts → app/api/mf-revalidate/route.ts
+```
+
+`loader/server.ts` 는 Route Handler 에서도 닿아 **RSC 그래프**에 들어간다. 합치는 단위를
+프로브 표로 낮추고 네임스페이스는 각 경로가 자기 그래프에서 import 하게 했다.
+기록: known-issues H-1. **드리프트하는 것이 무엇인지 먼저 보고 그것만 합친다.**
+
+### 검증
+
+- `pnpm typecheck` · `pnpm lint` 통과
+- `pnpm test` — 42 파일 632개 통과 (테스트는 소스 옆으로 같이 옮겼다)
+- `pnpm build` 통과 — host 프리렌더가 remote SSR 번들을 실제로 실행하는 경로까지 확인
+
 ## 2026-09-01 (24차) — 배포본에서 remote `style.css` 만 404
 
 배포본 Network 탭에 remote 당 `style.css` 가 둘이었다 — SSR 이 박은

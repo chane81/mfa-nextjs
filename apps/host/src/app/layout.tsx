@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense, type ReactNode } from 'react';
 
 import { SiteHeaderSlot } from '@/components/SiteHeaderSlot';
-import { RemoteVersionSync } from '@/mf/RemoteVersionSync';
+import { RemoteVersionSync } from '@/mf/components/RemoteVersionSync';
 
 import './globals.css';
 

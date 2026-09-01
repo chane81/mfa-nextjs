@@ -2,12 +2,9 @@ import { cacheLife, cacheTag } from 'next/cache';
 
 import { REMOTE_NAMES } from '@mfa/contracts';
 
-import { REMOTE_VERSIONS_GLOBAL } from './versions/browser';
-import {
-  fetchRemoteVersion,
-  remoteOrigin,
-  remoteVersionTag,
-} from './versions/server';
+import { ssrOrigin } from '../config';
+import { REMOTE_VERSIONS_GLOBAL } from '../versions/browser';
+import { fetchRemoteVersion, remoteVersionTag } from '../versions/server';
 
 /**
  * remote 버전을 새로 읽어 globalThis 에 반영하고, 브라우저에도 같은 값을 넘긴다.
@@ -50,7 +47,7 @@ export async function RemoteVersionSync() {
         info
           ? {
               version: info.version,
-              entry: `${remoteOrigin(remote)}${info.webEntry}`,
+              entry: `${ssrOrigin(remote)}${info.webEntry}`,
             }
           : null,
       ] as const;

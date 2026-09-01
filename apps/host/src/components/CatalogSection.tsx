@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 
 import type { Product } from '@mfa/contracts';
 
-import { RemoteComponent } from '@/mf/RemoteComponent';
+import { RemoteComponent } from '@/mf/components/RemoteComponent';
 
 /**
  * 라우팅은 host 소유, 렌더링은 remote 소유.
