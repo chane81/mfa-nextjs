@@ -55,6 +55,24 @@ Node 의 타입 스트리핑에 기댄다. 그래서 이 패키지에는 런타�
 | 서버(SSR 로더 등)    | `SSR_ENTRIES` · `publicOrigin()`                                   |
 | 브라우저에 나가는 값 | `REMOTE_ORIGINS` · `WEB_ENTRIES` (`next.config.ts` 가 구워 넣는다) |
 
+같은 성질이 **`globalThis` 에 사는 값**에도 있다. 그래서 버전 코드는
+`apps/host/src/mf/versions/` 에서 **값이 어디서 유효한지로** 갈라 둔다.
+
+| 파일                  | 값이 사는 곳                                 | 누가 import 하나                 |
+| --------------------- | -------------------------------------------- | -------------------------------- |
+| `versions/server.ts`  | remote 가 **공표한** 값 (`announcedVersion`) | RSC 레이아웃 · SSR 로더 · 라우트 |
+| `versions/browser.ts` | 서버가 **심어준** 값 (`injectedEntry`)       | `runtime.ts`(엔트리 URL) · 진단  |
+| `versions/index.ts`   | — 둘 중 있는 쪽 (`remoteVersion`)            | **렌더 코드 전부**               |
+
+적재 상태와 warm 세대는 버전이 아니라 "그 버전으로 뭘 했나" 라서 `mf/warm-state.ts` 에 있다.
+
+이름은 위치가 아니라 **출처**로 짓는다(공표된 / 심어준). 그래야 합치는 줄에서 두 항이
+같은 모양이 되고, 같은 종류의 값이라는 게 보인다.
+
+**버전이 필요하면 `remoteVersion()`(`mf/versions`) 하나만 부른다.** 둘 중 어느 쪽을 읽을지는
+그 함수 안에서 끝나고, `typeof window` 로 가르지 않는다(근거: known-issues G-1).
+새 코드가 `versions/server` 를 브라우저 렌더 경로에서 import 하고 있으면 그건 신호다.
+
 ## 환경변수를 추가하면 `turbo.json` 에 등록한다
 
 `globalEnv` 에 없는 변수는 turbo 가 **걸러낸다**. 실패가 "값이 비어 있다"로 나타나 원인이 안 보인다.

@@ -64,6 +64,7 @@
 | dev 에서만 remote 가 무스타일 (`/style.css` 는 200) | [C-1](#c-1-dev-에서-vite-remote-의-css-를-브라우저가-통째로-무시한다)          |
 | `@mfa/ui` 컴포넌트만 무스타일 · 빌드는 성공         | [C-2](#c-2-mfaui-의-클래스가-css-에서-조용히-빠진다)                           |
 | 배포에서 스타일시트가 `localhost` 를 가리킴         | [C-3](#c-3-브라우저에서-만든-스타일시트-주소가-배포에서-localhost-를-가리킨다) |
+| 배포에서 remote `style.css` 만 404 (SSR 것은 200)   | [G-1](#g-1-브라우저-렌더가-서버-전용-버전-저장소를-읽어-css-만-404-였다)       |
 
 ### 캐시 · 버전 · 재배포
 
@@ -97,6 +98,87 @@
 | 증상                                                           | 항목                                                                    |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련) | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다) |
+
+## G. (24차) 배포본에서 remote `style.css` 만 404
+
+### G-1. 브라우저 렌더가 서버 전용 버전 저장소를 읽어 CSS 만 404 였다
+
+증상: 배포본(`https://mfa.lakegreen.net`) Network 탭에 remote 당 `style.css` 가 **두 번**
+찍힌다. 하나는 200, 하나는 404 다.
+
+| 요청                         | initiator | 주소                    | 결과 |
+| ---------------------------- | --------- | ----------------------- | ---- |
+| SSR 이 HTML 에 박은 `<link>` | document  | `/v<version>/style.css` | 200  |
+| 하이드레이션 때 다시 그린 것 | JS 청크   | `/style.css`            | 404  |
+
+화면은 안 깨진다 — 200 쪽이 이미 스타일을 먹였다. 콘솔 에러도 없다(404 는 스타일시트라
+throw 하지 않는다). 그래서 **네트워크 탭을 열어보기 전까지 안 보인다.**
+
+원인: `RemoteComponent` 가 버전을 서버 전용 저장소(당시 `mf/remote-version.ts` 의
+`knownVersion()`, 지금의 `versions/server.ts` 의 `announcedVersion()`) 에서 읽었다.
+그건 `globalCell` — 즉 **host 서버 프로세스의 globalThis** 다. RSC 레이아웃이 조회해
+거기 남기므로 서버 렌더는 버전을 알지만, **브라우저 번들에서는 그 셀이 언제나 비어 있다.**
+`stylesPath(undefined)` → `/style.css` 이고, 배포된 remote 의 루트에는
+`mf-version.json` 하나뿐이라 404 다(실측: `/style.css` 404 · `/v<version>/style.css` 200).
+
+href 가 서버 것과 다르니 React 19 의 `precedence` 중복 제거도 안 걸려 `<link>` 가 하나 더 생긴다.
+
+브라우저가 버전을 아예 모르는 건 아니었다. `RemoteVersionSync` 가 인라인 스크립트로 심어주고
+있었는데, 그 값을 읽는 코드가 `runtime.ts` 안에 있어서 **MF 엔트리 URL 만** 혜택을 봤다.
+같은 이유로 `remoteCacheKey` 도 브라우저에서 늘 `@unversioned` 였다(A-2 가 막으려던 것이
+브라우저 쪽에서는 반쯤 열려 있었다).
+
+해결: 버전 코드를 **값이 어디서 유효한지**로 갈라 `apps/host/src/mf/versions/` 에 모으고,
+렌더 코드가 부를 함수는 하나만 남긴다.
+
+| 파일                  | 값이 사는 곳                                 | 누가 읽나                        |
+| --------------------- | -------------------------------------------- | -------------------------------- |
+| `versions/server.ts`  | remote 가 **공표한** 값 (`announcedVersion`) | RSC 레이아웃 · SSR 로더 · 라우트 |
+| `versions/browser.ts` | 서버가 **심어준** 값 (`injectedEntry`)       | MF 런타임(엔트리 URL) · 진단     |
+| `versions/index.ts`   | — 둘 중 있는 쪽 (`remoteVersion`)            | **렌더 코드 전부**               |
+
+```ts
+// apps/host/src/mf/versions/index.ts
+export function remoteVersion(remote: RemoteName): string | null {
+  return (
+    injectedEntry(remote)?.version ?? announcedVersion(remote)?.version ?? null
+  );
+}
+```
+
+이름의 축은 **위치(server/browser)가 아니라 출처**다 — remote 가 공표한(announced) 것과
+서버가 심어준(injected) 것. 그래야 두 항이 같은 모양이 되어 무엇을 고르는지가 읽힌다.
+위치로 부르던 때(`browserVersion` ?? `knownVersion`)는 왼쪽만 `?.version` 이 없어
+대칭이 깨졌고, 그 비대칭이 "두 값이 같은 종류인가" 를 흐렸다.
+
+주입값 읽기를 `runtime.ts` 에 두고 거기서 import 할 수는 없다 — `versions/server` →
+`runtime` → `server-loader` → `versions/server` 순환이 된다. `versions/browser.ts` 는
+**아무것도 import 하지 않는 잎**이라 그 문제가 없고, 전역 이름(`__MFA_REMOTE_VERSIONS__`)도
+거기 한 곳에만 있다(심는 쪽인 `RemoteVersionSync` 가 같은 상수를 쓴다).
+
+⚠️ 파일을 가른 이유는 번들 크기가 아니다. 실측하면 트리셰이킹이 이미 서버 경로를 걷어낸다
+(클라이언트 청크에 `Ed25519` · 매니페스트 거부 문자열이 없다). 가른 이유는 **"이 값이 어디서
+유효한가" 를 파일 배치로 못박기 위해서**다 — 그걸 모르는 상태가 이 버그였다.
+
+### ⚠️ `typeof window` 로 가르면 안 된다
+
+"서버면 `announcedVersion`, 브라우저면 `injectedEntry`" 로 가르는 게 자연스러워 보이지만 **틀린다.**
+두 값은 한쪽만 차 있으므로 있는 쪽을 집으면 그만이고, 환경을 물으면 `window` 가 있는데
+주입은 없는 상태 — jsdom 에서 서버 경로를 렌더하는 테스트 — 가 전부 "버전 모름" 이 된다.
+실측: 분기 버전으로 바꾸면 `RemoteComponent.test.tsx` 가 4개 깨진다.
+
+```
+× 버전을 알면 불변 경로를 가리킨다
+× 버전을 키에 넣는다
+× remote 마다 자기 버전을 본다
+× 버전이 바뀌면 새 lazy 를 만든다
+```
+
+교훈: **"브라우저 안전한 값" 판정은 오리진에서 끝나지 않는다.** C-3 에서 오리진을
+`REMOTE_ORIGINS` 로 고쳤을 때 같은 표현식 안의 버전은 서버 전용인 채로 남았다.
+`process.env` 뿐 아니라 **`globalThis` 에 사는 값도 레이어마다 다른 실체**다.
+
+---
 
 ## F. (18차) 테스트와 turbo 설정에서 밟은 것
 
@@ -454,8 +536,11 @@ pnpm 워크스페이스 링크라 앱 입장에서 `node_modules` 안에 있다.
 
 ```tsx
 // apps/host/src/mf/RemoteComponent.tsx
-href={`${REMOTE_ORIGINS[remoteName]}${stylesPath(knownVersion(remoteName)?.version)}`}
+href={`${REMOTE_ORIGINS[remoteName]}${stylesPath(remoteVersion(remoteName))}`}
 ```
+
+⚠️ 오리진만 브라우저 안전 값으로 바꾸면 절반만 고친 것이다. **버전도 같은 성질을 갖는다** —
+그쪽을 빠뜨린 채로 두 회차를 지났다. [G-1](#g-1-브라우저-렌더가-서버-전용-버전-저장소를-읽어-css-만-404-였다).
 
 ---
 
