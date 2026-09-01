@@ -36,6 +36,17 @@ host 는 dev 든 배포든 같은 모양의 URL 을 만든다. 그래서 dev 서
 dev 전용 미들웨어를 늘릴 때는 `configureServer`(dev)와 `configurePreviewServer`(preview) 훅
 자체를 판별자로 쓴다. `NODE_ENV` · `command` 로는 구분이 안 된다.
 
+## `exposes` 는 손으로 적지 않는다
+
+`src/exposes/` 를 읽어서 만든다 — `readExposes('./src/exposes', { ignore: [/\.test\.tsx$/] })`
+(`@mfa/remote-config/node`). 번들러가 둘이라 스캔을 각자 구현하면 "무엇이 expose 인가"가
+remote 마다 갈린다. dev 가 볼 게 아닌 이웃 파일이 생기면 `ignore` 에 줄을 하나 더 넣는다.
+
+**대가는 파일 하나로 공개 계약이 바뀐다는 것이다.** 그래서 각 remote 의
+`src/exposes/contract.test.ts` 가 스캔 결과를 `@mfa/contracts` 의 `MODULE_IDS` 와 대조한다.
+파일을 추가했으면 `@mfa/contracts` 의 `MODULES` 에 한 줄 등록해야 그 테스트가 통과한다.
+거기 한 곳이 타입 맵(`RemoteModuleMap`)과 런타임 목록(`MODULE_IDS`)을 **둘 다** 만든다.
+
 ## DTS 는 껐다
 
 MF 자동 타입 생성을 켜면 타입 SSOT 가 `@mfa/contracts` 와 중복되고, `pnpm typecheck` 가 remote 기동을

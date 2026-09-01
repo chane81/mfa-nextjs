@@ -36,7 +36,7 @@ host 는 번들러 플러그인 없이 `@module-federation/runtime` 만 쓴다. 
 | React external 목록      | 같은 패키지의 `SSR_EXTERNALS` (remote 빌드 · host 셰임이 같이 본다)  |
 | 매니페스트 서명 페이로드 | 같은 패키지의 `signedPayload()` (stamp 와 host 검증이 같이 본다)     |
 | 빌드 버전 · dist 경로    | `@mfa/remote-config/node` — `readBuildVersion()` · `versionedDist()` |
-| remote 모듈 타입         | `packages/contracts` 의 `RemoteModuleMap`                            |
+| remote 모듈 타입 · 목록  | `packages/contracts` 의 `MODULES` (맵·id 목록이 여기서 파생된다)     |
 | 런타임 공유 상태         | `packages/store` — 도메인별 폴더(`cart/`)                            |
 | 레이어를 넘는 host 상태  | `apps/host/src/mf/state/cell.ts` 의 `globalCell()`                   |
 
