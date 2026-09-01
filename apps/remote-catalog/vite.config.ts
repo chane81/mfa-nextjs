@@ -6,6 +6,7 @@ import {
   assetBase,
   createMfDevMiddleware,
   readBuildVersion,
+  readExposes,
   versionedDist,
 } from '@mfa/remote-config/node';
 import tailwindcss from '@tailwindcss/vite';
@@ -16,6 +17,34 @@ import { defineConfig, type Plugin } from 'vite';
 const NAME = 'catalog';
 const REMOTE = REMOTES[NAME];
 const PORT = REMOTE.devPort;
+
+/**
+ * 이 remote 가 노출하는 것 — **`src/exposes/` 를 읽어서 정한다.**
+ *
+ * 손으로 적으면 파일을 추가할 때마다 여기도 같이 고쳐야 하고, 빠뜨리면 "파일은 있는데
+ * host 가 못 찾는" 상태가 된다. 규칙은 이미 "이 폴더에 있는 것만 노출한다" 하나뿐이라
+ * 그 규칙을 설정에 다시 적지 않는다. 스캔은 `@mfa/remote-config/node` 가 쥔다 —
+ * cart(Rsbuild)와 같은 판단이어야 하기 때문이다.
+ *
+ * ## 제외 규칙을 여기 적는 이유
+ *
+ * 이 저장소는 **테스트를 대상 소스 옆에 둔다**(`docs/06-testing/01-test-plan.md`).
+ * 그래서 이 폴더에는 expose 가 아닌 이웃 파일이 같이 산다(`exposes.test.tsx`).
+ * 거르지 않으면 remote 의 공개 계약이 조용히 늘어나고, dev 에서는 사전 transform 까지
+ * 시도하다 `@tests/*` alias 를 못 찾고 터진다.
+ *
+ *     Pre-transform error: Failed to resolve import "@tests/helpers/globals"
+ *     from "src/exposes/exposes.test.tsx"
+ *
+ * alias 를 여기 추가하는 건 답이 아니다 — 테스트는 애초에 dev 모듈 그래프에 들어갈
+ * 파일이 아니다. **dev 가 볼 게 아닌 이웃 파일이 또 생기면 아래 배열에 한 줄 더 넣는다**
+ * (`/\.stories\.tsx$/` 같은 것). 기록: known-issues H-2.
+ *
+ * 스캔 결과가 `@mfa/contracts` 의 계약과 어긋나면 `src/exposes/contract.test.ts` 가 잡는다.
+ */
+const EXPOSED = readExposes('./src/exposes', {
+  ignore: [/\.test\.tsx$/],
+});
 
 /**
  * 이 remote 가 배포된 **공개 오리진**. 자산 URL 접두사(`base`)가 여기서 나온다.
@@ -149,10 +178,7 @@ export default defineConfig(({ command }) => {
          * 검토 전문: docs/01-research/03-dts-plugin-review.md
          */
         dts: false,
-        exposes: {
-          './ProductGrid': './src/exposes/ProductGrid.tsx',
-          './ProductDetail': './src/exposes/ProductDetail.tsx',
-        },
+        exposes: EXPOSED.exposes,
         shared: {
           react: { singleton: true, requiredVersion: '^19.0.0' },
           'react-dom': { singleton: true, requiredVersion: '^19.0.0' },
@@ -196,7 +222,10 @@ export default defineConfig(({ command }) => {
        *   286→293  loadShare(react/jsx-dev-runtime)     ← 캐시 miss, undefined 로 굳는다
        *   311→313  .vite/deps/react_jsx-dev-runtime.js  ← 실제 모듈은 20ms 뒤
        *
-       * 미리 transform 해 두면 이 구간이 사라진다. 실측: 워밍 없이 2/2 실패,
+       * 미리 transform 해 두면 이 구간이 사라진다. 대상은 `EXPOSED.files` 다 —
+       * expose 와 **같은 목록**이라 워밍이 expose 를 놓치는 경우가 성립하지 않는다.
+       *
+       * 실측: 워밍 없이 2/2 실패,
        * 워밍 후 4/4 성공(dev 재시작 + 새 브라우저 세션 기준).
        *
        * ## `optimizeDeps` 와 겹치지 않는다
@@ -215,7 +244,7 @@ export default defineConfig(({ command }) => {
        * https://vite.dev/config/server-options#server-warmup
        */
       warmup: {
-        clientFiles: ['./src/exposes/*.tsx'],
+        clientFiles: EXPOSED.files,
       },
     },
     preview: {
@@ -239,7 +268,7 @@ export default defineConfig(({ command }) => {
      * docs/05-troubleshooting/01-known-issues.md 의 0-4c.
      */
     optimizeDeps: {
-      entries: ['src/exposes/*.tsx', 'src/main.tsx'],
+      entries: [...EXPOSED.files, './src/main.tsx'],
       include: [
         'react',
         'react-dom',
