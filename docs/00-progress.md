@@ -1,5 +1,86 @@
 # 진행 상황
 
+## 2026-09-01 (26차·b) — catalog dev 워밍 glob 이 테스트 파일을 잡고 있었다
+
+`pnpm dev` 기동 로그에 catalog 쪽 에러가 매번 찍혔다.
+
+```
+[vite] (client) Pre-transform error: Failed to resolve import "@tests/helpers/globals"
+from "src/exposes/exposes.test.tsx"
+```
+
+`vite.config.ts` 가 `server.warmup.clientFiles` 와 `optimizeDeps.entries` 를
+`src/exposes/*.tsx` 라는 glob 으로 적고 있었고, 그 디렉터리에는 expose 둘 말고
+`exposes.test.tsx` 도 있다. `@tests` alias 는 `vitest.config.ts` 에만 있다 —
+테스트는 애초에 dev 모듈 그래프에 들어갈 파일이 아니라 alias 를 추가하는 건 답이 아니다.
+
+`exposes` 를 손으로 적는 것 자체를 없앴다. `readExposes('./src/exposes', { ignore:
+[/\.test\.tsx$/] })` 가 디렉터리를 읽어 `{ exposes, files }` 를 준다. catalog 는 그
+`files` 를 워밍과 스캔 진입점에도 쓴다 — expose 와 같은 목록이라 워밍이 expose 를
+놓치는 경우가 성립하지 않는다. 스캔은 `@mfa/remote-config/node` 가 쥔다(번들러가 둘이라
+각자 구현하면 "무엇이 expose 인가"가 갈린다 — `createMfDevMiddleware` 와 같은 이유).
+
+**대가는 파일 하나로 공개 계약이 바뀐다는 것이다.** 그래서 각 remote 에
+`src/exposes/contract.test.ts` 를 두고 스캔 결과를 `@mfa/contracts` 의 `MODULE_IDS` 와
+대조한다. `Drift.tsx` 를 넣어 실제로 실패하는 것까지 확인했다. 그러려면 `MODULE_IDS` 가
+런타임 값이어야 해서 계약 테스트에 있던 것을 `remote-contract.ts` 본체로 올렸다
+(양방향 타입 결속은 그대로, `exposedNames(remote)` 를 같이 내보낸다).
+
+### 계약 쪽 등록 지점도 하나로 합쳤다
+
+`RemoteModuleMap`(타입)과 `MODULE_IDS`(값)가 같은 id 다섯 개를 **두 번** 적고 있었다.
+`satisfies` 와 전수 검사로 묶어 둬서 갈라지지는 않았지만, 모듈 하나 추가에 손이 두 번 갔다.
+
+타입에서 값을 뽑는 건 불가능하므로(타입은 런타임에 없다) **방향을 뒤집었다.**
+`MODULES` 객체 하나가 SSOT 고 둘 다 거기서 파생된다.
+
+```ts
+const props = <P,>(): ComponentType<P> => undefined as unknown as ComponentType<P>;
+
+const MODULES = {
+  'catalog/ProductGrid': props<ProductGridProps>(),
+  …
+} satisfies Record<`${RemoteName}/${string}`, unknown>;
+
+export type RemoteModuleMap = {
+  [K in keyof typeof MODULES]: { default: (typeof MODULES)[K] };
+};
+export const MODULE_IDS = Object.keys(MODULES) as RemoteModuleId[];
+```
+
+`props<T>()` 는 런타임에 아무 일도 안 한다(`undefined` 를 돌려주고 아무도 안 부른다).
+타입 인자만이 의미고, 그 덕에 이 객체가 "런타임에 키를 셀 수 있는 값"이면서 동시에
+"각 모듈의 props 를 아는 타입"이 된다.
+
+지운 것: `_Exhaustive` 전수 검사와 `CONTRACT_TYPE_CHECKS`. 파생이라 어긋날 수가 없다.
+접두사 검사도 별도 타입 단언이 아니라 `satisfies` 의 키 타입이 **선언 자리에서** 막는다.
+실측으로 확인했다.
+
+```
+error TS2353: Object literal may only specify known properties, and ''checkout/Flow''
+does not exist in type 'Record<`catalog/${string}` | `cart/${string}`, unknown>'.
+```
+
+**props 타입까지 자동화하는 것은 기각했다.** 그러려면 이 패키지가 remote 소스를
+import 해야 하는데, 그게 MF 의 DTS 가 하는 일이고 이미 껐다 — remote 구현이 곧 계약이
+되어 host 기대치가 조용히 따라 바뀌고, `pnpm typecheck` 가 remote 기동을 요구하게 된다
+(docs/01-research/03-dts-plugin-review.md). "무엇을 노출하고 그 props 가 무엇인가"는
+사람이 정한다. 대신 그 선언이 **한 곳**이면 된다.
+
+정리하면 모듈 하나 추가에 필요한 손은 이제 둘이다 — 파일을 놓고, `MODULES` 에 한 줄.
+번들러 설정 두 곳은 스캔이 따라오고, 둘이 어긋나면 계약 대조 테스트가 잡는다.
+
+같이 알아낸 것: **`optimizeDeps.entries` 를 명시하면 Vite 가 기본으로 걸던
+`**/**tests**/**`·`**/coverage/**` 무시가 사라진다**(8.2.1 `globEntries`).
+제외는 전적으로 우리 책임이 된다.
+
+### 검증
+
+- `pnpm typecheck` · `pnpm lint` · `pnpm build` 통과
+- `pnpm test` — 44 파일 639개 (계약 대조 테스트 2개 추가). 파생이 실제로 막는지는
+  잘못된 접두사·props 를 넣어 `tsc` 가 죽는 것으로 확인했다
+- `pnpm dev` — `준비됨` 네 줄 + host Ready, pre-transform 에러 없음
+
 ## 2026-09-01 (26차) — `src/mf` 를 목적축 여섯 폴더로 나눴다
 
 `apps/host/src/mf/` 가 평면이었다. 소스 15 + 테스트 12 가 한 층에 나란히 있어서, 파일을

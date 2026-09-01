@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /**
@@ -229,4 +229,69 @@ export function createMfDevMiddleware({
     res.setHeader('Cache-Control', 'no-store');
     res.end(body);
   };
+}
+
+/**
+ * remote 가 노출할 파일 목록을 **디렉터리에서 읽는다.**
+ *
+ * `exposes` 를 손으로 적으면 파일을 추가할 때마다 번들러 설정을 같이 고쳐야 하고,
+ * 빠뜨리면 "파일은 있는데 host 가 못 찾는" 상태가 된다. 이 저장소의 두 remote 는
+ * **`src/exposes/` 에 있는 것만 노출**한다는 규칙이 이미 있으므로, 그 규칙을 설정에
+ * 다시 적는 대신 디렉터리를 그대로 읽는다.
+ *
+ * 번들러가 둘(Vite · Rsbuild)이라 여기 둔다 — `createMfDevMiddleware` 와 같은 이유다.
+ * 각자 구현하면 "어느 파일이 expose 인가"가 remote 마다 갈린다.
+ *
+ * ## 무엇을 거르나
+ *
+ * 이 저장소는 **테스트를 대상 소스 옆에 둔다**. 그래서 `src/exposes/` 에는 expose 가
+ * 아닌 이웃 파일이 같이 산다(`exposes.test.tsx`). 그런 파일이 expose 로 올라가면
+ * remote 의 공개 계약이 조용히 늘어나고, dev 에서는 사전 transform 까지 시도해
+ * `@tests/*` alias 를 못 찾고 터진다(known-issues H-2).
+ *
+ * 그래서 **제외 규칙을 인자로 받는다.** 호출부에 눈에 보이게 두고, dev 가 볼 게 아닌
+ * 이웃 파일이 또 생기면(`*.stories.tsx` 등) 거기에 한 줄 더 넣는다.
+ *
+ * ## 계약과 어긋나면 누가 잡나
+ *
+ * 여기서 만든 목록은 `@mfa/contracts` 의 `MODULE_IDS` 와 반드시 같아야 한다. 그 대조는
+ * 각 remote 의 `exposes/contract.test.ts` 가 한다 — 파일만 추가하고 props 타입을 안
+ * 적었거나, 계약에만 있고 파일이 없는 경우가 거기서 걸린다.
+ *
+ * @param dir `cwd` 기준 상대 디렉터리 (예: `'./src/exposes'`)
+ * @param ignore 제외할 파일명 규칙. 기본값은 없다 — 호출부가 명시한다.
+ */
+export function readExposes(
+  dir: string,
+  { ignore = [], cwd = process.cwd() }: ExposeScanOptions = {},
+): ExposeScan {
+  const abs = resolve(cwd, dir);
+
+  const names = readdirSync(abs)
+    .filter((name) => name.endsWith('.tsx'))
+    .filter((name) => !ignore.some((rule) => rule.test(name)))
+    .sort();
+
+  const entries = names.map(
+    (name) =>
+      [`./${name.replace(/\.tsx$/, '')}`, `${dir}/${name}`] as [string, string],
+  );
+
+  return {
+    exposes: Object.fromEntries(entries),
+    files: entries.map(([, file]) => file),
+  };
+}
+
+export interface ExposeScanOptions {
+  /** 제외할 파일명 규칙. 파일명(디렉터리 제외)에 대고 검사한다. */
+  ignore?: RegExp[];
+  cwd?: string;
+}
+
+export interface ExposeScan {
+  /** MF 플러그인에 그대로 넘기는 `{ './Name': './src/exposes/Name.tsx' }` */
+  exposes: Record<string, string>;
+  /** 같은 파일들의 경로만. dev 사전 transform · 의존성 스캔 진입점이 쓴다. */
+  files: string[];
 }

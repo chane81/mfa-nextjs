@@ -149,6 +149,9 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 35. `scripts/stamp-remote-version.ts` → `integrity()` · payload 조립 · **정리 대상 경계**(현재 버전만 남긴다 / `v` 접두사 밖은 안 건드린다) 추출
 - [x] 36. `apps/host/src/app/api/mf-revalidate/route.ts` → `selfOrigin()` export
 - [x] 37. `apps/host/src/mf/components/RemoteComponent.tsx` → `remoteCacheKey()` export. 브라우저에서도 버전이 키에 들어가는지 같이 본다(24차)
+- [x] 38. `apps/remote-*/src/exposes/contract.test.ts` — 디렉터리 스캔 결과 ≡ `@mfa/contracts` 의
+      `MODULE_IDS`. **파일만 추가하고 props 타입을 안 적은 경우**와 그 반대를 둘 다 잡는다
+      (`Drift.tsx` 로 실패 실증). `exposes` 를 스캔으로 만들면서 생긴 위험을 여기서 막는다
 
 ## 테스트하지 않는 것
 

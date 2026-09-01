@@ -6,6 +6,7 @@ import {
   assetBase,
   createMfDevMiddleware,
   readBuildVersion,
+  readExposes,
   versionedDist,
 } from '@mfa/remote-config/node';
 import { defineConfig } from '@rsbuild/core';
@@ -16,6 +17,24 @@ const NAME = 'cart';
 const REMOTE = REMOTES[NAME];
 const PORT = REMOTE.devPort;
 const DIST = resolve(process.cwd(), 'dist');
+
+/**
+ * 이 remote 가 노출하는 것 — **`src/exposes/` 를 읽어서 정한다.**
+ *
+ * 손으로 적으면 파일을 추가할 때마다 여기도 같이 고쳐야 하고, 빠뜨리면 "파일은 있는데
+ * host 가 못 찾는" 상태가 된다. 스캔은 `@mfa/remote-config/node` 가 쥔다 —
+ * catalog(Vite)와 **같은 판단**이어야 하기 때문이다. 번들러가 달라도 "무엇이 expose 인가"
+ * 는 갈리면 안 된다.
+ *
+ * 제외 규칙을 여기 적는 이유: 이 저장소는 테스트를 대상 소스 옆에 둔다. 거르지 않으면
+ * `exposes.test.tsx` 가 remote 의 공개 계약에 올라간다. dev 가 볼 게 아닌 이웃 파일이
+ * 또 생기면 아래 배열에 한 줄 더 넣는다. 기록: known-issues H-2.
+ *
+ * 스캔 결과가 `@mfa/contracts` 의 계약과 어긋나면 `src/exposes/contract.test.ts` 가 잡는다.
+ */
+const EXPOSED = readExposes('./src/exposes', {
+  ignore: [/\.test\.tsx$/],
+});
 /**
  * 이 remote 가 배포된 **공개 오리진**. assetPrefix 가 여기서 나온다.
  *
@@ -51,11 +70,7 @@ export default defineConfig({
     pluginModuleFederation({
       name: NAME,
       filename: 'remoteEntry.js',
-      exposes: {
-        './CartPanel': './src/exposes/CartPanel.tsx',
-        './CartBadge': './src/exposes/CartBadge.tsx',
-        './CheckoutFlow': './src/exposes/CheckoutFlow.tsx',
-      },
+      exposes: EXPOSED.exposes,
       shared: {
         react: { singleton: true, requiredVersion: '^19.0.0' },
         'react-dom': { singleton: true, requiredVersion: '^19.0.0' },

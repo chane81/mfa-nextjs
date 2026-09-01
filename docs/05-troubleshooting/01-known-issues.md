@@ -32,16 +32,17 @@
 
 ### remote 가 안 뜨거나 깨짐
 
-| 증상                                                       | 항목                                                                                                                                              |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `_jsxDEV is not a function` (dev, catalog 첫 로드)         | [0-4c](#0-4c-콜드-dev-첫-로드에서-_jsxdev-is-not-a-function)                                                                                      |
-| `Invalid hook call` / React 2벌 로드                       | [0-3](#0-3-remote-서버-번들이-자기-react-를-들고-오면-서버에서도-훅이-깨진다), [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) |
-| `Failed to bridge external shared module` / `#RUNTIME-015` | [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) — host 의 `shared` 에서 서브엔트리를 뺐다                                      |
-| host 의 `shared` 를 고쳤는데 뭘 확인해야 하나              | [0-4e](#0-4e-shared-를-고쳤을-때의-dev-검증-절차) — 빌드만으로는 부족하다                                                                         |
-| `예상 밖 모듈을 require 했습니다`                          | 번들러 externals — [0-5](#0-5-shared-모듈-네임스페이스-interop)                                                                                   |
-| `[ dynamic-remote-type-hints-plugin ] err: [object Event]` | [0-4b](#0-4b--dynamic-remote-type-hints-plugin--err-object-event)                                                                                 |
-| `SSR 번들을 가져오지 못했습니다` / `ECONNREFUSED` (dev)    | remote 미기동. 살아있는데도 나면 [0-4](#0-4-dev-에서-ssr-번들이-안-내려옴)                                                                        |
-| 배럴 import 가 Server Component 를 오염                    | [3](#3-공유-ui-패키지-배럴이-server-component-를-오염시킴)                                                                                        |
+| 증상                                                                       | 항목                                                                                                                                              |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `_jsxDEV is not a function` (dev, catalog 첫 로드)                         | [0-4c](#0-4c-콜드-dev-첫-로드에서-_jsxdev-is-not-a-function)                                                                                      |
+| `Invalid hook call` / React 2벌 로드                                       | [0-3](#0-3-remote-서버-번들이-자기-react-를-들고-오면-서버에서도-훅이-깨진다), [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) |
+| `Failed to bridge external shared module` / `#RUNTIME-015`                 | [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) — host 의 `shared` 에서 서브엔트리를 뺐다                                      |
+| host 의 `shared` 를 고쳤는데 뭘 확인해야 하나                              | [0-4e](#0-4e-shared-를-고쳤을-때의-dev-검증-절차) — 빌드만으로는 부족하다                                                                         |
+| `예상 밖 모듈을 require 했습니다`                                          | 번들러 externals — [0-5](#0-5-shared-모듈-네임스페이스-interop)                                                                                   |
+| `[ dynamic-remote-type-hints-plugin ] err: [object Event]`                 | [0-4b](#0-4b--dynamic-remote-type-hints-plugin--err-object-event)                                                                                 |
+| `SSR 번들을 가져오지 못했습니다` / `ECONNREFUSED` (dev)                    | remote 미기동. 살아있는데도 나면 [0-4](#0-4-dev-에서-ssr-번들이-안-내려옴)                                                                        |
+| 배럴 import 가 Server Component 를 오염                                    | [3](#3-공유-ui-패키지-배럴이-server-component-를-오염시킴)                                                                                        |
+| `Pre-transform error: Failed to resolve import "@tests/…"` (dev 기동 로그) | 워밍 glob 이 테스트 파일을 잡았다 — [H-2](#h-2-dev-워밍-glob-이-테스트-파일까지-잡아-사전-transform-이-실패했다)                                  |
 
 ### SSR · hydration
 
@@ -100,7 +101,7 @@
 | -------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련) | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다) |
 
-## H. (26차) `src/mf` 폴더 재배치 중에 밟은 것
+## H. (26차) 재배치 · dev 기동에서 밟은 것
 
 ### H-1. 공유 모듈 표에 `react-dom/client` 실체를 담으면 RSC 그래프가 막는다
 
@@ -138,6 +139,96 @@ Import traces:
 
 **교훈: 중복을 합칠 때 "무엇이 실제로 드리프트하는가"를 먼저 본다.** 여기서 합쳐야 했던
 것은 값 하나(프로브)였고, 모듈 실체까지 끌어오는 순간 그래프 제약을 어겼다.
+
+### H-2. dev 워밍 glob 이 테스트 파일까지 잡아 사전 transform 이 실패했다
+
+증상: `pnpm dev` 기동 로그에 catalog 쪽 에러가 찍힌다. 화면은 뜨지만 매 기동마다 나온다.
+
+```
+[vite] (client) Pre-transform error: Failed to resolve import "@tests/helpers/globals"
+from "src/exposes/exposes.test.tsx"
+Plugin: vite:import-analysis
+File: /…/apps/remote-catalog/src/exposes/exposes.test.tsx:8:38
+```
+
+원인: `apps/remote-catalog/vite.config.ts` 가 dev 사전 transform 대상과 의존성 스캔
+진입점을 **glob 으로** 적고 있었다.
+
+```ts
+warmup: {
+  clientFiles: ['./src/exposes/*.tsx'];
+}
+optimizeDeps: {
+  entries: ['src/exposes/*.tsx', 'src/main.tsx'];
+}
+```
+
+`src/exposes/` 에는 expose 두 개 말고 `exposes.test.tsx` 도 있다. 그 파일이
+`@tests/helpers/globals` 를 import 하는데, 그 alias 는 `vitest.config.ts` 에만 있고
+Vite dev 설정에는 없다 — **있어야 할 이유도 없다.** 테스트는 애초에 dev 모듈 그래프에
+들어갈 파일이 아니다.
+
+이 저장소는 테스트를 대상 소스 옆에 두므로(`docs/06-testing/01-test-plan.md`)
+소스 디렉터리를 `*` 로 훑는 설정은 전부 이 함정을 갖는다.
+
+고침: **`exposes` 를 손으로 적지 않고 `src/exposes/` 를 읽어서 만든다.**
+그 스캔이 제외 규칙을 인자로 받고, 거기서 테스트를 뺀다.
+
+```ts
+// apps/remote-*/{vite,rsbuild}.config.ts
+const EXPOSED = readExposes('./src/exposes', {
+  ignore: [/\.test\.tsx$/],
+});
+```
+
+`readExposes` 는 `@mfa/remote-config/node` 에 있다 — 번들러가 둘(Vite · Rsbuild)이라
+각자 구현하면 "무엇이 expose 인가"가 remote 마다 갈린다(`createMfDevMiddleware` 와 같은
+이유). 돌려주는 `files` 를 catalog 의 `server.warmup.clientFiles` 와
+`optimizeDeps.entries` 가 그대로 쓴다 — expose 와 **같은 목록**이라 워밍이 expose 를
+놓치는 경우가 성립하지 않는다.
+
+dev 가 볼 게 아닌 이웃 파일이 또 생기면(`*.stories.tsx` 등) `ignore` 에 줄을 하나 더 넣는다.
+
+alias 를 vite 설정에 추가하는 안은 기각했다 — 테스트를 dev 모듈 그래프에 들이는 것이
+문제의 원인이지 해결이 아니다.
+
+### 폴더 스캔의 대가와 그걸 막는 장치
+
+파일 하나를 놓는 것만으로 **remote 의 공개 계약이 바뀐다.** 그래서 각 remote 에
+`src/exposes/contract.test.ts` 를 두고 스캔 결과를 `@mfa/contracts` 의 `MODULE_IDS` 와
+대조한다. 잡히는 경우가 둘이다.
+
+| 상황          | 무엇이 잘못됐나                                                  |
+| ------------- | ---------------------------------------------------------------- |
+| 파일만 추가   | props 타입을 `RemoteModuleMap` 에 안 적었다 → host 가 못 쓴다    |
+| 계약에만 있다 | 파일이 없거나 이름이 다르다 → 런타임에 "expose 없음" 으로 죽는다 |
+
+실증: `Drift.tsx` 를 넣자 즉시 실패했다.
+
+```
+AssertionError: expected [ 'Drift', 'ProductDetail', …(1) ] to deeply equal
+[ 'ProductDetail', 'ProductGrid' ]
+```
+
+그러려면 `MODULE_IDS` 가 런타임 값이어야 해서 `remote-contract.test.ts` 에 있던 것을
+`remote-contract.ts` 본체로 올렸다. 양방향 타입 결속(`satisfies` · `_Exhaustive`)은 그대로다.
+
+### ⚠️ `optimizeDeps.entries` 를 명시하면 Vite 의 기본 무시가 사라진다
+
+```js
+// vite 8.2.1, globEntries()
+ignore: [
+  `**/${outDir}/**`,
+  ...(config.optimizeDeps.entries ? [] : ['**/__tests__/**', '**/coverage/**']),
+];
+```
+
+즉 `entries` 를 적는 순간 `__tests__` · `coverage` 제외가 우리 책임이 된다.
+이 저장소는 테스트를 `__tests__` 가 아니라 소스 옆에 두므로 기본 무시로는 애초에 못
+막지만, 디렉터리를 늘릴 때 알고 있어야 할 성질이다.
+
+밟은 시점은 `c834704`(vitest 스위트 도입)부터다. 26차의 폴더 재배치와는 무관하고,
+dev 기동 로그에만 나와서 오래 남아 있었다.
 
 ## G. (24차) 배포본에서 remote `style.css` 만 404
 
