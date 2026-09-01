@@ -1,7 +1,7 @@
 import { REMOTE_NAMES } from '@mfa/contracts';
 
 import { getLoaderStats, resetLoaderStats } from '@/mf/loader-stats';
-import { fetchRemoteVersion, knownVersions } from '@/mf/remote-version';
+import { fetchRemoteVersion, announcedVersions } from '@/mf/versions/server';
 import { ssrEntrySnapshot } from '@/mf/server-loader';
 
 /**
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
 
   return Response.json({
     at: new Date().toISOString(),
-    versions: knownVersions(),
+    versions: announcedVersions(),
     entries: ssrEntrySnapshot(),
     stats: getLoaderStats(),
   });

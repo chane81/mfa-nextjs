@@ -1,9 +1,9 @@
 import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
 import { MF_FILES } from '@mfa/remote-config';
 
-import { REMOTE_FETCH_TIMEOUT_MS } from './constants';
-import { globalCell } from './global-state';
-import { SSR_ENTRIES } from './remote-endpoints';
+import { REMOTE_FETCH_TIMEOUT_MS } from '../constants';
+import { globalCell } from '../global-state';
+import { SSR_ENTRIES } from '../remote-endpoints';
 import {
   assertAllowedOrigin,
   assertManifestSignature,
@@ -11,10 +11,15 @@ import {
   assertSafeVersion,
   allowedOrigins,
   signedPayload,
-} from './remote-trust';
+} from '../remote-trust';
 
 /**
- * remote 버전 해석.
+ * remote 버전 해석 — **host 서버 전용**.
+ *
+ * 이 파일의 값은 전부 host **서버 프로세스**에서만 유효하다. `globalCell` 은 그 프로세스의
+ * globalThis 고, `fetchRemoteVersion` 은 신뢰 검증까지 하는 서버 경로다. 브라우저에서
+ * 부르면 조용히 "버전 모름" 이 된다 — 그 오해가 24차의 CSS 404 였다(known-issues G-1).
+ * 브라우저 쪽 값은 `./browser`, 둘을 합친 소비 창구는 `./index` 의 `remoteVersion` 이다.
  *
  * ## 왜 버전이 필요한가
  *
@@ -62,7 +67,11 @@ export function trustedOrigins(): string[] {
 }
 
 /**
- * 마지막으로 확인된 **공표된** 버전 — remote 가 `mf-version.json` 에서 뭐라고 말했는지.
+ * remote 가 **공표한** 버전 — `mf-version.json` 에서 뭐라고 말했는지.
+ *
+ * 이름의 축은 **누가 준 값인가**다. 여기는 remote 가 공표(announce)한 것,
+ * `./browser` 의 `injectedEntry` 는 서버가 HTML 에 심어(inject) 준 것.
+ * 위치(server/browser)가 아니라 출처로 부르면 합치는 줄이 대칭이 된다.
  *
  * 조회하는 쪽(RSC 레이아웃)과 그걸로 캐시 키를 만드는 쪽(SSR 레이어)이 서로 다른
  * 모듈 그래프라 레이어를 넘는 저장소여야 한다. 근거는 `[[global-state]]`.
@@ -72,7 +81,7 @@ const known = globalCell(
   () => ({}) as Partial<Record<RemoteName, RemoteVersion>>,
 );
 
-export function knownVersion(remote: RemoteName): RemoteVersion | null {
+export function announcedVersion(remote: RemoteName): RemoteVersion | null {
   return known.value[remote] ?? null;
 }
 
@@ -80,72 +89,7 @@ export function rememberVersion(remote: RemoteName, info: RemoteVersion): void {
   known.value[remote] = info;
 }
 
-/**
- * "이 프로세스가 지금 어느 버전의 번들을 실제로 들고 있는가."
- *
- * `knownVersion` 은 **공표된** 버전(remote 가 뭐라고 말하는지),
- * 이건 **적재된** 버전(우리가 실제로 평가해 둔 게 뭔지)이다. 둘은 다를 수 있고,
- * warm 이 성공했는지는 정확히 "둘이 같아졌는가"로 판정한다.
- *
- * 적재는 SSR 레이어에서 일어나고 판정은 RSC 레이어(Route Handler)에서 한다 — 방향만
- * 반대일 뿐 위와 같은 이유로 레이어를 넘는다.
- */
-interface ReadyState {
-  version: string;
-  /** 적재된 시점의 warm 세대. "언제 적재했는지"까지 봐야 warm 이 증명이 된다. */
-  epoch: number;
-}
-
-const ready = globalCell(
-  'ready-versions',
-  () => ({}) as Partial<Record<RemoteName, ReadyState>>,
-);
-
-export function markBundleReady(
-  remote: RemoteName,
-  version: string,
-  epoch: number,
-): void {
-  ready.value[remote] = { version, epoch };
-}
-
-export function readyVersion(remote: RemoteName): string | null {
-  return ready.value[remote]?.version ?? null;
-}
-
-/**
- * "이번 warm 에서 이 버전을 실제로 적재했는가."
- *
- * 버전만 비교하면 예전에 같은 버전을 적재해 둔 상태를 성공으로 오인한다.
- * 실제로 번들이 변조된 배포가 그 구멍으로 통과했다(무결성 검사는 막았는데 웹훅은 200).
- */
-export function isBundleReady(
-  remote: RemoteName,
-  version: string,
-  epoch: number,
-): boolean {
-  const state = ready.value[remote];
-  return state?.version === version && state.epoch === epoch;
-}
-
-/**
- * warm 세대. 올리면 다음 접근에서 번들을 **다시 받아 다시 검증**한다.
- *
- * 버전만으로 캐시를 키잉하면 "같은 버전인데 바이트가 바뀐" 경우를 못 잡는다.
- * 정상 배포에서는 버전이 늘 바뀌므로 그런 상황은 변조이거나 깨진 파이프라인이고,
- * warm 은 그걸 잡아내야 의미가 있다. 그래서 warm 은 캐시를 믿지 않는다.
- */
-const epoch = globalCell('warm-epoch', () => 0);
-
-export function warmEpoch(): number {
-  return epoch.value;
-}
-
-export function bumpWarmEpoch(): number {
-  return (epoch.value += 1);
-}
-
-export function knownVersions(): Partial<Record<RemoteName, string>> {
+export function announcedVersions(): Partial<Record<RemoteName, string>> {
   const out: Partial<Record<RemoteName, string>> = {};
   for (const [remote, info] of Object.entries(known.value)) {
     out[remote as RemoteName] = info.version;

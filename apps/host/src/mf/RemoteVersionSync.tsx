@@ -2,11 +2,12 @@ import { cacheLife, cacheTag } from 'next/cache';
 
 import { REMOTE_NAMES } from '@mfa/contracts';
 
+import { REMOTE_VERSIONS_GLOBAL } from './versions/browser';
 import {
   fetchRemoteVersion,
   remoteOrigin,
   remoteVersionTag,
-} from './remote-version';
+} from './versions/server';
 
 /**
  * remote 버전을 새로 읽어 globalThis 에 반영하고, 브라우저에도 같은 값을 넘긴다.
@@ -63,7 +64,7 @@ export async function RemoteVersionSync() {
       id="mfa-remote-versions"
       // 값은 remote 가 공표한 hex 해시라 문자열 이스케이프만으로 충분하다
       dangerouslySetInnerHTML={{
-        __html: `window.__MFA_REMOTE_VERSIONS__=${JSON.stringify(versions)}`,
+        __html: `window.${REMOTE_VERSIONS_GLOBAL}=${JSON.stringify(versions)}`,
       }}
     />
   );

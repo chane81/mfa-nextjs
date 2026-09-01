@@ -17,12 +17,11 @@ import { recordEval, recordFetch, recordLoad } from './loader-stats';
 import {
   fallbackSsrEntry,
   fetchRemoteVersion,
-  knownVersion,
-  markBundleReady,
+  announcedVersion,
   remoteOrigin,
   trustedOrigins,
-  warmEpoch,
-} from './remote-version';
+} from './versions/server';
+import { markBundleReady, warmEpoch } from './warm-state';
 import { assertAllowedOrigin, assertIntegrity } from './remote-trust';
 
 /**
@@ -167,7 +166,7 @@ async function resolveEntry(
    *
    * 아무것도 모르는 콜드 상태에서만 직접 읽는다.
    */
-  const info = knownVersion(remote) ?? (await fetchRemoteVersion(remote));
+  const info = announcedVersion(remote) ?? (await fetchRemoteVersion(remote));
   if (!info) return { url: fallbackSsrEntry(remote), version: UNVERSIONED };
   return {
     url: `${remoteOrigin(remote)}${info.ssrEntry}`,
@@ -318,7 +317,7 @@ export async function loadRemoteModuleOnServer<K extends RemoteModuleId>(
 /** 진단용 — 지금 이 인스턴스가 어느 엔트리를 보고 있는지 */
 export function ssrEntrySnapshot(): Record<RemoteName, string> {
   return byRemote((remote) => {
-    const info = knownVersion(remote);
+    const info = announcedVersion(remote);
     return info
       ? `${remoteOrigin(remote)}${info.ssrEntry}`
       : fallbackSsrEntry(remote);

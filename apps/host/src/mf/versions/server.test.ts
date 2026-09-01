@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.stubEnv('MF_REQUIRE_SIGNATURE', undefined);
 });
 
-const load = () => import('./remote-version');
+const load = () => import('./server');
 
 /** remote 가 공표하는 매니페스트의 최소 형태 */
 const manifest = (version = 't1abc') => ({
@@ -62,14 +62,14 @@ describe('주소 조립', () => {
   });
 });
 
-describe('공표된 버전 (knownVersion)', () => {
+describe('공표된 버전 (announcedVersion)', () => {
   it('기억하기 전에는 null 이다', async () => {
-    const { knownVersion } = await load();
-    expect(knownVersion('catalog')).toBeNull();
+    const { announcedVersion } = await load();
+    expect(announcedVersion('catalog')).toBeNull();
   });
 
   it('기억한 값을 그대로 돌려준다', async () => {
-    const { knownVersion, rememberVersion } = await load();
+    const { announcedVersion, rememberVersion } = await load();
     const info = {
       version: 't1',
       ssrEntry: '/vt1/a.cjs',
@@ -78,73 +78,19 @@ describe('공표된 버전 (knownVersion)', () => {
 
     rememberVersion('catalog', info);
 
-    expect(knownVersion('catalog')).toEqual(info);
-    expect(knownVersion('cart')).toBeNull();
+    expect(announcedVersion('catalog')).toEqual(info);
+    expect(announcedVersion('cart')).toBeNull();
   });
 
-  it('knownVersions 는 버전 문자열만 추린다', async () => {
-    const { knownVersions, rememberVersion } = await load();
+  it('announcedVersions 는 버전 문자열만 추린다', async () => {
+    const { announcedVersions, rememberVersion } = await load();
     rememberVersion('catalog', {
       version: 't1',
       ssrEntry: '/vt1/a.cjs',
       webEntry: '/vt1/b.json',
     });
 
-    expect(knownVersions()).toEqual({ catalog: 't1' });
-  });
-});
-
-describe('적재된 버전 (isBundleReady)', () => {
-  it('적재 전에는 준비되지 않았다', async () => {
-    const { isBundleReady, readyVersion } = await load();
-    expect(readyVersion('catalog')).toBeNull();
-    expect(isBundleReady('catalog', 't1', 0)).toBe(false);
-  });
-
-  it('버전과 epoch 이 모두 같아야 준비다', async () => {
-    const { isBundleReady, markBundleReady, readyVersion } = await load();
-    markBundleReady('catalog', 't1', 5);
-
-    expect(readyVersion('catalog')).toBe('t1');
-    expect(isBundleReady('catalog', 't1', 5)).toBe(true);
-  });
-
-  it('버전이 같아도 epoch 이 다르면 준비가 아니다', async () => {
-    // 버전만 비교하면 예전에 같은 버전을 적재해 둔 상태를 성공으로 오인한다.
-    // 실제로 변조된 배포가 그 구멍으로 웹훅 200 을 받아냈다.
-    const { isBundleReady, markBundleReady } = await load();
-    markBundleReady('catalog', 't1', 5);
-
-    expect(isBundleReady('catalog', 't1', 6)).toBe(false);
-  });
-
-  it('epoch 이 같아도 버전이 다르면 준비가 아니다', async () => {
-    const { isBundleReady, markBundleReady } = await load();
-    markBundleReady('catalog', 't1', 5);
-
-    expect(isBundleReady('catalog', 't2', 5)).toBe(false);
-  });
-
-  it('공표된 버전과 적재된 버전은 별개다', async () => {
-    const { isBundleReady, knownVersion, rememberVersion } = await load();
-    rememberVersion('catalog', {
-      version: 't2',
-      ssrEntry: '/vt2/a.cjs',
-      webEntry: '/vt2/b.json',
-    });
-
-    expect(knownVersion('catalog')?.version).toBe('t2');
-    expect(isBundleReady('catalog', 't2', 0)).toBe(false);
-  });
-});
-
-describe('warm 세대 (epoch)', () => {
-  it('0 에서 시작해 하나씩 오른다', async () => {
-    const { bumpWarmEpoch, warmEpoch } = await load();
-    expect(warmEpoch()).toBe(0);
-    expect(bumpWarmEpoch()).toBe(1);
-    expect(bumpWarmEpoch()).toBe(2);
-    expect(warmEpoch()).toBe(2);
+    expect(announcedVersions()).toEqual({ catalog: 't1' });
   });
 });
 
@@ -157,7 +103,7 @@ describe('fetchRemoteVersion', () => {
 
   it('매니페스트를 읽어 기억한다', async () => {
     stubFetch(() => okResponse(manifest()));
-    const { fetchRemoteVersion, knownVersion } = await load();
+    const { fetchRemoteVersion, announcedVersion } = await load();
 
     const info = await fetchRemoteVersion('catalog');
 
@@ -167,7 +113,7 @@ describe('fetchRemoteVersion', () => {
       webEntry: versionedPath(MF_FILES.webManifest, 't1abc'),
       ssrIntegrity: 'sha384-aaa',
     });
-    expect(knownVersion('catalog')).toEqual(info);
+    expect(announcedVersion('catalog')).toEqual(info);
   });
 
   it('버전 매니페스트 주소를 조립한다', async () => {
@@ -263,10 +209,10 @@ describe('fetchRemoteVersion', () => {
   it('아직 stamp 안 한 remote 와 못 읽는 remote 를 구분하지 않는다', async () => {
     // 둘 다 "버전을 모른다" 이고, 그때 할 일은 같다 — 폴백 엔트리.
     stubFetch(() => okResponse({}));
-    const { fetchRemoteVersion, knownVersion } = await load();
+    const { fetchRemoteVersion, announcedVersion } = await load();
 
     expect(await fetchRemoteVersion('catalog')).toBeNull();
-    expect(knownVersion('catalog')).toBeNull();
+    expect(announcedVersion('catalog')).toBeNull();
   });
 
   describe('검증 실패는 조용히 넘기지 않는다', () => {
@@ -291,12 +237,12 @@ describe('fetchRemoteVersion', () => {
       ['상위 경로 탈출', { ...manifest(), ssrEntry: '/vt1abc/../../x.cjs' }],
     ])('%s 은 거부하고 로그를 남긴다', async (_label, body) => {
       stubFetch(() => okResponse(body));
-      const { fetchRemoteVersion, knownVersion } = await load();
+      const { fetchRemoteVersion, announcedVersion } = await load();
 
       expect(await fetchRemoteVersion('catalog')).toBeNull();
       expect(error).toHaveBeenCalledOnce();
       // 폴백으로 흘러가면 막은 의미가 없다 — 기억도 하지 않는다.
-      expect(knownVersion('catalog')).toBeNull();
+      expect(announcedVersion('catalog')).toBeNull();
     });
 
     it('서명 강제인데 서명이 없으면 거부한다', async () => {
@@ -316,7 +262,7 @@ describe('fetchRemoteVersion', () => {
       vi.stubEnv('MF_REMOTE_PUBLIC_KEY', publicKey);
       vi.stubEnv('MF_REQUIRE_SIGNATURE', '1');
 
-      const { signedPayload } = await import('./remote-trust');
+      const { signedPayload } = await import('../remote-trust');
       const body = manifest();
       const signature = signPayload(
         signedPayload({ remote: 'catalog', ...body }),

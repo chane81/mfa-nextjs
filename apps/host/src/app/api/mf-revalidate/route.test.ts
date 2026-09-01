@@ -71,7 +71,7 @@ const world = async (options: WorldOptions = {}) => {
     warmLoadsBundle = true,
   } = options;
 
-  const remoteVersion = await import('@/mf/remote-version');
+  const warmState = await import('@/mf/warm-state');
 
   const fetchMock = vi.fn(async (input: string | URL, _init?: RequestInit) => {
     const url = String(input);
@@ -90,10 +90,10 @@ const world = async (options: WorldOptions = {}) => {
       }
       if (warmLoadsBundle && version) {
         // warm 렌더가 remote 번들을 적재한 자리
-        remoteVersion.markBundleReady(
+        warmState.markBundleReady(
           'catalog',
           version.version,
-          remoteVersion.warmEpoch(),
+          warmState.warmEpoch(),
         );
       }
       return {
@@ -115,7 +115,7 @@ const world = async (options: WorldOptions = {}) => {
     fetchMock,
     revalidateTag: vi.mocked(cache.revalidateTag),
     revalidatePath: vi.mocked(cache.revalidatePath),
-    remoteVersion,
+    warmState,
   };
 };
 
@@ -200,7 +200,7 @@ describe('입력 검증', () => {
 describe('성공 경로 — warm-then-revalidate', () => {
   it('버전·번들 태그를 먼저 깨고, warm 이 끝난 뒤에 페이지 태그를 깬다', async () => {
     const { POST, fetchMock, revalidateTag } = await world();
-    const { remoteVersionTag } = await import('@/mf/remote-version');
+    const { remoteVersionTag } = await import('@/mf/versions/server');
     const { remoteBundleTag, remoteCacheTag } = await import(
       '@/mf/server-loader'
     );
@@ -416,15 +416,11 @@ describe('중단 — 페이지 캐시를 건드리지 않는다', () => {
 
   it('예전 세대에 적재해 둔 것을 성공으로 오인하지 않는다', async () => {
     // 버전만 비교하면 이 구멍으로 변조된 배포가 웹훅 200 을 받아낸다.
-    const remoteVersion = await import('@/mf/remote-version');
-    remoteVersion.markBundleReady(
-      'catalog',
-      VERSION,
-      remoteVersion.warmEpoch(),
-    );
+    const warmState = await import('@/mf/warm-state');
+    warmState.markBundleReady('catalog', VERSION, warmState.warmEpoch());
 
     const { POST } = await world({ warmLoadsBundle: false });
-    const { bumpWarmEpoch } = await import('@/mf/remote-version');
+    const { bumpWarmEpoch } = await import('@/mf/warm-state');
     bumpWarmEpoch();
 
     expect((await POST(request())).status).toBe(502);
