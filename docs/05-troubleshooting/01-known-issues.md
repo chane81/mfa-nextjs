@@ -174,6 +174,14 @@ export function remoteVersion(remote: RemoteName): string | null {
 × 버전이 바뀌면 새 lazy 를 만든다
 ```
 
+### 같은 원인이 남아 있던 자리 하나
+
+`GET /api/lab/stats?refresh=1` 은 `fetchRemoteVersion` 으로 `globalCell` 만 갱신하고
+캐시 태그는 깨지 않았다. 그러면 서버가 만든 `<link>` 는 새 버전, `RemoteVersionSync`
+(`"use cache"`)가 심는 값은 옛 버전이라 같은 어긋남이 다시 생긴다 — 재배포 웹훅은
+이미 같은 태그를 깨고 있었고 이 실험용 조회만 갱신과 무효화가 갈라져 있었다.
+지금은 **버전이 실제로 바뀐 remote 만** `revalidateTag(…, { expire: 0 })` 로 만료시킨다.
+
 교훈: **"브라우저 안전한 값" 판정은 오리진에서 끝나지 않는다.** C-3 에서 오리진을
 `REMOTE_ORIGINS` 로 고쳤을 때 같은 표현식 안의 버전은 서버 전용인 채로 남았다.
 `process.env` 뿐 아니라 **`globalThis` 에 사는 값도 레이어마다 다른 실체**다.

@@ -121,7 +121,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 16. `apps/host/src/app/api/mf-revalidate/route.ts` — 401 / 400 / `warm=0` / 502 + **태그 미무효화** / `cause` 언래핑 / 성공 호출 순서 / `paths=1`
 - [x] 17. `apps/host/src/proxy.ts` — 시크릿 없으면 **401 이 아니라 404** / `config.matcher` / `/api/lab/*` 은 **DELETE 만** 프로덕션에서 닫힘
 - [x] 18. `apps/host/src/lib/cart-cookie.ts` — 쿠키 없음 → `[]` / 이중 디코딩 안 함
-- [x] 19. `apps/host/src/app/api/lab/stats/route.ts` — `refresh=1` 일 때만 fetch / 응답 형태 / `DELETE` / **배포본에서 DELETE 는 404** (proxy 와 별개의 이중 방어)
+- [x] 19. `apps/host/src/app/api/lab/stats/route.ts` — `refresh=1` 일 때만 fetch / **버전이 바뀐 remote 만 태그 만료**(24차) / 응답 형태 / `DELETE` / **배포본에서 DELETE 는 404** (proxy 와 별개의 이중 방어)
 - [x] 20. `apps/host/src/mf/remote-endpoints.ts` — `MFA_REMOTE_WEB_ENTRIES` 파싱 실패 삼킴 / 주입 / `REMOTE_ORIGINS`
 - [x] 20b. `apps/host/src/mf/versions/browser.ts` — 심어준 값 없음 → `undefined` / remote 별 격리 / **전역 이름이 `RemoteVersionSync` 와 같다**(24차 회귀)
 - [x] 20c. `apps/host/src/mf/versions/index.ts` — `remoteVersion` 4분기(공표만 / 심어준 것만 / 양쪽 없음 / remote 별 격리)
