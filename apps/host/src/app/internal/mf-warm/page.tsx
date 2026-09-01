@@ -5,7 +5,7 @@ import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
 
 import { MfWarmup } from '@/components/lab/MfWarmup';
 import { checkMfSecret } from '@/lib/mf-secret';
-import { bumpWarmEpoch } from '@/mf/remote-version';
+import { bumpWarmEpoch } from '@/mf/warm-state';
 
 /**
  * warm 전용 라우트. 사람이 볼 화면이 아니라 `/api/mf-revalidate` 가 내부에서 호출한다.

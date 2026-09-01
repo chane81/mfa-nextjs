@@ -16,12 +16,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * 오리진을 리터럴로 각각 적으면 한쪽만 고쳐도 테스트는 초록인 채로 의미를 잃는다.
  * `vi.mock` 팩토리는 호이스팅되어 바깥 `const` 를 못 보므로 오리진과 목을 `vi.hoisted` 에 둔다.
  */
-const { CATALOG_ORIGIN, CART_ORIGIN, pinnedEntry, pinnedVersion } = vi.hoisted(
+const { CATALOG_ORIGIN, CART_ORIGIN, pinnedEntry, injectedEntry } = vi.hoisted(
   () => ({
     CATALOG_ORIGIN: 'https://catalog.example.com',
     CART_ORIGIN: 'https://cart.example.com',
     pinnedEntry: vi.fn(),
-    pinnedVersion: vi.fn(),
+    injectedEntry: vi.fn(),
   }),
 );
 
@@ -33,9 +33,11 @@ const FALLBACK = {
 
 vi.mock('@/mf/runtime', () => ({
   pinnedEntry,
-  pinnedVersion,
   REMOTE_ENTRIES: FALLBACK,
 }));
+
+// 버전 핀 표시는 서버가 심어준 값에서 온다 — 그 잎 모듈만 따로 목킹한다.
+vi.mock('@/mf/versions/browser', () => ({ injectedEntry }));
 
 /** MF 런타임이 실제로 쓰는 주소. 경로 조립은 `versionedPath` 가 한다. */
 const PINNED = {
@@ -48,7 +50,7 @@ beforeEach(() => {
   pinnedEntry.mockImplementation(
     (remote: 'catalog' | 'cart') => PINNED[remote],
   );
-  pinnedVersion.mockReturnValue(null);
+  injectedEntry.mockReturnValue(undefined);
 });
 
 const ok = (exposes: string[]) =>
@@ -190,8 +192,10 @@ describe('MfDiagnostics', () => {
 
   it('버전 핀이 있으면 그 값을, 없으면 폴백임을 밝힌다', async () => {
     // 배포에서 "버전 핀 없음" 인데 404 면 remote 가 mf-version.json 을 공표하지 못한 것이다.
-    pinnedVersion.mockImplementation((remote: string) =>
-      remote === 'catalog' ? 't1abc' : null,
+    injectedEntry.mockImplementation((remote: string) =>
+      remote === 'catalog'
+        ? { version: 't1abc', entry: PINNED.catalog }
+        : undefined,
     );
     vi.stubGlobal(
       'fetch',

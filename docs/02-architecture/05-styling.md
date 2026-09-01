@@ -121,4 +121,12 @@ cart 의 `<link>` 는 하나만 남았다 — React 19 의 중복 제거가 실�
 `<link>` 를 거는 주체는 host 다(`RemoteComponent`). 한때 remote 의 expose 마다 선언하게
 했다가 옮겼다 — 근거는 같은 문서의 "왜 remote 쪽이 아니라 host 쪽인가".
 
+⚠️ 주소의 두 조각(오리진 · 버전)은 **둘 다 브라우저에서 읽을 수 있는 값**이어야 한다.
+오리진은 `REMOTE_ORIGINS`(`next.config.ts` 가 구워 넣는다), 버전은
+`remoteVersion()`(`mf/versions/index.ts`) — 서버가 심어준 값(`versions/browser.ts` 의
+`injectedEntry`) 아니면 remote 가 공표한 값(`versions/server.ts` 의 `announcedVersion`) 이고,
+그 합치기는 그 함수 안에서 끝난다.
+한쪽만 고치면 서버 HTML 과 브라우저 렌더의 href 가 갈려 404 가 하나 더 생긴다
+(기록: known-issues C-3 · G-1).
+
 검증일: 2026-08-19 · Tailwind CSS 4.3.3

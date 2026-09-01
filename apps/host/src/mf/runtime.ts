@@ -15,6 +15,7 @@ import {
   type RemoteName,
 } from '@mfa/contracts';
 
+import { injectedEntry } from './versions/browser';
 import { normalizeModule } from './interop';
 import { WEB_ENTRIES } from './remote-endpoints';
 import { loadRemoteModuleOnServer } from './server-loader';
@@ -108,27 +109,14 @@ let initialized = false;
 
 /**
  * 서버가 이 HTML 을 만들 때 쓴 remote 엔트리를 그대로 쓴다.
- * (`RemoteVersionSync` 가 `window.__MFA_REMOTE_VERSIONS__` 로 심어준다)
+ * (`RemoteVersionSync` 가 인라인 스크립트로 심고, `versions/browser.ts` 가 읽는다)
  *
  * 목적은 **서버 마크업과 hydrate 하는 코드를 같은 빌드로 맞추는 것**이다.
  * 캐시된 HTML 이 오래 살아 있을수록 이 창이 벌어지고, 어긋나면 hydration 이 깨진다.
  *
  * remote 가 웹 자산을 `/v<version>/` 불변 경로로 배포하므로, 이 URL 이 나중에
- * 다른 코드를 가리키게 되는 일은 없다. 값이 없으면(dev 등) 버전 없는 엔트리로 폴백한다.
- */
-interface InjectedEntry {
-  version: string;
-  entry: string;
-}
-
-/** 서버가 심어준 값 하나. 없으면 `undefined` — 폴백 판단은 부르는 쪽이 한다. */
-function injectedEntry(remote: RemoteName): InjectedEntry | undefined {
-  return (
-    globalThis as { __MFA_REMOTE_VERSIONS__?: Record<string, InjectedEntry> }
-  ).__MFA_REMOTE_VERSIONS__?.[remote];
-}
-
-/**
+ * 다른 코드를 가리키게 되는 일은 없다.
+ *
  * ⚠️ 폴백(`WEB_ENTRIES`)은 **dev 에서만 실재하는 주소**다.
  *
  * dev 서버는 `/mf-manifest.json` 을 루트에서 내려주지만, 배포된 remote 의 루트에는
@@ -140,11 +128,6 @@ function injectedEntry(remote: RemoteName): InjectedEntry | undefined {
  */
 export function pinnedEntry(remote: RemoteName): string {
   return injectedEntry(remote)?.entry ?? WEB_ENTRIES[remote];
-}
-
-/** 버전 핀이 실제로 꽂혔는지. 진단이 "폴백을 보고 있다"를 구분해 보여주는 데 쓴다. */
-export function pinnedVersion(remote: RemoteName): string | null {
-  return injectedEntry(remote)?.version ?? null;
 }
 
 function ensureInit(): void {

@@ -1,5 +1,71 @@
 # 진행 상황
 
+## 2026-09-01 (24차) — 배포본에서 remote `style.css` 만 404
+
+배포본 Network 탭에 remote 당 `style.css` 가 둘이었다 — SSR 이 박은
+`/v<version>/style.css` 는 200, 하이드레이션 때 다시 그린 `/style.css` 는 404.
+화면은 안 깨지고 콘솔도 조용해서 탭을 열기 전까지 안 보였다.
+
+### 원인 — 브라우저가 서버 전용 저장소를 읽고 있었다
+
+`RemoteComponent` 가 CSS 주소의 버전을 서버 전용 저장소에서 읽었다. 그건
+`globalCell` 이고, **host 서버 프로세스의 globalThis** 다. 브라우저에서는 언제나 비어 있어
+`stylesPath(undefined)` → 배포본에 없는 `/style.css` 가 나갔다.
+
+버전 자체는 브라우저에도 있었다(`RemoteVersionSync` 의 인라인 스크립트). 다만 그걸 읽는
+코드가 `runtime.ts` 안에 있어서 **MF 엔트리 URL 만** 쓰고 있었다. 같은 이유로
+`remoteCacheKey` 도 브라우저에서는 늘 `@unversioned` 였다 — A-2 가 막으려던 상태가
+브라우저 쪽에서 반쯤 열려 있었다.
+
+### 고친 것
+
+- **`apps/host/src/mf/warm-state.ts` 분리.** 적재 상태(`isBundleReady` 등)와 warm 세대는
+  "버전이 무엇인가" 가 아니라 "그 버전으로 뭘 했나" 라 축이 다르다. `versions/server.ts` 가
+  238 → 177줄이 되고, 폴더 이름과 내용이 어긋나던 것도 없어졌다.
+- **`apps/host/src/mf/versions/` 신설.** 버전 코드를 값이 어디서 유효한지로 갈랐다 —
+  `server.ts`(공표 버전 `announcedVersion` · 조회 · 신뢰 검증 · warm), `browser.ts`(서버가
+  심어준 값 `injectedEntry` · 전역 이름 상수), `index.ts`(둘 중 있는 쪽 `remoteVersion`).
+  `remote-version.ts` 와 `injected-version.ts` 가 이 셋이 됐다.
+- `versions/index.ts` 의 `remoteVersion()` — `injectedEntry(…)?.version ?? announcedVersion(…)?.version`.
+  이름의 축은 위치가 아니라 **출처**다(공표된 / 심어준). 위치로 부르면 두 항의 모양이
+  달라져(`browserVersion` vs `knownVersion(…)?.version`) 무엇을 고르는지가 안 읽힌다.
+  **버전이 필요한 곳이 부를 함수는 이거 하나다.** CSS href 와 lazy 캐시 키가 둘 다 이걸 쓴다.
+  `typeof window` 로 가르는 안은 버렸다 — `window` 는 있는데 주입은 없는 상태(jsdom 에서
+  서버 경로를 렌더하는 테스트)가 전부 "버전 모름" 이 된다. 실측으로 4개 깨졌다.
+- `runtime.ts` 는 `pinnedEntry` 만 내보낸다(재-export 없음 — 진단 화면이 `versions/browser` 를
+  직접 읽는다). 주입값 읽기를 `runtime` 에 두면
+  `versions/server` → `runtime` → `server-loader` → `versions/server` 순환이 된다.
+  `versions/browser.ts` 는 아무것도 import 하지 않는 잎이라 그 문제가 없다.
+
+### 테스트
+
+629개 통과. 새 테스트가 회귀를 실제로 잡는지 `remoteVersion` 을 옛 구현으로 되돌려
+확인했다 — 정확히 2개 실패(CSS href, 캐시 키), 되돌리니 통과.
+
+- `versions/browser.test.ts` — 값 없음 → `undefined` / remote 별 격리 / 전역 이름 계약
+- `versions/index.test.ts` — 공표만 / 심어준 것만 / 양쪽 다 비었을 때 / remote 별 격리
+- `RemoteComponent.test.tsx` — `globalCell` 을 비운 채 심어준 값만으로 불변 경로가 나오는지
+
+폴더를 가른 뒤 브라우저 번들도 다시 확인했다. 트리셰이킹이 이미 서버 경로를 걷어내고
+있어서(`Ed25519` · 매니페스트 거부 문자열 없음) **크기 이득은 없다.** 가른 값은
+"이 값이 어디서 유효한가" 가 파일 배치로 보인다는 것뿐이고, 그게 이번 버그의 원인이었다.
+
+### 리뷰에서 하나 더 나왔다
+
+`GET /api/lab/stats?refresh=1` 이 `globalCell` 만 갱신하고 캐시 태그는 안 깼다. 그러면
+`RemoteVersionSync` 의 `"use cache"` 스크립트가 옛 버전을 계속 내서 같은 어긋남이 다시
+생긴다(서버 `<link>` = 새 버전, 심어준 값 = 옛 버전). 재배포 웹훅은 이미 그 태그를 깨고
+있었고 이 실험용 조회만 갈라져 있었다. **버전이 실제로 바뀐 remote 만** 만료시킨다 —
+매번 깨면 캐시 실험 자체가 캐시를 못 본다. 뮤테이션으로 테스트가 회귀를 잡는 것도 확인했다.
+
+같은 리뷰에서 `versions/index.ts` 의 `RemoteVersion` 재-export 가 소비처 0 인 것도 지웠다.
+
+### 남은 것
+
+배포본에 반영하려면 host 를 다시 빌드·배포해야 한다. remote 는 안 건드렸다.
+
+---
+
 ## 2026-08-31 (23차) — 저장소를 public 으로 열기 전 점검
 
 공개 전환은 되돌릴 수 없다(포크·크롤러·검색 인덱스). 그래서 먼저 훑었다.

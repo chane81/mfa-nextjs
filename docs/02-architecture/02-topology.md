@@ -138,7 +138,7 @@ remote 컴포넌트는 host 페이지 안에서 렌더되는데, **CSS 는 두 �
 // apps/host/src/mf/RemoteComponent.tsx — 모든 remote 소비가 지나가는 단일 진입점
 <link
   rel="stylesheet"
-  href={`${REMOTE_ORIGINS[remoteName]}${stylesPath(knownVersion(remoteName)?.version)}`}
+  href={`${REMOTE_ORIGINS[remoteName]}${stylesPath(remoteVersion(remoteName))}`}
   precedence="mfa-remote"
 />
 ```
@@ -180,7 +180,10 @@ SSR HTML 에도 들어가고 소프트 내비게이션에서도 동작하며, �
 | `runtime.ts`            | 브라우저 MF 런타임 `init` — React 5개를 `lib` 로 직접 주입                   |
 | `server-loader.ts`      | 서버 경로 — `mf-server.cjs` fetch → `new Function` 평가 → 컴포넌트 맵        |
 | `remote-endpoints.ts`   | remote 주소. **remote 이름이 한 줄도 없다** — 전부 `@mfa/remote-config` 파생 |
-| `remote-version.ts`     | `mf-version.json` 해석 · 버전 캐시 · 인스턴스 수렴                           |
+| `versions/server.ts`    | remote 가 **공표한** 버전(`announcedVersion`) · 조회 · 인스턴스 수렴         |
+| `versions/browser.ts`   | 서버가 **심어준** 값(`injectedEntry`). 의존 0 인 잎                          |
+| `versions/index.ts`     | `remoteVersion` — 렌더 코드의 유일한 버전 창구                               |
+| `warm-state.ts`         | **적재된** 버전 · warm 세대. 버전이 아니라 "그 버전으로 뭘 했나"             |
 | `remote-trust.ts`       | 오리진 허용 목록 → 경로 형태 검증 → SRI/Ed25519 서명, 세 겹                  |
 | `constants.ts`          | `REMOTE_FETCH_TIMEOUT_MS` 등 공용 상수                                       |
 | `interop.ts`            | `import * as X` 결과 모양 정규화(`{default:{...}}` 케이스)                   |

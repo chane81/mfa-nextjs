@@ -12,7 +12,7 @@ import { Skeleton } from '@mfa/ui';
 
 import { REMOTE_ORIGINS } from './remote-endpoints';
 import { REMOTE_ENTRIES, loadRemoteModule } from './runtime';
-import { knownVersion } from './remote-version';
+import { remoteVersion } from './versions';
 import { RemoteBoundary } from './RemoteBoundary';
 
 type PropsOf<K extends RemoteModuleId> =
@@ -39,7 +39,7 @@ const lazyCache = new Map<string, ComponentType<Record<string, unknown>>>();
 export function remoteCacheKey(id: RemoteModuleId, reloadKey?: string): string {
   const remote = id.split('/')[0] as RemoteName;
   // 브라우저에는 서버가 심어준 버전이 있고(RemoteVersionSync), 없으면 unversioned 로 고정된다
-  const version = knownVersion(remote)?.version ?? 'unversioned';
+  const version = remoteVersion(remote) ?? 'unversioned';
   return `${id}@${version}${reloadKey ? `#${reloadKey}` : ''}`;
 }
 
@@ -128,12 +128,13 @@ export function RemoteComponent<K extends RemoteModuleId>({
   return (
     <RemoteBoundary remoteName={remoteName} entry={REMOTE_ENTRIES[remoteName]}>
       {/*
-        버전은 서버가 심어준 값을 그대로 쓴다(`RemoteVersionSync`). 없으면 버전 없는
-        경로로 떨어지는데, 그건 dev 서버가 자산을 서빙하는 주소라 그때는 그게 맞다.
+        버전은 서버가 심어준 값을 그대로 쓴다(`RemoteVersionSync` → `remoteVersion`).
+        없으면 버전 없는 경로로 떨어지는데, 그건 dev 서버가 자산을 서빙하는 주소라
+        그때는 그게 맞다.
       */}
       <link
         rel="stylesheet"
-        href={`${REMOTE_ORIGINS[remoteName]}${stylesPath(knownVersion(remoteName)?.version)}`}
+        href={`${REMOTE_ORIGINS[remoteName]}${stylesPath(remoteVersion(remoteName))}`}
         precedence="mfa-remote"
       />
       <Suspense fallback={placeholder}>

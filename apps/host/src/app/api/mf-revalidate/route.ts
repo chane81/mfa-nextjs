@@ -5,12 +5,10 @@ import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
 import { checkMfSecret, mfSecretHeader } from '@/lib/mf-secret';
 import {
   fetchRemoteVersion,
-  isBundleReady,
-  knownVersion,
-  readyVersion,
+  announcedVersion,
   remoteVersionTag,
-  warmEpoch,
-} from '@/mf/remote-version';
+} from '@/mf/versions/server';
+import { isBundleReady, readyVersion, warmEpoch } from '@/mf/warm-state';
 import { remoteBundleTag, remoteCacheTag } from '@/mf/server-loader';
 
 /**
@@ -102,7 +100,7 @@ export async function POST(req: Request) {
         error: 'warm 실패 — 페이지 캐시를 건드리지 않고 중단했습니다',
         detail,
         remote,
-        version: knownVersion(remote)?.version ?? null,
+        version: announcedVersion(remote)?.version ?? null,
         ready: readyVersion(remote),
       },
       { status: 502 },
@@ -116,7 +114,7 @@ export async function POST(req: Request) {
    * "remote 에 닿았는지"를 증명하지 못한다 — 그 역할은 이 단계가 맡는다.
    */
   const published = skipWarm
-    ? knownVersion(remote)
+    ? announcedVersion(remote)
     : await fetchRemoteVersion(remote);
   if (!skipWarm && !published) {
     return abort(`remote '${remote}' 의 버전 매니페스트를 읽지 못했습니다`);
@@ -178,7 +176,7 @@ export async function POST(req: Request) {
   return Response.json({
     ok: true,
     remote,
-    version: knownVersion(remote)?.version ?? null,
+    version: announcedVersion(remote)?.version ?? null,
     warmed: warmed ?? 'skipped',
     tag: remoteCacheTag(remote),
     revalidated: paths,

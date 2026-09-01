@@ -116,13 +116,16 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 
 ### Phase 3 — 모킹 통합 (node)
 
-- [x] 14. `apps/host/src/mf/remote-version.ts` — `isBundleReady` **epoch 불일치 → false** / `fetchRemoteVersion` 6분기
+- [x] 14. `apps/host/src/mf/versions/server.ts` — `announcedVersion` 저장/조회 / `fetchRemoteVersion` 6분기
 - [x] 15. `apps/host/src/mf/server-loader.ts` — id 파싱 / 오리진·HTTP·타임아웃·무결성 분기 / requireShim / `default` 언랩 / 통계 순서 / 캐시(재사용·재로드·**실패 promise 제거**)
 - [x] 16. `apps/host/src/app/api/mf-revalidate/route.ts` — 401 / 400 / `warm=0` / 502 + **태그 미무효화** / `cause` 언래핑 / 성공 호출 순서 / `paths=1`
 - [x] 17. `apps/host/src/proxy.ts` — 시크릿 없으면 **401 이 아니라 404** / `config.matcher` / `/api/lab/*` 은 **DELETE 만** 프로덕션에서 닫힘
 - [x] 18. `apps/host/src/lib/cart-cookie.ts` — 쿠키 없음 → `[]` / 이중 디코딩 안 함
-- [x] 19. `apps/host/src/app/api/lab/stats/route.ts` — `refresh=1` 일 때만 fetch / 응답 형태 / `DELETE` / **배포본에서 DELETE 는 404** (proxy 와 별개의 이중 방어)
+- [x] 19. `apps/host/src/app/api/lab/stats/route.ts` — `refresh=1` 일 때만 fetch / **버전이 바뀐 remote 만 태그 만료**(24차) / 응답 형태 / `DELETE` / **배포본에서 DELETE 는 404** (proxy 와 별개의 이중 방어)
 - [x] 20. `apps/host/src/mf/remote-endpoints.ts` — `MFA_REMOTE_WEB_ENTRIES` 파싱 실패 삼킴 / 주입 / `REMOTE_ORIGINS`
+- [x] 20b. `apps/host/src/mf/versions/browser.ts` — 심어준 값 없음 → `undefined` / remote 별 격리 / **전역 이름이 `RemoteVersionSync` 와 같다**(24차 회귀)
+- [x] 20c. `apps/host/src/mf/versions/index.ts` — `remoteVersion` 4분기(공표만 / 심어준 것만 / 양쪽 없음 / remote 별 격리)
+- [x] 20d. `apps/host/src/mf/warm-state.ts` — 적재 전/후 · **epoch 불일치 → false** · 공표≠적재 · warm 세대 증가
 - [x] 21. `packages/remote-config/src/node.ts` — `readBuildVersion` / `assetBase` 4조합 / `createMfDevMiddleware` 상태코드·헤더·dev↔preview 차이
 
 ### Phase 4 — DOM (jsdom + RTL)
@@ -135,7 +138,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 27. `packages/store/src/cart/use-cart-sync.ts` — 기준선 3-상태 / 동일 원문 스킵 / **정규화 후 reseed**
 - [x] 28. `packages/ui/src/components.tsx` — `--hue` 변수 / 조건부 렌더 / variant 클래스 매핑
 - [x] 29. `apps/host/src/mf/RemoteBoundary.tsx` — 자식 throw → `ErrorBox` 내용
-- [x] 30. `apps/host/src/mf/RemoteComponent.tsx` — Skeleton → 마크업 전이 / `<link href>` 조립 / 실패 시 Boundary
+- [x] 30. `apps/host/src/mf/RemoteComponent.tsx` — Skeleton → 마크업 전이 / `<link href>` 조립 / **브라우저는 심어준 버전을 본다**(24차, `globalCell` 없이 불변 경로) / 실패 시 Boundary
 - [x] 31. remote exposes — cart 3종 · catalog 4종. props 계약 + 콜백. **remote 는 host 라우터를 모른다**(ADR-013)
 - [x] 32. host 컴포넌트 — `SiteHeader` · `MfDiagnostics` · `lab/*`
 
@@ -145,7 +148,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 34. `scripts/wait-for-remotes.ts` → `remoteEntryUrl` 추출. `publicPath` 절대·`auto`·누락 / 슬래시 트리밍
 - [x] 35. `scripts/stamp-remote-version.ts` → `integrity()` · payload 조립 · **정리 대상 경계**(현재 버전만 남긴다 / `v` 접두사 밖은 안 건드린다) 추출
 - [x] 36. `apps/host/src/app/api/mf-revalidate/route.ts` → `selfOrigin()` export
-- [x] 37. `apps/host/src/mf/RemoteComponent.tsx` → `remoteCacheKey()` export
+- [x] 37. `apps/host/src/mf/RemoteComponent.tsx` → `remoteCacheKey()` export. 브라우저에서도 버전이 키에 들어가는지 같이 본다(24차)
 
 ## 테스트하지 않는 것
 

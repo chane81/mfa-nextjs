@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react';
 import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
 import { Badge, Panel } from '@mfa/ui';
 
-import { REMOTE_ENTRIES, pinnedEntry, pinnedVersion } from '@/mf/runtime';
+import { REMOTE_ENTRIES, pinnedEntry } from '@/mf/runtime';
+import { injectedEntry } from '@/mf/versions/browser';
 
 interface ProbeResult {
   remote: RemoteName;
@@ -46,7 +47,7 @@ export function MfDiagnostics() {
     void Promise.all(
       REMOTE_NAMES.map(async (remote): Promise<ProbeResult> => {
         const entry = pinnedEntry(remote);
-        const version = pinnedVersion(remote);
+        const version = injectedEntry(remote)?.version ?? null;
         try {
           const res = await fetch(entry, { cache: 'no-store' });
           if (!res.ok) {

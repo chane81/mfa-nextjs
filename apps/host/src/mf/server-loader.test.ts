@@ -62,7 +62,7 @@ const stubBundleOnly = (respond: () => unknown) => {
 
 /** 버전을 미리 기억시켜 `resolveEntry` 가 매니페스트를 조회하지 않게 한다 */
 const rememberVersions = async (version = 't1abc') => {
-  const { rememberVersion } = await import('./remote-version');
+  const { rememberVersion } = await import('./versions/server');
   for (const remote of ['catalog', 'cart'] as const) {
     rememberVersion(remote, {
       version,
@@ -265,7 +265,7 @@ describe('가져오기 실패', () => {
   it('무결성이 어긋나면 평가하지 않는다', async () => {
     // 이 줄 아래부터가 남의 코드를 이 프로세스에서 실행하는 구간이다.
     stubFetch(() => bundle(`throw new Error('평가되면 안 된다');`));
-    const { rememberVersion } = await import('./remote-version');
+    const { rememberVersion } = await import('./versions/server');
     rememberVersion('catalog', {
       version: 't1abc',
       ssrEntry: versionedPath(MF_FILES.ssrBundle, 't1abc'),
@@ -373,7 +373,7 @@ describe('캐시 — 프로덕션에서만', () => {
     // 버전만으로 키잉하면 "같은 버전인데 바이트가 바뀐" 경우를 못 잡는다.
     const calls = stubBundleOnly(() => bundle(EXPOSES));
     await rememberVersions();
-    const { bumpWarmEpoch } = await import('./remote-version');
+    const { bumpWarmEpoch } = await import('./warm-state');
     const { loadRemoteModuleOnServer } = await load();
 
     await loadRemoteModuleOnServer('catalog/ProductGrid');
@@ -401,7 +401,7 @@ describe('캐시 — 프로덕션에서만', () => {
   it('적재에 성공하면 그 버전을 준비 완료로 표시한다', async () => {
     stubBundleOnly(() => bundle(EXPOSES));
     await rememberVersions();
-    const { isBundleReady, warmEpoch } = await import('./remote-version');
+    const { isBundleReady, warmEpoch } = await import('./warm-state');
     const { loadRemoteModuleOnServer } = await load();
 
     await loadRemoteModuleOnServer('catalog/ProductGrid');
@@ -500,7 +500,7 @@ describe('ssrEntrySnapshot', () => {
   });
 
   it('아는 버전이 있으면 불변 경로를 보여준다', async () => {
-    const { rememberVersion } = await import('./remote-version');
+    const { rememberVersion } = await import('./versions/server');
     rememberVersion('catalog', {
       version: 't1abc',
       ssrEntry: versionedPath(MF_FILES.ssrBundle, 't1abc'),

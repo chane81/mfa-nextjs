@@ -9,9 +9,17 @@ import { clearGlobalRegistries } from '@tests/helpers/globals';
  */
 const ORIGIN = 'https://catalog.example.com';
 
+/**
+ * `revalidateTag` 는 Next 런타임 밖에서는 못 돈다. 여기서 보는 건 무효화가 실제로
+ * 일어났는지가 아니라 **언제 부르는지**다 — 버전이 바뀐 remote 만, 바뀐 만큼.
+ */
+const { revalidateTag } = vi.hoisted(() => ({ revalidateTag: vi.fn() }));
+vi.mock('next/cache', () => ({ revalidateTag }));
+
 beforeEach(() => {
   clearGlobalRegistries();
   vi.resetModules();
+  revalidateTag.mockClear();
   vi.stubEnv('REMOTE_CATALOG_PUBLIC_URL', ORIGIN);
   vi.stubEnv('REMOTE_CART_PUBLIC_URL', 'https://cart.example.com');
   vi.stubEnv('NODE_ENV', 'test');
@@ -56,6 +64,34 @@ describe('GET', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(body.versions).toEqual({ catalog: 't1cat', cart: 't2cart' });
+  });
+
+  it('버전이 바뀌면 그 remote 의 버전 태그를 즉시 만료시킨다', async () => {
+    /**
+     * 조회만 하고 태그를 안 깨면 `globalCell` 은 새 버전인데 `RemoteVersionSync` 의
+     * `"use cache"` 스크립트는 옛 버전을 계속 낸다. 그러면 서버가 만든 `<link>` 와
+     * 브라우저가 만드는 `<link>` 가 갈려 스타일시트를 한 번 더 요청한다
+     * (옛 자산이 정리됐으면 404 — known-issues G-1 과 같은 얼굴이다).
+     */
+    const { GET } = await setup();
+
+    await GET(get('?refresh=1'));
+
+    expect(revalidateTag.mock.calls).toEqual([
+      ['mf-remote-version:catalog', { expire: 0 }],
+      ['mf-remote-version:cart', { expire: 0 }],
+    ]);
+  });
+
+  it('버전이 그대로면 태그를 깨지 않는다', async () => {
+    // 안 그러면 조회할 때마다 캐시가 날아가 실험 자체가 캐시를 못 본다.
+    const { GET } = await setup();
+    await GET(get('?refresh=1'));
+    revalidateTag.mockClear();
+
+    await GET(get('?refresh=1'));
+
+    expect(revalidateTag).not.toHaveBeenCalled();
   });
 
   it('응답에 네 축을 담는다', async () => {

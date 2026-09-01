@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearGlobalRegistries } from '@tests/helpers/globals';
 
+import { REMOTE_VERSIONS_GLOBAL } from './versions/browser';
+
 /**
  * 모든 remote 소비가 지나가는 자리. 여기서 보는 것은 셋이다 —
  * 스켈레톤 → remote 마크업 전이, 스타일시트 주소 조립, 그리고 실패 시 경계로 떨어지기.
@@ -52,6 +54,14 @@ beforeEach(() => {
 });
 
 const load = () => import('./RemoteComponent');
+
+/**
+ * 서버가 인라인 스크립트로 심어주는 값(`RemoteVersionSync`)을 흉내낸다.
+ * `vi.stubGlobal` 이라 `unstubGlobals` 설정이 테스트마다 되돌린다.
+ */
+const stubInjectedVersions = (
+  value: Record<string, { version: string; entry: string }>,
+) => vi.stubGlobal(REMOTE_VERSIONS_GLOBAL, value);
 
 /**
  * ⚠️ `<link>` 개수를 절대값으로 세지 않는다.
@@ -148,7 +158,7 @@ describe('스타일시트', () => {
   });
 
   it('버전을 알면 불변 경로를 가리킨다', async () => {
-    const { rememberVersion } = await import('./remote-version');
+    const { rememberVersion } = await import('./versions/server');
     rememberVersion('catalog', {
       version: 't1abc',
       ssrEntry: `/vt1abc/${MF_FILES.ssrBundle}`,
@@ -160,6 +170,29 @@ describe('스타일시트', () => {
     render(<RemoteComponent module="catalog/ProductGrid" />);
 
     await expectLinked(`${CATALOG_ORIGIN}${stylesPath('t1abc')}`);
+  });
+
+  it('브라우저에서는 서버가 심어준 버전을 본다', async () => {
+    /**
+     * ⚠️ 이 테스트가 이 파일에서 제일 중요하다.
+     *
+     * 서버가 조회한 버전(`rememberVersion` → `globalCell`)은 **서버 프로세스에만** 있다.
+     * 브라우저 렌더가 그걸 읽으려 하면 늘 비어 있어서 `/style.css` — 배포본에 없는
+     * 주소 — 로 요청이 나갔다. 여기서는 `globalCell` 을 일부러 비워 두고, 심어준 값만으로
+     * 불변 경로가 나오는지 본다.
+     */
+    stubInjectedVersions({
+      catalog: {
+        version: 't9zzz',
+        entry: `${CATALOG_ORIGIN}/vt9zzz/${MF_FILES.webManifest}`,
+      },
+    });
+    loadRemoteModule.mockReturnValue(new Promise(() => {}));
+    const { RemoteComponent } = await load();
+
+    render(<RemoteComponent module="catalog/ProductGrid" />);
+
+    await expectLinked(`${CATALOG_ORIGIN}${stylesPath('t9zzz')}`);
   });
 
   it('remote 마다 오리진이 다르다', async () => {
@@ -237,7 +270,7 @@ describe('remoteCacheKey', () => {
   it('버전을 키에 넣는다', async () => {
     // 안 넣으면 React 의 lazy() 가 옛 컴포넌트를 프로세스 수명 내내 고정한다.
     const { remoteCacheKey } = await load();
-    const { rememberVersion } = await import('./remote-version');
+    const { rememberVersion } = await import('./versions/server');
 
     expect(remoteCacheKey('catalog/ProductGrid')).toBe(
       'catalog/ProductGrid@unversioned',
@@ -254,6 +287,22 @@ describe('remoteCacheKey', () => {
     );
   });
 
+  it('브라우저에서는 심어준 버전이 키에 들어간다', async () => {
+    // 여기가 `unversioned` 로 굳으면 재배포해도 브라우저의 lazy 캐시가 안 무효화된다.
+    stubInjectedVersions({
+      catalog: {
+        version: 't9zzz',
+        entry: `${CATALOG_ORIGIN}/vt9zzz/${MF_FILES.webManifest}`,
+      },
+    });
+    const { remoteCacheKey } = await load();
+
+    expect(remoteCacheKey('catalog/ProductGrid')).toBe(
+      'catalog/ProductGrid@t9zzz',
+    );
+    expect(remoteCacheKey('cart/CartBadge')).toBe('cart/CartBadge@unversioned');
+  });
+
   it('reloadKey 가 있으면 뒤에 붙인다', async () => {
     const { remoteCacheKey } = await load();
     expect(remoteCacheKey('catalog/ProductGrid', 'nonce-1')).toBe(
@@ -263,7 +312,7 @@ describe('remoteCacheKey', () => {
 
   it('remote 마다 자기 버전을 본다', async () => {
     const { remoteCacheKey } = await load();
-    const { rememberVersion } = await import('./remote-version');
+    const { rememberVersion } = await import('./versions/server');
     rememberVersion('cart', {
       version: 't2def',
       ssrEntry: `/vt2def/${MF_FILES.ssrBundle}`,
@@ -323,7 +372,7 @@ describe('lazy 캐시', () => {
     // 안 넣으면 재배포해도 옛 컴포넌트가 프로세스 수명 내내 고정된다.
     loadRemoteModule.mockResolvedValue({ default: () => <p>ok</p> });
     const { RemoteComponent } = await load();
-    const { rememberVersion } = await import('./remote-version');
+    const { rememberVersion } = await import('./versions/server');
 
     const { rerender } = render(
       <RemoteComponent module="catalog/ProductGrid" />,

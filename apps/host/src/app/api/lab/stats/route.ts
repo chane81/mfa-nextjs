@@ -1,8 +1,41 @@
-import { REMOTE_NAMES } from '@mfa/contracts';
+import { revalidateTag } from 'next/cache';
+
+import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
 
 import { getLoaderStats, resetLoaderStats } from '@/mf/loader-stats';
-import { fetchRemoteVersion, knownVersions } from '@/mf/remote-version';
+import {
+  announcedVersions,
+  fetchRemoteVersion,
+  remoteVersionTag,
+} from '@/mf/versions/server';
 import { ssrEntrySnapshot } from '@/mf/server-loader';
+
+/**
+ * 조회로 버전이 바뀌었으면 그 remote 의 캐시 태그를 즉시 만료시킨다.
+ *
+ * ## 왜 조회만으로는 부족한가
+ *
+ * `fetchRemoteVersion` 은 `globalCell` 을 새 버전으로 갱신한다. 그런데 브라우저에
+ * 버전을 심는 `RemoteVersionSync` 는 `"use cache"` 라 **옛 버전을 담은 스크립트를
+ * 계속 낸다.** 그 상태로 페이지가 새로 렌더되면 서버가 만든 `<link>` 는 새 버전,
+ * 심어준 값은 옛 버전이라 하이드레이션 때 스타일시트를 한 번 더 요청한다
+ * (옛 버전 자산이 정리됐으면 404 — known-issues G-1 과 같은 얼굴이다).
+ *
+ * 재배포 웹훅(`/api/mf-revalidate`)은 이미 같은 태그를 깬다. 이 실험용 조회만
+ * 갱신과 무효화가 갈라져 있었다.
+ *
+ * `{ expire: 0 }` 은 Server Action 밖에서 즉시 만료시키는 형태다
+ * (Next 16.3 `revalidateTag(tag, profile)` — 웹훅 라우트와 같은 호출).
+ */
+function expireChangedTags(
+  before: Partial<Record<RemoteName, string>>,
+  after: Partial<Record<RemoteName, string>>,
+): void {
+  for (const remote of REMOTE_NAMES) {
+    if (before[remote] !== after[remote])
+      revalidateTag(remoteVersionTag(remote), { expire: 0 });
+  }
+}
 
 /**
  * 로더 계측과 이 인스턴스가 보고 있는 remote 버전을 읽는다.
@@ -19,12 +52,15 @@ import { ssrEntrySnapshot } from '@/mf/server-loader';
  */
 export async function GET(req: Request) {
   const refresh = new URL(req.url).searchParams.get('refresh') === '1';
-  if (refresh)
+  if (refresh) {
+    const before = announcedVersions();
     await Promise.all(REMOTE_NAMES.map((remote) => fetchRemoteVersion(remote)));
+    expireChangedTags(before, announcedVersions());
+  }
 
   return Response.json({
     at: new Date().toISOString(),
-    versions: knownVersions(),
+    versions: announcedVersions(),
     entries: ssrEntrySnapshot(),
     stats: getLoaderStats(),
   });
