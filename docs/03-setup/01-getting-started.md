@@ -100,7 +100,7 @@ turbo 루트 태스크(`//#typecheck:scripts`, `//#lint:scripts`)로 따로 걸�
 ### host 빌드는 remote 가 **떠 있어야** 끝난다
 
 host 빌드는 순수한 컴파일이 아니다. 프리렌더 도중 remote 의 SSR 번들을 HTTP 로 받아
-실행한다(`src/mf/server-loader.ts`). remote 오리진이 안 뜨면 이렇게 죽는다.
+실행한다(`src/mf/loader/server.ts`). remote 오리진이 안 뜨면 이렇게 죽는다.
 
 ```
 Error occurred prerendering page "/_not-found"
@@ -256,7 +256,7 @@ packages/remote-config          remote 목록 + env 이름 + 파일명 + 기본�
   ↓  (node 에서 순회하며 오리진 + 파일명 조립)
 apps/host/next.config.ts        env: { MFA_REMOTE_WEB_ENTRIES: JSON.stringify(…) }
   ↓  (Next 가 번들에 인라인)
-apps/host/src/mf/remote-endpoints.ts   리터럴 하나만 읽어 JSON.parse
+apps/host/src/mf/config/index.ts   리터럴 하나만 읽어 JSON.parse
 ```
 
 `next.config.ts` 는 node 에서 평가되므로 순회가 가능하고, `env` 로 넘긴 값은

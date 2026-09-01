@@ -122,7 +122,7 @@ cart 의 `<link>` 는 하나만 남았다 — React 19 의 중복 제거가 실�
 했다가 옮겼다 — 근거는 같은 문서의 "왜 remote 쪽이 아니라 host 쪽인가".
 
 ⚠️ 주소의 두 조각(오리진 · 버전)은 **둘 다 브라우저에서 읽을 수 있는 값**이어야 한다.
-오리진은 `REMOTE_ORIGINS`(`next.config.ts` 가 구워 넣는다), 버전은
+오리진은 `WEB_ORIGINS`(`next.config.ts` 가 구워 넣는다), 버전은
 `remoteVersion()`(`mf/versions/index.ts`) — 서버가 심어준 값(`versions/browser.ts` 의
 `injectedEntry`) 아니면 remote 가 공표한 값(`versions/server.ts` 의 `announcedVersion`) 이고,
 그 합치기는 그 함수 안에서 끝난다.

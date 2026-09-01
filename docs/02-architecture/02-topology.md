@@ -135,10 +135,10 @@ remote 컴포넌트는 host 페이지 안에서 렌더되는데, **CSS 는 두 �
 그래서 **host 가 remote 를 소비하는 자리에서 `<link>` 를 함께 건다.**
 
 ```tsx
-// apps/host/src/mf/RemoteComponent.tsx — 모든 remote 소비가 지나가는 단일 진입점
+// apps/host/src/mf/components/RemoteComponent.tsx — 모든 remote 소비가 지나가는 단일 진입점
 <link
   rel="stylesheet"
-  href={`${REMOTE_ORIGINS[remoteName]}${stylesPath(remoteVersion(remoteName))}`}
+  href={`${WEB_ORIGINS[remoteName]}${stylesPath(remoteVersion(remoteName))}`}
   precedence="mfa-remote"
 />
 ```
@@ -175,22 +175,25 @@ SSR HTML 에도 들어가고 소프트 내비게이션에서도 동작하며, �
 
 ## host 의 MF 계층 (`apps/host/src/mf/`)
 
-| 파일                    | 역할                                                                         |
-| ----------------------- | ---------------------------------------------------------------------------- |
-| `runtime.ts`            | 브라우저 MF 런타임 `init` — React 5개를 `lib` 로 직접 주입                   |
-| `server-loader.ts`      | 서버 경로 — `mf-server.cjs` fetch → `new Function` 평가 → 컴포넌트 맵        |
-| `remote-endpoints.ts`   | remote 주소. **remote 이름이 한 줄도 없다** — 전부 `@mfa/remote-config` 파생 |
-| `versions/server.ts`    | remote 가 **공표한** 버전(`announcedVersion`) · 조회 · 인스턴스 수렴         |
-| `versions/browser.ts`   | 서버가 **심어준** 값(`injectedEntry`). 의존 0 인 잎                          |
-| `versions/index.ts`     | `remoteVersion` — 렌더 코드의 유일한 버전 창구                               |
-| `warm-state.ts`         | **적재된** 버전 · warm 세대. 버전이 아니라 "그 버전으로 뭘 했나"             |
-| `remote-trust.ts`       | 오리진 허용 목록 → 경로 형태 검증 → SRI/Ed25519 서명, 세 겹                  |
-| `constants.ts`          | `REMOTE_FETCH_TIMEOUT_MS` 등 공용 상수                                       |
-| `interop.ts`            | `import * as X` 결과 모양 정규화(`{default:{...}}` 케이스)                   |
-| `loader-stats.ts`       | 로더 카운터. `/api/lab/stats` 가 읽는다                                      |
-| `RemoteComponent.tsx`   | 서버/브라우저 두 경로를 감싸는 소비 진입점                                   |
-| `RemoteBoundary.tsx`    | remote 하나가 죽어도 host 가 안 죽게 격리                                    |
-| `RemoteVersionSync.tsx` | `"use cache"` 스코프에서 버전 태그를 달아 무효화 경로를 잇는다               |
+목적축으로 여섯 폴더다. 나눈 근거와 "새 파일을 어디에 두나"는
+[06-host-mf-layout.md](./06-host-mf-layout.md) 에 있다.
+
+| 파일                               | 역할                                                                                     |
+| ---------------------------------- | ---------------------------------------------------------------------------------------- |
+| `config/index.ts`                  | remote 주소 · 호출 예산. **remote 이름이 한 줄도 없다** — 전부 `@mfa/remote-config` 파생 |
+| `versions/server.ts`               | remote 가 **공표한** 버전(`announcedVersion`) · 조회 · 인스턴스 수렴                     |
+| `versions/browser.ts`              | 서버가 **심어준** 값(`injectedEntry`). 의존 0 인 잎                                      |
+| `versions/index.ts`                | `remoteVersion` — 렌더 코드의 유일한 버전 창구                                           |
+| `state/cell.ts`                    | `globalCell` — RSC · SSR 레이어를 넘는 값의 유일한 자리                                  |
+| `state/warm.ts`                    | **적재된** 버전 · warm 세대. 버전이 아니라 "그 버전으로 뭘 했나"                         |
+| `state/loader-stats.ts`            | 로더 카운터. `/api/lab/stats` 가 읽는다                                                  |
+| `trust/index.ts`                   | 허용 오리진 → 경로 형태 검증 → SRI/Ed25519 서명, 세 겹                                   |
+| `loader/index.ts`                  | isomorphic 창구 + 브라우저 MF `init` — React 5개를 `lib` 로 직접 주입                    |
+| `loader/server.ts`                 | 서버 경로 — `mf-server.cjs` fetch → `new Function` 평가 → 컴포넌트 맵                    |
+| `loader/react-modules.ts`          | 공유 모듈 **이름과 프로브 표** + `import * as X` 결과 모양 정규화                        |
+| `components/RemoteComponent.tsx`   | 서버/브라우저 두 경로를 감싸는 소비 진입점                                               |
+| `components/RemoteBoundary.tsx`    | remote 하나가 죽어도 host 가 안 죽게 격리                                                |
+| `components/RemoteVersionSync.tsx` | `"use cache"` 스코프에서 버전 태그를 달아 무효화 경로를 잇는다                           |
 
 remote 를 향한 모든 HTTP 호출에는 `AbortSignal.timeout(REMOTE_FETCH_TIMEOUT_MS)` 가 걸린다.
 remote 가 응답하지 않을 때 host 요청이 같이 멈추면 격리가 무의미해지기 때문이다.
@@ -200,7 +203,7 @@ remote 가 응답하지 않을 때 host 요청이 같이 멈추면 격리가 무
 ```ts
 loadRemoteModule("cart/CheckoutFlow")
   │
-  ├─ typeof window === "undefined"   →  server-loader.ts
+  ├─ typeof window === "undefined"   →  loader/server.ts
   │                                     fetch(mf-server.cjs) → new Function(...) → React 주입
   │
   └─ 브라우저                          →  @module-federation/runtime
@@ -223,10 +226,10 @@ host 는 브라우저 쪽에 5개를 공유한다. 루트만으로 충분해 보
 | `react/jsx-runtime`     | `jsx`          |                                                  |
 | `react/jsx-dev-runtime` | `jsxDEV`       | dev 전용 경로                                    |
 
-넘기는 값은 `apps/host/src/mf/interop.ts` 의 `normalizeModule(mod, probe)` 로 정규화한다.
+넘기는 값은 `apps/host/src/mf/loader/react-modules.ts` 의 `normalizeModule(mod, probe)` 로 정규화한다.
 `import * as X` 결과가 `{ default: {...} }` 로 오는 경우가 있어서다.
 
-서버 쪽(`server-loader.ts`)은 MF shared 를 쓰지 않고 **require 셰임**으로 같은 4개를 주입한다.
+서버 쪽(`loader/server.ts`)은 MF shared 를 쓰지 않고 **require 셰임**으로 같은 4개를 주입한다.
 remote 의 node 번들이 `require("react/jsx-runtime")` 를 그대로 호출하기 때문이다.
 
 ## MF 자동 타입(DTS)은 꺼져 있다

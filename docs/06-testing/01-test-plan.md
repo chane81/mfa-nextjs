@@ -105,27 +105,27 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 6. `packages/store/src/utils/global-singleton.ts` — create 1회 / 먼저 도착한 쪽이 이김 / name 격리
 - [x] 7. `apps/host/src/lib/format-time.ts` — 3형태 입력 / KST +9h / 자정 `00` / TZ 무관
 - [x] 8. `apps/host/src/lib/mf-secret.ts` — fail-closed / 길이 불일치 / 멀티바이트
-- [x] 9. `apps/host/src/mf/interop.ts` — `default` 언랩 / 미발견 시 원본 + dev 경고
-- [x] 10. `apps/host/src/mf/global-state.ts` · `loader-stats.ts` — 셀 재사용 / 카운터 / **얕은 복사 방어** / reset
+- [x] 9. `apps/host/src/mf/loader/react-modules.ts` — `default` 언랩 / 미발견 시 원본 + dev 경고
+- [x] 10. `apps/host/src/mf/state/cell.ts` · `state/loader-stats.ts` — 셀 재사용 / 카운터 / **얕은 복사 방어** / reset
 - [x] 11. `apps/host/src/components/lab/modes.ts` — 순수 상수·매핑
 
 ### Phase 2 — 신뢰 경계 (node, WebCrypto 실물)
 
-- [x] 12. `apps/host/src/mf/remote-trust.ts` — `allowedOrigins` / `assertAllowedOrigin` / `assertSafeVersion`(`</script>` 주입, 64자, 선두 `.`) / `assertSafeEntryPath`(절대 URL, `//evil`, `..`, `?#`, 버전 불일치) / SHA-384 고정 벡터 / `assertIntegrity` 4분기 / `integrityRequired`·`signatureRequired` 진리표
+- [x] 12. `apps/host/src/mf/trust/index.ts` — `allowedOrigins` / `assertAllowedOrigin` / `assertSafeVersion`(`</script>` 주입, 64자, 선두 `.`) / `assertSafeEntryPath`(절대 URL, `//evil`, `..`, `?#`, 버전 불일치) / SHA-384 고정 벡터 / `assertIntegrity` 4분기 / `integrityRequired`·`signatureRequired` 진리표
 - [x] 13. **서명 계약 라운드트립** — `signedPayload`(remote-config) → Ed25519 서명(`node:crypto`) → `assertManifestSignature`(host, WebCrypto). 15차에 실제로 갈라졌던 자리
 
 ### Phase 3 — 모킹 통합 (node)
 
 - [x] 14. `apps/host/src/mf/versions/server.ts` — `announcedVersion` 저장/조회 / `fetchRemoteVersion` 6분기
-- [x] 15. `apps/host/src/mf/server-loader.ts` — id 파싱 / 오리진·HTTP·타임아웃·무결성 분기 / requireShim / `default` 언랩 / 통계 순서 / 캐시(재사용·재로드·**실패 promise 제거**)
+- [x] 15. `apps/host/src/mf/loader/server.ts` — id 파싱 / 오리진·HTTP·타임아웃·무결성 분기 / requireShim / `default` 언랩 / 통계 순서 / 캐시(재사용·재로드·**실패 promise 제거**)
 - [x] 16. `apps/host/src/app/api/mf-revalidate/route.ts` — 401 / 400 / `warm=0` / 502 + **태그 미무효화** / `cause` 언래핑 / 성공 호출 순서 / `paths=1`
 - [x] 17. `apps/host/src/proxy.ts` — 시크릿 없으면 **401 이 아니라 404** / `config.matcher` / `/api/lab/*` 은 **DELETE 만** 프로덕션에서 닫힘
 - [x] 18. `apps/host/src/lib/cart-cookie.ts` — 쿠키 없음 → `[]` / 이중 디코딩 안 함
 - [x] 19. `apps/host/src/app/api/lab/stats/route.ts` — `refresh=1` 일 때만 fetch / **버전이 바뀐 remote 만 태그 만료**(24차) / 응답 형태 / `DELETE` / **배포본에서 DELETE 는 404** (proxy 와 별개의 이중 방어)
-- [x] 20. `apps/host/src/mf/remote-endpoints.ts` — `MFA_REMOTE_WEB_ENTRIES` 파싱 실패 삼킴 / 주입 / `REMOTE_ORIGINS`
+- [x] 20. `apps/host/src/mf/config/index.ts` — `MFA_REMOTE_WEB_ENTRIES` 파싱 실패 삼킴 / 주입 / `WEB_ORIGINS`
 - [x] 20b. `apps/host/src/mf/versions/browser.ts` — 심어준 값 없음 → `undefined` / remote 별 격리 / **전역 이름이 `RemoteVersionSync` 와 같다**(24차 회귀)
 - [x] 20c. `apps/host/src/mf/versions/index.ts` — `remoteVersion` 4분기(공표만 / 심어준 것만 / 양쪽 없음 / remote 별 격리)
-- [x] 20d. `apps/host/src/mf/warm-state.ts` — 적재 전/후 · **epoch 불일치 → false** · 공표≠적재 · warm 세대 증가
+- [x] 20d. `apps/host/src/mf/state/warm.ts` — 적재 전/후 · **epoch 불일치 → false** · 공표≠적재 · warm 세대 증가
 - [x] 21. `packages/remote-config/src/node.ts` — `readBuildVersion` / `assetBase` 4조합 / `createMfDevMiddleware` 상태코드·헤더·dev↔preview 차이
 
 ### Phase 4 — DOM (jsdom + RTL)
@@ -137,8 +137,8 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 26. `use-hydrated.ts` · `use-cart-lines.ts` — `renderToString` SSR 경로 / 클라이언트 전환
 - [x] 27. `packages/store/src/cart/use-cart-sync.ts` — 기준선 3-상태 / 동일 원문 스킵 / **정규화 후 reseed**
 - [x] 28. `packages/ui/src/components.tsx` — `--hue` 변수 / 조건부 렌더 / variant 클래스 매핑
-- [x] 29. `apps/host/src/mf/RemoteBoundary.tsx` — 자식 throw → `ErrorBox` 내용
-- [x] 30. `apps/host/src/mf/RemoteComponent.tsx` — Skeleton → 마크업 전이 / `<link href>` 조립 / **브라우저는 심어준 버전을 본다**(24차, `globalCell` 없이 불변 경로) / 실패 시 Boundary
+- [x] 29. `apps/host/src/mf/components/RemoteBoundary.tsx` — 자식 throw → `ErrorBox` 내용
+- [x] 30. `apps/host/src/mf/components/RemoteComponent.tsx` — Skeleton → 마크업 전이 / `<link href>` 조립 / **브라우저는 심어준 버전을 본다**(24차, `globalCell` 없이 불변 경로) / 실패 시 Boundary
 - [x] 31. remote exposes — cart 3종 · catalog 4종. props 계약 + 콜백. **remote 는 host 라우터를 모른다**(ADR-013)
 - [x] 32. host 컴포넌트 — `SiteHeader` · `MfDiagnostics` · `lab/*`
 
@@ -148,33 +148,33 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 34. `scripts/wait-for-remotes.ts` → `remoteEntryUrl` 추출. `publicPath` 절대·`auto`·누락 / 슬래시 트리밍
 - [x] 35. `scripts/stamp-remote-version.ts` → `integrity()` · payload 조립 · **정리 대상 경계**(현재 버전만 남긴다 / `v` 접두사 밖은 안 건드린다) 추출
 - [x] 36. `apps/host/src/app/api/mf-revalidate/route.ts` → `selfOrigin()` export
-- [x] 37. `apps/host/src/mf/RemoteComponent.tsx` → `remoteCacheKey()` export. 브라우저에서도 버전이 키에 들어가는지 같이 본다(24차)
+- [x] 37. `apps/host/src/mf/components/RemoteComponent.tsx` → `remoteCacheKey()` export. 브라우저에서도 버전이 키에 들어가는지 같이 본다(24차)
 
 ## 테스트하지 않는 것
 
-| 대상                                     | 이유                                                                                                                                         |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/host/src/mf/RemoteVersionSync.tsx` | `'use cache'` 는 Next 컴파일러가 변환하는 디렉티브다. 변환 없이 실행하면 `cacheLife`/`cacheTag` 가 캐시 스코프 밖 호출로 throw. **e2e 영역** |
-| 실제 MF 런타임 로딩 · host 프리렌더      | `pnpm build` 가 이미 계약 테스트로 커버한다 (CI `build` job)                                                                                 |
-| `scripts/gen-signing-key.ts`             | 로직이 없다. 키 형식만 `tests/helpers/signing.ts` 로 옮겨 픽스처 생성에 쓴다                                                                 |
-| `scripts/mf-build-version.ts`            | `t${Date.now().toString(36)}` 한 줄                                                                                                          |
-| 브라우저 실제 동작                       | e2e 범위                                                                                                                                     |
+| 대상                                                | 이유                                                                                                                                         |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/host/src/mf/components/RemoteVersionSync.tsx` | `'use cache'` 는 Next 컴파일러가 변환하는 디렉티브다. 변환 없이 실행하면 `cacheLife`/`cacheTag` 가 캐시 스코프 밖 호출로 throw. **e2e 영역** |
+| 실제 MF 런타임 로딩 · host 프리렌더                 | `pnpm build` 가 이미 계약 테스트로 커버한다 (CI `build` job)                                                                                 |
+| `scripts/gen-signing-key.ts`                        | 로직이 없다. 키 형식만 `tests/helpers/signing.ts` 로 옮겨 픽스처 생성에 쓴다                                                                 |
+| `scripts/mf-build-version.ts`                       | `t${Date.now().toString(36)}` 한 줄                                                                                                          |
+| 브라우저 실제 동작                                  | e2e 범위                                                                                                                                     |
 
 ## 테스트를 쓸 때 반드시 지킬 것
 
 이 저장소에는 테스트를 조용히 오염시키는 자리가 네 군데 있다.
 
-1. **모듈 top-level 에서 env 를 캡처한다** — `apps/host/src/mf/remote-endpoints.ts` 는 import 시점에
+1. **모듈 top-level 에서 env 를 캡처한다** — `apps/host/src/mf/config/index.ts` 는 import 시점에
    env 를 읽고 `new URL()` 로 오리진을 조립한다. 즉 잘못된 값이면 **모듈 로드 자체가 throw** 한다.
    env 를 바꾸는 테스트는 반드시 `vi.stubEnv` → `vi.resetModules()` → `await import()` 순서여야 한다.
-   이 모듈은 `remote-version` · `server-loader` · `runtime` · `RemoteComponent` 가 전부 전이 의존한다.
+   이 모듈은 `versions/server` · `loader/server` · `loader` · `RemoteComponent` 가 전부 전이 의존한다.
 
 2. **globalThis 오염** — `globalCell`(host) 과 `globalSingleton`(store) 은 `Symbol.for` 레지스트리라
    `vi.resetModules()` 로 안 지워진다. `tests/helpers/globals.ts` 의 `clearGlobalRegistries()` 를
    `beforeEach` 에서 부른다.
 
-3. **모듈 스코프 가변 상태** — `server-loader.ts` 의 `bundleCache`, `runtime.ts` 의 `clientCache` ·
-   `initialized`, `RemoteComponent.tsx` 의 `lazyCache`, `utils/cookie-storage.ts` 의 `warned: Set`.
+3. **모듈 스코프 가변 상태** — `loader/server.ts` 의 `bundleCache`, `loader/index.ts` 의 `clientCache` ·
+   `initialized`, `components/RemoteComponent.tsx` 의 `lazyCache`, `utils/cookie-storage.ts` 의 `warned: Set`.
    리셋 API 가 없어 `vi.resetModules()` + 동적 import 로만 격리된다.
 
 4. **ICU 로케일 의존** — `formatKRW`(`toLocaleString('ko-KR')`)와 `formatKst`(`Intl.DateTimeFormat`)의
