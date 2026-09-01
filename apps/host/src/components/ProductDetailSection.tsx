@@ -1,6 +1,6 @@
 'use client';
 
-import { RemoteComponent } from '@/mf/RemoteComponent';
+import { RemoteComponent } from '@/mf/components/RemoteComponent';
 
 export function ProductDetailSection({ productId }: { productId: string }) {
   return (

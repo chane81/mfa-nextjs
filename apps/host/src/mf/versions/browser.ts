@@ -22,7 +22,7 @@ import type { RemoteName } from '@mfa/contracts';
  * (href 가 다르니 React 19 의 `precedence` 중복 제거가 안 걸린다).
  *
  * 읽는 곳이 둘 이상이 된 순간 `runtime.ts` 는 자리가 아니다 — 거기서 import 하면
- * `./server` → `runtime.ts` 순환이 생긴다(`runtime` 은 `server-loader` 를, `server-loader` 는
+ * `./server` → `loader/index.ts` 순환이 생긴다(`loader` 는 `loader/server` 를, 그쪽은
  * `./server` 를 import 한다). 이 파일은 **아무것도 import 하지 않는 잎**이라 그 문제가 없다.
  * 전역 이름도 여기 한 곳에만 있다.
  */

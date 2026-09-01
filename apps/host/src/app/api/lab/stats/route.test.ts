@@ -40,7 +40,7 @@ const setup = async () => {
   vi.stubGlobal('fetch', fetchMock);
 
   const route = await import('./route');
-  const stats = await import('@/mf/loader-stats');
+  const stats = await import('@/mf/state/loader-stats');
   return { ...route, fetchMock, ...stats };
 };
 

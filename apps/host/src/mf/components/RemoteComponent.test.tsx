@@ -6,13 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearGlobalRegistries } from '@tests/helpers/globals';
 
-import { REMOTE_VERSIONS_GLOBAL } from './versions/browser';
+import { REMOTE_VERSIONS_GLOBAL } from '../versions/browser';
 
 /**
  * 모든 remote 소비가 지나가는 자리. 여기서 보는 것은 셋이다 —
  * 스켈레톤 → remote 마크업 전이, 스타일시트 주소 조립, 그리고 실패 시 경계로 떨어지기.
  *
- * `runtime.ts` 는 `@module-federation/runtime` 을 초기화하므로 통째로 모킹한다.
+ * `loader/index.ts` 는 `@module-federation/runtime` 을 초기화하므로 통째로 모킹한다.
  * 여기서 검증할 것은 MF 런타임이 아니라 이 컴포넌트의 조립이다.
  *
  * ## 픽스처 오리진을 `vi.hoisted` 에 두는 이유
@@ -20,9 +20,10 @@ import { REMOTE_VERSIONS_GLOBAL } from './versions/browser';
  * `vi.mock` 팩토리는 파일 맨 위로 호이스팅되어 **바깥 `const` 를 못 본다.** `vi.hoisted` 에
  * 두면 팩토리와 테스트 본문이 같은 값을 본다.
  *
- * 오리진은 세 자리가 **같은 값이어야** 의미가 있는 픽스처다 — `REMOTE_ENTRIES` 목,
- * env 스텁, 스타일시트 주소 단언. 한 곳이라도 갈라지면 테스트는 자기들끼리만 맞는
- * 상태로 초록이 된다. 로더 목도 같이 둬서 `(id) => loadRemoteModule(id)` 래퍼를 없앴다.
+ * 오리진은 두 자리가 **같은 값이어야** 의미가 있는 픽스처다 — env 스텁과 스타일시트
+ * 주소 단언. 한쪽이라도 갈라지면 테스트는 자기들끼리만 맞는 상태로 초록이 된다.
+ * 엔트리 주소는 목이 아니라 `config` 가 env 에서 실제로 조립한 값을 쓴다.
+ * 로더 목도 같이 둬서 `(id) => loadRemoteModule(id)` 래퍼를 없앴다.
  */
 const { CATALOG_ORIGIN, CART_ORIGIN, loadRemoteModule } = vi.hoisted(() => ({
   CATALOG_ORIGIN: 'https://catalog.example.com',
@@ -30,13 +31,7 @@ const { CATALOG_ORIGIN, CART_ORIGIN, loadRemoteModule } = vi.hoisted(() => ({
   loadRemoteModule: vi.fn(),
 }));
 
-vi.mock('./runtime', () => ({
-  loadRemoteModule,
-  REMOTE_ENTRIES: {
-    catalog: `${CATALOG_ORIGIN}/${MF_FILES.webManifest}`,
-    cart: `${CART_ORIGIN}/${MF_FILES.webManifest}`,
-  },
-}));
+vi.mock('../loader', () => ({ loadRemoteModule }));
 
 beforeEach(() => {
   clearGlobalRegistries();
@@ -158,7 +153,7 @@ describe('스타일시트', () => {
   });
 
   it('버전을 알면 불변 경로를 가리킨다', async () => {
-    const { rememberVersion } = await import('./versions/server');
+    const { rememberVersion } = await import('../versions/server');
     rememberVersion('catalog', {
       version: 't1abc',
       ssrEntry: `/vt1abc/${MF_FILES.ssrBundle}`,
@@ -270,7 +265,7 @@ describe('remoteCacheKey', () => {
   it('버전을 키에 넣는다', async () => {
     // 안 넣으면 React 의 lazy() 가 옛 컴포넌트를 프로세스 수명 내내 고정한다.
     const { remoteCacheKey } = await load();
-    const { rememberVersion } = await import('./versions/server');
+    const { rememberVersion } = await import('../versions/server');
 
     expect(remoteCacheKey('catalog/ProductGrid')).toBe(
       'catalog/ProductGrid@unversioned',
@@ -312,7 +307,7 @@ describe('remoteCacheKey', () => {
 
   it('remote 마다 자기 버전을 본다', async () => {
     const { remoteCacheKey } = await load();
-    const { rememberVersion } = await import('./versions/server');
+    const { rememberVersion } = await import('../versions/server');
     rememberVersion('cart', {
       version: 't2def',
       ssrEntry: `/vt2def/${MF_FILES.ssrBundle}`,
@@ -372,7 +367,7 @@ describe('lazy 캐시', () => {
     // 안 넣으면 재배포해도 옛 컴포넌트가 프로세스 수명 내내 고정된다.
     loadRemoteModule.mockResolvedValue({ default: () => <p>ok</p> });
     const { RemoteComponent } = await load();
-    const { rememberVersion } = await import('./versions/server');
+    const { rememberVersion } = await import('../versions/server');
 
     const { rerender } = render(
       <RemoteComponent module="catalog/ProductGrid" />,

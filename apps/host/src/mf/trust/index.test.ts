@@ -14,7 +14,7 @@ import {
   integrityRequired,
   signatureRequired,
   signedPayload,
-} from './remote-trust';
+} from './index';
 
 /**
  * host **서버**가 remote 코드를 받아 `new Function` 으로 실행한다. 여기가 그 앞을 막는
@@ -406,7 +406,7 @@ describe('서명 계약 라운드트립 — stamp(서명) ↔ host(검증)', () 
      * `scripts/stamp-remote-version.ts` 의 `signManifest` 를 그대로 태운다.
      */
     const { signManifest } = await import(
-      '../../../../scripts/stamp-remote-version'
+      '../../../../../scripts/stamp-remote-version'
     );
     const { privateKey, publicKey } = generateSigningKeyPair();
     vi.stubEnv('MF_REMOTE_PUBLIC_KEY', publicKey);
@@ -455,5 +455,30 @@ describe('서명 계약 라운드트립 — stamp(서명) ↔ host(검증)', () 
       assertSafeEntryPath('cart', fields.webEntry, fields.version),
     ).not.toThrow();
     expect(() => assertSafeVersion('cart', fields.version)).not.toThrow();
+  });
+});
+
+/**
+ * `trustedOrigins` 는 `config` 를 거쳐 env 에서 기본값을 만든다. `config` 가 **import
+ * 시점에** env 를 굽기 때문에 여기서만 동적 import 를 쓴다.
+ */
+describe('trustedOrigins', () => {
+  it('기본값은 설정된 remote 오리진뿐이다 — 기본이 이미 닫혀 있다', async () => {
+    vi.resetModules();
+    vi.stubEnv('REMOTE_ALLOWED_ORIGINS', undefined);
+    vi.stubEnv('REMOTE_CATALOG_PUBLIC_URL', ORIGINS[0]);
+    vi.stubEnv('REMOTE_CART_PUBLIC_URL', ORIGINS[1]);
+
+    const { trustedOrigins } = await import('./index');
+    expect(trustedOrigins()).toEqual(ORIGINS);
+  });
+
+  it('REMOTE_ALLOWED_ORIGINS 가 있으면 그쪽이 이긴다', async () => {
+    vi.resetModules();
+    vi.stubEnv('REMOTE_ALLOWED_ORIGINS', 'https://cdn.example.com');
+    vi.stubEnv('REMOTE_CATALOG_PUBLIC_URL', ORIGINS[0]);
+
+    const { trustedOrigins } = await import('./index');
+    expect(trustedOrigins()).toEqual(['https://cdn.example.com']);
   });
 });

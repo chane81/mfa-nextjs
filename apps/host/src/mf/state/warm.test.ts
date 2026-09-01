@@ -11,7 +11,7 @@ import { clearGlobalRegistries } from '@tests/helpers/globals';
  *
  * `globalCell` 은 realm 전역이라 `vi.resetModules()` 로 안 지워진다. 매번 비운다.
  */
-const load = () => import('./warm-state');
+const load = () => import('./warm');
 
 beforeEach(() => {
   clearGlobalRegistries();
@@ -52,7 +52,7 @@ describe('적재된 버전 (isBundleReady)', () => {
   it('공표된 버전과 적재된 버전은 별개다', async () => {
     const { isBundleReady } = await load();
     const { announcedVersion, rememberVersion } = await import(
-      './versions/server'
+      '../versions/server'
     );
     rememberVersion('catalog', {
       version: 't2',

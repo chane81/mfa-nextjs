@@ -2,13 +2,13 @@ import { revalidateTag } from 'next/cache';
 
 import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
 
-import { getLoaderStats, resetLoaderStats } from '@/mf/loader-stats';
+import { getLoaderStats, resetLoaderStats } from '@/mf/state/loader-stats';
 import {
   announcedVersions,
   fetchRemoteVersion,
   remoteVersionTag,
 } from '@/mf/versions/server';
-import { ssrEntrySnapshot } from '@/mf/server-loader';
+import { ssrEntrySnapshot } from '@/mf/loader/server';
 
 /**
  * 조회로 버전이 바뀌었으면 그 remote 의 캐시 태그를 즉시 만료시킨다.

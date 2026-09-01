@@ -1,7 +1,7 @@
 import { cacheLife, cacheTag } from 'next/cache';
 
 import { LabPanel } from '@/components/lab/LabPanel';
-import { remoteCacheTag } from '@/mf/server-loader';
+import { remoteCacheTag } from '@/mf/loader/server';
 
 /**
  * 실험 C — 이벤트 기반 무효화.

@@ -6,14 +6,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * 그래서 env 를 바꾸는 테스트는 `vi.stubEnv` → `vi.resetModules()` → `await import()`
  * 순서여야 한다. 순서를 어기면 앞 테스트가 구운 값을 그대로 본다.
  *
- * 이 모듈은 `remote-version` · `server-loader` · `runtime` · `RemoteComponent` 가 전부
+ * 이 모듈은 `versions/server` · `loader/server` · `loader` · `RemoteComponent` 가 전부
  * 전이 의존하므로, 여기가 오염되면 그쪽 테스트가 같이 흔들린다.
  */
 beforeEach(() => {
   vi.resetModules();
 });
 
-const load = () => import('./remote-endpoints');
+const load = () => import('./index');
 
 describe('byRemote', () => {
   it('REMOTE_NAMES 를 순회해 표를 만든다', async () => {
@@ -116,7 +116,7 @@ describe('WEB_ENTRIES — next.config.ts 가 구워 넣은 값을 먼저 본다'
   });
 });
 
-describe('REMOTE_ORIGINS — 브라우저에서도 맞는 값', () => {
+describe('WEB_ORIGINS — 브라우저에서도 맞는 값', () => {
   it('WEB_ENTRIES 에서 오리진만 뽑는다', async () => {
     vi.stubEnv(
       'MFA_REMOTE_WEB_ENTRIES',
@@ -125,9 +125,9 @@ describe('REMOTE_ORIGINS — 브라우저에서도 맞는 값', () => {
         cart: 'https://cart.example.com/mf-manifest.json',
       }),
     );
-    const { REMOTE_ORIGINS } = await load();
+    const { WEB_ORIGINS } = await load();
 
-    expect(REMOTE_ORIGINS).toEqual({
+    expect(WEB_ORIGINS).toEqual({
       catalog: 'https://cdn.example.com',
       cart: 'https://cart.example.com',
     });
@@ -141,9 +141,9 @@ describe('REMOTE_ORIGINS — 브라우저에서도 맞는 값', () => {
       JSON.stringify({ catalog: 'https://baked.example.com/mf-manifest.json' }),
     );
     vi.stubEnv('REMOTE_CATALOG_PUBLIC_URL', 'https://server-only.example.com');
-    const { REMOTE_ORIGINS, SSR_ENTRIES } = await load();
+    const { WEB_ORIGINS, SSR_ENTRIES } = await load();
 
-    expect(REMOTE_ORIGINS.catalog).toBe('https://baked.example.com');
+    expect(WEB_ORIGINS.catalog).toBe('https://baked.example.com');
     expect(SSR_ENTRIES.catalog).toContain('server-only.example.com');
   });
 
@@ -154,5 +154,21 @@ describe('REMOTE_ORIGINS — 브라우저에서도 맞는 값', () => {
       JSON.stringify({ catalog: '/상대/경로/mf-manifest.json' }),
     );
     await expect(load()).rejects.toThrow();
+  });
+});
+
+describe('ssrOrigin — SSR 엔트리에서 오리진만 뽑는다', () => {
+  it('설정된 remote 오리진을 그대로 준다', async () => {
+    vi.stubEnv('REMOTE_CATALOG_PUBLIC_URL', 'https://catalog.example.com');
+    const { ssrOrigin } = await load();
+    expect(ssrOrigin('catalog')).toBe('https://catalog.example.com');
+  });
+
+  it('SSR_ENTRIES 는 그 오리진의 버전 없는 엔트리다', async () => {
+    vi.stubEnv('REMOTE_CATALOG_PUBLIC_URL', 'https://catalog.example.com');
+    const { SSR_ENTRIES } = await load();
+    expect(SSR_ENTRIES.catalog).toBe(
+      `https://catalog.example.com/${MF_FILES.ssrBundle}`,
+    );
   });
 });

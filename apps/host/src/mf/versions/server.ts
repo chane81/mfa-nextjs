@@ -1,17 +1,16 @@
-import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
+import { type RemoteName } from '@mfa/contracts';
 import { MF_FILES } from '@mfa/remote-config';
 
-import { REMOTE_FETCH_TIMEOUT_MS } from '../constants';
-import { globalCell } from '../global-state';
-import { SSR_ENTRIES } from '../remote-endpoints';
+import { REMOTE_FETCH_TIMEOUT_MS, ssrOrigin } from '../config';
+import { globalCell } from '../state/cell';
 import {
   assertAllowedOrigin,
   assertManifestSignature,
   assertSafeEntryPath,
   assertSafeVersion,
-  allowedOrigins,
   signedPayload,
-} from '../remote-trust';
+  trustedOrigins,
+} from '../trust';
 
 /**
  * remote 버전 해석 — **host 서버 전용**.
@@ -34,21 +33,6 @@ import {
  * 이 모듈은 client component 트리에서도 import 되므로 `next/*` 를 쓰지 않는다.
  */
 
-/** remote 오리진. 버전 매니페스트와 버전 경로를 여기에 붙인다. */
-export function remoteOrigin(remote: RemoteName): string {
-  return new URL(SSR_ENTRIES[remote]).origin;
-}
-
-/** 버전 없는 폴백 엔트리 (dev, 또는 stamp 를 돌리지 않은 remote) */
-export function fallbackSsrEntry(remote: RemoteName): string {
-  return SSR_ENTRIES[remote];
-}
-
-/** remote 버전 조회 응답을 무효화할 때 쓰는 태그 */
-export function remoteVersionTag(remote: RemoteName): string {
-  return `mf-remote-version:${remote}`;
-}
-
 export interface RemoteVersion {
   version: string;
   /** host 서버가 받아 실행하는 node 번들 (오리진 기준 상대 경로) */
@@ -59,11 +43,9 @@ export interface RemoteVersion {
   ssrIntegrity?: string;
 }
 
-/** 허용 오리진. 기본값은 설정된 remote 오리진들뿐이라 이미 닫혀 있다. */
-export function trustedOrigins(): string[] {
-  return allowedOrigins(
-    REMOTE_NAMES.map((remote) => new URL(SSR_ENTRIES[remote]).origin),
-  );
+/** remote 버전 조회 응답을 무효화할 때 쓰는 태그 */
+export function remoteVersionTag(remote: RemoteName): string {
+  return `mf-remote-version:${remote}`;
 }
 
 /**
@@ -74,7 +56,7 @@ export function trustedOrigins(): string[] {
  * 위치(server/browser)가 아니라 출처로 부르면 합치는 줄이 대칭이 된다.
  *
  * 조회하는 쪽(RSC 레이아웃)과 그걸로 캐시 키를 만드는 쪽(SSR 레이어)이 서로 다른
- * 모듈 그래프라 레이어를 넘는 저장소여야 한다. 근거는 `[[global-state]]`.
+ * 모듈 그래프라 레이어를 넘는 저장소여야 한다. 근거는 `[[state/cell]]`.
  */
 const known = globalCell(
   'remote-versions',
@@ -97,6 +79,75 @@ export function announcedVersions(): Partial<Record<RemoteName, string>> {
   return out;
 }
 
+/** 매니페스트는 remote 가 주는 값이다 — 필드가 다 있는지도 아직 모른다 */
+type Manifest = Partial<RemoteVersion> & {
+  signature?: string;
+  webIntegrity?: string;
+};
+
+/**
+ * 매니페스트를 받아온다. 네트워크 실패는 `null` — remote 가 잠깐 안 뜬 것과
+ * **검증 거부**는 다른 사건이라, 거부는 부르는 쪽에서 따로 다룬다.
+ */
+async function fetchManifest(
+  remote: RemoteName,
+  url: string,
+): Promise<Manifest | null> {
+  // 번들과 같은 제한을 건다 — 매니페스트가 매달리면 그 뒤 전부가 매달린다
+  const signal = AbortSignal.timeout(REMOTE_FETCH_TIMEOUT_MS);
+  const init: RequestInit =
+    process.env.NODE_ENV === 'production'
+      ? ({
+          next: { revalidate: 30, tags: [remoteVersionTag(remote)] },
+          signal,
+        } as RequestInit)
+      : { cache: 'no-store', signal };
+
+  try {
+    assertAllowedOrigin(remote, url, trustedOrigins());
+    const res = await fetch(url, init);
+    if (!res.ok) return null;
+    return (await res.json()) as Manifest;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 매니페스트가 준 값을 믿어도 되는지 확인한다.
+ *
+ * 이건 **remote 가 주는 값**이다. 그대로 믿으면 "다른 오리진에서 받아 실행하라"는
+ * 지시를 그대로 따르게 된다. 경로 형태를 먼저 좁히고, 서명이 있으면 출처까지 확인한다.
+ *
+ * 검증 실패는 조용히 넘기지 않는다. 폴백으로 흘러가면 막은 의미가 없다.
+ */
+async function assertTrusted(
+  remote: RemoteName,
+  version: string,
+  ssrEntry: string,
+  webEntry: string,
+  rest: Pick<Manifest, 'ssrIntegrity' | 'webIntegrity' | 'signature'>,
+): Promise<void> {
+  const { ssrIntegrity, webIntegrity, signature } = rest;
+
+  // 경로보다 먼저 버전을 좁힌다 — 경로 검사는 버전을 신뢰한 채로 도는 검사다
+  assertSafeVersion(remote, version);
+  assertSafeEntryPath(remote, ssrEntry, version);
+  assertSafeEntryPath(remote, webEntry, version);
+  await assertManifestSignature(
+    remote,
+    signedPayload({
+      remote,
+      version,
+      ssrEntry,
+      webEntry,
+      ssrIntegrity,
+      webIntegrity,
+    }),
+    signature,
+  );
+}
+
 /**
  * remote 가 공표한 현재 버전을 읽는다.
  *
@@ -110,62 +161,13 @@ export function announcedVersions(): Partial<Record<RemoteName, string>> {
 export async function fetchRemoteVersion(
   remote: RemoteName,
 ): Promise<RemoteVersion | null> {
-  const url = `${remoteOrigin(remote)}/${MF_FILES.versionManifest}`;
-  // 번들과 같은 제한을 건다 — 매니페스트가 매달리면 그 뒤 전부가 매달린다
-  const signal = AbortSignal.timeout(REMOTE_FETCH_TIMEOUT_MS);
-  const init: RequestInit =
-    process.env.NODE_ENV === 'production'
-      ? ({
-          next: { revalidate: 30, tags: [remoteVersionTag(remote)] },
-          signal,
-        } as RequestInit)
-      : { cache: 'no-store', signal };
-
-  type Manifest = Partial<RemoteVersion> & {
-    signature?: string;
-    webIntegrity?: string;
-  };
-
-  // 네트워크 실패는 조용히 넘긴다 — remote 가 잠깐 안 뜬 것과 거부는 다른 사건이다
-  const body = await (async (): Promise<Manifest | null> => {
-    try {
-      assertAllowedOrigin(remote, url, trustedOrigins());
-      const res = await fetch(url, init);
-      if (!res.ok) return null;
-      return (await res.json()) as Manifest;
-    } catch {
-      return null;
-    }
-  })();
-
+  const url = `${ssrOrigin(remote)}/${MF_FILES.versionManifest}`;
+  const body = await fetchManifest(remote, url);
   if (!body?.version || !body.ssrEntry || !body.webEntry) return null;
-  const { version, ssrEntry, webEntry, ssrIntegrity, webIntegrity, signature } =
-    body;
+  const { version, ssrEntry, webEntry, ssrIntegrity } = body;
 
-  /**
-   * 이 매니페스트는 **remote 가 주는 값**이다. 그대로 믿으면
-   * "다른 오리진에서 받아 실행하라"는 지시를 그대로 따르게 된다.
-   * 경로 형태를 먼저 좁히고, 서명이 있으면 출처까지 확인한다.
-   *
-   * 검증 실패는 조용히 넘기지 않는다. 폴백으로 흘러가면 막은 의미가 없다.
-   */
   try {
-    // 경로보다 먼저 버전을 좁힌다 — 경로 검사는 버전을 신뢰한 채로 도는 검사다
-    assertSafeVersion(remote, version);
-    assertSafeEntryPath(remote, ssrEntry, version);
-    assertSafeEntryPath(remote, webEntry, version);
-    await assertManifestSignature(
-      remote,
-      signedPayload({
-        remote,
-        version,
-        ssrEntry,
-        webEntry,
-        ssrIntegrity,
-        webIntegrity,
-      }),
-      signature,
-    );
+    await assertTrusted(remote, version, ssrEntry, webEntry, body);
   } catch (error) {
     console.error(`[mf] remote '${remote}' 버전 매니페스트 거부:`, error);
     return null;

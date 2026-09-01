@@ -31,10 +31,7 @@ const FALLBACK = {
   cart: `${CART_ORIGIN}/${MF_FILES.webManifest}`,
 } as const;
 
-vi.mock('@/mf/runtime', () => ({
-  pinnedEntry,
-  REMOTE_ENTRIES: FALLBACK,
-}));
+vi.mock('@/mf/loader', () => ({ pinnedEntry }));
 
 // 버전 핀 표시는 서버가 심어준 값에서 온다 — 그 잎 모듈만 따로 목킹한다.
 vi.mock('@/mf/versions/browser', () => ({ injectedEntry }));
@@ -47,6 +44,8 @@ const PINNED = {
 
 beforeEach(() => {
   vi.resetModules();
+  // 폴백 주소는 `@/mf/config` 가 env 에서 만든다 — 목이 아니라 진짜 조립을 거치게 둔다
+  vi.stubEnv('MFA_REMOTE_WEB_ENTRIES', JSON.stringify(FALLBACK));
   pinnedEntry.mockImplementation(
     (remote: 'catalog' | 'cart') => PINNED[remote],
   );

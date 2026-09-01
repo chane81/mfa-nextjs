@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 
 import type { CartLine } from '@mfa/contracts';
 
-import { RemoteComponent } from '@/mf/RemoteComponent';
+import { RemoteComponent } from '@/mf/components/RemoteComponent';
 
 /**
  * 결제 화면. Multi-Zone 이 아니라 **remote** 다.

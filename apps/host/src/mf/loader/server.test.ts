@@ -62,7 +62,7 @@ const stubBundleOnly = (respond: () => unknown) => {
 
 /** 버전을 미리 기억시켜 `resolveEntry` 가 매니페스트를 조회하지 않게 한다 */
 const rememberVersions = async (version = 't1abc') => {
-  const { rememberVersion } = await import('./versions/server');
+  const { rememberVersion } = await import('../versions/server');
   for (const remote of ['catalog', 'cart'] as const) {
     rememberVersion(remote, {
       version,
@@ -72,7 +72,7 @@ const rememberVersions = async (version = 't1abc') => {
   }
 };
 
-const load = () => import('./server-loader');
+const load = () => import('./server');
 
 describe('태그 — remote 하나에 두 개', () => {
   it('번들 fetch 용과 페이지 캐시용이 다르다', async () => {
@@ -265,7 +265,7 @@ describe('가져오기 실패', () => {
   it('무결성이 어긋나면 평가하지 않는다', async () => {
     // 이 줄 아래부터가 남의 코드를 이 프로세스에서 실행하는 구간이다.
     stubFetch(() => bundle(`throw new Error('평가되면 안 된다');`));
-    const { rememberVersion } = await import('./versions/server');
+    const { rememberVersion } = await import('../versions/server');
     rememberVersion('catalog', {
       version: 't1abc',
       ssrEntry: versionedPath(MF_FILES.ssrBundle, 't1abc'),
@@ -316,7 +316,7 @@ describe('엔트리 해석', () => {
 
   it('프로덕션에서는 Data Cache 에 태그를 달아 올린다', async () => {
     vi.stubEnv('NODE_ENV', 'production');
-    // 무결성 강제는 remote-trust 쪽에서 따로 검증한다. 여기서 보려는 건 fetch 옵션이다.
+    // 무결성 강제는 `trust` 쪽에서 따로 검증한다. 여기서 보려는 건 fetch 옵션이다.
     vi.stubEnv('MF_REQUIRE_INTEGRITY', '0');
     const calls = stubBundleOnly(() => bundle(EXPOSES));
     const { loadRemoteModuleOnServer, remoteBundleTag } = await load();
@@ -342,7 +342,7 @@ describe('엔트리 해석', () => {
 describe('캐시 — 프로덕션에서만', () => {
   beforeEach(() => {
     vi.stubEnv('NODE_ENV', 'production');
-    // 무결성 강제는 remote-trust 쪽에서 따로 검증한다. 여기서 보려는 건 캐시 동작이다.
+    // 무결성 강제는 `trust` 쪽에서 따로 검증한다. 여기서 보려는 건 캐시 동작이다.
     vi.stubEnv('MF_REQUIRE_INTEGRITY', '0');
   });
 
@@ -373,7 +373,7 @@ describe('캐시 — 프로덕션에서만', () => {
     // 버전만으로 키잉하면 "같은 버전인데 바이트가 바뀐" 경우를 못 잡는다.
     const calls = stubBundleOnly(() => bundle(EXPOSES));
     await rememberVersions();
-    const { bumpWarmEpoch } = await import('./warm-state');
+    const { bumpWarmEpoch } = await import('../state/warm');
     const { loadRemoteModuleOnServer } = await load();
 
     await loadRemoteModuleOnServer('catalog/ProductGrid');
@@ -401,7 +401,7 @@ describe('캐시 — 프로덕션에서만', () => {
   it('적재에 성공하면 그 버전을 준비 완료로 표시한다', async () => {
     stubBundleOnly(() => bundle(EXPOSES));
     await rememberVersions();
-    const { isBundleReady, warmEpoch } = await import('./warm-state');
+    const { isBundleReady, warmEpoch } = await import('../state/warm');
     const { loadRemoteModuleOnServer } = await load();
 
     await loadRemoteModuleOnServer('catalog/ProductGrid');
@@ -447,7 +447,9 @@ describe('캐시 — 프로덕션에서만', () => {
 describe('계측', () => {
   it('성공하면 fetch · eval · load 를 순서대로 센다', async () => {
     stubFetch(() => bundle(EXPOSES));
-    const { getLoaderStats, resetLoaderStats } = await import('./loader-stats');
+    const { getLoaderStats, resetLoaderStats } = await import(
+      '../state/loader-stats'
+    );
     resetLoaderStats();
     const { loadRemoteModuleOnServer } = await load();
 
@@ -465,7 +467,9 @@ describe('계측', () => {
     // remote 를 렌더하는 페이지는 RemoteBoundary 로 감싸여 있어 remote 가 죽어도 200 이다.
     // 그래서 이 두 축이 갈라져 있어야 진단이 된다.
     stubFetch(() => ({ ok: false, status: 500 }) as Response);
-    const { getLoaderStats, resetLoaderStats } = await import('./loader-stats');
+    const { getLoaderStats, resetLoaderStats } = await import(
+      '../state/loader-stats'
+    );
     resetLoaderStats();
     const { loadRemoteModuleOnServer } = await load();
 
@@ -482,7 +486,9 @@ describe('계측', () => {
   it('허용 목록에서 막히면 fetch 시도도 세지 않는다', async () => {
     vi.stubEnv('REMOTE_ALLOWED_ORIGINS', 'https://only.example.com');
     stubFetch(() => bundle(EXPOSES));
-    const { getLoaderStats, resetLoaderStats } = await import('./loader-stats');
+    const { getLoaderStats, resetLoaderStats } = await import(
+      '../state/loader-stats'
+    );
     resetLoaderStats();
     const { loadRemoteModuleOnServer } = await load();
 
@@ -500,7 +506,7 @@ describe('ssrEntrySnapshot', () => {
   });
 
   it('아는 버전이 있으면 불변 경로를 보여준다', async () => {
-    const { rememberVersion } = await import('./versions/server');
+    const { rememberVersion } = await import('../versions/server');
     rememberVersion('catalog', {
       version: 't1abc',
       ssrEntry: versionedPath(MF_FILES.ssrBundle, 't1abc'),

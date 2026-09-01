@@ -1,4 +1,6 @@
-import type { RemoteName } from '@mfa/contracts';
+import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
+
+import { ssrOrigin } from '../config';
 
 /**
  * 서명 페이로드 직렬화는 **여기서 정의하지 않는다.**
@@ -39,6 +41,9 @@ export { signedPayload, type SignedManifestFields } from '@mfa/remote-config';
  *
  * 명시하지 않으면 설정된 remote 오리진만 허용한다. 즉 기본값이 이미 닫혀 있고,
  * 프록시·CDN 을 따로 쓸 때만 `REMOTE_ALLOWED_ORIGINS` 로 넓힌다.
+ *
+ * 기본값을 인자로 받는 **순수 함수**다. 이 저장소에서 그 기본값은 언제나
+ * `trustedOrigins()` 가 정하지만, 둘을 나눠 두면 "env 파싱 규칙"만 따로 시험할 수 있다.
  */
 export function allowedOrigins(defaults: string[]): string[] {
   const configured = process.env.REMOTE_ALLOWED_ORIGINS;
@@ -49,6 +54,17 @@ export function allowedOrigins(defaults: string[]): string[] {
     .map((origin) => origin.trim())
     .filter(Boolean)
     .map((origin) => new URL(origin).origin);
+}
+
+/**
+ * **이 host 가 remote 바이트를 받아도 되는 오리진.** 신뢰 판단의 창구는 여기 하나다.
+ *
+ * 기본값이 `SSR_ENTRIES` 의 오리진이라 **서버에서만 의미가 있다.** 브라우저 번들에서는
+ * `publicOrigin` 이 치환되지 않아 `localhost` 목록이 나오는데, remote 바이트를 받아
+ * 실행하는 경로가 서버뿐이라 브라우저는 이 값을 부르지 않는다.
+ */
+export function trustedOrigins(): string[] {
+  return allowedOrigins(REMOTE_NAMES.map((remote) => ssrOrigin(remote)));
 }
 
 export function assertAllowedOrigin(

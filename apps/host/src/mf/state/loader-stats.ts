@@ -1,4 +1,4 @@
-import { globalCell } from './global-state';
+import { globalCell } from './cell';
 
 /**
  * remote 서버 번들 로더 계측기.
@@ -6,7 +6,7 @@ import { globalCell } from './global-state';
  * ## 왜 레이어를 넘는 저장소인가
  * 카운터를 올리는 쪽은 페이지 SSR(SSR 레이어)이고 읽는 쪽은 Route Handler(RSC 레이어)다.
  * 모듈 스코프 변수에 두면 서로 다른 인스턴스라 읽는 쪽에서 항상 0 으로 보인다.
- * 근거와 공유 방식은 `[[global-state]]`.
+ * 근거와 공유 방식은 `[[state/cell]]`.
  *
  * ## 왜 시간(Date)을 안 담나
  * 이 카운터는 remote 렌더 도중에 호출된다. cacheComponents 를 켜면 prerender 중
