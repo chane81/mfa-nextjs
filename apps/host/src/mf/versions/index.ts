@@ -27,9 +27,6 @@ import { announcedVersion } from './server';
  * 떨어져 remote CSS 를 배포본에 없는 `/style.css` 로 요청했다(known-issues G-1).
  */
 
-/** 서버가 만드는 버전 정보. 이 폴더 밖에서도 쓰므로 여기서 다시 내보낸다. */
-export type { RemoteVersion } from './server';
-
 /**
  * **"지금 이 렌더가 가리켜야 하는 remote 버전."**
  *
