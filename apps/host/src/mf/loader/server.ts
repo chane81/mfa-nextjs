@@ -3,7 +3,11 @@ import * as ReactJSXDevRuntime from 'react/jsx-dev-runtime';
 import * as ReactJSXRuntime from 'react/jsx-runtime';
 import * as ReactDOM from 'react-dom';
 
-import type { RemoteName } from '@mfa/contracts';
+import type {
+  RemoteModule,
+  RemoteModuleId,
+  RemoteName,
+} from '@mfa/contracts/remote';
 import type { SsrExternal } from '@mfa/remote-config';
 
 import {
@@ -16,7 +20,6 @@ import { recordEval, recordFetch, recordLoad } from '../state/loader-stats';
 import { markBundleReady, warmEpoch } from '../state/warm';
 import { assertAllowedOrigin, assertIntegrity, trustedOrigins } from '../trust';
 import { announcedVersion, fetchRemoteVersion } from '../versions/server';
-import type { RemoteModule, RemoteModuleId } from './modules';
 import { normalizeShared } from './react-modules';
 
 /**

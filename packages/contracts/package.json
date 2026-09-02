@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./remote": {
+      "types": "./dist/remote-contract.d.ts",
+      "default": "./dist/remote-contract.js"
     }
   },
   "files": [
@@ -19,7 +23,8 @@
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf dist .turbo"
+    "clean": "rm -rf dist .turbo",
+    "mf:types": "mf dts --fetch true --generate false && node ../../scripts/gen-module-ids.ts"
   },
   "dependencies": {
     "@mfa/remote-config": "workspace:*"
@@ -27,7 +32,10 @@
   "devDependencies": {
     "@mfa/eslint-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
+    "@module-federation/cli": "^2.8.2",
+    "@module-federation/runtime": "^2.8.2",
     "@types/react": "^19.2.2",
+    "concurrently": "^9.2.1",
     "eslint": "^10.8.1",
     "typescript": "6.0.3"
   }

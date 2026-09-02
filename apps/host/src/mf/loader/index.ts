@@ -8,11 +8,11 @@ import * as ReactJSXRuntime from 'react/jsx-runtime';
 import * as ReactDOM from 'react-dom';
 import * as ReactDOMClient from 'react-dom/client';
 
-import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
+import type { RemoteModule, RemoteModuleId } from '@mfa/contracts/remote';
+import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts/remote';
 
 import { WEB_ENTRIES } from '../config';
 import { injectedEntry } from '../versions/browser';
-import type { RemoteModule, RemoteModuleId } from './modules';
 import {
   normalizeShared,
   REACT_VERSION,

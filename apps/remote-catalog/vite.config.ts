@@ -178,7 +178,7 @@ export default defineConfig(({ command }) => {
          * ## 그래도 `@mfa/contracts` 가 SSOT 다
          *
          * 여기서 나온 타입이 host 의 모듈 타입을 **그대로 만든다**
-         * (`apps/host/src/mf/loader/modules.ts`). 그래서 이 remote 가 props 를 바꾸면
+         * (`packages/contracts/src/remote-contract.ts`). 그래서 이 remote 가 props 를 바꾸면
          * host 의 호출부가 컴파일 에러가 된다.
          *
          * `@mfa/contracts` 에 남은 건 **어휘**(`Product` 등)와 **런타임 이름 목록**

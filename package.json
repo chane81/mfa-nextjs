@@ -24,7 +24,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "clean": "turbo run clean && rm -rf node_modules",
-    "mf:types": "pnpm --filter @mfa/host mf:types"
+    "mf:types": "pnpm --filter @mfa/contracts mf:types"
   },
   "devDependencies": {
     "@mfa/eslint-config": "workspace:*",

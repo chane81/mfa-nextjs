@@ -17,13 +17,22 @@
      * 파일마다 달라진다 — `vitest.config.ts` 의 alias 와 **같은 대상**을 가리켜야 한다.
      */
     "paths": {
-      "@tests/*": ["../../tests/*"]
+      "@tests/*": ["../../tests/*"],
+
+      // MF DTS 가 받아온 remote 타입. `@mf-types/*/apis.d.ts` 안의
+      // `typeof import('catalog/ProductGrid')` 가 **bare specifier** 라 이 매핑이 없으면
+      // 모듈을 못 찾는다. host tsconfig 에도 같은 매핑이 있다 — `.d.ts` 안의 참조는
+      // 그 파일을 **읽는 프로그램**의 설정으로 해석되기 때문이다.
+      //
+      // ⚠️ `"*"` 와일드카드로 쓰지 않는다. 평범한 import 까지 가로챈다(known-issues I-4).
+      "catalog/*": ["./src/generated/@mf-types/catalog/*"],
+      "cart/*": ["./src/generated/@mf-types/cart/*"]
     }
   },
   /**
    * 테스트도 포함한다. 빼면 편집기의 TS 서버가 그 파일을 **어느 프로젝트에도 넣지 못해**
    * `@tests/*` · `@mfa/*` 를 통째로 못 찾는다(`ts(2307)`).
    */
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "generated/**/*", "module-federation.config.ts"],
   "exclude": ["dist", "node_modules"]
 }

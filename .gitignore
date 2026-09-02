@@ -19,8 +19,8 @@ coverage
 # TS 증분 빌드
 *.tsbuildinfo
 
-# ⚠️ `apps/host/@mf-types` 는 **커밋한다** (여기 없다).
-# host 소스가 그 타입을 실제로 쓰기 때문이다(`src/mf/loader/modules.ts`).
+# ⚠️ `packages/contracts/src/generated/` 는 **커밋한다** (여기 없다).
+# 생성물이지만 `src/remote-contract.ts` 가 그 타입과 목록을 실제로 쓰기 때문이다.
 # 무시하면 `pnpm typecheck` 가 remote 기동을 요구하게 되고, 그건 이 저장소가 DTS 를
 # 오래 껐던 바로 그 이유다. 낡았는지는 CI 가 `pnpm mf:types` 후 diff 로 본다.
 #

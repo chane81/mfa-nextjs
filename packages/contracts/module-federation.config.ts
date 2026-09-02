@@ -8,7 +8,14 @@ import {
 } from '@mfa/remote-config';
 
 /**
- * host 의 **DTS 전용** Module Federation 설정.
+ * **DTS 전용** Module Federation 설정. 계약 패키지가 소유한다.
+ *
+ * ## 왜 host 가 아니라 여기인가
+ *
+ * 받아온 타입을 읽는 자리가 `src/remote-contract.ts` 이기 때문이다. 그 파일이
+ * `RemoteModuleId` · `RemoteModule<K>` 를 만들고 host 는 그걸 그대로 쓴다.
+ * 생성물(`@mf-types/`)과 그걸 읽는 코드가 같은 패키지에 있으면 경로가 짧고,
+ * "계약이 어디서 오는가" 를 한 곳에서 답할 수 있다.
  *
  * ## 이건 번들러 설정이 아니다
  *
@@ -18,7 +25,7 @@ import {
  * "remote 의 타입 아카이브를 어디서 받아 어디에 풀지" 를 말해주는 것뿐이다.
  *
  * 그래서 `exposes` 도 `shared` 도 없다. 여기 있는 `remotes` 는 소비자 이름 목록의 의미고,
- * 실제 런타임 remote 목록은 여전히 `src/mf/loader/index.ts` 의 `init()` 이 쥔다.
+ * 실제 런타임 remote 목록은 여전히 host 의 `mf/loader/index.ts` 가 쥔다.
  *
  * ## 왜 `.ts` 인가
  *
@@ -28,15 +35,33 @@ import {
  *
  * ## 실행
  *
- *     pnpm --filter @mfa/host mf:types      # remote 가 떠 있어야 한다
+ *     pnpm mf:types      # remote 가 떠 있어야 한다
  *
- * 결과는 `apps/host/@mf-types/` 에 풀리고 **저장소에 커밋된다.** host 소스가 그 타입을
- * 실제로 쓰기 때문이다(`src/mf/loader/modules.ts`) — 무시하면 `pnpm typecheck` 가
- * remote 기동을 요구하게 되고, 그건 이 저장소가 DTS 를 오래 껐던 바로 그 이유다.
+ * 결과는 `packages/contracts/src/generated/` 에 풀리고 **저장소에 커밋된다.**
+ * `src/remote-contract.ts` 가 그 타입을 실제로 쓰기 때문이다 — 무시하면
+ * `pnpm typecheck` 가 remote 기동을 요구하게 되고, 그건 이 저장소가 DTS 를 오래 껐던
+ * 바로 그 이유다.
  *
  * 그래서 이 명령은 **remote 를 고친 사람이 돌리는 것**이지 CI 의 기본 경로가 아니다.
  * 커밋된 타입이 낡았는지는 CI 가 빌드 뒤에 이걸 한 번 돌리고 `git diff` 로 본다.
  */
+
+/**
+ * 이 파일이 쓰는 전역 두 개를 **최소한으로** 선언한다.
+ *
+ * 이 패키지는 브라우저 번들에 실리므로 `@types/node` 도 `lib.dom` 도 붙이지 않는다
+ * (`tsconfig.json` 의 `lib` 은 `ES2023` 뿐이다). 그렇다고 이 파일을 검사에서 빼면
+ * 오타가 `mf dts` 실행 시점까지 미뤄진다.
+ *
+ * 그래서 실제로 쓰는 조각만 여기서 선언한다 — `@mfa/remote-config` 가
+ * `declare const process` 로 같은 문제를 푸는 것과 같은 수법이다. 모듈 스코프 선언이라
+ * 전역 타입이 있는 소비처와도 충돌하지 않는다.
+ */
+declare const fetch: (
+  url: string,
+  init?: { signal?: unknown },
+) => Promise<{ ok: boolean; json(): Promise<unknown> }>;
+declare const AbortSignal: { timeout(ms: number): unknown };
 
 /**
  * remote 하나의 타입 URL 두 개.
@@ -118,6 +143,12 @@ export default {
       abortOnError: true,
       /** `RemoteKeys` · `PackageType` 까지 받는다 (`loadRemote()` 모듈 확장) */
       consumeAPITypes: true,
+      /**
+       * 받은 타입을 `generated/` 아래에 푼다. 같은 폴더에 `module-ids.ts` 도 생기므로
+       * **손으로 고치면 안 되는 파일이 한 자리에 모인다.**
+       * `context`(= 이 패키지 루트) 기준 상대 경로다.
+       */
+      typesFolder: 'src/generated/@mf-types',
     },
   },
 };

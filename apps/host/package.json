@@ -10,8 +10,7 @@
     "start": "next start --port 3000",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf .next .turbo",
-    "mf:types": "mf dts --fetch true --generate false"
+    "clean": "rm -rf .next .turbo"
   },
   "dependencies": {
     "@mfa/contracts": "workspace:*",
@@ -27,7 +26,6 @@
   "devDependencies": {
     "@mfa/eslint-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
-    "@module-federation/cli": "^2.8.2",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.2",

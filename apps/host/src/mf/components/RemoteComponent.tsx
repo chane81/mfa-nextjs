@@ -2,13 +2,16 @@
 
 import { Suspense, lazy, type ComponentType } from 'react';
 
-import type { RemoteName } from '@mfa/contracts';
+import type {
+  RemoteModule,
+  RemoteModuleId,
+  RemoteName,
+} from '@mfa/contracts/remote';
 import { stylesPath } from '@mfa/remote-config';
 import { Skeleton } from '@mfa/ui';
 
 import { WEB_ENTRIES, WEB_ORIGINS } from '../config';
 import { loadRemoteModule } from '../loader';
-import type { RemoteModule, RemoteModuleId } from '../loader/modules';
 import { remoteVersion } from '../versions';
 import { RemoteBoundary } from './RemoteBoundary';
 

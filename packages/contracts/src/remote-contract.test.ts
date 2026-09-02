@@ -6,7 +6,7 @@ import { MODULE_IDS, REMOTE_NAMES, exposedNames } from './remote-contract';
  * remote 계약의 성질.
  *
  * **이 파일에 props 검사는 없다.** props 는 remote 의 expose 파일이 선언하고 host 는
- * MF DTS 로 받아간다 — 그 대조는 컴파일 타임에 `apps/host/src/mf/loader/modules.ts`
+ * MF DTS 로 받아간다 — 그 대조는 컴파일 타임에 `packages/contracts/src/remote-contract.ts`
  * 가 한다. 여기 남은 건 **런타임 값인 이름 목록**의 성질뿐이다.
  *
  * 키 형태(`<remote>/<모듈>`)는 `MODULE_IDS` 선언의 `satisfies` 가 그 자리에서 막는다.
@@ -34,6 +34,11 @@ describe('remote 계약', () => {
   });
 
   it('exposedNames 는 접두사를 떼고 이름만 준다', () => {
-    expect(exposedNames('catalog')).toEqual(['ProductGrid', 'ProductDetail']);
+    // 순서는 계약이 아니다. `MODULE_IDS` 는 생성물이고
+    // (`scripts/gen-module-ids.ts`) 출력이 결정적이도록 정렬돼 있을 뿐이다.
+    expect([...exposedNames('catalog')].sort()).toEqual([
+      'ProductDetail',
+      'ProductGrid',
+    ]);
   });
 });
