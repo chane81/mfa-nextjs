@@ -100,6 +100,10 @@ const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.map': 'application/json; charset=utf-8',
+  // MF DTS 산출물. `.ts` 는 `@mf-types.d.ts` 를 가리킨다 — 브라우저가 받는 파일이
+  // 아니라 `mf dts --fetch` 가 텍스트로 읽는 타입 선언이다.
+  '.zip': 'application/zip',
+  '.ts': 'application/typescript; charset=utf-8',
 };
 
 /**

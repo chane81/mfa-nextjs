@@ -1,7 +1,12 @@
 import { resolve } from 'node:path';
 
 import { pluginModuleFederation } from '@module-federation/rsbuild-plugin';
-import { MF_FILES, REMOTES, publicOrigin } from '@mfa/remote-config';
+import {
+  MF_FILES,
+  MF_TYPES_FOLDER,
+  REMOTES,
+  publicOrigin,
+} from '@mfa/remote-config';
 import {
   assetBase,
   createMfDevMiddleware,
@@ -76,13 +81,30 @@ export default defineConfig({
         'react-dom': { singleton: true, requiredVersion: '^19.0.0' },
       },
       /**
-       * MF 자동 타입 생성(DTS)을 끈다. 이유는 catalog 쪽 vite.config.ts 주석 참고.
-       * 요약: 타입 SSOT 가 `@mfa/contracts` 라 정보가 중복이고,
-       * 타입 소비가 typecheck 에 remote 기동을 요구해 CI 비용이 크다.
+       * MF 자동 타입 생성(DTS)을 **켠다.** 배경과 판단은 catalog 쪽 vite.config.ts 주석 참고.
+       * 요약: 생산자로서 `exposes` 시그니처를 `@mf-types.zip` 으로 내보내고,
+       * host 가 `mf dts --fetch` 로 받아 `@mfa/contracts` 와 대조한다.
+       * 계약의 SSOT 는 여전히 `@mfa/contracts` 다 — DTS 는 검증 장치다.
        *
-       * 콘솔의 `dynamic-remote-type-hints-plugin` 에러는 dts 가 아니라 dev 옵션 소관이다.
+       * ⚠️ 번들러가 달라도 **옵션 값은 catalog 와 같아야 한다.** 갈라지면 한쪽 remote 만
+       * 다른 모양의 타입을 내보내고, host 는 그걸 같은 방식으로 소비하려다 실패한다.
        */
-      dts: false,
+      dts: {
+        generateTypes: {
+          tsConfigPath: './tsconfig.json',
+          // 폴더 이름은 계약이다 — catalog 쪽 주석 참고
+          typesFolder: MF_TYPES_FOLDER,
+          generateAPITypes: true,
+          abortOnError: true,
+          extractThirdParty: false,
+        },
+        // 이 remote 는 다른 remote 를 소비하지 않는다 — 받을 타입이 없다
+        consumeTypes: false,
+      },
+      dev: {
+        // WS 기반 동적 타입 힌트만 끈다 (`[ dynamic-remote-type-hints-plugin ] err: [object Event]`)
+        disableDynamicRemoteTypeHints: true,
+      },
     }),
   ],
   server: {
