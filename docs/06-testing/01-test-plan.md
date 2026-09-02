@@ -156,8 +156,8 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 ## vitest 밖의 검사 — MF DTS 가 `pnpm typecheck` 안에서 돈다
 
 remote 의 props 계약은 테스트가 아니라 **컴파일러**가 검사한다. props 선언이 remote 에
-있고 host 는 MF DTS 가 좁혀준 `loadRemote()` 에서 모듈 타입을 되꺼내므로
-(`src/mf/loader/modules.ts` 의 `RemoteModule<K>`),
+있고 `@mfa/contracts` 가 MF DTS 가 좁혀준 `loadRemote()` 에서 모듈 타입을 되꺼내므로
+(`@mfa/contracts/remote` 의 `RemoteModule<K>`),
 remote 가 시그니처를 바꾸면 **host 의 호출부가 그냥 컴파일 에러**가 된다.
 
 ```

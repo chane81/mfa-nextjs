@@ -91,35 +91,141 @@ export type RemoteModule<K extends RemoteModuleId> = Awaited<
 
 표가 사라졌다. 드리프트 검출은 그대로다 — remote 에 필수 prop 을 추가하고 확인했다.
 
+### 4단계: 계약 지식을 `@mfa/contracts` 한 파일로 모았다
+
+3단계까지도 계약 지식이 두 패키지에 걸쳐 있었다 — 이름 목록은 `@mfa/contracts`,
+타입은 host 의 `loader/modules.ts`. `@mf-types` 도 host 가 들고 있었다.
+
+DTS 생성물을 `packages/contracts/` 로 옮기고 계약 지식을 전부 `remote-contract.ts` 로 합쳤다.
+그러면서 방향도 하나 더 뒤집었다 — **`RemoteModuleId` 의 원본이 `RemoteKeys` 가 됐다.**
+
+```ts
+export type RemoteModuleId = CatalogKeys | CartKeys;     // remote 가 공표한 것
+export const MODULE_IDS = [ … ] as const satisfies readonly RemoteModuleId[];
+export type ModuleIdsAreExhaustive = Expect<Equal<(typeof MODULE_IDS)[number], RemoteModuleId>>;
+```
+
+손으로 적는 `MODULE_IDS` 는 이제 **타입을 따라가는 런타임 반영**이다(`satisfies` 만으로는
+누락을 못 잡아 전수 대조를 따로 건다). `apps/host/src/mf/loader/modules.ts` 는 사라졌다.
+
+#### 진입점을 갈라야 했다
+
+`remote-contract.ts` 가 `../@mf-types` 를 읽는데, 그건 remote 를 빌드해야 생긴다.
+그런데 remote 의 `src/exposes` 는 배럴에서 `Product` · `CartLine` 을 가져다 쓴다.
+배럴이 이 파일까지 재-export 하면 **remote 빌드가 자기 산출물을 요구하는 순환**이 된다.
+
+그래서 `@mfa/contracts`(어휘)와 `@mfa/contracts/remote`(모듈 계약)를 갈랐다.
+remote 는 앞의 것만 쓴다. 각 remote 의 `exposes/contract.test.ts` 도 그래서 없앴다 —
+그 테스트가 `exposedNames` 를 쓰느라 뒤의 진입점을 끌어왔고, 검증 내용은
+`ModuleIdsAreExhaustive`(실제 빌드 산출물과 대조라 더 강하다)와 `readExposes` 단위
+테스트로 나눠 옮겼다.
+
+#### 조용히 무너지는 함정을 하나 밟았다
+
+옮긴 직후 host `typecheck` 는 통과하는데 **드리프트가 안 잡혔다.** `RemoteModule<K>` 가
+`any` 로 무너져 있었다 — `loadRemote()` 를 좁히는 모듈 확장(`@mf-types/index.d.ts`)이
+host 프로그램에 없었기 때문이다. 그 파일은 아무도 import 하지 않아 저절로 안 들어오고,
+`RemoteModule<K>` 는 `.d.ts` 에 계산 전 형태로 emit 되어 **소비처에서 다시 계산된다.**
+
+읽는 프로그램마다 `include` 에 넣어야 한다. 자세한 것과 5초짜리 확인법은 known-issues I-5.
+
+### 5단계: 런타임 목록도 생성물로 바꿨다
+
+4단계까지 손으로 적는 자리가 딱 하나 남아 있었다.
+
+```ts
+export const MODULE_IDS = [
+  'catalog/ProductGrid',
+  …
+] as const satisfies readonly RemoteModuleId[];
+```
+
+타입에서 값은 못 뽑는다. 하지만 **DTS 산출물이 이미 그 목록을 파일로 갖고 있다.**
+
+```ts
+// @mf-types/catalog/apis.d.ts
+export type RemoteKeys = 'catalog/ProductDetail' | 'catalog/ProductGrid';
+```
+
+`scripts/gen-module-ids.ts` 가 그 리터럴을 뽑아 `generated/module-ids.ts` 로 쓴다.
+`pnpm mf:types` 가 페치 다음에 그걸 이어서 돌린다.
+
+파싱은 dts-plugin 의 출력 포맷에 기대므로 **믿지 않는다.** 결과가 틀리면
+`ModuleIdsAreExhaustive` 가 컴파일 타임에 잡는다 — 생성된 배열과 (타입으로 읽은)
+`RemoteModuleId` 를 전수 대조하기 때문이다. 항목을 빼고, 없는 키를 넣어 양쪽 다
+실패하는 것을 확인했다. 즉 **스크립트는 편의고 정확성은 타입 시스템이 보증한다.**
+
+#### 실증 — 손으로 고친 파일 0개
+
+`apps/remote-catalog/src/exposes/StockTicker.tsx` 를 새로 놓고 remote 빌드 →
+`pnpm mf:types` → `pnpm typecheck` 만 돌렸다. 목록이 5개에서 6개로 늘고 전부 통과했다.
+**계약 파일에도 host 에도 손대지 않았다.**
+
+"그 디렉터리에 있는 것만 노출한다" 는 규칙이 이제 타입과 값을 관통한다 —
+`src/exposes/` → `exposes` 설정(`readExposes`) → DTS `RemoteKeys` → `MODULE_IDS`.
+
+#### 생성물은 `src/generated/` 한 폴더에 모은다
+
+`@mf-types/`(DTS 산출물)와 `module-ids.ts`(거기서 뽑은 목록)는 둘 다 `pnpm mf:types` 가
+만든다. 손으로 고치면 안 되는 파일이 소스 사이에 섞여 있으면 그 사실이 안 보인다.
+
+옮기고 나서 **계약이 통째로 사라졌다.** contracts 빌드도 host `typecheck` 도 초록인데
+`RemoteModuleId` 가 `any` 였다.
+
+```ts
+const bogus: RemoteModuleId = 'catalog/DoesNotExist'; // ← 통과했다
+```
+
+`remote-contract.ts` 의 `import … from './generated/@mf-types/catalog/apis'` 가 emit 된
+`dist/remote-contract.d.ts` 에 그대로 남는데, tsc 는 입력 `.d.ts` 를 `dist` 로 복사하지
+않는다. 소비처가 그 경로를 못 찾고 **`skipLibCheck` 가 에러를 삼킨다.** (known-issues I-6)
+
+복사 스크립트로 풀 수도 있었고 실제로 그렇게 만들어 동작시켜봤다. 하지만 참조가 남아
+있는 한 같은 함정이 계속 있다 — `exports` 나 `rootDir` 을 누가 건드리면 또 조용히
+무너진다. 그래서 **참조 자체를 없앴다.**
+
+- 생성 스크립트가 값과 **타입을 같이** 만든다
+  (`export type RemoteModuleId = (typeof MODULE_IDS)[number]`) → 소스가 `@mf-types` 를
+  안 본다
+- `@mf-types` 와의 대조는 **아무것도 export 하지 않는** `src/contract-check.ts` 가 맡는다.
+  export 가 없으면 그 `.d.ts` 는 `export {}` 뿐이라 참조가 안 남는다
+
+결과적으로 `rootDir` · `exports` 를 건드릴 일도 없어졌고, 복사 스크립트도 필요 없다.
+`src/**` 가 `src/generated/@mf-types/**` 를 이미 잡으므로 모듈 확장도 저절로 들어온다.
+
 ### 결산 — 모듈 하나를 추가하는 비용
 
-| 단계               | 전(main)                       | 후                                  |
-| ------------------ | ------------------------------ | ----------------------------------- |
-| remote expose 파일 | 새 파일                        | 새 파일 (props 도 그 안에)          |
-| props 선언         | `@mfa/contracts` 에 인터페이스 | (위와 같은 파일이라 추가 비용 없음) |
-| 등록               | `MODULES` 한 줄                | `MODULE_IDS` 한 줄                  |
-| host               | —                              | —                                   |
-| 명령               | —                              | `pnpm mf:types` + 생성물 커밋       |
+| 단계               | 전(main)                       | 후                            |
+| ------------------ | ------------------------------ | ----------------------------- |
+| remote expose 파일 | 새 파일                        | 새 파일 (props 도 그 안에)    |
+| props 선언         | `@mfa/contracts` 에 인터페이스 | (위와 같은 파일)              |
+| 등록               | `MODULES` 한 줄                | **없음**                      |
+| host               | —                              | —                             |
+| 명령               | —                              | `pnpm mf:types` + 생성물 커밋 |
 
-**손으로 만지는 파일 수는 2개로 같다.** 늘어난 건 명령 하나와 커밋되는 생성물이다.
+**손으로 만지는 파일이 1개다** — 전보다 하나 줄었다. 대신 명령 하나와 커밋되는
+생성물 둘(`generated/@mf-types/`, `generated/module-ids.ts`)이 붙는다.
 
-remote 를 **새로** 추가할 때는 host 에 두 줄이 는다 — `tsconfig.json` 의 `paths` 와
-`loader/modules.ts` 의 `RemoteKeys` import. 와일드카드(`"*"`)로 `paths` 를 쓰면 host
-소스의 평범한 import 까지 가로채 무관한 에러가 쏟아진다(known-issues I-4).
+remote 를 **새로** 추가할 때는 세 줄이 는다 — `remote-contract.ts` 의 `RemoteKeys`
+import, 그리고 contracts · host 양쪽 tsconfig 의 `paths` 매핑(`.d.ts` 안의 bare
+specifier 는 읽는 쪽 설정으로 해석되므로 양쪽 다 필요하다). 와일드카드(`"*"`)로 `paths`
+를 쓰면 평범한 import 까지 가로챈다(known-issues I-4).
 
 늘어난 것:
 
 ```
-pnpm mf:types                          # 타입 갱신 (remote 기동 전제)
-apps/host/module-federation.config.ts  # mf dts CLI 전용 설정
-apps/host/src/mf/loader/modules.ts     # RemoteModule<K> + 키 집합 대조 (표는 없다)
-apps/host/@mf-types/                   # 커밋되는 생성물
-.github/workflows/ci.yml               # 그 생성물이 낡았는지 보는 단계
+pnpm mf:types                                   # 타입 + 목록 갱신 (remote 기동 전제)
+packages/contracts/module-federation.config.ts  # mf dts CLI 전용 설정
+packages/contracts/generated/                   # 커밋되는 생성물 (@mf-types · module-ids)
+scripts/gen-module-ids.ts                       # DTS → 런타임 목록
+@mfa/contracts/remote                           # 모듈 계약 전용 진입점
+.github/workflows/ci.yml                        # 그 생성물들이 낡았는지 보는 단계
 ```
 
 줄어든 것: `@mfa/contracts` 의 props 인터페이스 5개, `props<P>()` 헬퍼, `MODULES` 객체,
-`RemoteModuleMap`. 1단계에서 만들었던 `mf-types-check/` 와 `tsconfig.mf-types.json` 도
-없앴다 — 대조가 host 소스 안으로 들어와 기본 `typecheck` 가 같이 본다.
+`RemoteModuleMap`, 손으로 적던 `MODULE_IDS`, host 의 `loader/modules.ts`,
+각 remote 의 `exposes/contract.test.ts` 둘. 1단계에서 만들었던 `mf-types-check/` 와
+`tsconfig.mf-types.json` 도 없앴다.
 
 ### 이 값어치가 있나 — 정직하게
 

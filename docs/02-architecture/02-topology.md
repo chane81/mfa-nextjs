@@ -124,19 +124,19 @@ export default function ProductGrid({ … }: ProductGridProps) { … }
 
 host 는 그 props 를 **MF DTS 로 받는다.** 손으로 적는 타입 표는 없다 — DTS 가
 `@module-federation/runtime` 을 모듈 확장하며 `loadRemote()` 시그니처를 좁혀놓으므로,
-그 반환 타입을 되꺼내 쓴다(`apps/host/src/mf/loader/modules.ts` 의 `RemoteModule<K>`).
+그 반환 타입을 되꺼내 쓴다(`@mfa/contracts/remote` 의 `RemoteModule<K>`).
 
 props 를 계약 패키지로 올리지 않는 이유: 올리면 host 와 remote 가 같은 선언을 가리켜
 DTS 가 전달할 정보가 0 이 된다(known-issues I-2).
 
 ### 같은 키가 네 곳에서 맞아야 한다
 
-| 위치                          | 형태                                                 | 누가 검사하나                    |
-| ----------------------------- | ---------------------------------------------------- | -------------------------------- |
-| remote 웹 빌드 `exposes`      | `"./CheckoutFlow": "./src/exposes/CheckoutFlow.tsx"` | 디렉터리 스캔이라 자동           |
-| remote 서버 진입점 맵         | `"./CheckoutFlow": CheckoutFlow`                     | `exposes/contract.test.ts`       |
-| `MODULE_IDS`                  | `"cart/CheckoutFlow"`                                | 같은 테스트 + host 의 타입 대조  |
-| remote 가 공표한 `RemoteKeys` | DTS 산출물                                           | `loader/modules.ts` 의 타입 단언 |
+| 위치                          | 형태                                                 | 누가 검사하나                     |
+| ----------------------------- | ---------------------------------------------------- | --------------------------------- |
+| remote 웹 빌드 `exposes`      | `"./CheckoutFlow": "./src/exposes/CheckoutFlow.tsx"` | 디렉터리 스캔이라 자동            |
+| remote 서버 진입점 맵         | `"./CheckoutFlow": CheckoutFlow`                     | `exposes/contract.test.ts`        |
+| `MODULE_IDS`                  | `"cart/CheckoutFlow"`                                | 같은 테스트 + host 의 타입 대조   |
+| remote 가 공표한 `RemoteKeys` | DTS 산출물                                           | `remote-contract.ts` 의 타입 단언 |
 
 마지막이 host 관점의 안전장치다 — remote 의 **빌드가 실제로 무엇을 내보냈는지**까지
 반영한다. 런타임 형태(manifest 의 실제 `exposes`)는 `/debug` 가 보여준다.
@@ -144,11 +144,14 @@ DTS 가 전달할 정보가 0 이 된다(known-issues I-2).
 ### 모듈을 하나 추가하는 절차
 
 1. remote 에 `src/exposes/NewThing.tsx` — props 도 그 파일 안에 `export`
-2. `@mfa/contracts` 의 `MODULE_IDS` 에 한 줄
-3. `pnpm mf:types` 후 `apps/host/@mf-types/` 를 같이 커밋
+2. `pnpm mf:types` 후 생성물(`packages/contracts/src/generated/`)을 같이 커밋
 
-host 소스는 손대지 않는다. remote 를 **새로** 추가할 때만 host 의 `tsconfig.json` 에
-`paths` 한 줄과 `loader/modules.ts` 에 `RemoteKeys` import 한 줄이 는다.
+**등록하는 자리가 없다.** 타입도 런타임 목록도 그 디렉터리에서 파생된다 —
+`src/exposes/` → `exposes` 설정(`readExposes`) → DTS `RemoteKeys` → `MODULE_IDS`.
+
+host 소스는 손대지 않는다. remote 를 **새로** 추가할 때만 세 줄이 는다 —
+`remote-contract.ts` 의 `RemoteKeys` import, 그리고 contracts · host 양쪽 tsconfig 의
+`paths` 매핑(`.d.ts` 안의 bare specifier 는 읽는 쪽 설정으로 해석된다).
 
 ## remote 의 CSS 는 어떻게 따라오나
 
@@ -263,7 +266,8 @@ remote 의 node 번들이 `require("react/jsx-runtime")` 를 그대로 호출하
 ## MF 자동 타입(DTS)은 켜져 있다
 
 두 remote 모두 `dts.generateTypes` 를 켜고, host 는 `pnpm mf:types` 로 받아간다.
-받은 타입은 `apps/host/@mf-types/` 에 **커밋된다** — host 소스가 그 타입을 쓰기 때문이다.
+받은 타입은 `packages/contracts/src/generated/` 에 **커밋된다** — `remote-contract.ts` 가
+그 타입을 쓰기 때문이다.
 그래서 `pnpm typecheck` 는 여전히 네트워크 0회다. 낡았는지는 CI 가 `git diff` 로 본다.
 
 콘솔의 `[ dynamic-remote-type-hints-plugin ] err: [object Event]` 는 `dts` 가 아니라

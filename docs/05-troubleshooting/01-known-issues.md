@@ -47,6 +47,8 @@
 | DTS 를 켰는데 계약 드리프트가 안 잡힌다                                    | props 가 계약 패키지에 있다 — [I-2](#i-2-dts-를-켜도-props-드리프트가-안-잡혔다--생성-타입이-계약을-되-import-했다)                               |
 | `extractThirdParty: true` 인데 산출물이 그대로다                           | ESM 전용 워크스페이스 패키지를 못 집는다 — [I-3](#i-3-extractthirdparty-는-esm-전용-워크스페이스-패키지를-못-집는다)                              |
 | tsconfig 에 `@mf-types` 매핑을 넣었더니 `Cannot find name 'process'`       | `paths` 에 `*` 와일드카드를 썼다 — [I-4](#i-4-paths-에--와일드카드를-쓰면-무관한-에러가-쏟아진다)                                                 |
+| DTS 를 켰는데 드리프트가 **조용히** 통과한다                               | 모듈 확장이 프로그램에 없어 `RemoteModule<K>` 가 `any` 다 — [I-5](#i-5-모듈-확장을-include-에-안-넣으면-remotemodulek-가-조용히-any-가-된다)      |
+| 계약 타입이 소비처에서 **통째로 `any`** 인데 검사는 초록이다               | emit 된 `.d.ts` 가 복사되지 않는 생성물을 참조한다 — [I-6](#i-6-emit-되는-dts-가-생성물을-참조하면-소비처에서-조용히-any-가-된다)                 |
 
 ### SSR · hydration
 
@@ -162,7 +164,7 @@ remote 가 props 타입을 `@mfa/contracts` 에서 가져다 썼으므로 host �
 
 **host 와 remote 가 같은 선언을 가리키는 한 DTS 가 전달할 정보는 0 이다.**
 그래서 props 를 remote 의 expose 파일 옆으로 옮기고, host 는 받아온 타입으로
-`RemoteModuleMap` 을 조립한다(`apps/host/src/mf/loader/modules.ts`).
+`RemoteModuleMap` 을 조립한다(`packages/contracts/src/remote-contract.ts`).
 
 이제 remote 가 필수 prop 을 늘리면 **host 의 실제 호출부가 깨진다.**
 
@@ -229,13 +231,122 @@ src/mf/trust/index.ts(54,11): error TS7006: Parameter 'origin' implicitly has an
 ```
 
 remote 를 추가하면 이 줄도 하나 는다. tsconfig 는 JSON 이라 `@mfa/remote-config` 에서
-파생할 방법이 없다 — 다만 잊으면 `loader/modules.ts` 의 import 가 해석되지 않아 즉시
+파생할 방법이 없다 — 다만 잊으면 `remote-contract.ts` 의 import 가 해석되지 않아 즉시
 컴파일이 죽으므로 조용히 넘어가진 않는다.
 
 > 곁다리: 타입 수준 단언을 `Expect<Equal<X, never>>` 로 쓰면 에러가
 > `Type 'false' does not satisfy the constraint 'true'` 밖에 안 나온다. 어긋난 키를
 > 그대로 노출하는 모양(`type NoMismatch<T extends never> = T`)으로 바꾸면
 > 메시지에 모듈 이름이 실린다.
+
+### I-5. 모듈 확장을 `include` 에 안 넣으면 `RemoteModule<K>` 가 **조용히 `any` 가 된다**
+
+계약 타입을 `packages/contracts` 로 옮긴 뒤, host 의 `pnpm typecheck` 는 통과하는데
+**드리프트가 안 잡혔다.** remote 에 필수 prop 을 넣고 확인했는데 아무 말이 없었다.
+
+원인은 `RemoteModule<K>` 의 계산 방식이다.
+
+```ts
+export type RemoteModule<K extends RemoteModuleId> = Awaited<
+  ReturnType<typeof loadRemote<K, never>>
+>;
+```
+
+이건 `@mf-types/index.d.ts` 의 **모듈 확장**에 기댄다.
+
+```ts
+declare module '@module-federation/runtime' {
+  export function loadRemote<T extends RemoteKeys, Y>(
+    p: T,
+  ): Promise<PackageType<T, Y>>;
+}
+```
+
+그런데 그 파일은 **아무도 import 하지 않는다.** 확장 선언뿐이라 프로그램에 저절로
+들어오지 않는다. 그리고 `RemoteModule<K>` 는 `.d.ts` 에 계산 전 형태로 emit 되므로
+**소비처에서 다시 계산된다** — 소비처에 확장이 없으면 원본 시그니처를 보고 무너진다.
+
+무너지는 방식이 나쁘다. 빌드 쪽(`declaration` emit)에서는 에러가 난다.
+
+```
+error TS2635: Type '<T>(id: string, …) => Promise<T | null>' has no signatures
+              for which the type argument list is applicable.
+```
+
+그런데 **소비처에서는 그냥 `any` 다.** 확인하려고 일부러 틀린 값을 넣어봤는데 전부 통과했다.
+
+```ts
+type M = RemoteModule<'catalog/ProductDetail'>;
+const check: M = { nope: 1 }; // ← 에러가 나야 하는데 통과했다
+```
+
+고치는 법: **그 타입을 계산하는 모든 프로그램**이 확장 파일을 `include` 에 넣는다.
+
+```jsonc
+// apps/host/tsconfig.json
+"include": […, "../../packages/contracts/src/generated/@mf-types/index.d.ts"]
+// packages/contracts/tsconfig.build.json
+"include": ["src/**/*", …, "generated/@mf-types/index.d.ts"]
+```
+
+triple-slash reference(`/// <reference path="…" />`)로도 되지만 두 가지가 막는다 —
+eslint 의 `@typescript-eslint/triple-slash-reference` 가 금지하고, emit 될 때 tsc 가
+그 줄을 지워서 **소비처까지 전달되지도 않는다.**
+
+> DTS 를 쓰는 다른 프로그램(테스트 tsconfig 등)을 새로 만들 때 이 줄을 잊으면
+> 검사가 조용히 무력해진다. `RemoteModule<K>` 에 일부러 틀린 값을 넣어보는 것이
+> 5초짜리 확인법이다.
+
+### I-6. emit 되는 `.d.ts` 가 생성물을 참조하면 소비처에서 **조용히 `any` 가 된다**
+
+생성물을 `packages/contracts/src/generated/` 한 폴더로 모은 뒤, contracts 빌드도
+host `typecheck` 도 통과하는데 **계약이 통째로 사라져 있었다.**
+
+```ts
+// host 에서
+const bogus: RemoteModuleId = 'catalog/DoesNotExist'; // ← 통과했다
+```
+
+원인은 `.d.ts` 의 취급이다. `remote-contract.ts` 가 이렇게 썼다.
+
+```ts
+import type { RemoteKeys as CatalogKeys } from './generated/@mf-types/catalog/apis';
+export type RemoteModuleId = CatalogKeys | CartKeys;
+```
+
+그 import 는 emit 된 `dist/remote-contract.d.ts` 에 **그대로 남는다.** 그런데 tsc 는
+입력 `.d.ts` 를 `outDir` 로 복사하지 않는다(컴파일 대상이 아니라 선언 소스다).
+그래서 소비처는 `dist/generated/@mf-types/…` 를 찾다 실패하고 —
+**`skipLibCheck: true` 가 그 에러를 삼킨다.** 남는 건 `any` 다.
+
+에러가 아니라 통과라서 나쁘다. I-5 와 같은 계열이고, 이번엔 `RemoteModuleId` 전체가
+날아갔는데도 `pnpm typecheck` 가 12/12 초록이었다.
+
+#### 고치는 법 — emit 되는 선언에서 그 참조를 떼어낸다
+
+1. 생성 스크립트가 **값과 타입을 같이** 만든다. 그러면 소스가 `@mf-types` 를 안 본다.
+
+   ```ts
+   // src/generated/module-ids.ts (생성물)
+   export const MODULE_IDS = [ … ] as const;
+   export type RemoteModuleId = (typeof MODULE_IDS)[number];
+   ```
+
+2. `@mf-types` 와의 대조는 **아무것도 export 하지 않는** 파일이 맡는다
+   (`src/contract-check.ts`). export 가 없으면 그 파일의 `.d.ts` 는 `export {}` 뿐이라
+   참조가 남지 않는다. 검사는 `tsc` 가 컴파일하는 것만으로 끝난다.
+
+> 확인법: 소비처에서 `RemoteModuleId` 에 없는 키를 넣어본다. 통과하면 무너진 것이다.
+> `grep -E '^import' packages/contracts/dist/remote-contract.d.ts` 로
+> `@mf-types` 가 안 보이는지도 같이 본다.
+
+#### 왜 복사로 안 풀었나
+
+빌드 뒤 `@mf-types` 를 `dist` 로 복사하면 참조가 풀린다. 실제로 그렇게 만들어봤고
+동작했다. 하지만 스크립트가 하나 늘고, "왜 이 폴더만 복사하나" 를 설명해야 하며,
+무엇보다 **참조가 남아 있다는 사실 자체가 함정으로 남는다** — 다음에 누가
+`exports` 나 `rootDir` 을 건드리면 같은 방식으로 조용히 무너진다.
+참조를 없애면 그 갈래가 구조적으로 사라진다.
 
 ## H. (26차) 재배치 · dev 기동에서 밟은 것
 

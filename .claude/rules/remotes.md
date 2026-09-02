@@ -46,7 +46,7 @@ remote 마다 갈린다. dev 가 볼 게 아닌 이웃 파일이 생기면 `igno
 **대가는 파일 하나로 공개 계약이 바뀐다는 것이다.** 그래서 각 remote 의
 `src/exposes/contract.test.ts` 가 스캔 결과를 `@mfa/contracts` 의 `MODULE_IDS` 와 대조한다.
 파일을 추가했으면 `@mfa/contracts` 의 `MODULES` 에 한 줄 등록해야 그 테스트가 통과한다.
-그 목록은 **런타임 값**이다 — 타입은 DTS 가 준다(`apps/host/src/mf/loader/modules.ts`).
+그 목록은 **런타임 값**이다 — 타입은 DTS 가 준다(`packages/contracts/src/remote-contract.ts`).
 
 ## props 는 **이 remote 가 소유한다** (DTS 가 켜져 있다)
 
@@ -66,8 +66,9 @@ export default function ProductGrid({ … }: ProductGridProps) { … }
 경계가 둘이다. **어휘**(`Product` · `CartLine` · `ProductCategory`)는 host·remote·store 가
 같이 쓰므로 계약 패키지, **표면**(props)은 이 remote 의 것이므로 구현 옆.
 
-`@mfa/contracts` 에 남은 건 그 어휘와 **런타임 이름 목록**(`MODULE_IDS`)뿐이다.
-모듈을 추가하면 그 목록에 한 줄 등록해야 `exposes/contract.test.ts` 가 통과한다.
+`@mfa/contracts` 에 남은 건 그 어휘와 **런타임 이름 목록**(`MODULE_IDS`)뿐인데,
+그 목록도 생성물이다(`scripts/gen-module-ids.ts` 가 DTS 에서 뽑는다).
+**모듈을 추가할 때 등록하는 자리가 없다** — 파일을 놓고 `pnpm mf:types` 만 돌린다.
 
 ### DTS 설정은 두 remote 가 같아야 한다
 
@@ -86,8 +87,11 @@ host 가 받을 주소가 거기서 파생되므로 설정에 문자열을 다�
 
 ### props 를 고쳤으면 `pnpm mf:types` 를 돌린다
 
-host 는 커밋된 `apps/host/@mf-types/` 를 읽는다(그래야 `pnpm typecheck` 가 네트워크 없이
-돈다). 갱신을 잊으면 host 가 옛 타입으로 통과하는데, 그 창은 CI 가 `git diff` 로 닫는다.
+`@mfa/contracts` 가 커밋된 `@mf-types/` 를 읽는다(그래야 `pnpm typecheck` 가 네트워크
+없이 돈다). 갱신을 잊으면 host 가 옛 타입으로 통과하는데, 그 창은 CI 가 `git diff` 로 닫는다.
+
+**이 remote 는 `@mfa/contracts` 의 배럴만 쓴다.** `@mfa/contracts/remote` 를 import 하면
+그 순간 remote 가 자기 빌드 산출물(`@mf-types`)을 요구하는 순환이 생긴다.
 
 ## dev 기동 순서
 

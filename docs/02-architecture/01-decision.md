@@ -771,17 +771,17 @@ import 하고 있었다(known-issues I-2).
 
 **props 선언은 remote 의 expose 파일 옆에 둔다.** host 는 MF DTS 가 좁혀준
 `loadRemote()` 시그니처에서 모듈 타입을 되꺼낸다
-(`apps/host/src/mf/loader/modules.ts` 의 `RemoteModule<K>`) — **손으로 적는 표는 없다.**
+(`@mfa/contracts/remote` 의 `RemoteModule<K>`) — **손으로 적는 표는 없다.**
 
 경계를 둘로 가른다.
 
-| 무엇                                 | 어디                     | 왜                                      |
-| ------------------------------------ | ------------------------ | --------------------------------------- |
-| **어휘** — `Product` · `CartLine` 등 | `@mfa/contracts`         | host·remote·store 가 같이 쓴다          |
-| **표면** — 각 모듈의 props           | remote 의 `src/exposes/` | 그 remote 의 것이다. DTS 가 실어 나른다 |
-| **이름 목록** — `MODULE_IDS`         | `@mfa/contracts`         | 런타임 값이라 DTS 가 대신 못 한다       |
+| 무엇                                 | 어디                      | 왜                                             |
+| ------------------------------------ | ------------------------- | ---------------------------------------------- |
+| **어휘** — `Product` · `CartLine` 등 | `@mfa/contracts`          | host·remote·store 가 같이 쓴다                 |
+| **표면** — 각 모듈의 props           | remote 의 `src/exposes/`  | 그 remote 의 것이다. DTS 가 실어 나른다        |
+| **이름 목록** — `MODULE_IDS`         | `@mfa/contracts` (생성물) | 런타임 값이다. DTS 의 `RemoteKeys` 에서 뽑는다 |
 
-`apps/host/@mf-types/` 는 생성물이지만 **커밋한다.** host 소스가 그 타입을 쓰므로,
+`packages/contracts/src/generated/` 는 생성물이지만 **커밋한다.** 소스가 그 타입과 목록을 쓰므로,
 무시하면 `pnpm typecheck` 가 remote 기동을 요구하게 된다 — 그건 이 저장소가 DTS 를
 오래 껐던 바로 그 이유다. 낡을 위험은 CI 가 `pnpm mf:types` 후 `git diff` 로 잡는다.
 
@@ -792,11 +792,18 @@ remote 가 필수 prop 을 늘리면 host 의 **실제 호출부**가 컴파일 
 
 대가:
 
-- 등록 지점이 둘이 됐다. 모듈을 추가하면 `MODULE_IDS` 한 줄 + `loader/modules.ts` 두 줄
-  (import 와 맵). 어느 쪽을 잊어도 `modules.ts` 의 타입 단언이 컴파일 타임에 잡는다.
-- `apps/host/tsconfig.json` 의 `paths` 에 remote 이름이 하드코딩된다. JSON 이라
-  `@mfa/remote-config` 에서 파생할 수 없다 — 잊으면 즉시 컴파일이 죽으므로 조용히
-  넘어가진 않는다(known-issues I-4).
+- 모듈을 추가할 때 **등록하는 자리가 없다.** `MODULE_IDS` 는 `scripts/gen-module-ids.ts`
+  가 DTS 의 `RemoteKeys` 에서 뽑는다. 파싱이 틀리면 `ModuleIdsAreExhaustive` 가 컴파일
+  타임에 잡으므로 스크립트를 믿지 않아도 된다.
+
+- remote 를 추가하면 `remote-contract.ts` 의 `RemoteKeys` import 한 줄과
+  contracts · host 양쪽 tsconfig 의 `paths` 매핑. JSON 이라 `@mfa/remote-config` 에서
+  파생할 수 없다 — 잊으면 즉시 컴파일이 죽으므로 조용히 넘어가진 않는다(known-issues I-4).
+- 계약 패키지의 진입점이 둘로 갈렸다. `@mfa/contracts` 는 어휘,
+  `@mfa/contracts/remote` 는 모듈 계약이다. 후자를 배럴에 실으면 remote 빌드가 자기
+  산출물을 요구하는 부트스트랩 순환이 된다.
+- `@mf-types/index.d.ts`(모듈 확장)를 **읽는 프로그램마다** `include` 에 넣어야 한다.
+  빠뜨리면 소비처에서 `RemoteModule<K>` 가 **조용히 `any` 가 된다**(known-issues I-5).
 - remote 를 고치면 `pnpm mf:types` 를 돌려 결과를 같이 커밋해야 한다.
 
 ### 기각한 대안
@@ -830,6 +837,6 @@ DTS 의 `RemoteKeys` 에서 파생시키자는 안. 세 가지가 막는다.
 3. **값과 타입.** `MODULE_IDS` 는 런타임 배열이고 DTS 는 `.d.ts` 뿐이다. `RemoteKeys` 로
    타입은 바꿔 끼울 수 있어도 값은 못 만든다.
 
-그래서 `@mf-types` 를 읽는 자리는 **host 하나**(`loader/modules.ts`)로 둔다.
+그래서 `@mf-types` 를 읽는 자리는 **host 하나**(`remote-contract.ts`)로 둔다.
 손으로 적은 `MODULE_IDS` 가 틀리면 거기서 `RemoteKeys` 와 대조되어 컴파일이 죽는다 —
 선언은 공유 패키지에, 검증은 host 에.
