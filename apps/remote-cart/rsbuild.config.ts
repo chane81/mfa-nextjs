@@ -9,6 +9,7 @@ import {
 } from '@mfa/remote-config';
 import {
   assetBase,
+  EXPOSE_SCAN,
   createMfDevMiddleware,
   readBuildVersion,
   readExposes,
@@ -31,15 +32,13 @@ const DIST = resolve(process.cwd(), 'dist');
  * catalog(Vite)와 **같은 판단**이어야 하기 때문이다. 번들러가 달라도 "무엇이 expose 인가"
  * 는 갈리면 안 된다.
  *
- * 제외 규칙을 여기 적는 이유: 이 저장소는 테스트를 대상 소스 옆에 둔다. 거르지 않으면
- * `exposes.test.tsx` 가 remote 의 공개 계약에 올라간다. dev 가 볼 게 아닌 이웃 파일이
- * 또 생기면 아래 배열에 한 줄 더 넣는다. 기록: known-issues H-2.
- *
- * 스캔 결과가 `@mfa/contracts` 의 계약과 어긋나면 `src/exposes/contract.test.ts` 가 잡는다.
+ * 제외 규칙도 그 패키지의 `EXPOSE_SCAN` 이 쥔다. 이 저장소는 테스트를 대상 소스 옆에
+ * 두므로 거르지 않으면 `exposes.test.tsx` 가 remote 의 공개 계약에 올라간다
+ * (known-issues H-2). 같은 값을 catalog 의 Vite 설정과 `gen-module-ids.test.ts` 도
+ * 봐야 해서 한 곳에 뒀다 — 갈리면 검사가 실제 빌드와 다른 것을 보게 된다.
+ * 스캔 결과가 커밋된 `MODULE_IDS` 와 어긋나면 그 테스트가 잡는다.
  */
-const EXPOSED = readExposes('./src/exposes', {
-  ignore: [/\.test\.tsx$/],
-});
+const EXPOSED = readExposes(EXPOSE_SCAN.dir, { ignore: EXPOSE_SCAN.ignore });
 /**
  * 이 remote 가 배포된 **공개 오리진**. assetPrefix 가 여기서 나온다.
  *

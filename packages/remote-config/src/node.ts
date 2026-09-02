@@ -254,9 +254,11 @@ export function createMfDevMiddleware({
  *
  * ## 계약과 어긋나면 누가 잡나
  *
- * 여기서 만든 목록은 `@mfa/contracts` 의 `MODULE_IDS` 와 반드시 같아야 한다. 그 대조는
- * 각 remote 의 `exposes/contract.test.ts` 가 한다 — 파일만 추가하고 props 타입을 안
- * 적었거나, 계약에만 있고 파일이 없는 경우가 거기서 걸린다.
+ * 여기서 만든 목록은 `@mfa/contracts` 의 `MODULE_IDS` 와 반드시 같아야 한다.
+ * `MODULE_IDS` 는 이 스캔 결과가 remote 빌드 → MF DTS 를 거쳐 돌아온 것이라
+ * `pnpm mf:types` 를 돌리는 한 어긋날 수 없다. **안 돌렸을 때**를
+ * `scripts/gen-module-ids.test.ts` 가 잡는다 — 네트워크도 remote 기동도 없이,
+ * 디렉터리와 커밋된 생성물만 대고 본다.
  *
  * @param dir `cwd` 기준 상대 디렉터리 (예: `'./src/exposes'`)
  * @param ignore 제외할 파일명 규칙. 기본값은 없다 — 호출부가 명시한다.
@@ -285,7 +287,7 @@ export function readExposes(
 
 export interface ExposeScanOptions {
   /** 제외할 파일명 규칙. 파일명(디렉터리 제외)에 대고 검사한다. */
-  ignore?: RegExp[];
+  ignore?: readonly RegExp[];
   cwd?: string;
 }
 
@@ -295,3 +297,28 @@ export interface ExposeScan {
   /** 같은 파일들의 경로만. dev 사전 transform · 의존성 스캔 진입점이 쓴다. */
   files: string[];
 }
+
+/**
+ * 두 remote 가 **같이 쓰는** 스캔 인자.
+ *
+ * `readExposes` 자체는 인자를 요구한다(호출부에 무엇이 걸러지는지 보이게 두려고).
+ * 그런데 이 저장소에서 그 인자를 대는 곳이 셋이다 — catalog 의 Vite 설정, cart 의
+ * Rsbuild 설정, 그리고 그 결과가 커밋된 `MODULE_IDS` 와 같은지 보는
+ * `scripts/gen-module-ids.test.ts`. 셋이 각자 리터럴을 적으면 **검사가 실제 빌드와
+ * 다른 것을 보게 되는** 상태가 성립한다(테스트만 옛 규칙으로 스캔하는 식).
+ *
+ * "무엇이 expose 인가" 는 번들러가 달라도 갈리면 안 된다는 게 이미 규칙이라
+ * (`.claude/rules/remotes.md`), 그 판단을 여기 한 곳에 둔다.
+ *
+ * dev 가 볼 게 아닌 이웃 파일이 생기면(`*.stories.tsx` 등) `ignore` 에 한 줄 넣는다.
+ * remote 한쪽에만 있는 파일이어도 여기 넣는다 — 없는 쪽에서는 아무것도 안 걸러진다.
+ */
+export const EXPOSE_SCAN = {
+  /** 각 remote 의 앱 루트 기준 */
+  dir: './src/exposes',
+  /**
+   * 이 저장소는 테스트를 대상 소스 옆에 둔다. 거르지 않으면 remote 의 공개 계약이
+   * 조용히 늘고, dev 에서는 사전 transform 까지 시도하다 터진다(known-issues H-2).
+   */
+  ignore: [/\.test\.tsx$/],
+} as const satisfies { dir: string } & ExposeScanOptions;

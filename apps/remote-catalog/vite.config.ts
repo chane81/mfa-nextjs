@@ -9,6 +9,7 @@ import {
 } from '@mfa/remote-config';
 import {
   assetBase,
+  EXPOSE_SCAN,
   createMfDevMiddleware,
   readBuildVersion,
   readExposes,
@@ -45,11 +46,11 @@ const PORT = REMOTE.devPort;
  * 파일이 아니다. **dev 가 볼 게 아닌 이웃 파일이 또 생기면 아래 배열에 한 줄 더 넣는다**
  * (`/\.stories\.tsx$/` 같은 것). 기록: known-issues H-2.
  *
- * 스캔 결과가 `@mfa/contracts` 의 계약과 어긋나면 `src/exposes/contract.test.ts` 가 잡는다.
+ * 스캔 인자는 `EXPOSE_SCAN` 에 있다 — cart(Rsbuild) 와 `gen-module-ids.test.ts` 가 같은
+ * 값을 봐야 하기 때문이다. 셋이 갈리면 검사가 실제 빌드와 다른 것을 보게 된다.
+ * 스캔 결과가 커밋된 `MODULE_IDS` 와 어긋나면 그 테스트가 잡는다.
  */
-const EXPOSED = readExposes('./src/exposes', {
-  ignore: [/\.test\.tsx$/],
-});
+const EXPOSED = readExposes(EXPOSE_SCAN.dir, { ignore: EXPOSE_SCAN.ignore });
 
 /**
  * 이 remote 가 배포된 **공개 오리진**. 자산 URL 접두사(`base`)가 여기서 나온다.
