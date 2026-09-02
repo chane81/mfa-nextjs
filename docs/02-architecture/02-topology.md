@@ -89,7 +89,7 @@ catalog 는 `@tailwindcss/vite`). 공유 CSS 를 한 번 빌드해 배포하면 
 
 contracts 는 **타입 계약**이다 — remote 가 무엇을 노출하고 props 모양이 어떤지.
 장바구니 스토어는 **런타임 상태**다. 값이 시간에 따라 변하고 구독자가 있고 쿠키를
-만진다. 둘을 한 패키지에 두면 타입만 필요한 소비처(host 의 `RemoteModuleMap`)까지
+만진다. 둘을 한 패키지에 두면 타입만 필요한 소비처까지
 zustand 와 DOM 타입을 끌고 온다. 실제로 contracts 의 tsconfig 에는 스토어 때문에 넣은
 `lib: ["DOM", ...]` 이 있었고, 분리하면서 지웠다.
 
@@ -100,27 +100,55 @@ host 하고만 대화한다"). 소유자가 없는 상태라는 성질은 [ADR-0
 
 ## 노출 모듈 계약
 
-`packages/contracts/src/remote-contract.ts` 가 단일 진실 공급원(SSOT)이다.
+**이름은 `@mfa/contracts`, 타입은 remote 가 소유한다.** (ADR-019)
 
 ```ts
-export interface RemoteModuleMap {
-  'catalog/ProductGrid': { default: ComponentType<ProductGridProps> };
-  'catalog/ProductDetail': { default: ComponentType<ProductDetailProps> };
-  'cart/CartPanel': { default: ComponentType<CartPanelProps> };
-  'cart/CartBadge': { default: ComponentType<CartBadgeProps> };
-  'cart/CheckoutFlow': { default: ComponentType<CheckoutFlowProps> };
-}
+// packages/contracts — 런타임에 셀 수 있는 이름 목록
+export const MODULE_IDS = [
+  'catalog/ProductGrid',
+  'catalog/ProductDetail',
+  'cart/CartPanel',
+  'cart/CartBadge',
+  'cart/CheckoutFlow',
+] as const satisfies readonly `${RemoteName}/${string}`[];
 ```
 
-같은 키가 **세 곳**에서 1:1 로 맞아야 한다.
+```tsx
+// apps/remote-catalog/src/exposes/ProductGrid.tsx — 표면은 구현 옆에
+export interface ProductGridProps {
+  category?: ProductCategory | 'all';
+  onSelect?: (product: Product) => void;
+}
+export default function ProductGrid({ … }: ProductGridProps) { … }
+```
 
-| 위치                     | 형태                                                 |
-| ------------------------ | ---------------------------------------------------- |
-| remote 웹 빌드 `exposes` | `"./CheckoutFlow": "./src/exposes/CheckoutFlow.tsx"` |
-| remote 서버 진입점 맵    | `"./CheckoutFlow": CheckoutFlow`                     |
-| host 타입 계약           | `"cart/CheckoutFlow"`                                |
+host 는 그 props 를 **MF DTS 로 받는다.** 손으로 적는 타입 표는 없다 — DTS 가
+`@module-federation/runtime` 을 모듈 확장하며 `loadRemote()` 시그니처를 좁혀놓으므로,
+그 반환 타입을 되꺼내 쓴다(`apps/host/src/mf/loader/modules.ts` 의 `RemoteModule<K>`).
 
-어긋나면 런타임에야 발견된다. `/debug` 가 manifest 의 실제 `exposes` 를 보여주는 이유다.
+props 를 계약 패키지로 올리지 않는 이유: 올리면 host 와 remote 가 같은 선언을 가리켜
+DTS 가 전달할 정보가 0 이 된다(known-issues I-2).
+
+### 같은 키가 네 곳에서 맞아야 한다
+
+| 위치                          | 형태                                                 | 누가 검사하나                    |
+| ----------------------------- | ---------------------------------------------------- | -------------------------------- |
+| remote 웹 빌드 `exposes`      | `"./CheckoutFlow": "./src/exposes/CheckoutFlow.tsx"` | 디렉터리 스캔이라 자동           |
+| remote 서버 진입점 맵         | `"./CheckoutFlow": CheckoutFlow`                     | `exposes/contract.test.ts`       |
+| `MODULE_IDS`                  | `"cart/CheckoutFlow"`                                | 같은 테스트 + host 의 타입 대조  |
+| remote 가 공표한 `RemoteKeys` | DTS 산출물                                           | `loader/modules.ts` 의 타입 단언 |
+
+마지막이 host 관점의 안전장치다 — remote 의 **빌드가 실제로 무엇을 내보냈는지**까지
+반영한다. 런타임 형태(manifest 의 실제 `exposes`)는 `/debug` 가 보여준다.
+
+### 모듈을 하나 추가하는 절차
+
+1. remote 에 `src/exposes/NewThing.tsx` — props 도 그 파일 안에 `export`
+2. `@mfa/contracts` 의 `MODULE_IDS` 에 한 줄
+3. `pnpm mf:types` 후 `apps/host/@mf-types/` 를 같이 커밋
+
+host 소스는 손대지 않는다. remote 를 **새로** 추가할 때만 host 의 `tsconfig.json` 에
+`paths` 한 줄과 `loader/modules.ts` 에 `RemoteKeys` import 한 줄이 는다.
 
 ## remote 의 CSS 는 어떻게 따라오나
 
@@ -232,16 +260,19 @@ host 는 브라우저 쪽에 5개를 공유한다. 루트만으로 충분해 보
 서버 쪽(`loader/server.ts`)은 MF shared 를 쓰지 않고 **require 셰임**으로 같은 4개를 주입한다.
 remote 의 node 번들이 `require("react/jsx-runtime")` 를 그대로 호출하기 때문이다.
 
-## MF 자동 타입(DTS)은 꺼져 있다
+## MF 자동 타입(DTS)은 켜져 있다
 
-두 remote 모두 `dts: false`. 근거는 두 가지다.
+두 remote 모두 `dts.generateTypes` 를 켜고, host 는 `pnpm mf:types` 로 받아간다.
+받은 타입은 `apps/host/@mf-types/` 에 **커밋된다** — host 소스가 그 타입을 쓰기 때문이다.
+그래서 `pnpm typecheck` 는 여전히 네트워크 0회다. 낡았는지는 CI 가 `git diff` 로 본다.
 
-- 타입 계약의 SSOT 가 `@mfa/contracts` 의 `RemoteModuleMap` 이라 정보가 중복
-- host 가 타입을 소비하려면 typecheck 전에 remote 가 HTTP 로 떠 있어야 한다 (CI 순서 의존)
+콘솔의 `[ dynamic-remote-type-hints-plugin ] err: [object Event]` 는 `dts` 가 아니라
+`dev` 옵션 소관이라 `dev.disableDynamicRemoteTypeHints: true` 로만 끈다.
 
-> `[ dynamic-remote-type-hints-plugin ] err: [object Event]` 콘솔 에러는 **이 결정의 근거가 아니다.**
-> 그건 `dev.disableDynamicRemoteTypeHints` 로 따로 끌 수 있다.
-> 상세: [01-research/03-dts-plugin-review.md](../01-research/03-dts-plugin-review.md)
+24차까지는 꺼져 있었고 근거는 "정보 중복" 이었다. 그 중복은 DTS 의 한계가 아니라
+props 를 계약 패키지에 둔 결과였다 — 배치를 바꾸면서 판정도 뒤집혔다.
+상세: [01-research/03-dts-plugin-review.md](../01-research/03-dts-plugin-review.md) 8절,
+[ADR-019](./01-decision.md)
 
 ## 데이터 흐름 — 장바구니
 

@@ -13,12 +13,13 @@ cart = Rsbuild 2 + `@module-federation/rsbuild-plugin`). 번들러 자유도가 
 
 ## 산출물 계약
 
-| 파일                                  | 무엇                                    |
-| ------------------------------------- | --------------------------------------- |
-| `remoteEntry.js` · `mf-manifest.json` | 브라우저 MF 런타임용                    |
-| `mf-server.cjs`                       | host **서버**가 받아 실행하는 노드 번들 |
-| `style.css`                           | 이 remote 의 CSS 전부 (해시 없음, 루트) |
-| `mf-version.json`                     | 버전 공표. 배포 경로는 `/v<version>/`   |
+| 파일                                  | 무엇                                                          |
+| ------------------------------------- | ------------------------------------------------------------- |
+| `remoteEntry.js` · `mf-manifest.json` | 브라우저 MF 런타임용                                          |
+| `mf-server.cjs`                       | host **서버**가 받아 실행하는 노드 번들                       |
+| `style.css`                           | 이 remote 의 CSS 전부 (해시 없음, 루트)                       |
+| `mf-version.json`                     | 버전 공표. 배포 경로는 `/v<version>/`                         |
+| `@mf-types.zip` · `@mf-types.d.ts`    | MF DTS. host 가 `mf dts --fetch` 로 받아간다 (이 브랜치 한정) |
 
 이름과 위치는 `MF_FILES` 가 정한다. 번들러 설정에서 출력 경로 · 파일명을 바꾸려면 **계약 쪽을
 먼저** 본다. CSS 는 해시를 붙이지 않는다 — 주소를 host 가 계산으로 알아내야 하고, 캐시 무효화는
@@ -45,12 +46,48 @@ remote 마다 갈린다. dev 가 볼 게 아닌 이웃 파일이 생기면 `igno
 **대가는 파일 하나로 공개 계약이 바뀐다는 것이다.** 그래서 각 remote 의
 `src/exposes/contract.test.ts` 가 스캔 결과를 `@mfa/contracts` 의 `MODULE_IDS` 와 대조한다.
 파일을 추가했으면 `@mfa/contracts` 의 `MODULES` 에 한 줄 등록해야 그 테스트가 통과한다.
-거기 한 곳이 타입 맵(`RemoteModuleMap`)과 런타임 목록(`MODULE_IDS`)을 **둘 다** 만든다.
+그 목록은 **런타임 값**이다 — 타입은 DTS 가 준다(`apps/host/src/mf/loader/modules.ts`).
 
-## DTS 는 껐다
+## props 는 **이 remote 가 소유한다** (DTS 가 켜져 있다)
 
-MF 자동 타입 생성을 켜면 타입 SSOT 가 `@mfa/contracts` 와 중복되고, `pnpm typecheck` 가 remote 기동을
-요구하게 된다. 지금은 네트워크 없이 돈다 — 이 성질을 잃지 않는다.
+각 모듈의 props 인터페이스는 그 expose 파일 안에 선언하고 `export` 한다.
+`@mfa/contracts` 로 올리지 않는다 — 올리는 순간 host 와 remote 가 같은 선언을 가리켜
+DTS 가 전달할 정보가 0 이 되고, 계약이 어긋나도 아무것도 안 잡힌다(known-issues I-2).
+
+```tsx
+// src/exposes/ProductGrid.tsx
+export interface ProductGridProps {
+  category?: ProductCategory | 'all'; // ← 도메인 어휘는 @mfa/contracts 에서 온다
+  onSelect?: (product: Product) => void;
+}
+export default function ProductGrid({ … }: ProductGridProps) { … }
+```
+
+경계가 둘이다. **어휘**(`Product` · `CartLine` · `ProductCategory`)는 host·remote·store 가
+같이 쓰므로 계약 패키지, **표면**(props)은 이 remote 의 것이므로 구현 옆.
+
+`@mfa/contracts` 에 남은 건 그 어휘와 **런타임 이름 목록**(`MODULE_IDS`)뿐이다.
+모듈을 추가하면 그 목록에 한 줄 등록해야 `exposes/contract.test.ts` 가 통과한다.
+
+### DTS 설정은 두 remote 가 같아야 한다
+
+번들러가 달라도 host 는 같은 방식으로 소비한다.
+
+```ts
+dts: {
+  generateTypes: { tsConfigPath: './tsconfig.json', typesFolder: MF_TYPES_FOLDER, … },
+  consumeTypes: false,       // remote 는 다른 remote 를 소비하지 않는다
+},
+dev: { disableDynamicRemoteTypeHints: true },   // WS 플러그인만 끈다
+```
+
+산출물 이름은 `MF_TYPES_FOLDER` 와 `MF_FILES.typesApi` · `typesArchive` 가 정한다 —
+host 가 받을 주소가 거기서 파생되므로 설정에 문자열을 다시 적지 않는다.
+
+### props 를 고쳤으면 `pnpm mf:types` 를 돌린다
+
+host 는 커밋된 `apps/host/@mf-types/` 를 읽는다(그래야 `pnpm typecheck` 가 네트워크 없이
+돈다). 갱신을 잊으면 host 가 옛 타입으로 통과하는데, 그 창은 CI 가 `git diff` 로 닫는다.
 
 ## dev 기동 순서
 

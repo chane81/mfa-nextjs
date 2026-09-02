@@ -1,5 +1,157 @@
 # 진행 상황
 
+## 2026-09-02 (27차) — MF DTS 를 켜고, 계약의 방향을 뒤집었다 (`feat/mf-dts`)
+
+3차에 껐고 [24차 검토](01-research/03-dts-plugin-review.md)에서 "도입 보류" 로 판정했던
+`dts` 를 켰다. 켜는 것 자체는 절반이었다 — **진짜 작업은 계약의 소유권을 옮긴 것**이다.
+
+### 1단계: 켜기만 했더니 아무것도 안 잡혔다
+
+remote 둘의 `dts.generateTypes` 를 켜고, host 가 `mf dts --fetch` 로 받아 `@mfa/contracts`
+와 대조하게 만들었다. 파이프라인은 전부 동작했다(dev · 빌드 산출물 양쪽).
+그런데 계약에 필수 prop 을 넣고 대조해도 **통과했다.**
+
+받아온 타입을 열어보면 이유가 바로 나온다.
+
+```ts
+// @mf-types/catalog/compiled-types/src/exposes/ProductGrid.d.ts
+import { type ProductGridProps } from '@mfa/contracts'; // ← 계약을 다시 가리킨다
+```
+
+remote 가 props 를 `@mfa/contracts` 에서 가져다 썼으므로, host 가 받은 타입도 결국
+같은 선언이었다. 대조는 `A extends A` 를 확인하는 셈이었다.
+
+`extractThirdParty: true` 로 계약을 인라인시키려 했지만 그것도 안 됐다 —
+`third-party-dts-extractor` 가 `require.resolve` 를 쓰는데 `@mfa/contracts` 는 `require`
+조건이 없는 ESM 전용 워크스페이스 패키지다(known-issues I-3).
+
+### 2단계: props 의 소유권을 remote 로 옮겼다
+
+문제는 도구가 아니라 **배치**였다. host 와 remote 가 같은 선언을 가리키는 한 DTS 가
+전달할 정보는 0 이다. 그래서 방향을 뒤집었다.
+
+| 무엇                       | 전                  | 후                                         |
+| -------------------------- | ------------------- | ------------------------------------------ |
+| props 선언                 | `@mfa/contracts`    | **remote 의 expose 파일 옆**               |
+| `RemoteModuleMap`          | `@mfa/contracts`    | **host** — DTS 가 받아온 타입으로 조립     |
+| 모듈 id 목록(`MODULE_IDS`) | `MODULES` 에서 파생 | `@mfa/contracts` — 손으로 적은 문자열 배열 |
+| 도메인 어휘(`Product` 등)  | `@mfa/contracts`    | 그대로                                     |
+
+`@mfa/contracts` 에 남은 것은 **런타임 이름 목록**과 **공통 어휘**뿐이다. 타입은 DTS 가
+주지만 DTS 는 타입뿐이라 "노출 모듈이 몇 개인가" 는 코드가 물어볼 수 없다 — 그게
+`MODULE_IDS` 가 남은 이유다.
+
+### 실측 — 이제 진짜로 잡힌다
+
+`ProductDetail` 의 props 에 필수 `variant` 를 추가하고 `pnpm mf:types` → `pnpm typecheck`.
+
+```
+src/components/ProductDetailSection.tsx(10,7):
+  error TS2741: Property 'variant' is missing in type '{ productId: string; }'
+                but required in type 'ProductDetailProps'.
+```
+
+**타입 별칭 대조가 아니라 host 의 실제 호출부가 깨졌다.** 1단계 구조에서는 이게 절대
+안 잡혔다. remote 가 계약을 바꾸면 host 가 컴파일 단계에서 안다 — DTS 를 켜는 이유가
+이거였다.
+
+### 대가 — `@mf-types` 를 커밋한다
+
+host 소스가 생성물에 의존하게 됐다. 그대로 두면 `pnpm typecheck` 가 remote 기동을
+요구하고, 그건 이 저장소가 DTS 를 오래 껐던 바로 그 이유다.
+
+그래서 `apps/host/@mf-types/` 를 **저장소에 넣는다.** typecheck 는 네트워크 0회를 유지한다.
+낡을 위험은 CI 가 잡는다 — `pnpm build` 뒤에 정적 서버를 띄워 `pnpm mf:types` 를 돌리고
+`git diff --exit-code` 로 본다. prettier 는 이 디렉터리를 건드리지 않는다(`.prettierignore`) —
+포맷하면 생성 원본과 매번 달라져 그 검사가 항상 실패한다.
+
+### 3단계: 손으로 적는 표를 없앴다
+
+2단계까지는 host 에 이런 표가 있었다.
+
+```ts
+type RemoteModuleMap = {
+  'catalog/ProductGrid': { default: typeof ProductGrid };
+  … // 모듈마다 import 한 줄 + 표 한 줄
+};
+```
+
+**그건 `@mfa/contracts` 에 있던 맵을 host 로 옮겨 적은 것에 지나지 않았다.** 모듈을
+추가할 때 손이 가는 자리가 오히려 하나 늘었다 — 개선이 아니라 이동이었다.
+
+DTS 는 이미 `@module-federation/runtime` 을 모듈 확장하며 `loadRemote()` 의 시그니처를
+좁혀놓는다. `PackageType` 자체는 `export` 되지 않지만 **함수의 반환 타입에서 되꺼낼 수
+있다**(실측).
+
+```ts
+export type RemoteModule<K extends RemoteModuleId> = Awaited<
+  ReturnType<typeof loadRemote<K, never>>
+>;
+```
+
+표가 사라졌다. 드리프트 검출은 그대로다 — remote 에 필수 prop 을 추가하고 확인했다.
+
+### 결산 — 모듈 하나를 추가하는 비용
+
+| 단계               | 전(main)                       | 후                                  |
+| ------------------ | ------------------------------ | ----------------------------------- |
+| remote expose 파일 | 새 파일                        | 새 파일 (props 도 그 안에)          |
+| props 선언         | `@mfa/contracts` 에 인터페이스 | (위와 같은 파일이라 추가 비용 없음) |
+| 등록               | `MODULES` 한 줄                | `MODULE_IDS` 한 줄                  |
+| host               | —                              | —                                   |
+| 명령               | —                              | `pnpm mf:types` + 생성물 커밋       |
+
+**손으로 만지는 파일 수는 2개로 같다.** 늘어난 건 명령 하나와 커밋되는 생성물이다.
+
+remote 를 **새로** 추가할 때는 host 에 두 줄이 는다 — `tsconfig.json` 의 `paths` 와
+`loader/modules.ts` 의 `RemoteKeys` import. 와일드카드(`"*"`)로 `paths` 를 쓰면 host
+소스의 평범한 import 까지 가로채 무관한 에러가 쏟아진다(known-issues I-4).
+
+늘어난 것:
+
+```
+pnpm mf:types                          # 타입 갱신 (remote 기동 전제)
+apps/host/module-federation.config.ts  # mf dts CLI 전용 설정
+apps/host/src/mf/loader/modules.ts     # RemoteModule<K> + 키 집합 대조 (표는 없다)
+apps/host/@mf-types/                   # 커밋되는 생성물
+.github/workflows/ci.yml               # 그 생성물이 낡았는지 보는 단계
+```
+
+줄어든 것: `@mfa/contracts` 의 props 인터페이스 5개, `props<P>()` 헬퍼, `MODULES` 객체,
+`RemoteModuleMap`. 1단계에서 만들었던 `mf-types-check/` 와 `tsconfig.mf-types.json` 도
+없앴다 — 대조가 host 소스 안으로 들어와 기본 `typecheck` 가 같이 본다.
+
+### 이 값어치가 있나 — 정직하게
+
+**모노레포에서는 얻는 것이 크지 않다.** 전에도 드리프트는 잡혔다 — props 가 계약
+패키지에 있었으므로 remote 가 그걸 안 지키면 **remote 자신의 typecheck** 가 죽었다.
+바뀐 건 실패 지점이다.
+
+|                         | 계약 강제(전)         | DTS 전파(후)             |
+| ----------------------- | --------------------- | ------------------------ |
+| remote 가 계약을 어기면 | remote 빌드가 죽는다  | — (어길 대상이 없다)     |
+| remote 가 표면을 바꾸면 | 아무 일도 안 일어난다 | **host 호출부가 죽는다** |
+
+전자는 "합의한 모양을 지켜라", 후자는 "네가 바꾸면 쓰는 쪽이 안다" 다. 같은 저장소에서
+같은 사람이 양쪽을 고친다면 전자가 더 단순하고 실패도 빨리 난다.
+
+DTS 가 값어치를 하는 건 **remote 가 다른 저장소·다른 팀**일 때다. 그때는 계약 패키지를
+공유할 수 없으니 DTS 가 유일한 전달 수단이 된다. 24차 검토가 재검토 조건으로 적었던
+바로 그 상황이고, **이 저장소는 아직 그 조건이 아니다.**
+
+그래서 이 브랜치는 "그 조건이 왔을 때 무엇을 해야 하는지" 를 실물로 남긴 것에 가깝다.
+`main` 에 병합할지는 그 판단에 달렸다.
+
+### 남은 한계
+
+**SSR 경로는 여전히 DTS 밖이다.** `loader/server.ts` 는 우리가 만든 로더라 MF 가 존재를
+모른다. 다만 호출부가 `loadRemoteModule` 하나로 통일돼 있고 그 반환 타입이
+`RemoteModuleMap` 이므로, 서버 경로도 **같은 타입을 쓴다** — DTS 가 그 맵의 내용을
+정하게 된 지금은 서버 경로의 타입도 remote 에서 온다.
+
+`extractThirdParty` 는 여전히 안 된다. remote 가 다른 저장소로 나가는 날
+`@mfa/contracts` 에 CJS 진입점을 붙이는 것이 첫 작업이다(known-issues I-3).
+
 ## 2026-09-01 (26차·b) — catalog dev 워밍 glob 이 테스트 파일을 잡고 있었다
 
 `pnpm dev` 기동 로그에 catalog 쪽 에러가 매번 찍혔다.

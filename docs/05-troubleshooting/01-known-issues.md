@@ -16,6 +16,7 @@
 | 포트가 안 비어서 기동 실패 / 옛 빌드가 계속 응답                   | [0-1](#0-1-pkill--f-next-start-가-안-먹혀서-옛-빌드를-계속-테스트함), [B-4](#b-4-dev-서버가-떠-있으면-포트-충돌조차-안-난다), [B-4b](#b-4b-pnpm-start-가-자기-자신과-포트를-다툰다) |
 | `Directory import … is not supported` / `Cannot find module './x'` | dist 를 raw Node 로 로드했다 — [D-1](#d-1-확장자-없는-상대-경로는-번들러에서만-풀린다)                                                                                              |
 | `ERR_PNPM_FROZEN_LOCKFILE_WITH_OUTDATED_LOCKFILE`                  | 실행 중인 pnpm 이 락파일에 기록된 `packageManager` 핀과 다르다 — [버전 › Node / 패키지 매니저](../03-setup/02-versions.md#node--패키지-매니저)                                      |
+| `pnpm install` 은 성공했는데 새 패키지의 CLI(`.bin`)가 없다        | 락파일의 peer 표기가 snapshots 와 어긋났다 — [I-1](#i-1-pnpm-install-이-새-devdependency-의-bin-을-안-심는다)                                                                       |
 
 ### `pnpm build` 실패
 
@@ -43,6 +44,9 @@
 | `SSR 번들을 가져오지 못했습니다` / `ECONNREFUSED` (dev)                    | remote 미기동. 살아있는데도 나면 [0-4](#0-4-dev-에서-ssr-번들이-안-내려옴)                                                                        |
 | 배럴 import 가 Server Component 를 오염                                    | [3](#3-공유-ui-패키지-배럴이-server-component-를-오염시킴)                                                                                        |
 | `Pre-transform error: Failed to resolve import "@tests/…"` (dev 기동 로그) | 워밍 glob 이 테스트 파일을 잡았다 — [H-2](#h-2-dev-워밍-glob-이-테스트-파일까지-잡아-사전-transform-이-실패했다)                                  |
+| DTS 를 켰는데 계약 드리프트가 안 잡힌다                                    | props 가 계약 패키지에 있다 — [I-2](#i-2-dts-를-켜도-props-드리프트가-안-잡혔다--생성-타입이-계약을-되-import-했다)                               |
+| `extractThirdParty: true` 인데 산출물이 그대로다                           | ESM 전용 워크스페이스 패키지를 못 집는다 — [I-3](#i-3-extractthirdparty-는-esm-전용-워크스페이스-패키지를-못-집는다)                              |
+| tsconfig 에 `@mf-types` 매핑을 넣었더니 `Cannot find name 'process'`       | `paths` 에 `*` 와일드카드를 썼다 — [I-4](#i-4-paths-에--와일드카드를-쓰면-무관한-에러가-쏟아진다)                                                 |
 
 ### SSR · hydration
 
@@ -100,6 +104,138 @@
 | 증상                                                           | 항목                                                                    |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련) | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다) |
+
+## I. (27차) MF DTS 를 켜면서 밟은 것
+
+전부 `feat/mf-dts` 브랜치에서 나왔다. 배경과 판단: [진행 상황 27차](../00-progress.md).
+
+### I-1. `pnpm install` 이 새 devDependency 의 bin 을 안 심는다
+
+`@module-federation/cli` 를 host 에 추가하고 `pnpm install` 을 돌렸는데 `mf` 가 없었다.
+
+```
+$ ls apps/host/node_modules/.bin/ | grep mf
+$ ls -la apps/host/node_modules/@module-federation/cli
+… -> ../../../../node_modules/.pnpm/@module-federation+cli@2.8.2/node_modules/…   ← 이 경로가 없다
+```
+
+**`--force` 로 재설치해도 그대로였다.** 원인은 락파일 안의 peer 표기 불일치다.
+
+```yaml
+# importers (host)
+'@module-federation/cli':
+  version: 2.8.2 # ← peer 없이 적혔다
+
+# snapshots
+'@module-federation/cli@2.8.2(typescript@6.0.3)': # ← 실제로는 이것만 있다
+```
+
+이 패키지는 `typescript` 를 peer 로 받고 host 에는 `typescript` 가 있다. 그러니
+`2.8.2(typescript@6.0.3)` 이 맞는데, 락파일 갱신이 그걸 안 적었다. 링크가 없는 디렉터리를
+가리키니 `.bin` 도 안 생긴다. **에러는 안 난다** — 설치는 성공했다고 나온다.
+
+고치는 법: 락파일의 importers 쪽 `version` 을 snapshots 에 실제로 있는 키와 맞춘 뒤
+`pnpm install`. 그 한 줄로 `+8` 개가 설치되고 `mf` 가 생겼다.
+
+> `pnpm install` 이 "Already up to date" 라고 하는데 방금 추가한 패키지의 CLI 가 없다면
+> 이 갈래를 먼저 본다. `node_modules/.pnpm` 에 그 조합이 실제로 있는지 보면 5초에 끝난다.
+
+### I-2. DTS 를 켜도 props 드리프트가 안 잡혔다 — 생성 타입이 계약을 되-import 했다
+
+> **해결됨.** 원인은 도구가 아니라 배치였다. 아래 "고친 방법" 참고.
+
+DTS 를 켜는 목적이 "계약과 구현이 어긋난 걸 컴파일 타임에 잡는 것" 이었는데,
+계약에 필수 prop 을 넣고 대조해도 **통과했다.**
+
+받아온 타입을 열어보면 이유가 바로 나온다.
+
+```ts
+// @mf-types/catalog/compiled-types/src/exposes/ProductGrid.d.ts
+import { type ProductGridProps } from '@mfa/contracts'; // ← 계약을 다시 가리킨다
+export default function ProductGrid({ … }: ProductGridProps): JSX.Element;
+```
+
+remote 가 props 타입을 `@mfa/contracts` 에서 가져다 썼으므로 host 가 받은 타입도 결국
+같은 선언이다. 대조는 `A extends A` 를 확인하는 셈이었다.
+
+#### 고친 방법 — props 의 소유권을 remote 로 옮겼다
+
+**host 와 remote 가 같은 선언을 가리키는 한 DTS 가 전달할 정보는 0 이다.**
+그래서 props 를 remote 의 expose 파일 옆으로 옮기고, host 는 받아온 타입으로
+`RemoteModuleMap` 을 조립한다(`apps/host/src/mf/loader/modules.ts`).
+
+이제 remote 가 필수 prop 을 늘리면 **host 의 실제 호출부가 깨진다.**
+
+```
+src/components/ProductDetailSection.tsx(10,7):
+  error TS2741: Property 'variant' is missing in type '{ productId: string; }'
+                but required in type 'ProductDetailProps'.
+```
+
+`@mfa/contracts` 에는 런타임 이름 목록(`MODULE_IDS`)과 공통 어휘(`Product` · `CartLine`)만
+남는다. 배경: [진행 상황 27차](../00-progress.md).
+
+> ⚠️ **props 를 계약 패키지로 되돌리지 말 것.** 되돌리는 순간 이 항목의 상태로 돌아간다 —
+> 아무것도 못 잡으면서 CI 는 초록으로 통과한다.
+
+### I-3. `extractThirdParty` 는 ESM 전용 워크스페이스 패키지를 못 집는다
+
+I-2 를 도구로 풀어보려던 시도다. remote 가 `@mfa/contracts` 의 타입을 아카이브에
+**인라인**해서 보내면 host 가 독립된 스냅샷과 대조할 수 있다 — 그게
+`dts.generateTypes.extractThirdParty` 다. 켜고 빌드했더니 로그는 정상인데 산출물이
+**한 글자도 안 바뀌었다** — 여전히 `from '@mfa/contracts'`.
+
+(I-2 자체는 배치를 바꿔 풀었다. 이 항목은 **다른 저장소로 나가는 날** 다시 필요해진다.)
+
+원인은 `@module-federation/third-party-dts-extractor` 의 해석 방식이다.
+
+```js
+const importEntry = require.resolve(importPath, { paths: [this.context] });
+```
+
+`@mfa/contracts` 는 `type: module` 이고 `exports` 에 `require` 조건이 없다. `require.resolve`
+가 실패하고, 그 패키지는 조용히 목록에서 빠진다. 실패 로그도 없다.
+
+remote 를 다른 저장소로 내보내는 날 이 옵션이 **사실상 유일한 계약 전달 수단**이 되므로,
+그때는 `@mfa/contracts` 가 CJS 진입점도 내보내게 만드는 것이 선행 작업이다.
+
+### I-4. `paths` 에 `*` 와일드카드를 쓰면 무관한 에러가 쏟아진다
+
+받아온 `apis.d.ts` 가 `typeof import('catalog/ProductGrid')` 처럼 **bare specifier** 를
+쓴다. 그래서 host tsconfig 에 매핑이 필요한데, 공식 문서가 안내하는 모양이 이렇다.
+
+```jsonc
+"paths": { "*": ["./@mf-types/*"] }
+```
+
+host 소스가 든 프로그램에 그대로 넣었더니 이렇게 됐다.
+
+```
+src/mf/config/index.ts(59,15): error TS2591: Cannot find name 'process'.
+src/mf/trust/index.ts(54,11): error TS7006: Parameter 'origin' implicitly has an 'any' type.
+… (12개)
+```
+
+`*` 는 **모든** 미해결 specifier 를 가로챈다. host 소스의 평범한 import 까지
+`@mf-types/` 아래에서 먼저 찾게 되고, 타입 패키지 해석이 통째로 흔들린다.
+
+**remote 이름을 하나씩 적는다.**
+
+```jsonc
+"paths": {
+  "catalog/*": ["./@mf-types/catalog/*"],
+  "cart/*": ["./@mf-types/cart/*"]
+}
+```
+
+remote 를 추가하면 이 줄도 하나 는다. tsconfig 는 JSON 이라 `@mfa/remote-config` 에서
+파생할 방법이 없다 — 다만 잊으면 `loader/modules.ts` 의 import 가 해석되지 않아 즉시
+컴파일이 죽으므로 조용히 넘어가진 않는다.
+
+> 곁다리: 타입 수준 단언을 `Expect<Equal<X, never>>` 로 쓰면 에러가
+> `Type 'false' does not satisfy the constraint 'true'` 밖에 안 나온다. 어긋난 키를
+> 그대로 노출하는 모양(`type NoMismatch<T extends never> = T`)으로 바꾸면
+> 메시지에 모듈 이름이 실린다.
 
 ## H. (26차) 재배치 · dev 기동에서 밟은 것
 

@@ -747,3 +747,89 @@ remote 는 **props 와 콜백으로만** host 와 대화한다.
     [06-host-mf-layout.md](./06-host-mf-layout.md#옛-경로--새-경로) 에 둔다.
   - ❌ `REMOTE_ORIGINS` → `WEB_ORIGINS`, `remoteOrigin()` → `ssrOrigin()` 이름이 바뀌었다.
     값이 같고 출처만 다른 위험한 쌍이라 축을 이름에 드러냈다.
+
+## ADR-019 — remote 모듈의 props 는 remote 가 소유하고, host 는 MF DTS 로 받는다
+
+**날짜** 2026-09-02 (27차) · **상태** 채택
+
+### 맥락
+
+`@mfa/contracts` 가 각 remote 모듈의 props 를 선언하고 host 와 remote 가 **둘 다** 그걸
+import 했다. 등록 지점이 하나(`MODULES`)라 관리가 단순했고, ADR-017 이 세운
+"이름의 원본은 한 곳" 원칙과도 결이 같았다.
+
+문제는 **그 구조에서는 계약이 거짓말이어도 알 수 없다**는 것이다. host 의 기대와
+remote 의 구현이 같은 선언을 가리키므로 어긋날 수가 없고, 어긋나지 않는 대신
+"remote 가 실제로 무엇을 받는가" 는 아무도 확인하지 않았다. 24차 DTS 검토는 이걸
+"정보 중복" 으로 읽고 도입을 보류했다.
+
+27차에 DTS 를 켜서 확인해보니 진단이 반대였다. 중복은 DTS 의 한계가 아니라
+**props 를 계약 패키지에 둔 결과**였다 — remote 가 보내온 타입이 다시 계약을
+import 하고 있었다(known-issues I-2).
+
+### 결정
+
+**props 선언은 remote 의 expose 파일 옆에 둔다.** host 는 MF DTS 가 좁혀준
+`loadRemote()` 시그니처에서 모듈 타입을 되꺼낸다
+(`apps/host/src/mf/loader/modules.ts` 의 `RemoteModule<K>`) — **손으로 적는 표는 없다.**
+
+경계를 둘로 가른다.
+
+| 무엇                                 | 어디                     | 왜                                      |
+| ------------------------------------ | ------------------------ | --------------------------------------- |
+| **어휘** — `Product` · `CartLine` 등 | `@mfa/contracts`         | host·remote·store 가 같이 쓴다          |
+| **표면** — 각 모듈의 props           | remote 의 `src/exposes/` | 그 remote 의 것이다. DTS 가 실어 나른다 |
+| **이름 목록** — `MODULE_IDS`         | `@mfa/contracts`         | 런타임 값이라 DTS 가 대신 못 한다       |
+
+`apps/host/@mf-types/` 는 생성물이지만 **커밋한다.** host 소스가 그 타입을 쓰므로,
+무시하면 `pnpm typecheck` 가 remote 기동을 요구하게 된다 — 그건 이 저장소가 DTS 를
+오래 껐던 바로 그 이유다. 낡을 위험은 CI 가 `pnpm mf:types` 후 `git diff` 로 잡는다.
+
+### 결과
+
+remote 가 필수 prop 을 늘리면 host 의 **실제 호출부**가 컴파일 에러가 된다.
+타입 별칭 대조가 아니라 사용처가 깨지므로 놓칠 수 없다.
+
+대가:
+
+- 등록 지점이 둘이 됐다. 모듈을 추가하면 `MODULE_IDS` 한 줄 + `loader/modules.ts` 두 줄
+  (import 와 맵). 어느 쪽을 잊어도 `modules.ts` 의 타입 단언이 컴파일 타임에 잡는다.
+- `apps/host/tsconfig.json` 의 `paths` 에 remote 이름이 하드코딩된다. JSON 이라
+  `@mfa/remote-config` 에서 파생할 수 없다 — 잊으면 즉시 컴파일이 죽으므로 조용히
+  넘어가진 않는다(known-issues I-4).
+- remote 를 고치면 `pnpm mf:types` 를 돌려 결과를 같이 커밋해야 한다.
+
+### 기각한 대안
+
+**`extractThirdParty: true`** — 계약 패키지를 그대로 두고 remote 가 그 타입을 아카이브에
+인라인해 보내게 하는 방법. 이 저장소에서는 동작하지 않는다. `third-party-dts-extractor`
+가 `require.resolve` 로 패키지를 찾는데 `@mfa/contracts` 는 `require` 조건이 없는
+ESM 전용 워크스페이스 패키지다(known-issues I-3).
+
+**DTS 를 검증 장치로만 쓰기** — 계약은 그대로 두고 받아온 타입과 대조만 하는 안.
+27차에 실제로 만들어봤고, 위 이유로 **아무것도 잡지 못했다.**
+
+**모듈 타입 표를 host 에 손으로 유지** — 처음엔 `{ 'catalog/ProductGrid': { default:
+typeof ProductGrid }, … }` 라는 표를 host 에 뒀다. 그건 `@mfa/contracts` 의
+`RemoteModuleMap` 을 **옮겨 적은 것에 지나지 않았고**, 모듈을 추가할 때 손이 가는
+자리가 오히려 하나 늘었다.
+
+DTS 가 `@module-federation/runtime` 을 모듈 확장하며 `loadRemote()` 의 시그니처를 이미
+좁혀놓는다. `PackageType` 은 `export` 되지 않지만 **함수의 반환 타입에서 되꺼낼 수 있다**
+(실측). 그래서 표를 없앴다 — 모듈을 추가할 때 host 소스는 손대지 않는다.
+
+**`@mfa/contracts` 도 `@mf-types` 를 읽게 하기** — `MODULE_IDS` 를 손으로 적는 대신
+DTS 의 `RemoteKeys` 에서 파생시키자는 안. 세 가지가 막는다.
+
+1. **부트스트랩 순환(실측).** 이 패키지를 두 remote 가 직접 import 하는데
+   (`src/exposes` 가 `Product` · `CartLine` 을 쓴다), `@mf-types` 는 remote 를 빌드한
+   **뒤에야** 생긴다. 참조를 넣고 `@mf-types` 를 지워보면 `TS2307` 로 contracts 빌드가
+   죽는다 — 깨끗한 체크아웃에서 아무것도 빌드할 수 없게 된다.
+2. **패키지 경계.** `@mf-types` 는 host 앱 안에 있다. 상대경로가 `dist/*.d.ts` 에 그대로
+   남아(실측) 이 패키지가 저장소 밖으로 나가는 순간 깨진다.
+3. **값과 타입.** `MODULE_IDS` 는 런타임 배열이고 DTS 는 `.d.ts` 뿐이다. `RemoteKeys` 로
+   타입은 바꿔 끼울 수 있어도 값은 못 만든다.
+
+그래서 `@mf-types` 를 읽는 자리는 **host 하나**(`loader/modules.ts`)로 둔다.
+손으로 적은 `MODULE_IDS` 가 틀리면 거기서 `RemoteKeys` 와 대조되어 컴파일이 죽는다 —
+선언은 공유 패키지에, 검증은 host 에.

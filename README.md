@@ -117,7 +117,7 @@ remote CSS 에 대한 지식이 없다. 근거와 실측은
 - [진행 상황](./docs/00-progress.md)
 - [nextjs-mf 가 왜 죽었나](./docs/01-research/01-nextjs-mf-eol.md)
 - [대체재 비교](./docs/01-research/02-alternatives.md)
-- [DTS 플러그인 도입 검토 (보류)](./docs/01-research/03-dts-plugin-review.md)
+- [DTS 플러그인 검토 → 도입 (27차에 판정 정정)](./docs/01-research/03-dts-plugin-review.md)
 - [아키텍처 결정 기록(ADR)](./docs/02-architecture/01-decision.md)
 - [토폴로지](./docs/02-architecture/02-topology.md)
 - **[SSR + 소프트 내비게이션](./docs/02-architecture/03-ssr-and-soft-nav.md)**

@@ -99,7 +99,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 
 - [x] 1. `packages/remote-config/src/index.ts` — `publicOrigin` env 폴백·후행 슬래시 / `versionedPath` falsy / `assertRemoteName` throw / **`signedPayload` 필드 순서** / `MF_FILES` 조립 불변식 / **`REMOTE_NAMES` 가 `REMOTES` 키 순서를 따른다**(ADR-017) / 포트·env 키 유일성
 - [x] 2. `packages/contracts/src/product.ts` — `findProduct` / `formatKRW` / `PRODUCTS` 데이터 무결성
-- [x] 3. `packages/contracts/src/remote-contract.ts` — `REMOTE_NAMES` ↔ `RemoteModuleMap` 접두사 일치 (계약 드리프트)
+- [x] 3. `packages/contracts/src/remote-contract.ts` — `REMOTE_NAMES` ↔ `MODULE_IDS` 접두사 일치 (계약 드리프트)
 - [x] 4. `packages/store/src/cart/cookie-codec.ts` — 수량 강제변환·클램프 99·중복 병합·방어 파싱·퍼센트 디코딩 안 함·라운드트립
 - [x] 5. `packages/store/src/cart/totals.ts` — 빈 배열 / 합계 / `Infinity`
 - [x] 6. `packages/store/src/utils/global-singleton.ts` — create 1회 / 먼저 도착한 쪽이 이김 / name 격리
@@ -152,6 +152,27 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 38. `apps/remote-*/src/exposes/contract.test.ts` — 디렉터리 스캔 결과 ≡ `@mfa/contracts` 의
       `MODULE_IDS`. **파일만 추가하고 props 타입을 안 적은 경우**와 그 반대를 둘 다 잡는다
       (`Drift.tsx` 로 실패 실증). `exposes` 를 스캔으로 만들면서 생긴 위험을 여기서 막는다
+
+## vitest 밖의 검사 — MF DTS 가 `pnpm typecheck` 안에서 돈다
+
+remote 의 props 계약은 테스트가 아니라 **컴파일러**가 검사한다. props 선언이 remote 에
+있고 host 는 MF DTS 가 좁혀준 `loadRemote()` 에서 모듈 타입을 되꺼내므로
+(`src/mf/loader/modules.ts` 의 `RemoteModule<K>`),
+remote 가 시그니처를 바꾸면 **host 의 호출부가 그냥 컴파일 에러**가 된다.
+
+```
+src/components/ProductDetailSection.tsx(10,7):
+  error TS2741: Property 'variant' is missing … but required in type 'ProductDetailProps'.
+```
+
+같은 파일이 타입 수준 단언 둘도 들고 있다 — remote 가 노출한다고 말한 키 집합이
+`MODULE_IDS` 와 같은지, 그리고 맵이 그 목록을 다 덮는지.
+
+`@mf-types` 는 커밋되어 있어서 이 검사는 네트워크를 쓰지 않는다. 낡았는지는 CI 가
+`pnpm build` 뒤에 `pnpm mf:types` 를 돌리고 `git diff` 로 본다.
+
+위 38번(`exposes/contract.test.ts`)과 겹치지만 관점이 다르다 — 저쪽은 remote 가 자기
+디렉터리를 본 결과고, 이쪽은 host 가 받아 본 결과다.
 
 ## 테스트하지 않는 것
 
