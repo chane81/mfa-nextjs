@@ -135,15 +135,20 @@ DTS 가 전달할 정보가 0 이 된다(known-issues I-2).
 
 ### 같은 키가 네 곳에서 맞아야 한다
 
-| 위치                          | 형태                                                 | 누가 검사하나                                                                  |
-| ----------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------ |
-| remote 웹 빌드 `exposes`      | `"./CheckoutFlow": "./src/exposes/CheckoutFlow.tsx"` | 디렉터리 스캔이라 자동                                                         |
-| remote 서버 진입점 맵         | `"./CheckoutFlow": CheckoutFlow`                     | 손으로 적는다 — `pnpm build` 의 host 프리렌더가 그 번들을 실제로 실행해 잡는다 |
-| `MODULE_IDS`                  | `"cart/CheckoutFlow"`                                | 생성물 — `contract-check.ts` 의 타입 단언, 낡음은 CI 의 `mf:types` diff        |
-| remote 가 공표한 `RemoteKeys` | DTS 산출물                                           | 같은 단언의 반대편                                                             |
+| 위치                          | 형태                                                 | 누가 검사하나                                                                 |
+| ----------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------- |
+| remote 웹 빌드 `exposes`      | `"./CheckoutFlow": "./src/exposes/CheckoutFlow.tsx"` | 디렉터리 스캔이라 자동                                                        |
+| remote 서버 진입점 맵         | `"./CheckoutFlow": CheckoutFlow`                     | 손으로 적는다 — `src/server-entry.test.tsx` 가 스캔 결과와 대조               |
+| `MODULE_IDS`                  | `"cart/CheckoutFlow"`                                | `scripts/gen-module-ids.test.ts`(로컬·오프라인) + `contract-check.ts` 의 단언 |
+| remote 가 공표한 `RemoteKeys` | DTS 산출물                                           | 같은 단언의 반대편                                                            |
 
 마지막이 host 관점의 안전장치다 — remote 의 **빌드가 실제로 무엇을 내보냈는지**까지
 반영한다. 런타임 형태(manifest 의 실제 `exposes`)는 `/debug` 가 보여준다.
+
+가운데 둘은 층이 다르다. `contract-check.ts` 는 **생성물끼리** 비교하므로
+`pnpm mf:types` 를 안 돌리면 둘 다 낡은 채로 일치한다 — 그 창을 로컬에서 닫는 게
+`gen-module-ids.test.ts`(디스크의 `src/exposes/` 를 직접 본다)이고, 마지막 방어선이
+CI 의 `pnpm mf:types` 후 `git diff` 다.
 
 ### 모듈을 하나 추가하는 절차
 

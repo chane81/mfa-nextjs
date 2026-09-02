@@ -158,6 +158,15 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
       그 패키지가 MF DTS 를 읽게 되면서 **remote 가 자기 빌드 산출물에 묶이는 순환**이
       생겨 옮겼다. 대조 쪽은 테스트가 아니라 컴파일러가 맡는다(`contract-check.ts`) —
       스캔 규칙은 `readExposes` 의 성질이지 특정 remote 의 성질이 아니다
+- [x] 39. `scripts/gen-module-ids.test.ts` — 커밋된 `MODULE_IDS` ≡ 지금 `src/exposes/`
+      스캔 결과. **잡는 건 하나다: `pnpm mf:types` 를 안 돌렸다.** `pnpm typecheck` 로는
+      안 잡힌다 — `contract-check.ts` 는 생성물끼리 비교하므로 둘 다 낡으면 일치한다.
+      네트워크 · remote 기동 · 빌드 없이 돈다(`Drift.tsx` 로 실패 실증).
+      `scripts/` 에 두는 이유: remote 안에 두면 순환이다(38번 참고)
+- [x] 40. `apps/remote-*/src/server-entry.test.tsx` — SSR 진입점 맵의 키 ≡ 웹 `exposes`
+      스캔 결과. 웹 쪽은 스캔인데 이 맵만 손으로 적는다(정적 import 여야 번들이 갈리지
+      않는다). 빠뜨리면 **브라우저는 되는데 서버 렌더만 "expose 없음"** 이 되고,
+      그 전까지는 `pnpm build` 의 host 프리렌더가 유일한 감지 지점이었다
 
 ## vitest 밖의 검사 — MF DTS 가 `pnpm typecheck` 안에서 돈다
 

@@ -193,6 +193,65 @@ const bogus: RemoteModuleId = 'catalog/DoesNotExist'; // ← 통과했다
 결과적으로 `rootDir` · `exports` 를 건드릴 일도 없어졌고, 복사 스크립트도 필요 없다.
 `src/**` 가 `src/generated/@mf-types/**` 를 이미 잡으므로 모듈 확장도 저절로 들어온다.
 
+### 6단계: 로컬에서 잡히던 것을 되찾고, 남은 구멍 둘을 막았다
+
+5단계까지 오면서 **"등록을 잊는다"가 "명령을 잊는다"로 바뀌었다.** 그런데 그 둘은 잡히는
+자리가 다르다.
+
+| 잊는 것              | 전(main)                | 5단계 직후         |
+| -------------------- | ----------------------- | ------------------ |
+| `MODULES` 등록       | `pnpm test` — 로컬 · 초 | (그 자리가 없어짐) |
+| `pnpm mf:types` 실행 | —                       | **CI 만**          |
+
+`pnpm typecheck` 로는 안 잡힌다. `contract-check.ts` 가 생성된 `MODULE_IDS` 와 생성된
+`RemoteKeys` 를 대조하는데 갱신을 안 하면 **둘 다 똑같이 낡아서 일치**한다. push 하고
+CI 가 remote 를 빌드해 `pnpm mf:types` 를 돌린 뒤 `git diff` 로 잡을 때까지 모른다.
+
+그래서 `scripts/gen-module-ids.test.ts` 를 뒀다. 커밋된 `MODULE_IDS` 를 지금
+`src/exposes/` 스캔 결과와 대고 본다 — 네트워크도 remote 기동도 빌드도 없이 디렉터리와
+커밋된 파일만 읽는다. 실증: `Drift.tsx` 를 넣자 즉시 실패했다.
+
+```
+AssertionError: expected [ 'cart/CartBadge', …(4) ] to deeply equal [ 'cart/CartBadge', …(5) ]
+-   "catalog/Drift",
+```
+
+**`scripts/` 에 둔 이유**는 순환이다. 이 대조를 remote 안에 두면 `@mfa/contracts` 를
+import 하게 되고, 그 패키지가 MF DTS 를 읽는 지금은 remote 가 자기 산출물을 요구하게
+된다 — 각 remote 의 `exposes/contract.test.ts` 를 없앤 바로 그 이유다. `scripts/` 는
+어느 remote 의 빌드 그래프에도 없다.
+
+#### 스캔 인자를 `EXPOSE_SCAN` 으로 합쳤다
+
+그 테스트가 생기면서 `readExposes('./src/exposes', { ignore: [/\.test\.tsx$/] })` 를 적는
+자리가 셋이 됐다(Vite 설정 · Rsbuild 설정 · 테스트). 갈리면 **검사가 실제 빌드와 다른
+것을 보게 되는** 상태가 성립한다. "무엇이 expose 인가는 번들러가 달라도 갈리면 안 된다"가
+이미 규칙이라, 그 판단을 `@mfa/remote-config/node` 의 `EXPOSE_SCAN` 한 곳에 뒀다.
+
+#### 구멍 1 — SSR 진입점 맵은 아무도 안 봤다
+
+웹 `exposes` 는 스캔인데 `server-entry.ts` 의 맵은 손으로 적는다(정적 import 여야 번들이
+갈리지 않는다). 빠뜨리면 **브라우저에서는 되는데 서버 렌더에서만 "expose 없음"** 이 된다.
+`pnpm build` 의 host 프리렌더가 결국 잡지만 remote 를 다 빌드한 뒤다.
+
+각 remote 에 `src/server-entry.test.tsx` 를 뒀다 — 맵의 키 ≡ 스캔 결과. 파일 하나 여는
+값으로 잡힌다.
+
+> 토폴로지 문서의 "같은 키가 네 곳에서 맞아야 한다" 표는 이 자리를
+> `exposes/contract.test.ts` 가 본다고 적고 있었는데, 그 테스트는 실제로 스캔 ≡
+> `MODULE_IDS` 만 봤다. **서버 맵은 처음부터 검사 밖이었다.**
+
+#### 구멍 2 — "remote 는 배럴만" 이 문서에만 있었다
+
+remote 가 `@mfa/contracts/remote` 를 import 하면 빌드 순환이 된다. 어기면 결국 죽지만
+에러가 모듈 해석 실패로만 보여 원인을 안 가리킨다. 두 remote 의 `eslint.config.js` 에
+`no-restricted-imports` 로 이름을 대고 막았다 — 규칙이 문서가 아니라 코드가 됐다.
+
+```
+1:1  error  '@mfa/contracts/remote' import is restricted from being used.
+            remote 는 @mfa/contracts 배럴만 쓴다. /remote 는 MF DTS 산출물을 읽어서 빌드 순환이 된다
+```
+
 ### 결산 — 모듈 하나를 추가하는 비용
 
 | 단계               | 전(main)                       | 후                            |
@@ -252,8 +311,9 @@ DTS 가 값어치를 하는 건 **remote 가 다른 저장소·다른 팀**일 �
 
 **SSR 경로는 여전히 DTS 밖이다.** `loader/server.ts` 는 우리가 만든 로더라 MF 가 존재를
 모른다. 다만 호출부가 `loadRemoteModule` 하나로 통일돼 있고 그 반환 타입이
-`RemoteModuleMap` 이므로, 서버 경로도 **같은 타입을 쓴다** — DTS 가 그 맵의 내용을
-정하게 된 지금은 서버 경로의 타입도 remote 에서 온다.
+`RemoteModule<K>` 이므로, 서버 경로도 **같은 타입을 쓴다** — DTS 가 그 내용을 정하게 된
+지금은 서버 경로의 타입도 remote 에서 온다. 그 진입점 맵이 웹 `exposes` 와 같은지는
+6단계의 `server-entry.test.tsx` 가 본다.
 
 `extractThirdParty` 는 여전히 안 된다. remote 가 다른 저장소로 나가는 날
 `@mfa/contracts` 에 CJS 진입점을 붙이는 것이 첫 작업이다(known-issues I-3).
