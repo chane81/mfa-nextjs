@@ -460,6 +460,14 @@ AssertionError: expected [ 'Drift', 'ProductDetail', …(1) ] to deeply equal
 그러려면 `MODULE_IDS` 가 런타임 값이어야 해서 `remote-contract.test.ts` 에 있던 것을
 `remote-contract.ts` 본체로 올렸다. 양방향 타입 결속(`satisfies` · `_Exhaustive`)은 그대로다.
 
+> **지금은 그 테스트가 없다** (DTS 를 켠 뒤 바뀌었다). `MODULE_IDS` 가 손으로 적는 값이
+> 아니라 DTS 에서 생성되므로 "등록을 잊었다" 는 상태 자체가 성립하지 않는다. 남은 위험은
+> **`pnpm mf:types` 를 안 돌려 목록이 낡는 것** 하나고, 그건 CI 가 빌드 뒤에 그 명령을
+> 돌리고 `git diff` 로 잡는다. 스캔 규칙의 성질은 `packages/remote-config/src/node.test.ts`
+> 가, 생성 목록 ≡ remote 가 공표한 키는 `contract-check.ts` 가 컴파일 타임에 본다.
+> 그 테스트를 remote 에 두면 `@mfa/contracts` 를 import 하게 되고, 그 패키지가 MF DTS 를
+> 읽는 지금은 **remote 가 자기 빌드 산출물에 묶이는 순환**이 된다.
+
 ### ⚠️ `optimizeDeps.entries` 를 명시하면 Vite 의 기본 무시가 사라진다
 
 ```js

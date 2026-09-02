@@ -149,9 +149,15 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 35. `scripts/stamp-remote-version.ts` → `integrity()` · payload 조립 · **정리 대상 경계**(현재 버전만 남긴다 / `v` 접두사 밖은 안 건드린다) 추출
 - [x] 36. `apps/host/src/app/api/mf-revalidate/route.ts` → `selfOrigin()` export
 - [x] 37. `apps/host/src/mf/components/RemoteComponent.tsx` → `remoteCacheKey()` export. 브라우저에서도 버전이 키에 들어가는지 같이 본다(24차)
-- [x] 38. `apps/remote-*/src/exposes/contract.test.ts` — 디렉터리 스캔 결과 ≡ `@mfa/contracts` 의
-      `MODULE_IDS`. **파일만 추가하고 props 타입을 안 적은 경우**와 그 반대를 둘 다 잡는다
-      (`Drift.tsx` 로 실패 실증). `exposes` 를 스캔으로 만들면서 생긴 위험을 여기서 막는다
+- [x] 38. `packages/remote-config/src/node.test.ts` 의 `readExposes` — `.tsx` 만 센다 /
+      `ignore` 가 이웃 테스트를 거른다 / 키가 `./` 로 시작한다 / `files` 는 스캔 기준
+      경로다 / `ignore` 를 안 주면 아무것도 안 거른다. `exposes` 를 디렉터리 스캔으로
+      만들면서 생긴 위험을 여기서 막는다.
+      전에는 각 remote 의 `src/exposes/contract.test.ts` 가 스캔 결과를 `MODULE_IDS` 와
+      대조했다(`Drift.tsx` 로 실패 실증). 그 테스트가 `@mfa/contracts` 를 import 하는데
+      그 패키지가 MF DTS 를 읽게 되면서 **remote 가 자기 빌드 산출물에 묶이는 순환**이
+      생겨 옮겼다. 대조 쪽은 테스트가 아니라 컴파일러가 맡는다(`contract-check.ts`) —
+      스캔 규칙은 `readExposes` 의 성질이지 특정 remote 의 성질이 아니다
 
 ## vitest 밖의 검사 — MF DTS 가 `pnpm typecheck` 안에서 돈다
 
@@ -165,14 +171,16 @@ src/components/ProductDetailSection.tsx(10,7):
   error TS2741: Property 'variant' is missing … but required in type 'ProductDetailProps'.
 ```
 
-같은 파일이 타입 수준 단언 둘도 들고 있다 — remote 가 노출한다고 말한 키 집합이
-`MODULE_IDS` 와 같은지, 그리고 맵이 그 목록을 다 덮는지.
+타입 수준 단언 둘은 `contract-check.ts` 에 있다 — 생성된 `MODULE_IDS` 가 remote 가
+노출한다고 말한 키 집합(`RemoteKeys`)과 정확히 같은지, 그리고 그 id 의 접두사가 전부
+remote 이름인지. 그 파일은 **아무것도 export 하지 않는다** — emit 되는 `.d.ts` 에
+`@mf-types` 참조가 남으면 소비처에서 조용히 `any` 가 되기 때문이다(known-issues I-6).
 
 `@mf-types` 는 커밋되어 있어서 이 검사는 네트워크를 쓰지 않는다. 낡았는지는 CI 가
 `pnpm build` 뒤에 `pnpm mf:types` 를 돌리고 `git diff` 로 본다.
 
-위 38번(`exposes/contract.test.ts`)과 겹치지만 관점이 다르다 — 저쪽은 remote 가 자기
-디렉터리를 본 결과고, 이쪽은 host 가 받아 본 결과다.
+위 38번과 층이 다르다 — 저쪽은 스캔 **규칙**의 성질이고, 이쪽은 그 스캔 결과가 remote 의
+빌드를 거쳐 host 까지 온 뒤의 대조다.
 
 ## 테스트하지 않는 것
 

@@ -43,10 +43,19 @@ dev 전용 미들웨어를 늘릴 때는 `configureServer`(dev)와 `configurePre
 (`@mfa/remote-config/node`). 번들러가 둘이라 스캔을 각자 구현하면 "무엇이 expose 인가"가
 remote 마다 갈린다. dev 가 볼 게 아닌 이웃 파일이 생기면 `ignore` 에 줄을 하나 더 넣는다.
 
-**대가는 파일 하나로 공개 계약이 바뀐다는 것이다.** 그래서 각 remote 의
-`src/exposes/contract.test.ts` 가 스캔 결과를 `@mfa/contracts` 의 `MODULE_IDS` 와 대조한다.
-파일을 추가했으면 `@mfa/contracts` 의 `MODULES` 에 한 줄 등록해야 그 테스트가 통과한다.
-그 목록은 **런타임 값**이다 — 타입은 DTS 가 준다(`packages/contracts/src/remote-contract.ts`).
+**대가는 파일 하나로 공개 계약이 바뀐다는 것이다.** 그래도 등록하는 자리는 없다 —
+파일을 놓고 `pnpm mf:types` 를 돌리면 `MODULE_IDS` 까지 저절로 는다
+(`scripts/gen-module-ids.ts` 가 DTS 에서 뽑는다). 그 목록은 **런타임 값**이다 —
+타입은 DTS 가 준다(`packages/contracts/src/remote-contract.ts`).
+
+검사는 두 갈래로 갈라져 있다. 스캔 규칙 자체(`.tsx` 만 센다 · `ignore` 가 먹는다)는
+`packages/remote-config/src/node.test.ts` 가 보고, "생성된 목록 ≡ remote 가 공표한 키" 는
+`@mfa/contracts` 의 `contract-check.ts` 가 컴파일 타임에 본다. 갱신을 잊어 목록이 낡은
+경우는 CI 가 `pnpm mf:types` 후 `git diff` 로 잡는다.
+
+> 전에는 각 remote 의 `src/exposes/contract.test.ts` 가 이 대조를 했다. 그 테스트가
+> `@mfa/contracts` 를 import 하는데 그 패키지가 MF DTS(= remote 빌드 산출물)를 읽게 되면서
+> **remote 가 자기 산출물에 묶이는 순환**이 생겨 옮겼다.
 
 ## props 는 **이 remote 가 소유한다** (DTS 가 켜져 있다)
 

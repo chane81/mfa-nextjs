@@ -216,7 +216,7 @@ specifier 는 읽는 쪽 설정으로 해석되므로 양쪽 다 필요하다). 
 ```
 pnpm mf:types                                   # 타입 + 목록 갱신 (remote 기동 전제)
 packages/contracts/module-federation.config.ts  # mf dts CLI 전용 설정
-packages/contracts/generated/                   # 커밋되는 생성물 (@mf-types · module-ids)
+packages/contracts/src/generated/               # 커밋되는 생성물 (@mf-types · module-ids)
 scripts/gen-module-ids.ts                       # DTS → 런타임 목록
 @mfa/contracts/remote                           # 모듈 계약 전용 진입점
 .github/workflows/ci.yml                        # 그 생성물들이 낡았는지 보는 단계

@@ -103,15 +103,19 @@ host 하고만 대화한다"). 소유자가 없는 상태라는 성질은 [ADR-0
 **이름은 `@mfa/contracts`, 타입은 remote 가 소유한다.** (ADR-019)
 
 ```ts
-// packages/contracts — 런타임에 셀 수 있는 이름 목록
+// packages/contracts/src/generated/module-ids.ts — 자동 생성물. 손으로 고치지 않는다
 export const MODULE_IDS = [
-  'catalog/ProductGrid',
-  'catalog/ProductDetail',
-  'cart/CartPanel',
   'cart/CartBadge',
+  'cart/CartPanel',
   'cart/CheckoutFlow',
-] as const satisfies readonly `${RemoteName}/${string}`[];
+  'catalog/ProductDetail',
+  'catalog/ProductGrid',
+] as const;
 ```
+
+`pnpm mf:types` 가 DTS 의 `RemoteKeys` 에서 뽑는다(`scripts/gen-module-ids.ts`).
+순서는 계약이 아니라 출력을 결정적으로 만들려고 정렬한 결과다. 접두사가 remote 이름인지는
+`contract-check.ts` 가 타입으로 본다.
 
 ```tsx
 // apps/remote-catalog/src/exposes/ProductGrid.tsx — 표면은 구현 옆에
@@ -131,12 +135,12 @@ DTS 가 전달할 정보가 0 이 된다(known-issues I-2).
 
 ### 같은 키가 네 곳에서 맞아야 한다
 
-| 위치                          | 형태                                                 | 누가 검사하나                     |
-| ----------------------------- | ---------------------------------------------------- | --------------------------------- |
-| remote 웹 빌드 `exposes`      | `"./CheckoutFlow": "./src/exposes/CheckoutFlow.tsx"` | 디렉터리 스캔이라 자동            |
-| remote 서버 진입점 맵         | `"./CheckoutFlow": CheckoutFlow`                     | `exposes/contract.test.ts`        |
-| `MODULE_IDS`                  | `"cart/CheckoutFlow"`                                | 같은 테스트 + host 의 타입 대조   |
-| remote 가 공표한 `RemoteKeys` | DTS 산출물                                           | `remote-contract.ts` 의 타입 단언 |
+| 위치                          | 형태                                                 | 누가 검사하나                                                                  |
+| ----------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------ |
+| remote 웹 빌드 `exposes`      | `"./CheckoutFlow": "./src/exposes/CheckoutFlow.tsx"` | 디렉터리 스캔이라 자동                                                         |
+| remote 서버 진입점 맵         | `"./CheckoutFlow": CheckoutFlow`                     | 손으로 적는다 — `pnpm build` 의 host 프리렌더가 그 번들을 실제로 실행해 잡는다 |
+| `MODULE_IDS`                  | `"cart/CheckoutFlow"`                                | 생성물 — `contract-check.ts` 의 타입 단언, 낡음은 CI 의 `mf:types` diff        |
+| remote 가 공표한 `RemoteKeys` | DTS 산출물                                           | 같은 단언의 반대편                                                             |
 
 마지막이 host 관점의 안전장치다 — remote 의 **빌드가 실제로 무엇을 내보냈는지**까지
 반영한다. 런타임 형태(manifest 의 실제 `exposes`)는 `/debug` 가 보여준다.
