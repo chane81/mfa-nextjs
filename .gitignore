@@ -16,9 +16,15 @@ build
 # 테스트 커버리지
 coverage
 
-# TS 증분 빌드 / Module Federation 자동 생성 타입
+# TS 증분 빌드
 *.tsbuildinfo
-@mf-types
+
+# ⚠️ `apps/host/@mf-types` 는 **커밋한다** (여기 없다).
+# host 소스가 그 타입을 실제로 쓰기 때문이다(`src/mf/loader/modules.ts`).
+# 무시하면 `pnpm typecheck` 가 remote 기동을 요구하게 되고, 그건 이 저장소가 DTS 를
+# 오래 껐던 바로 그 이유다. 낡았는지는 CI 가 `pnpm mf:types` 후 diff 로 본다.
+#
+# remote 쪽 생성물(`dist/@mf-types*`, `dist/.dev-server*`)은 아래 `dist` 가 이미 무시한다.
 
 # Next 가 생성하는 타입 진입점.
 # 공식 문서는 커밋을 권장하지만 Next 16 은 마지막 실행이 dev 였는지 build 였는지에 따라

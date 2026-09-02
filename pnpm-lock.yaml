@@ -206,6 +206,9 @@ importers:
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@module-federation/cli':
+        specifier: ^2.8.2
+        version: 2.8.2(typescript@6.0.3)
       '@tailwindcss/postcss':
         specifier: ^4.3.3
         version: 4.3.3

@@ -6,3 +6,8 @@ out/
 
 # 잠금 파일
 pnpm-lock.yaml
+
+# MF DTS 생성물. **커밋하지만 포맷하지 않는다.**
+# prettier 가 손대면 `pnpm mf:types` 가 만든 원본과 매번 달라져서,
+# CI 의 "타입이 낡았는가" diff 검사가 항상 실패한다.
+apps/host/@mf-types

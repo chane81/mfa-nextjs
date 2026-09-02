@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
  * 공개 계약이 바뀐다.** 그래서 그 결과가 `@mfa/contracts` 의 `MODULE_IDS` 와 같은지
  * 대조한다. 잡히는 경우가 둘이다.
  *
- *   파일만 추가        props 타입을 `RemoteModuleMap` 에 안 적었다 → host 가 못 쓴다
+ *   파일만 추가        `MODULE_IDS` 에 등록을 안 했다 → host 가 그 모듈을 모른다
  *   계약에만 있다      파일이 없거나 이름이 다르다 → 런타임에 "expose 없음" 으로 죽는다
  *
  * 스캔 인자는 설정 파일과 **같은 값이어야** 의미가 있다. 갈라지면 이 테스트가 실제로

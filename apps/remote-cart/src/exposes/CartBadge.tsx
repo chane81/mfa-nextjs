@@ -1,9 +1,15 @@
 import type { CSSProperties } from 'react';
 
-import type { CartBadgeProps } from '@mfa/contracts';
+import type { CartLine } from '@mfa/contracts';
 import { cartTotals, useCartLines } from '@mfa/store';
 
 import { ORIGIN_HUE } from '../origin';
+
+/** 이 모듈의 공개 계약 — `initialLines` 의 의미는 `CartPanel.tsx` 의 같은 주석 */
+export interface CartBadgeProps {
+  initialLines?: readonly CartLine[];
+  label?: string;
+}
 
 /**
  * host 에 노출되는 모듈: `cart/CartBadge`

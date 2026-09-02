@@ -4,13 +4,32 @@
     "paths": {
       "@/*": ["./src/*"],
       // 테스트가 공유하는 셋업·헬퍼 (`vitest.config.ts` 의 alias 와 같은 대상)
-      "@tests/*": ["../../tests/*"]
+      "@tests/*": ["../../tests/*"],
+
+      // MF DTS 가 받아온 remote 타입. `src/mf/loader/modules.ts` 와 생성물 안의
+      // `apis.d.ts`(`typeof import('catalog/ProductGrid')`)가 이 이름으로 부른다.
+      //
+      // ⚠️ `"*": ["./@mf-types/*"]` 라는 와일드카드로 쓰지 않는다. 그러면 host 소스의
+      // 평범한 import 까지 여기서 먼저 찾게 되어 `Cannot find name 'process'` 같은
+      // 무관한 에러가 쏟아진다(known-issues I-4). remote 이름을 하나씩 적는다.
+      //
+      // remote 를 추가하면 이 줄도 하나 는다. tsconfig 는 JSON 이라
+      // `@mfa/remote-config` 에서 파생할 방법이 없다 — 잊으면 `loader/modules.ts` 의
+      // import 가 해석되지 않아 즉시 컴파일이 죽으므로 조용히 넘어가진 않는다.
+      "catalog/*": ["./@mf-types/catalog/*"],
+      "cart/*": ["./@mf-types/cart/*"]
     }
   },
   "include": [
     "next-env.d.ts",
     "src/**/*",
     "next.config.ts",
+    // `mf dts` CLI 가 읽는 설정. 번들에는 안 들어가지만 여기서 검사해야
+    // 오타가 CLI 실행 시점까지 안 미뤄진다.
+    "module-federation.config.ts",
+    // 받아온 remote 타입. **커밋되어 있으므로** 이 검사는 네트워크를 쓰지 않는다.
+    // 낡았는지는 CI 가 `pnpm mf:types` 후 diff 로 본다.
+    "@mf-types/**/*",
     ".next/types/**/*"
   ],
   "exclude": ["node_modules", ".next"]

@@ -19,8 +19,10 @@ import { type CartLine, findProduct } from '@mfa/contracts';
  *
  * ## `CartLine` 은 왜 아직 contracts 에 있나
  *
- * 그건 진짜 props 계약이다. `CartPanelProps` · `CartBadgeProps` · `CheckoutFlowProps` 의
- * `initialLines` 가 그 타입이고, `remote-cart` 가 그걸 받는다. 경계가 다르므로 자리도 다르다.
+ * 그건 host · remote · store 가 **같이 쓰는 어휘**다. `remote-cart` 의 세 모듈이
+ * `initialLines` 로 그 타입을 받고 host 가 넘긴다. props 선언 자체는 remote 의 expose
+ * 파일에 있지만(그래야 MF DTS 가 실어 나른다), 그 안에 쓰이는 `CartLine` 은 셋의
+ * 공통 어휘라 계약 패키지에 남는다. 경계가 다르므로 자리도 다르다.
  */
 
 /**

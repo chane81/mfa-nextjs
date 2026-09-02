@@ -2,21 +2,18 @@
 
 import { Suspense, lazy, type ComponentType } from 'react';
 
-import type {
-  RemoteModuleId,
-  RemoteModuleMap,
-  RemoteName,
-} from '@mfa/contracts';
+import type { RemoteName } from '@mfa/contracts';
 import { stylesPath } from '@mfa/remote-config';
 import { Skeleton } from '@mfa/ui';
 
 import { WEB_ENTRIES, WEB_ORIGINS } from '../config';
 import { loadRemoteModule } from '../loader';
+import type { RemoteModule, RemoteModuleId } from '../loader/modules';
 import { remoteVersion } from '../versions';
 import { RemoteBoundary } from './RemoteBoundary';
 
 type PropsOf<K extends RemoteModuleId> =
-  RemoteModuleMap[K]['default'] extends ComponentType<infer P> ? P : never;
+  RemoteModule<K>['default'] extends ComponentType<infer P> ? P : never;
 
 /**
  * lazy() 는 반드시 렌더 바깥에서 한 번만 만들어야 한다.
