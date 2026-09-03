@@ -63,6 +63,7 @@
 | 새로고침하면 장바구니 영역이 한 번 깜빡임                      | [E-1](#e-1-새로고침-때-장바구니가-깜빡인다--저장소가-느린-게-아니다)            |
 | 깜빡임을 자리표시자로 가렸더니 더 심해짐                       | [E-2](#e-2-자리표시자로-가리면-더-나빠진다)                                     |
 | `blocking-prerender-dynamic` 빌드 에러                         | [E-3](#e-3-쿠키를-suspense-밖에서-읽으면-빌드가-멈춘다)                         |
+| `CLIENT_HOOK_DYNAMIC` 빌드 에러 (건드리지도 않은 라우트)       | [I-9](#i-9-공유-컴포넌트에-usesearchparams-를-넣으면-남의-라우트가-깨진다)      |
 | 안 쓰는 패키지가 브라우저 번들에 실림                          | [E-4](#e-4-use-client-를-재수출하는-배럴은-서버에서-써도-브라우저로-따라온다)   |
 | `Encountered a script tag while rendering React component`     | [E-5](#e-5-서버-표면에-use-client-가-붙으면-dev-콘솔에서만-터진다)              |
 | `Attempted to call X() from the server but X is on the client` | [E-5](#e-5-서버-표면에-use-client-가-붙으면-dev-콘솔에서만-터진다)              |
@@ -431,6 +432,36 @@ GET /api/deployment.all?applicationId=<id>   x-api-key
 > 응답 형태는 실측했다 — 공식 문서에는 `Returns an empty JSON object {}` 라고만 적혀
 > 있어서(자동 생성 흔적) 그대로는 못 쓴다. 실제로는
 > `[{ deploymentId, status, title, errorMessage, createdAt, startedAt, finishedAt, … }]` 다.
+
+### I-9. 공유 컴포넌트에 `useSearchParams` 를 넣으면 남의 라우트가 깨진다
+
+증상: 홈(`/`)에 필터를 붙였는데 **건드리지도 않은** `/lab/cache` 프리렌더가 죽는다.
+
+```
+Error occurred prerendering page "/lab/cache"
+  digest: 'CLIENT_HOOK_DYNAMIC'
+  > 41 |   const searchParams = useSearchParams();
+```
+
+원인: 훅을 넣은 자리가 `CatalogSection` 이었는데, 그 컴포넌트를 홈만 쓰는 게 아니라
+`LabPanel` 을 거쳐 `/lab/ssr` · `/lab/isr` · `/lab/cache` 셋이 같이 쓴다. 홈은
+`instant = false` 라 아무 일도 없지만 lab 라우트는 **프리렌더 대상**이다.
+
+`useSearchParams` 는 요청마다 달라지는 값이라 프리렌더 중에는 읽을 수 없다. 공식 문서는
+`<Suspense>` 로 감싸라고 안내하지만, 그러면 그 트리가 클라이언트 렌더로 내려간다 —
+**서버 렌더 시각을 비교하는 게 목적인** lab 패널에서는 실험 자체가 무의미해진다.
+
+고치는 법: 경계를 옮긴다. 요청 컨텍스트(URL · 쿠키)를 읽는 코드를 **라우트별 껍데기**로
+빼고, 공유 컴포넌트는 값을 props 로만 받는다(ADR-020). 이 저장소에는 이미 같은 꼴이
+있었다 — `CartSlot`(쿠키를 읽는다) ↔ `CartSection`(받아서 그린다).
+
+```
+CatalogSlot     ← useSearchParams · router.replace   홈만 쓴다
+CatalogSection  ← category · onCategoryChange 만 받는다   홈 · lab 셋이 같이 쓴다
+```
+
+> **타입 검사도 테스트도 이걸 못 잡는다.** `pnpm typecheck` · `pnpm test` 는 전부 통과했고
+> `pnpm build` 만 죽었다. 공유 컴포넌트에 동적 훅을 넣는 변경은 빌드까지 돌려야 안다.
 
 ## H. (26차) 재배치 · dev 기동에서 밟은 것
 
