@@ -34,11 +34,16 @@ describe('remote 계약', () => {
   });
 
   it('exposedNames 는 접두사를 떼고 이름만 준다', () => {
-    // 순서는 계약이 아니다. `MODULE_IDS` 는 생성물이고
-    // (`scripts/gen-module-ids.ts`) 출력이 결정적이도록 정렬돼 있을 뿐이다.
-    expect([...exposedNames('catalog')].sort()).toEqual([
-      'ProductDetail',
-      'ProductGrid',
-    ]);
+    // **목록을 스냅샷으로 적지 않는다.** `MODULE_IDS` 는 생성물이라
+    // (`scripts/gen-module-ids.ts`) 여기 리터럴을 두면 모듈을 추가할 때마다 고쳐야 하는
+    // "등록하는 자리" 가 하나 되살아난다. 그건 이 구조가 없앤 것이다.
+    // 목록 자체가 실제와 맞는지는 `scripts/gen-module-ids.test.ts` 가 본다.
+    const names = exposedNames('catalog');
+    const ids = MODULE_IDS.filter((id) => id.startsWith('catalog/'));
+
+    expect(names).toHaveLength(ids.length);
+    // 접두사가 떨어졌다 = 남은 이름에 `/` 가 없다
+    for (const name of names) expect(name).not.toContain('/');
+    expect(names).toContain('ProductGrid');
   });
 });
