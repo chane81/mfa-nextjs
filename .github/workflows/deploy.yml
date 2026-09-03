@@ -17,9 +17,12 @@
 #   필수 prop 추가·이름 변경 → 옛 컴포넌트가 `undefined` 를 받는다 → 터지거나 오동작
 #   옵셔널 prop 추가         → 옛 컴포넌트가 조용히 무시한다 (에러가 안 나서 더 위험)
 #
-# remote 를 먼저 올리고 그게 **공표될 때까지 기다린 뒤** host 를 올리면 그 조합이
+# remote 를 먼저 올리고 **그 배포가 끝날 때까지 기다린 뒤** host 를 올리면 그 조합이
 # 성립하지 않는다. 남는 건 반대 방향(옛 host + 새 remote)뿐이고, 그건
 # "remote 는 한 배포 주기만큼 하위호환을 유지한다" 규칙 하나로 덮인다.
+#
+# 완료 판정은 `deployment.all` 의 status 로 한다 — `mf-version.json` 변화로 하면
+# 이미지가 재사용된 배포에서 영영 안 온다(known-issues I-8).
 #
 # ## 전제 — 세 앱의 Autodeploy 를 끈다
 #
@@ -134,6 +137,9 @@ jobs:
       matrix:
         remote: ${{ fromJSON(needs.detect.outputs.remotes) }}
     steps:
+      # 로컬 composite action 을 쓰려면 저장소가 체크아웃돼 있어야 한다.
+      - uses: actions/checkout@v5
+
       - id: baseline
         name: 배포 전 버전 기록
         env:
@@ -143,65 +149,49 @@ jobs:
           REMOTE_URL="$([ "$REMOTE" = catalog ] && echo "$CATALOG_URL" || echo "$CART_URL")"
           echo "remote_url=$REMOTE_URL" >> "$GITHUB_OUTPUT"
 
-          # 못 읽어도 진행한다 — 첫 배포이거나 remote 가 잠깐 안 뜬 것이고,
-          # 그 경우 아래 대기 루프는 "버전이 생길 때까지" 기다리는 일이 된다.
+          # 못 읽어도 진행한다 — 첫 배포이거나 remote 가 잠깐 안 뜬 것이다.
           BEFORE="$(curl -fsS --max-time 10 "$REMOTE_URL/mf-version.json" | jq -r '.version' || echo '')"
           echo "before=$BEFORE" >> "$GITHUB_OUTPUT"
           echo "배포 전 버전: ${BEFORE:-(읽지 못함)}"
 
-      - name: Dokploy 배포 트리거
-        env:
+      - uses: ./.github/actions/dokploy-deploy
+        with:
+          dokploy-url: ${{ env.DOKPLOY_URL }}
+          api-key: ${{ secrets.DOKPLOY_API_KEY }}
           # GHA 에는 삼항이 없어서 `조건 && A || B` 를 쓴다(공식 문서 관용구).
-          # ⚠️ **두 조건을 다 적어야 한다.** `&&`·`||` 는 피연산자 값을 돌려주고 빈 문자열은
-          # falsy 라, `catalog && CATALOG || CART` 로 쓰면 `DOKPLOY_APP_CATALOG` 가 비었을 때
-          # **cart 의 id 로 넘어간다** — catalog 를 배포하라는 job 이 조용히 cart 를 배포하고
-          # 로그에는 성공으로 남는다. 아래 `-z` 가드도 값이 비어야 걸리므로 그건 못 잡는다.
-          # 이렇게 적으면 값이 없을 때 `''` 로 떨어져 가드가 잡는다.
-          APP_ID: "${{ (matrix.remote == 'catalog' && vars.DOKPLOY_APP_CATALOG) || (matrix.remote == 'cart' && vars.DOKPLOY_APP_CART) || '' }}"
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-        run: |
-          set -euo pipefail
+          # ⚠️ **두 조건을 다 적어야 한다.** 빈 문자열은 falsy 라
+          # `catalog && CATALOG || CART` 로 쓰면 CATALOG 가 비었을 때 **cart 의 id 로 넘어간다** —
+          # catalog 를 배포하라는 job 이 조용히 cart 를 배포하고 로그에는 성공으로 남는다.
+          application-id: "${{ (matrix.remote == 'catalog' && vars.DOKPLOY_APP_CATALOG) || (matrix.remote == 'cart' && vars.DOKPLOY_APP_CART) || '' }}"
+          label: ${{ matrix.remote }}
 
-          if [ -z "${DOKPLOY_API_KEY:-}" ] || [ -z "${APP_ID:-}" ]; then
-            echo "::error::DOKPLOY_API_KEY(Secret) 와 DOKPLOY_APP_* (Variables) 가 필요하다."
-            exit 1
-          fi
-
-          curl -fsS --max-time 30 -X POST "$DOKPLOY_URL/api/application.deploy" \
-            -H "x-api-key: $DOKPLOY_API_KEY" \
-            -H 'content-type: application/json' \
-            -d "{\"applicationId\":\"$APP_ID\"}" > /dev/null
-          echo "트리거 완료 — ${{ matrix.remote }}"
-
-      - name: 새 버전 공개까지 대기
+      - name: 새 버전이 공표됐는지 확인 (게이트가 아니다)
         env:
           REMOTE_URL: ${{ steps.baseline.outputs.remote_url }}
           BEFORE: ${{ steps.baseline.outputs.before }}
-          # Dokploy 빌드 시간. 캐시 히트면 1분 이내, 콜드 빌드는 몇 분 걸린다.
-          TIMEOUT_SECONDS: '1200'
-          INTERVAL_SECONDS: '15'
+          # 배포가 `done` 이어도 컨테이너 교체가 몇 초 늦을 수 있어 잠깐 본다.
+          # 여기서 실패시키지 않는다 — 이미지가 그대로면(캐시 히트) 버전은 영영 안 바뀐다.
+          WAIT_SECONDS: '120'
         run: |
           set -euo pipefail
-          DEADLINE=$(( $(date +%s) + TIMEOUT_SECONDS ))
+          DEADLINE=$(( $(date +%s) + WAIT_SECONDS ))
 
           while :; do
             NOW="$(curl -fsS --max-time 10 "$REMOTE_URL/mf-version.json" | jq -r '.version' 2>/dev/null || echo '')"
 
             if [ -n "$NOW" ] && [ "$NOW" != "$BEFORE" ]; then
-              echo "새 버전 공개됨: $NOW"
-              echo "- ${{ matrix.remote }}: \`$NOW\`" >> "$GITHUB_STEP_SUMMARY"
+              echo "새 버전 공표됨: $NOW"
+              echo "  - 버전: \`$NOW\`" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
 
             if [ "$(date +%s)" -ge "$DEADLINE" ]; then
-              echo "::error::${TIMEOUT_SECONDS}초 안에 새 버전이 공개되지 않았다 (여전히 ${NOW:-없음})."
-              echo "Dokploy 빌드가 실패했을 수 있다 — 패널의 Deployments 로그를 본다."
-              # 여기서 멈추면 host 도 안 뜬다. 그게 맞다 — 옛 remote 위에 새 host 를
-              # 올리는 것이 이 파이프라인이 막으려는 바로 그 상태다.
-              exit 1
+              echo "::notice::버전이 그대로다(${NOW:-없음}). 빌드 컨텍스트가 이전과 같아 이미지가 재사용됐을 수 있다."
+              echo "  - 버전: \`${NOW:-?}\` (변화 없음 — 이미지 재사용)" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
             fi
 
-            sleep "$INTERVAL_SECONDS"
+            sleep 10
           done
 
   host:
@@ -213,33 +203,18 @@ jobs:
       always() &&
       needs.detect.outputs.host == 'true' &&
       needs.detect.result == 'success' &&
-      needs.remotes.result != 'failure'
+      needs.remotes.result != 'failure' &&
+      needs.remotes.result != 'cancelled'
     runs-on: ubuntu-latest
     steps:
-      - name: Dokploy 배포 트리거
-        env:
-          APP_ID: ${{ vars.DOKPLOY_APP_HOST }}
-          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
-        run: |
-          set -euo pipefail
+      - uses: actions/checkout@v5
 
-          if [ -z "${DOKPLOY_API_KEY:-}" ] || [ -z "${APP_ID:-}" ]; then
-            echo "::error::DOKPLOY_API_KEY(Secret) 와 DOKPLOY_APP_HOST(Variable) 가 필요하다."
-            exit 1
-          fi
-
-          curl -fsS --max-time 30 -X POST "$DOKPLOY_URL/api/application.deploy" \
-            -H "x-api-key: $DOKPLOY_API_KEY" \
-            -H 'content-type: application/json' \
-            -d "{\"applicationId\":\"$APP_ID\"}" > /dev/null
-
-          echo "트리거 완료 — host"
-          {
-            echo "### host"
-            echo ""
-            echo "- remote 가 새 버전을 공표한 뒤에 트리거했다."
-            echo "- ⚠️ 빌드 성공 여부는 이 워크플로가 보지 않는다 — Dokploy 패널의 Deployments 로 본다."
-          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: ./.github/actions/dokploy-deploy
+        with:
+          dokploy-url: ${{ env.DOKPLOY_URL }}
+          api-key: ${{ secrets.DOKPLOY_API_KEY }}
+          application-id: ${{ vars.DOKPLOY_APP_HOST }}
+          label: host
 
   revalidate:
     name: ${{ matrix.remote }} 캐시 무효화
