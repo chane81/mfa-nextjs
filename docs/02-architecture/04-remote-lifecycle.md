@@ -170,6 +170,12 @@ detect ─┬─ remotes (matrix)  트리거 → `deployment.all` 의 status 가
 `mf-version-check`(버전 공표 관측) · `mf-revalidate`(캐시 무효화). 로컬 action 은
 `uses: ./…` 이라 **그 job 이 먼저 `actions/checkout` 을 해야 한다**.
 
+폴링은 **5초** 간격이다. 실측 30건에서 Dokploy 배포는 p50 25초(catalog 21 · cart 19 ·
+host 27)고 대기열은 0초다. 그 소요는 거의 전부 **Docker 레이어 하나**가 쓴다 —
+배포 로그에서 앱 빌드 레이어가 catalog 15.4초 · host 21.8초고 나머지는 전부 `CACHED`
+다. 긴 꼬리가 없어서 감지 지연은 그대로 낭비다. 15초로 돌던 때는 그 낭비가 실작업의
+26%(+17초)였다.
+
 **전제: 세 앱의 Autodeploy 를 끈다.** 안 끄면 push 로도 뜨고 API 로도 떠서 이중 배포가
 되고 순서 보장이 사라진다.
 
