@@ -1,0 +1,48 @@
+# ⚠️ **임시 프로브.** `deployment.all` 응답 형태를 실측하려고 만든 것이고,
+# 폴링 구현이 끝나면 지운다. 공식 문서가 응답을 `{}` 라고만 적어놔서(자동 생성 흔적)
+# 그대로는 파싱을 못 쓴다.
+#
+# 브랜치 push 로 돈다 — main 에 임시 파일을 올리지 않기 위해서다.
+name: probe-dokploy
+
+on:
+  push:
+    branches: ['ci/**']
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: deployment.all 응답 형태 확인
+    runs-on: ubuntu-latest
+    steps:
+      - name: 응답 구조만 찍는다
+        env:
+          DOKPLOY_URL: ${{ vars.DOKPLOY_URL || 'https://dokploy.lakegreen.net' }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          APP_ID: ${{ vars.DOKPLOY_APP_CATALOG }}
+        run: |
+          set -euo pipefail
+
+          RAW="$(curl -sS --max-time 30 -w '\n%{http_code}' \
+            -H "x-api-key: $DOKPLOY_API_KEY" \
+            "$DOKPLOY_URL/api/deployment.all?applicationId=$APP_ID" || true)"
+
+          STATUS="$(echo "$RAW" | tail -n1)"
+          BODY="$(echo "$RAW" | sed '$d')"
+
+          echo "HTTP $STATUS"
+          echo "최상위 타입: $(echo "$BODY" | jq -r 'type' 2>/dev/null || echo '파싱 실패')"
+          echo "최상위 키   : $(echo "$BODY" | jq -rc 'if type=="object" then keys else "(배열)" end' 2>/dev/null || echo '-')"
+          echo "원소 개수   : $(echo "$BODY" | jq -r 'if type=="array" then length else (.deployments? // empty | length) end' 2>/dev/null || echo '-')"
+          echo "첫 원소 키  : $(echo "$BODY" | jq -rc 'if type=="array" then .[0] else (.deployments? // empty | .[0]) end | keys' 2>/dev/null || echo '-')"
+          echo "첫 원소 status/title/createdAt:"
+          echo "$BODY" | jq -c 'if type=="array" then .[0] else (.deployments? // empty | .[0]) end
+            | {status, title, createdAt, startedAt, finishedAt}' 2>/dev/null || echo '-'
+
+          # 파싱이 통째로 실패했을 때만 앞부분을 본다 (길면 잘라서)
+          if [ "$(echo "$BODY" | jq -r 'type' 2>/dev/null || echo x)" = "x" ]; then
+            echo "--- 원문 앞 500자 ---"
+            echo "$BODY" | head -c 500
+          fi
