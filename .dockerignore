@@ -14,7 +14,16 @@ build
 .turbo
 **/.turbo
 *.tsbuildinfo
-**/@mf-types
+
+# ⚠️ `@mf-types` 를 빼지 않는다. 전에는 `**/@mf-types` 로 걸렀는데, 그때는 그게
+# host 앱 안의 생성물이었고 이미지가 읽을 일이 없었다. 지금은
+# `packages/contracts/src/generated/@mf-types` 가 **커밋된 계약**이고 이미지 안에서
+# tsc 가 그걸 읽는다(`contract-check.ts`). 빼면 세 이미지가 전부 이렇게 죽는다.
+#
+#     @mfa/contracts:build: src/contract-check.ts(6,45): error TS2307:
+#       Cannot find module './generated/@mf-types/cart/apis'
+#
+# 남은 `@mf-types` 는 remote 의 `dist` 안 산출물뿐이고 위의 `**/dist` 가 이미 걸러낸다.
 
 # 빌드 버전은 mf-build-version.ts 가 이미지 안에서 새로 쓴다
 .mf-version
