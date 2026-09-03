@@ -110,6 +110,7 @@ export const MODULE_IDS = [
   'cart/CheckoutFlow',
   'catalog/ProductDetail',
   'catalog/ProductGrid',
+  'catalog/RelatedProducts',
 ] as const;
 ```
 

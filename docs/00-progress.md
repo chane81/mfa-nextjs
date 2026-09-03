@@ -1,5 +1,96 @@
 # 진행 상황
 
+## 2026-09-03 (28차) — 배포에서만 터진 회귀, 그리고 파이프라인을 한 바퀴 돌렸다
+
+27차를 main 에 머지하고 push 했다. CI 는 `build` · `test` · `verify` 셋 다 초록이었고
+새로 넣은 "MF DTS 가 최신인지 확인" 단계도 통과했다 — **빌드된 dist 를 서빙해 받은 타입이
+dev 로 받은 것과 바이트 단위로 같다**는 확인이다(그전까지는 dev 경로만 실측했었다).
+
+그런데 **Dokploy 배포는 세 앱 모두 실패했다.**
+
+```
+@mfa/contracts:build: src/contract-check.ts(6,45): error TS2307:
+  Cannot find module './generated/@mf-types/cart/apis'
+```
+
+`.dockerignore` 의 `**/@mf-types` 가 커밋된 생성물을 빌드 컨텍스트에서 빼고 있었다.
+그 줄은 컨테이너화 시점에 들어왔고 그때는 맞는 규칙이었다 — 생성물이 host 앱 안에 있어
+이미지가 읽을 일이 없었다. DTS 소유를 계약 패키지로 옮기면서 전제가 깨졌다.
+전문과 "왜 여기까지 와서야 드러났나" 는 known-issues **I-7**.
+
+배운 것 한 줄: **생성물을 커밋하기로 했으면 그것을 읽는 모든 경로에서 빠지지 않는지 본다.**
+`.gitignore` · `.prettierignore` 는 같이 고쳤는데 `.dockerignore` 만 남았고,
+그 파일은 로컬 빌드도 CI 도 읽지 않아 배포까지 가야 드러났다.
+
+Dokploy 의 Watch Paths 에도 `.dockerignore` 를 세 앱 모두 추가했다. 그게 없으면
+이 파일만 고친 커밋은 재배포를 트리거하지 못한다(실측 — push 했는데 아무 일도 안 일어났다).
+
+### 파이프라인 검증 — 모듈 하나를 실제로 추가해봤다
+
+"remote 에 파일을 놓고 `pnpm mf:types` 만 돌리면 host 까지 계약이 흐르는가" 를
+`catalog/RelatedProducts`(상세 페이지 아래 관련 상품) 로 한 바퀴 돌렸다.
+
+**1. 손으로 만진 파일은 remote 하나다.**
+
+```
+apps/remote-catalog/src/exposes/RelatedProducts.tsx   # props 도 이 파일 안에
+```
+
+**2. 그 상태에서 host 가 그 모듈을 쓰면 컴파일이 막는다.**
+
+```
+src/components/RelatedProductsSection.tsx(24,7): error TS2322:
+  Type '"catalog/RelatedProducts"' is not assignable to type
+  '"cart/CartBadge" | "cart/CartPanel" | "cart/CheckoutFlow" |
+   "catalog/ProductDetail" | "catalog/ProductGrid"'
+```
+
+**3. `pnpm mf:types` 한 번.**
+
+```
+[ Module Federation DTS ] Federated types extraction completed
+[gen-module-ids] 6개 → packages/contracts/src/generated/module-ids.ts
+```
+
+생성물 넷이 움직였다 — `@mf-types/catalog/RelatedProducts.d.ts`(신규),
+`compiled-types/src/exposes/RelatedProducts.d.ts`(신규, 실제 시그니처),
+`apis.d.ts`(`RemoteKeys` 확장), `module-ids.ts`(5 → 6). **등록한 자리는 없다.**
+
+props 가 인라인되어 넘어온 것도 확인했다 — 주석까지 같이 온다.
+
+```ts
+// generated/@mf-types/catalog/compiled-types/src/exposes/RelatedProducts.d.ts
+export interface RelatedProductsProps {
+  productId: string;
+  limit?: number;
+  onSelect?: (product: Product) => void;
+}
+```
+
+### 안전망 둘이 그 자리에서 걸렸다
+
+`pnpm test` 가 **2개 실패**로 돌아왔다. 둘 다 27차에 만든 그물이다.
+
+| 실패                                       | 무엇을 잡았나                                       |
+| ------------------------------------------ | --------------------------------------------------- |
+| `remote-catalog/src/server-entry.test.tsx` | SSR 진입점 맵에 새 모듈을 **안 넣었다** (진짜 누락) |
+| `contracts/src/remote-contract.test.ts`    | `exposedNames` 기대값이 이름 목록 스냅샷이었다      |
+
+첫 번째가 이 그물을 만든 이유 그대로다. 웹 `exposes` 는 디렉터리 스캔이라 저절로 늘지만
+SSR 맵은 손으로 적는 유일한 자리라, 빠뜨리면 **브라우저에서는 되고 서버 렌더에서만
+"expose 없음"** 이 된다. 만든 지 하루 만에 첫 실사용에서 걸렸다.
+
+두 번째는 예상 못 한 수확이다. 그 테스트가 `['ProductDetail', 'ProductGrid']` 를 적고
+있었는데, 그건 **"등록하는 자리" 가 테스트로 위장해 남아 있던 것**이다. 모듈을 추가할
+때마다 고쳐야 하니 이 구조가 없앤 그 비용이 그대로다. 스냅샷을 지우고 성질만 보게 고쳤다 —
+개수는 `MODULE_IDS` 에서 파생하고, "접두사가 떨어졌다" 는 남은 이름에 `/` 가 없는 것으로 본다.
+
+### 결과
+
+`pnpm lint` · `typecheck` · **647 테스트** · `pnpm build` 6/6 전부 통과.
+host 프리렌더가 remote SSR 번들을 실제로 실행하므로, 빌드 통과는 새 모듈이 SSR 경로까지
+살아 있다는 뜻이다.
+
 ## 2026-09-02 (27차) — MF DTS 를 켜고, 계약의 방향을 뒤집었다 (`feat/mf-dts`)
 
 3차에 껐고 [24차 검토](01-research/03-dts-plugin-review.md)에서 "도입 보류" 로 판정했던
