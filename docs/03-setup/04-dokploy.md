@@ -160,14 +160,17 @@ curl -X POST https://<host-도메인>/api/mf-revalidate \
 **Dokploy Application 에는 배포 후 훅이 없다.** 설정 스키마에 `preDeploy`/`postDeploy` 계열
 필드가 존재하지 않고, `command`/`args` 는 컨테이너 실행 명령 override 이며 Schedules 는 cron 이라
 배포 트리거가 아니다. 그래서 이 호출은 GitHub Actions 가 맡는다 —
-[`.github/workflows/mf-revalidate.yml`](../../.github/workflows/mf-revalidate.yml).
+[`deploy.yml`](../../.github/workflows/deploy.yml) 의 `revalidate` job 이
+[`.github/actions/mf-revalidate`](../../.github/actions/mf-revalidate/action.yml) 를 쓴다.
 
 그 워크플로는 배포를 시키지 않는다. Dokploy 가 push 를 직접 받아 빌드하므로, 워크플로는
 `mf-version.json` 의 버전이 바뀔 때까지 폴링하다가 그때 웹훅을 때린다. 빌드 전에 때리면
 host 가 **옛 remote 로** 페이지를 다시 굽고, 정작 새 버전이 떴을 때 알릴 사람이 없어진다.
 
-저장소 Secret 에 `MF_REVALIDATE_SECRET`(host 런타임 env 와 같은 값)이 필요하다. 도메인이
-바뀌면 Variables 로 `MF_HOST_URL` / `MF_CATALOG_URL` / `MF_CART_URL` 을 덮는다.
+저장소 Secret 에 `MF_REVALIDATE_SECRET`(host 런타임 env 와 같은 값)이 필요하다.
+Variables 에는 `MF_HOST_URL` / `MF_CATALOG_URL` / `MF_CART_URL` / `DOKPLOY_URL` 이
+**필수**다 — 워크플로에 폴백 도메인을 두지 않는다. 포크나 다른 인스턴스에서 폴백이 살아
+있으면 그 워크플로가 남의 도메인을 조용히 때린다.
 
 웹훅이 닿지 않은 host 인스턴스도 `mf-version.json` 을 짧은 TTL(30초)로 읽어 번들 계층은 스스로
 수렴한다. 다만 **이미 캐시된 페이지 HTML 은 태그를 깨야만 바뀐다** — `cacheLife` 의 revalidate

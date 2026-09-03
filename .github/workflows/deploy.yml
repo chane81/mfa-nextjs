@@ -51,11 +51,13 @@ concurrency:
 permissions:
   contents: read
 
+# 도메인은 저장소 Variables 한 곳에만 둔다. 폴백 리터럴을 두면 변수를 안 넣은 저장소에서
+# 워크플로가 남의 도메인을 조용히 때린다 — 안 붙어야 할 때 붙는 편이 낫다.
 env:
-  HOST_URL: ${{ vars.MF_HOST_URL || 'https://mfa.lakegreen.net' }}
-  CATALOG_URL: ${{ vars.MF_CATALOG_URL || 'https://mfa-catalog.lakegreen.net' }}
-  CART_URL: ${{ vars.MF_CART_URL || 'https://mfa-cart.lakegreen.net' }}
-  DOKPLOY_URL: ${{ vars.DOKPLOY_URL || 'https://dokploy.lakegreen.net' }}
+  HOST_URL: ${{ vars.MF_HOST_URL }}
+  CATALOG_URL: ${{ vars.MF_CATALOG_URL }}
+  CART_URL: ${{ vars.MF_CART_URL }}
+  DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
 
 jobs:
   detect:
@@ -70,61 +72,12 @@ jobs:
           fetch-depth: 0
 
       - id: pick
-        name: 무엇을 배포할지 결정
-        env:
-          EVENT: ${{ github.event_name }}
-          TARGET: ${{ inputs.target }}
-          BEFORE: ${{ github.event.before }}
-          AFTER: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-
-          emit() {
-            echo "remotes=$1" >> "$GITHUB_OUTPUT"
-            echo "host=$2" >> "$GITHUB_OUTPUT"
-            echo "대상 — remotes=$1 host=$2"
-          }
-
-          if [ "$EVENT" = "workflow_dispatch" ] && [ "$TARGET" != "auto" ]; then
-            case "$TARGET" in
-              all)     emit '["catalog","cart"]' true ;;
-              remotes) emit '["catalog","cart"]' false ;;
-              host)    emit '[]' true ;;
-            esac
-            exit 0
-          fi
-
-          # 첫 푸시·force push 후에는 BEFORE 커밋이 없을 수 있다. 그때는 전부 대상으로 본다.
-          if [ -z "$BEFORE" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            emit '["catalog","cart"]' true
-            exit 0
-          fi
-
-          CHANGED="$(git diff --name-only "$BEFORE" "$AFTER")"
-
-          # 공유 코드는 세 이미지가 전부 다시 빌드해야 한다.
-          # `.dockerignore` 가 여기 있는 이유: 그 파일이 빌드 컨텍스트를 정하므로 이미지가
-          # 통째로 달라진다. 빠뜨려서 배포가 안 물었던 적이 있다(known-issues I-7).
-          if echo "$CHANGED" | grep -qE '^(packages/|scripts/|pnpm-lock\.yaml|\.dockerignore)'; then
-            emit '["catalog","cart"]' true
-            exit 0
-          fi
-
-          # `grep -q … && ARR+=(…)` 는 못 쓴다. 매치가 없으면 그 문장이 실패로 끝나
-          # `set -e` 가 스크립트를 죽인다.
-          SELECTED=()
-          if echo "$CHANGED" | grep -q '^apps/remote-catalog/'; then SELECTED+=('"catalog"'); fi
-          if echo "$CHANGED" | grep -q '^apps/remote-cart/'; then SELECTED+=('"cart"'); fi
-
-          HOST=false
-          if echo "$CHANGED" | grep -q '^apps/host/'; then HOST=true; fi
-
-          if [ ${#SELECTED[@]} -eq 0 ]; then
-            emit '[]' "$HOST"
-          else
-            IFS=,
-            emit "[${SELECTED[*]}]" "$HOST"
-          fi
+        uses: ./.github/actions/detect-targets
+        with:
+          event-name: ${{ github.event_name }}
+          target: ${{ inputs.target }}
+          before: ${{ github.event.before }}
+          after: ${{ github.sha }}
 
   remotes:
     name: ${{ matrix.remote }} 배포
@@ -165,34 +118,10 @@ jobs:
           application-id: "${{ (matrix.remote == 'catalog' && vars.DOKPLOY_APP_CATALOG) || (matrix.remote == 'cart' && vars.DOKPLOY_APP_CART) || '' }}"
           label: ${{ matrix.remote }}
 
-      - name: 새 버전이 공표됐는지 확인 (게이트가 아니다)
-        env:
-          REMOTE_URL: ${{ steps.baseline.outputs.remote_url }}
-          BEFORE: ${{ steps.baseline.outputs.before }}
-          # 배포가 `done` 이어도 컨테이너 교체가 몇 초 늦을 수 있어 잠깐 본다.
-          # 여기서 실패시키지 않는다 — 이미지가 그대로면(캐시 히트) 버전은 영영 안 바뀐다.
-          WAIT_SECONDS: '120'
-        run: |
-          set -euo pipefail
-          DEADLINE=$(( $(date +%s) + WAIT_SECONDS ))
-
-          while :; do
-            NOW="$(curl -fsS --max-time 10 "$REMOTE_URL/mf-version.json" | jq -r '.version' 2>/dev/null || echo '')"
-
-            if [ -n "$NOW" ] && [ "$NOW" != "$BEFORE" ]; then
-              echo "새 버전 공표됨: $NOW"
-              echo "  - 버전: \`$NOW\`" >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-
-            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
-              echo "::notice::버전이 그대로다(${NOW:-없음}). 빌드 컨텍스트가 이전과 같아 이미지가 재사용됐을 수 있다."
-              echo "  - 버전: \`${NOW:-?}\` (변화 없음 — 이미지 재사용)" >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-
-            sleep 10
-          done
+      - uses: ./.github/actions/mf-version-check
+        with:
+          remote-url: ${{ steps.baseline.outputs.remote_url }}
+          before: ${{ steps.baseline.outputs.before }}
 
   host:
     name: host 배포
@@ -232,47 +161,10 @@ jobs:
       matrix:
         remote: ${{ fromJSON(needs.detect.outputs.remotes) }}
     steps:
-      - name: host 캐시 무효화
-        env:
-          REMOTE: ${{ matrix.remote }}
-          MF_REVALIDATE_SECRET: ${{ secrets.MF_REVALIDATE_SECRET }}
-        run: |
-          set -euo pipefail
+      - uses: actions/checkout@v5
 
-          if [ -z "${MF_REVALIDATE_SECRET:-}" ]; then
-            echo "::error::MF_REVALIDATE_SECRET 이 없다. Dokploy 의 host 런타임 env 와 같은 값을 저장소 Secret 으로 넣는다."
-            exit 1
-          fi
-
-          # 웹훅은 warm 을 먼저 하고 실패하면 캐시를 건드리지 않은 채 502 로 중단한다.
-          # 그래서 재시도가 안전하다 — 부분 적용 상태가 생기지 않는다.
-          for ATTEMPT in 1 2 3 4 5; do
-            BODY="$(curl -sS --max-time 60 -w '\n%{http_code}' \
-              -X POST "$HOST_URL/api/mf-revalidate" \
-              -H "x-mf-secret: $MF_REVALIDATE_SECRET" \
-              -H 'content-type: application/json' \
-              -d "{\"remote\":\"$REMOTE\"}" || true)"
-
-            STATUS="$(echo "$BODY" | tail -n1)"
-            JSON="$(echo "$BODY" | sed '$d')"
-
-            if [ "$STATUS" = "200" ] && [ "$(echo "$JSON" | jq -r '.ok')" = "true" ]; then
-              VERSION="$(echo "$JSON" | jq -r '.version')"
-              WARMED="$(echo "$JSON" | jq -r '.warmed')"
-              echo "무효화 완료 — version=$VERSION warmed=$WARMED"
-              {
-                echo "### $REMOTE 무효화"
-                echo ""
-                echo "- 버전: \`$VERSION\`"
-                echo "- warm: \`$WARMED\`"
-                echo "- 시도: $ATTEMPT 회"
-              } >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-
-            echo "시도 $ATTEMPT 실패 (HTTP $STATUS): $(echo "$JSON" | jq -c '.' 2>/dev/null || echo "$JSON")"
-            sleep $(( ATTEMPT * 10 ))
-          done
-
-          echo "::error::웹훅이 5회 모두 실패했다. host 페이지 캐시는 그대로다(웹훅이 캐시를 건드리기 전에 중단한다)."
-          exit 1
+      - uses: ./.github/actions/mf-revalidate
+        with:
+          host-url: ${{ env.HOST_URL }}
+          remote: ${{ matrix.remote }}
+          secret: ${{ secrets.MF_REVALIDATE_SECRET }}

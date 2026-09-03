@@ -1,0 +1,93 @@
+name: 배포 대상 판별
+description: 바뀐 경로로 어떤 앱을 배포할지 정한다 (Dokploy Watch Paths 를 CI 로 옮겨온 것)
+
+# Dokploy 의 Watch Paths 를 쓰지 않고 여기서 판별한다. Watch Paths 로는 "누가 먼저 끝나는가"를
+# 정할 수 없어 이 저장소가 막으려는 버전 스큐가 그대로 남기 때문이다(deploy.yml 상단 참고).
+#
+# 판별 결과는 JSON 배열 문자열이다 — 호출부가 `fromJSON` 으로 matrix 에 그대로 꽂는다.
+
+inputs:
+  event-name:
+    description: github.event_name
+    required: true
+  target:
+    description: workflow_dispatch 의 배포 대상 (auto · all · remotes · host)
+    required: false
+    default: auto
+  before:
+    description: push 이전 커밋 SHA (github.event.before)
+    required: false
+    default: ''
+  after:
+    description: 배포할 커밋 SHA
+    required: true
+
+outputs:
+  remotes:
+    description: 배포할 remote 이름의 JSON 배열 (예 `["catalog","cart"]`)
+    value: ${{ steps.pick.outputs.remotes }}
+  host:
+    description: host 를 배포할지 여부 (`true` · `false`)
+    value: ${{ steps.pick.outputs.host }}
+
+runs:
+  using: composite
+  steps:
+    # `git diff` 를 쓰므로 호출부가 `fetch-depth: 0` 으로 체크아웃해 둬야 한다.
+    - id: pick
+      name: 무엇을 배포할지 결정
+      shell: bash
+      env:
+        EVENT: ${{ inputs.event-name }}
+        TARGET: ${{ inputs.target }}
+        BEFORE: ${{ inputs.before }}
+        AFTER: ${{ inputs.after }}
+      run: |
+        set -euo pipefail
+
+        emit() {
+          echo "remotes=$1" >> "$GITHUB_OUTPUT"
+          echo "host=$2" >> "$GITHUB_OUTPUT"
+          echo "대상 — remotes=$1 host=$2"
+        }
+
+        if [ "$EVENT" = "workflow_dispatch" ] && [ "$TARGET" != "auto" ]; then
+          case "$TARGET" in
+            all)     emit '["catalog","cart"]' true ;;
+            remotes) emit '["catalog","cart"]' false ;;
+            host)    emit '[]' true ;;
+          esac
+          exit 0
+        fi
+
+        # 첫 푸시·force push 후에는 BEFORE 커밋이 없을 수 있다. 그때는 전부 대상으로 본다.
+        if [ -z "$BEFORE" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+          emit '["catalog","cart"]' true
+          exit 0
+        fi
+
+        CHANGED="$(git diff --name-only "$BEFORE" "$AFTER")"
+
+        # 공유 코드는 세 이미지가 전부 다시 빌드해야 한다.
+        # `.dockerignore` 가 여기 있는 이유: 그 파일이 빌드 컨텍스트를 정하므로 이미지가
+        # 통째로 달라진다. 빠뜨려서 배포가 안 물었던 적이 있다(known-issues I-7).
+        if echo "$CHANGED" | grep -qE '^(packages/|scripts/|pnpm-lock\.yaml|\.dockerignore)'; then
+          emit '["catalog","cart"]' true
+          exit 0
+        fi
+
+        # `grep -q … && ARR+=(…)` 는 못 쓴다. 매치가 없으면 그 문장이 실패로 끝나
+        # `set -e` 가 스크립트를 죽인다.
+        SELECTED=()
+        if echo "$CHANGED" | grep -q '^apps/remote-catalog/'; then SELECTED+=('"catalog"'); fi
+        if echo "$CHANGED" | grep -q '^apps/remote-cart/'; then SELECTED+=('"cart"'); fi
+
+        HOST=false
+        if echo "$CHANGED" | grep -q '^apps/host/'; then HOST=true; fi
+
+        if [ ${#SELECTED[@]} -eq 0 ]; then
+          emit '[]' "$HOST"
+        else
+          IFS=,
+          emit "[${SELECTED[*]}]" "$HOST"
+        fi

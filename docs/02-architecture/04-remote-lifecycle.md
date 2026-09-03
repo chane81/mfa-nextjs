@@ -165,6 +165,11 @@ detect ─┬─ remotes (matrix)  트리거 → `deployment.all` 의 status 가
 두 job 이 같은 판정을 해야 해서 그 로직은 `.github/actions/dokploy-deploy` 한 벌에 있다.
 ```
 
+워크플로 본문은 순서(`needs` · `if`)만 남기고 각 단계의 스크립트는 composite action 으로
+뺐다 — `detect-targets`(무엇을 배포할지) · `dokploy-deploy`(배포와 완료 대기) ·
+`mf-version-check`(버전 공표 관측) · `mf-revalidate`(캐시 무효화). 로컬 action 은
+`uses: ./…` 이라 **그 job 이 먼저 `actions/checkout` 을 해야 한다**.
+
 **전제: 세 앱의 Autodeploy 를 끈다.** 안 끄면 push 로도 뜨고 API 로도 떠서 이중 배포가
 되고 순서 보장이 사라진다.
 
