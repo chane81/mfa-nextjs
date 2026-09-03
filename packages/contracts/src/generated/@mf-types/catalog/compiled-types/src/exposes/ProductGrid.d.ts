@@ -16,9 +16,18 @@ import { type Product, type ProductCategory } from '@mfa/contracts';
  * 그건 host·remote·store 가 **같이 쓰는 어휘**지 이 모듈의 표면이 아니다.
  */
 export interface ProductGridProps {
+    /**
+     * 보여줄 카테고리. **이 값이 바뀌면 내부 선택도 따라간다** —
+     * host 가 URL 을 되돌렸을 때(뒤로 가기) 화면이 URL 과 갈라지지 않게 하려는 것이다.
+     */
     category?: ProductCategory | 'all';
     /** host 가 라우팅을 소유하므로 상세 이동은 콜백으로 위임 */
     onSelect?: (product: Product) => void;
+    /**
+     * 사용자가 필터를 바꿨다는 통지. **remote 는 URL 을 모른다** — 그 선택을 주소에
+     * 남길지 말지는 host 의 정책이라 여기서는 알리기만 한다(`onSelect` 와 같은 규칙).
+     */
+    onCategoryChange?: (category: ProductCategory | 'all') => void;
 }
 /** host 에 노출되는 모듈: `catalog/ProductGrid` */
-export default function ProductGrid({ category, onSelect, }: ProductGridProps): import("react").JSX.Element;
+export default function ProductGrid({ category, onSelect, onCategoryChange, }: ProductGridProps): import("react").JSX.Element;
