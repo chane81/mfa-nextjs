@@ -1,0 +1,59 @@
+# 임시 프로브 — Dokploy 가 실제로 배포에 얼마나 쓰는지 실측한다
+#
+# 목적은 폴링 간격(`dokploy-deploy` 의 `sleep 15`)이 적절한지 판단할 근거를 얻는 것이다.
+# 워크플로 로그로는 "감지 시각" 밖에 안 보이고, 진짜 소요는 Dokploy 가 쥔
+# `createdAt` · `startedAt` · `finishedAt` 에 있다.
+#
+# ⚠️ 판단이 끝나면 지운다. `workflow_dispatch` 전용이라 저절로 돌지는 않는다.
+name: dokploy-timing-probe
+
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: 배포 소요 실측
+    runs-on: ubuntu-latest
+    steps:
+      - name: 앱 3개의 최근 배포 시간을 뽑는다
+        env:
+          DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
+          API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          APP_CATALOG: ${{ vars.DOKPLOY_APP_CATALOG }}
+          APP_CART: ${{ vars.DOKPLOY_APP_CART }}
+          APP_HOST: ${{ vars.DOKPLOY_APP_HOST }}
+        run: |
+          set -euo pipefail
+
+          probe() {
+            local label="$1" id="$2"
+            echo "===== $label ====="
+            curl -fsS --max-time 30 -H "x-api-key: $API_KEY" \
+              "$DOKPLOY_URL/api/deployment.all?applicationId=$id" \
+            | jq -r '
+                .[:12][]
+                | {
+                    status,
+                    title,
+                    createdAt,
+                    startedAt,
+                    finishedAt,
+                    # 초 단위로 환산해 둔다 — 로그에서 바로 읽으려는 것이다
+                    queue_s: (
+                      if .startedAt and .createdAt
+                      then ((.startedAt|fromdate) - (.createdAt|fromdate)) else null end),
+                    build_s: (
+                      if .finishedAt and .startedAt
+                      then ((.finishedAt|fromdate) - (.startedAt|fromdate)) else null end),
+                    total_s: (
+                      if .finishedAt and .createdAt
+                      then ((.finishedAt|fromdate) - (.createdAt|fromdate)) else null end)
+                  }
+                | @json'
+          }
+
+          probe catalog "$APP_CATALOG"
+          probe cart    "$APP_CART"
+          probe host    "$APP_HOST"
