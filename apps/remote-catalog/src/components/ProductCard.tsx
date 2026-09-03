@@ -1,5 +1,5 @@
 import { formatKRW, type Product } from '@mfa/contracts';
-import { useCart } from '@mfa/store';
+import { MAX_CART_QUANTITY, useCart, useHydrated } from '@mfa/store';
 import { Badge, Button } from '@mfa/ui';
 
 import { ORIGIN_HUE } from '../origin';
@@ -14,6 +14,22 @@ export interface ProductCardProps {
 export function ProductCard({ product, onSelect }: ProductCardProps) {
   const add = useCart((state) => state.add);
   const soldOut = product.stock === 0;
+
+  /**
+   * 담긴 수량이 상한에 닿으면 더 담지 못하게 한다. 상한은 쿠키 코덱이 쥐고 있고
+   * (`MAX_CART_QUANTITY`) 스토어는 안 자른다 — 그 비대칭은 의도된 것이라, 화면이
+   * 그 위로 못 올라가게 막는 일이 담는 쪽 몫으로 남는다.
+   *
+   * `useHydrated` 로 한 번 거르는 이유: 스토어의 서버 스냅샷은 빈 장바구니라
+   * 하이드레이션 렌더까지는 담긴 수량을 알 수 없다. 그 전에 판정하면 서버가 그린
+   * 버튼과 첫 클라이언트 렌더가 갈린다.
+   */
+  const hydrated = useHydrated();
+  const held = useCart(
+    (state) =>
+      state.lines.find((line) => line.productId === product.id)?.quantity ?? 0,
+  );
+  const atMax = hydrated && held >= MAX_CART_QUANTITY;
 
   return (
     <article className="flex flex-col gap-3 rounded-md border border-line bg-surface-alt p-4">
@@ -44,10 +60,10 @@ export function ProductCard({ product, onSelect }: ProductCardProps) {
         </strong>
         <Button
           variant="primary"
-          disabled={soldOut}
+          disabled={soldOut || atMax}
           onClick={() => add(product)}
         >
-          담기
+          {atMax ? '가득' : '담기'}
         </Button>
       </div>
     </article>

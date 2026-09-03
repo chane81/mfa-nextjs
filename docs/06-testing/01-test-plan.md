@@ -139,7 +139,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 28. `packages/ui/src/components.tsx` — `--hue` 변수 / 조건부 렌더 / variant 클래스 매핑
 - [x] 29. `apps/host/src/mf/components/RemoteBoundary.tsx` — 자식 throw → `ErrorBox` 내용
 - [x] 30. `apps/host/src/mf/components/RemoteComponent.tsx` — Skeleton → 마크업 전이 / `<link href>` 조립 / **브라우저는 심어준 버전을 본다**(24차, `globalCell` 없이 불변 경로) / 실패 시 Boundary
-- [x] 31. remote exposes — cart 3종 · catalog 5종(`RelatedProducts` 포함). props 계약 + 콜백. **remote 는 host 라우터를 모른다**(ADR-013)
+- [x] 31. remote exposes — cart 3종 · catalog 5종(`RelatedProducts` 포함). props 계약 + 콜백. **remote 는 host 라우터를 모른다**(ADR-013). **저장 상한(`MAX_CART_QUANTITY`)에서 담기·`+` 가 잠긴다**(33차)
 - [x] 32. host 컴포넌트 — `SiteHeader` · `MfDiagnostics` · `lab/*` · `CatalogSlot`(주소 → 카테고리 검증 / `replace` / `all` 은 주소에서 뺀다 / 다른 쿼리 보존)
 
 ### Phase 5 — 테스트를 위한 최소 추출 (프로덕션 파일 수정)
