@@ -132,8 +132,8 @@
 - 결과:
   - ⭕ remote 단독 재배포가 가능하다.
   - ❌ Dokploy 에 배포 후 훅이 없다. remote 재배포 → host 캐시 무효화는 GitHub Actions
-    (`.github/workflows/mf-revalidate.yml`)가 대신한다 — 새 버전이 공표될 때까지 기다렸다
-    host 에 알린다.
+    (`.github/actions/mf-revalidate`, `deploy.yml` 의 `revalidate` job)가 대신한다 —
+    remote 배포가 끝난 뒤 host 에 알린다.
   - ❌ `outputFileTracingRoot` 를 저장소 루트로 올려야 한다(pnpm isolated 링커).
     `@swc/helpers` 의 `esm/` 누락은 `outputFileTracingIncludes` 로 따로 담는다.
 - 상세: [03-setup/04-dokploy.md](../03-setup/04-dokploy.md)

@@ -1,5 +1,52 @@
 # 진행 상황
 
+## 2026-09-03 (30차) — 배포 워크플로를 순서와 스크립트로 가른다
+
+29차에서 `deploy.yml` 이 280줄이 됐다. 순서(`needs` · `if`)와 각 단계의 bash 가 한 파일에
+섞여 있어서, 파이프라인 모양을 보려면 스크립트를 넘겨 읽어야 했다.
+
+### 폴백 도메인을 지웠다
+
+```yaml
+# 전
+HOST_URL: ${{ vars.MF_HOST_URL || 'https://mfa.lakegreen.net' }}
+# 후
+HOST_URL: ${{ vars.MF_HOST_URL }}
+```
+
+폴백은 편하지만 **포크나 다른 인스턴스에서 남의 도메인을 조용히 때린다.** 안 붙어야 할 때
+안 붙는 편이 낫다. 대신 `MF_HOST_URL` · `MF_CATALOG_URL` · `MF_CART_URL` · `DOKPLOY_URL`
+네 개가 저장소 Variables 에 **필수**가 됐다(`docs/03-setup/04-dokploy.md`).
+
+빈 값일 때 어디서 죽는지는 균일하지 않다 — `DOKPLOY_URL` 이 비면 `curl` 이 상대 URL 로
+즉시 실패해 job 이 죽지만, remote URL 이 비면 baseline 이 `|| echo ''` 로 삼켜 조용히
+지나간다. 시끄럽게 죽는 쪽만 믿을 수 있다는 뜻이다.
+
+### composite action 3개를 더 뺐다
+
+| action                  | 무엇                               | 왜 뺐나                              |
+| ----------------------- | ---------------------------------- | ------------------------------------ |
+| `detect-targets`        | 바뀐 경로 → 배포 대상 판별         | 가장 긴 bash. 함정 주석이 3개 붙는다 |
+| `dokploy-deploy` (29차) | 배포 트리거 + 완료 대기            | remote·host 가 **같은 판정**을 해야  |
+| `mf-version-check`      | 새 버전 공표 관측 (게이트 아님)    | "실패시키지 않는다" 이유가 길다      |
+| `mf-revalidate`         | host 캐시 무효화 웹훅 (재시도 5회) | 재시도 안전성 근거가 길다            |
+
+`deploy.yml` 280 → 170줄. 남은 건 트리거 · 동시성 · env · job 사이 순서뿐이라, 파일 하나로
+파이프라인 모양이 보인다.
+
+**로컬 action 은 `uses: ./…` 이라 그 job 이 먼저 `actions/checkout` 을 해야 한다.**
+`revalidate` job 은 지금까지 체크아웃이 없었어서 이번에 추가했다.
+
+`dokploy-deploy` 를 다른 action 안에 중첩하는 안은 안 썼다 — `remotes` job 을 한 줄로
+줄일 수 있지만, `vars`/`secrets` 를 한 겹 더 내려보내야 하고 로컬 action 의 `./` 해석이
+중첩에서 어떻게 도는지가 또 하나의 추측이 된다.
+
+### 문서에 남은 죽은 링크
+
+`.github/workflows/mf-revalidate.yml` 을 가리키는 곳이 둘 있었다(`01-decision.md`,
+`04-dokploy.md`). 29차에 `deploy.yml` 의 `revalidate` job 으로 흡수되며 사라진 파일이다.
+**워크플로를 합칠 때 문서 링크는 같이 안 따라온다** — grep 으로만 잡힌다.
+
 ## 2026-09-03 (29차) — 배포 순서를 CI 가 쥔다 (`ci/deploy-pipeline`)
 
 28차에서 "host 가 remote 보다 먼저 뜨면 어떻게 되나" 를 짚다가, 그게 실재하는 창이라는
