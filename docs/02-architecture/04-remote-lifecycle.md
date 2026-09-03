@@ -137,6 +137,55 @@ remote CI                          host (인스턴스 N개)
 **웹훅은 최적화다.** 없어도 모든 인스턴스가 TTL 안에 수렴한다(실측 30초).
 웹훅은 그 수렴을 즉시로 당길 뿐이고, 그래서 웹훅 유실이 정합성 문제가 되지 않는다.
 
+### 순서는 CI 가 만든다 — Dokploy 에는 그 개념이 없다
+
+Dokploy 는 앱마다 "이 경로가 바뀌면 나를 빌드해라"(Watch Paths)만 있고 **앱 사이의
+의존·순서가 없다.** 한 push 가 세 앱을 동시에 물면 누가 먼저 끝날지 모른다.
+공식 문서도 순서가 필요하면 CI 에서 API 로 트리거하라고 말한다
+(docs.dokploy.com — Auto deploy > API Method).
+
+```
+POST https://<dokploy>/api/application.deploy
+  x-api-key: <token>
+  { "applicationId": "<id>" }
+```
+
+그래서 `.github/workflows/deploy.yml` 이 파이프라인을 쥔다.
+
+```
+detect ─┬─ remotes (matrix)  트리거 → mf-version.json 이 바뀔 때까지 대기
+        │                     ↓ 실패하면 여기서 멈춘다
+        ├─ host              remote 가 공표된 **뒤에** 트리거
+        └─ revalidate        host 를 새로 안 띄웠을 때만 (아래)
+```
+
+**전제: 세 앱의 Autodeploy 를 끈다.** 안 끄면 push 로도 뜨고 API 로도 떠서 이중 배포가
+되고 순서 보장이 사라진다.
+
+#### 왜 remote 가 먼저여야 하나 — 버전 스큐
+
+host 는 커밋된 MF DTS 로 컴파일되지만 런타임에는 **배포된** remote 를 받는다.
+그래서 host 가 먼저 뜨면 **새 host 코드 + 옛 remote 번들** 조합이 생긴다.
+타입 검사는 이걸 못 잡는다 — 양쪽이 같은 커밋의 타입으로 컴파일되기 때문이다.
+
+| props 를 어떻게 바꿨나                 | 옛 remote 컴포넌트에서                          |
+| -------------------------------------- | ----------------------------------------------- |
+| 옵셔널 prop 추가                       | 모르는 prop 이라 무시 — **에러 없이 옛 동작**   |
+| 필수 prop 추가 · 이름 변경 · 타입 변경 | `undefined` 를 받는다 → 오동작 또는 `TypeError` |
+
+터지면 `RemoteBoundary` 가 잡아 그 패널만 에러 상자가 되고 페이지는 산다(200).
+**에러가 나는 쪽이 오히려 낫다** — 옵셔널 추가는 아무도 모르게 지나간다.
+
+순서를 고정하면 그 조합 자체가 성립하지 않는다. 남는 건 반대 방향(옛 host + 새 remote)
+뿐이고, 그건 **"remote 는 한 배포 주기만큼 하위호환을 유지한다"** 규칙 하나로 덮인다.
+그 규칙을 지킬 수 없는 변경(필수 prop 추가 등)은 expand/contract 로 두 번에 나눈다 —
+① remote 가 새 것을 옵셔널로 받게 배포 → ② host 가 쓰기 시작 → ③ remote 에서 옛 것 제거.
+
+#### 무효화는 host 를 새로 안 띄웠을 때만 한다
+
+host 를 재배포하면 새 컨테이너가 **빈 캐시**로 뜨므로 첫 요청이 이미 새 remote 로 굽는다.
+무효화는 "host 는 그대로인데 remote 만 바뀐" 경우의 것이다.
+
 ### warm-then-revalidate
 
 순서가 전부다. 무효화를 먼저 하면 재생성 렌더가 remote 번들을 네트워크로 받는 동안
@@ -241,6 +290,10 @@ curl -s "$HOST_URL/api/lab/stats?refresh=1" | jq
 
 ## 알려진 한계
 
+- **host 배포의 성공 여부를 파이프라인이 보지 않는다.** 트리거만 하고 끝낸다.
+  remote 는 `mf-version.json` 변화로 완료를 판정할 수 있지만 host 는 자기 버전을
+  공표하지 않는다. `GET /api/deployment.all?applicationId=…` 로 상태를 폴링할 수 있는데
+  응답 형태를 아직 실측하지 않았다 — 확인하면 그때 붙인다.
 - **멀티 인스턴스 무효화는 TTL 만큼 지연된다.** 웹훅은 한 인스턴스에만 닿는다.
   즉시성이 필요하면 공유 캐시 핸들러를 붙여야 한다.
 - **호스트 빌드가 remote 기동에 의존한다.** Cache Components 에서 `generateStaticParams` 가
