@@ -31,6 +31,16 @@
  * `.git` 을 컨텍스트에 넣고 `.git/HEAD` 를 직접 읽는 경로를 만들어야 한다
  * (git 바이너리가 없으므로 `git rev-parse` 로는 안 된다). 배경: docs/03-setup/04-dokploy.md
  *
+ * ## ⚠️ 이 값은 "배포가 끝났다" 는 신호가 아니다
+ *
+ * "빌드마다 달라진다" 는 성질은 **이 스크립트가 실제로 돌 때만** 성립한다. 컨테이너
+ * 빌드에서는 이 실행이 Docker 레이어라, 빌드 컨텍스트가 이전과 같으면 레이어째 캐시로
+ * 재사용되어 `.mf-version` 이 그대로다. 배포는 성공인데 버전은 안 바뀐다.
+ *
+ * 그래서 배포 파이프라인(`.github/actions/dokploy-deploy`)은 완료를 **Dokploy 의 배포
+ * 상태**로 판정한다. 여기서 나온 버전 변화로 판정하면 캐시가 히트한 배포에서 영영
+ * 기다리게 된다 — 실측으로 밟았다(known-issues I-8).
+ *
  * 사용: node scripts/mf-build-version.ts
  */
 import { writeFileSync } from 'node:fs';
