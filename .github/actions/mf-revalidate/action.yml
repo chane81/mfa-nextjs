@@ -1,0 +1,74 @@
+name: host 캐시 무효화
+description: host 의 `/api/mf-revalidate` 웹훅을 때려 remote 태그 캐시를 깨고 다시 굽게 한다
+
+# Dokploy Application 에는 배포 후 훅이 없어서(설정 스키마에 `preDeploy`/`postDeploy` 계열이
+# 없다) 이 호출은 CI 가 맡는다.
+#
+# ## 재시도가 안전한 이유
+#
+# 웹훅은 warm 을 **먼저** 하고, 실패하면 캐시를 건드리지 않은 채 502 로 중단한다.
+# 그래서 부분 적용 상태가 생기지 않는다 — 몇 번을 때려도 결과가 같다.
+
+inputs:
+  host-url:
+    description: host 공개 오리진
+    required: true
+  remote:
+    description: 무효화할 remote 이름 (catalog · cart)
+    required: true
+  secret:
+    description: MF_REVALIDATE_SECRET — host 런타임 env 와 같은 값
+    required: true
+  attempts:
+    description: 최대 시도 횟수
+    required: false
+    default: '5'
+
+runs:
+  using: composite
+  steps:
+    - name: ${{ inputs.remote }} 캐시 무효화
+      shell: bash
+      env:
+        HOST_URL: ${{ inputs.host-url }}
+        REMOTE: ${{ inputs.remote }}
+        MF_REVALIDATE_SECRET: ${{ inputs.secret }}
+        ATTEMPTS: ${{ inputs.attempts }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "${MF_REVALIDATE_SECRET:-}" ]; then
+          echo "::error::MF_REVALIDATE_SECRET 이 없다. Dokploy 의 host 런타임 env 와 같은 값을 저장소 Secret 으로 넣는다."
+          exit 1
+        fi
+
+        for ATTEMPT in $(seq 1 "$ATTEMPTS"); do
+          BODY="$(curl -sS --max-time 60 -w '\n%{http_code}' \
+            -X POST "$HOST_URL/api/mf-revalidate" \
+            -H "x-mf-secret: $MF_REVALIDATE_SECRET" \
+            -H 'content-type: application/json' \
+            -d "{\"remote\":\"$REMOTE\"}" || true)"
+
+          STATUS="$(echo "$BODY" | tail -n1)"
+          JSON="$(echo "$BODY" | sed '$d')"
+
+          if [ "$STATUS" = "200" ] && [ "$(echo "$JSON" | jq -r '.ok')" = "true" ]; then
+            VERSION="$(echo "$JSON" | jq -r '.version')"
+            WARMED="$(echo "$JSON" | jq -r '.warmed')"
+            echo "무효화 완료 — version=$VERSION warmed=$WARMED"
+            {
+              echo "### $REMOTE 무효화"
+              echo ""
+              echo "- 버전: \`$VERSION\`"
+              echo "- warm: \`$WARMED\`"
+              echo "- 시도: $ATTEMPT 회"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "시도 $ATTEMPT 실패 (HTTP $STATUS): $(echo "$JSON" | jq -c '.' 2>/dev/null || echo "$JSON")"
+          sleep $(( ATTEMPT * 10 ))
+        done
+
+        echo "::error::웹훅이 ${ATTEMPTS}회 모두 실패했다. host 페이지 캐시는 그대로다(웹훅이 캐시를 건드리기 전에 중단한다)."
+        exit 1
