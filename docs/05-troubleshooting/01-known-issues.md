@@ -33,22 +33,23 @@
 
 ### remote 가 안 뜨거나 깨짐
 
-| 증상                                                                       | 항목                                                                                                                                              |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `_jsxDEV is not a function` (dev, catalog 첫 로드)                         | [0-4c](#0-4c-콜드-dev-첫-로드에서-_jsxdev-is-not-a-function)                                                                                      |
-| `Invalid hook call` / React 2벌 로드                                       | [0-3](#0-3-remote-서버-번들이-자기-react-를-들고-오면-서버에서도-훅이-깨진다), [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) |
-| `Failed to bridge external shared module` / `#RUNTIME-015`                 | [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) — host 의 `shared` 에서 서브엔트리를 뺐다                                      |
-| host 의 `shared` 를 고쳤는데 뭘 확인해야 하나                              | [0-4e](#0-4e-shared-를-고쳤을-때의-dev-검증-절차) — 빌드만으로는 부족하다                                                                         |
-| `예상 밖 모듈을 require 했습니다`                                          | 번들러 externals — [0-5](#0-5-shared-모듈-네임스페이스-interop)                                                                                   |
-| `[ dynamic-remote-type-hints-plugin ] err: [object Event]`                 | [0-4b](#0-4b--dynamic-remote-type-hints-plugin--err-object-event)                                                                                 |
-| `SSR 번들을 가져오지 못했습니다` / `ECONNREFUSED` (dev)                    | remote 미기동. 살아있는데도 나면 [0-4](#0-4-dev-에서-ssr-번들이-안-내려옴)                                                                        |
-| 배럴 import 가 Server Component 를 오염                                    | [3](#3-공유-ui-패키지-배럴이-server-component-를-오염시킴)                                                                                        |
-| `Pre-transform error: Failed to resolve import "@tests/…"` (dev 기동 로그) | 워밍 glob 이 테스트 파일을 잡았다 — [H-2](#h-2-dev-워밍-glob-이-테스트-파일까지-잡아-사전-transform-이-실패했다)                                  |
-| DTS 를 켰는데 계약 드리프트가 안 잡힌다                                    | props 가 계약 패키지에 있다 — [I-2](#i-2-dts-를-켜도-props-드리프트가-안-잡혔다--생성-타입이-계약을-되-import-했다)                               |
-| `extractThirdParty: true` 인데 산출물이 그대로다                           | ESM 전용 워크스페이스 패키지를 못 집는다 — [I-3](#i-3-extractthirdparty-는-esm-전용-워크스페이스-패키지를-못-집는다)                              |
-| tsconfig 에 `@mf-types` 매핑을 넣었더니 `Cannot find name 'process'`       | `paths` 에 `*` 와일드카드를 썼다 — [I-4](#i-4-paths-에--와일드카드를-쓰면-무관한-에러가-쏟아진다)                                                 |
-| DTS 를 켰는데 드리프트가 **조용히** 통과한다                               | 모듈 확장이 프로그램에 없어 `RemoteModule<K>` 가 `any` 다 — [I-5](#i-5-모듈-확장을-include-에-안-넣으면-remotemodulek-가-조용히-any-가-된다)      |
-| 계약 타입이 소비처에서 **통째로 `any`** 인데 검사는 초록이다               | emit 된 `.d.ts` 가 복사되지 않는 생성물을 참조한다 — [I-6](#i-6-emit-되는-dts-가-생성물을-참조하면-소비처에서-조용히-any-가-된다)                 |
+| 증상                                                                                  | 항목                                                                                                                                              |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `_jsxDEV is not a function` (dev, catalog 첫 로드)                                    | [0-4c](#0-4c-콜드-dev-첫-로드에서-_jsxdev-is-not-a-function)                                                                                      |
+| `Invalid hook call` / React 2벌 로드                                                  | [0-3](#0-3-remote-서버-번들이-자기-react-를-들고-오면-서버에서도-훅이-깨진다), [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) |
+| `Failed to bridge external shared module` / `#RUNTIME-015`                            | [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) — host 의 `shared` 에서 서브엔트리를 뺐다                                      |
+| host 의 `shared` 를 고쳤는데 뭘 확인해야 하나                                         | [0-4e](#0-4e-shared-를-고쳤을-때의-dev-검증-절차) — 빌드만으로는 부족하다                                                                         |
+| `예상 밖 모듈을 require 했습니다`                                                     | 번들러 externals — [0-5](#0-5-shared-모듈-네임스페이스-interop)                                                                                   |
+| `[ dynamic-remote-type-hints-plugin ] err: [object Event]`                            | [0-4b](#0-4b--dynamic-remote-type-hints-plugin--err-object-event)                                                                                 |
+| `SSR 번들을 가져오지 못했습니다` / `ECONNREFUSED` (dev)                               | remote 미기동. 살아있는데도 나면 [0-4](#0-4-dev-에서-ssr-번들이-안-내려옴)                                                                        |
+| 배럴 import 가 Server Component 를 오염                                               | [3](#3-공유-ui-패키지-배럴이-server-component-를-오염시킴)                                                                                        |
+| `Pre-transform error: Failed to resolve import "@tests/…"` (dev 기동 로그)            | 워밍 glob 이 테스트 파일을 잡았다 — [H-2](#h-2-dev-워밍-glob-이-테스트-파일까지-잡아-사전-transform-이-실패했다)                                  |
+| DTS 를 켰는데 계약 드리프트가 안 잡힌다                                               | props 가 계약 패키지에 있다 — [I-2](#i-2-dts-를-켜도-props-드리프트가-안-잡혔다--생성-타입이-계약을-되-import-했다)                               |
+| `extractThirdParty: true` 인데 산출물이 그대로다                                      | ESM 전용 워크스페이스 패키지를 못 집는다 — [I-3](#i-3-extractthirdparty-는-esm-전용-워크스페이스-패키지를-못-집는다)                              |
+| tsconfig 에 `@mf-types` 매핑을 넣었더니 `Cannot find name 'process'`                  | `paths` 에 `*` 와일드카드를 썼다 — [I-4](#i-4-paths-에--와일드카드를-쓰면-무관한-에러가-쏟아진다)                                                 |
+| DTS 를 켰는데 드리프트가 **조용히** 통과한다                                          | 모듈 확장이 프로그램에 없어 `RemoteModule<K>` 가 `any` 다 — [I-5](#i-5-모듈-확장을-include-에-안-넣으면-remotemodulek-가-조용히-any-가-된다)      |
+| 계약 타입이 소비처에서 **통째로 `any`** 인데 검사는 초록이다                          | emit 된 `.d.ts` 가 복사되지 않는 생성물을 참조한다 — [I-6](#i-6-emit-되는-dts-가-생성물을-참조하면-소비처에서-조용히-any-가-된다)                 |
+| 로컬·CI 는 초록인데 **Dokploy 배포만** `Cannot find module './generated/@mf-types/…'` | `.dockerignore` 가 커밋된 생성물을 컨텍스트에서 뺐다 — [I-7](#i-7-dockerignore-가-커밋된-계약을-컨텍스트에서-빼고-있었다)                         |
 
 ### SSR · hydration
 
@@ -347,6 +348,50 @@ export type RemoteModuleId = CatalogKeys | CartKeys;
 무엇보다 **참조가 남아 있다는 사실 자체가 함정으로 남는다** — 다음에 누가
 `exports` 나 `rootDir` 을 건드리면 같은 방식으로 조용히 무너진다.
 참조를 없애면 그 갈래가 구조적으로 사라진다.
+
+### I-7. `.dockerignore` 가 **커밋된 계약**을 컨텍스트에서 빼고 있었다
+
+증상: 로컬 `pnpm build` · CI 전부 초록인데 **Dokploy 배포만 세 앱 모두 실패**한다.
+직전 커밋은 셋 다 성공했다.
+
+```
+#24 3.054 @mfa/contracts:build: src/contract-check.ts(6,45): error TS2307:
+          Cannot find module './generated/@mf-types/cart/apis' or its corresponding type declarations.
+#24 3.054 @mfa/contracts:build: src/remote-contract.ts(91,14): error TS2344:
+          Type 'typeof loadRemote<K, never>' does not satisfy the constraint '(...args: any) => any'.
+#24 ERROR: process "... pnpm turbo run build --filter=@mfa/remote-catalog"
+          did not complete successfully: exit code: 2
+```
+
+원인: `.dockerignore` 의 `**/@mf-types`. 그 줄은 컨테이너화 시점(`fccc068`)에 들어왔고
+**그때는 맞는 규칙이었다** — `@mf-types` 는 host 앱 안의 생성물이었고 이미지가 읽을 일이
+없었다. DTS 소유를 `packages/contracts` 로 옮기면서 그 전제가 깨졌다. 지금은 그 생성물이
+`tsc` 로 빌드되는 패키지 안에 있고, 세 이미지가 전부 그 패키지를 빌드한다.
+
+두 번째 에러(`TS2344`)는 파생이다 — `@mf-types/index.d.ts` 가 없으면 `loadRemote()` 의
+모듈 확장이 프로그램에 안 들어와 `RemoteModule<K>` 가 원본 시그니처를 보게 된다(I-5 와 같은 갈래).
+
+고친 법: 그 줄을 뺐다. 저장소 전체에서 `@mf-types` 디렉터리는 커밋된 그 하나뿐이고
+(remote 의 것은 `dist` 안이라 `**/dist` 가 이미 거른다), 그래서 예외 규칙 없이 삭제로 끝난다.
+
+#### 왜 여기까지 와서야 드러났나
+
+**`.dockerignore` 는 이 저장소의 어떤 검사도 읽지 않는다.** `pnpm build` 는 디스크의
+파일을 쓰고, CI 는 체크아웃 전체를 쓴다. 컨텍스트가 좁아지는 건 이미지 빌드뿐이다.
+
+| 무엇               | `@mf-types` | 결과 |
+| ------------------ | ----------- | ---- |
+| 로컬 `pnpm build`  | 있음        | 통과 |
+| CI                 | 있음        | 통과 |
+| Docker 이미지 빌드 | **빠짐**    | 실패 |
+
+같이 알게 된 것: **직전 커밋의 host 이미지도 `apps/host/@mf-types` 없이 빌드됐는데
+성공했다.** 그때 `loader/modules.ts` 가 그 경로를 import 하고 있었으므로, Next 16 의
+이미지 빌드가 그 import 를 타입 검사하지 않았다는 뜻이다. 즉 이 함정은 그때도 있었고
+**조용했다.** contracts 를 `tsc` 로 빌드하게 되면서 비로소 시끄럽게 터졌다.
+
+> 생성물을 커밋하기로 했으면 **그것을 읽는 모든 경로**에서 빠지지 않는지 확인한다.
+> `.gitignore` · `.prettierignore` 는 이번에 같이 고쳤는데 `.dockerignore` 만 남았다.
 
 ## H. (26차) 재배치 · dev 기동에서 밟은 것
 
