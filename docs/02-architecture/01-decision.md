@@ -840,3 +840,48 @@ DTS 의 `RemoteKeys` 에서 파생시키자는 안. 세 가지가 막는다.
 그래서 `@mf-types` 를 읽는 자리는 **host 하나**(`remote-contract.ts`)로 둔다.
 손으로 적은 `MODULE_IDS` 가 틀리면 거기서 `RemoteKeys` 와 대조되어 컴파일이 죽는다 —
 선언은 공유 패키지에, 검증은 host 에.
+
+## ADR-020 — 요청마다 달라지는 값은 라우트별 Slot 이 읽고, 공유 컴포넌트는 받기만 한다
+
+**날짜** 2026-09-03 (31차) · **상태** 채택
+
+### 맥락
+
+카탈로그 필터를 주소에 남기려고 `CatalogSection` 에 `useSearchParams` 를 넣었다.
+타입 검사도 테스트 655개도 전부 통과했는데 **`pnpm build` 가 죽었다** —
+그것도 이번에 건드리지 않은 `/lab/cache` 에서.
+
+```
+Error occurred prerendering page "/lab/cache"   digest: 'CLIENT_HOOK_DYNAMIC'
+```
+
+`CatalogSection` 을 홈만 쓰는 게 아니었다. `LabPanel` 을 거쳐 `/lab/*` 셋이 같이 쓰고,
+그쪽은 프리렌더 대상이다. 요청 컨텍스트를 읽는 훅 하나가 **소비처 전부의 렌더 방식을
+바꿔버린다.**
+
+`<Suspense>` 로 감싸는 것이 공식 안내지만 여기서는 답이 아니다. 그러면 그 트리가
+클라이언트 렌더로 내려가는데, lab 패널은 **서버 렌더 시각을 비교하는 것이 목적**이라
+실험 자체가 무의미해진다.
+
+### 결정
+
+**요청마다 달라지는 값**(쿠키 · URL · 헤더)을 읽는 코드는 그 값을 쓰는 **라우트별
+껍데기**(`*Slot`)에 둔다. 공유 컴포넌트는 그 값을 props 로만 받는다.
+
+```
+CatalogSlot     useSearchParams · router.replace      홈(`/`)만 쓴다
+CatalogSection  category · onCategoryChange 를 받는다  홈 · /lab/* 넷이 쓴다
+```
+
+이 저장소에 이미 같은 꼴이 있었다 — `CartSlot`(쿠키를 읽는다) ↔ `CartSection`(받아서
+그린다). ADR-014 가 장바구니에 대해 세운 규칙을 URL 로 넓힌 것뿐이다.
+
+### 결과
+
+- ⭕ 렌더 방식이 **라우트의 선택**으로 남는다. 공유 컴포넌트를 고쳐도 남의 라우트가
+  안 깨진다.
+- ⭕ 정책이 한 파일에 모인다. `?category=` 의 검증 · `all` 생략 · `replace` 여부가
+  전부 `CatalogSlot` 안이고, 그래서 remote 없이 테스트할 수 있다.
+- ❌ 파일이 하나 는다. 소비처가 하나뿐인 컴포넌트에는 과한 분리다 — **둘 이상이
+  쓰기 시작할 때** 가르는 것으로 충분하다.
+- ❌ 이 규칙을 어겨도 `typecheck` · `test` 는 안 잡는다. `pnpm build` 만 잡는다(I-9).

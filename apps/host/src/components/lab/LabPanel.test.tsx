@@ -18,6 +18,9 @@ import { LAB_MODES, LAB_ORDER } from './modes';
  * `CatalogSection` 이 `useRouter()` 로 상세 이동을 잡는다 — host 가 라우팅을 소유하고
  * remote 는 콜백만 받는 구조(ADR-013)의 host 쪽 끝이다. App Router 컨텍스트가 없으면
  * `invariant expected app router to be mounted` 로 죽으므로 여기서 세운다.
+ *
+ * `useSearchParams` 는 여기 없다. 필터를 주소에 남기는 건 `CatalogSlot` 의 일이고,
+ * 이 실험 라우트는 프리렌더 대상이라 그 훅이 들어오면 빌드가 깨진다.
  */
 const push = vi.fn();
 vi.mock('next/navigation', () => ({

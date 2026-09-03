@@ -216,6 +216,45 @@ describe('ProductGrid', () => {
     expect(onSelect).toHaveBeenCalledWith(first);
   });
 
+  it('필터를 바꾸면 host 에 알린다', async () => {
+    // remote 는 URL 을 모른다. 그 선택을 주소에 남기는 건 host 의 정책이라
+    // 여기서는 알리기만 하는 것이 계약이다.
+    const onCategoryChange = vi.fn();
+    const { ProductGrid } = await load();
+    render(<ProductGrid onCategoryChange={onCategoryChange} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'audio' }));
+
+    expect(onCategoryChange).toHaveBeenCalledWith('audio');
+  });
+
+  it('알리지 않아도 자기 화면은 바꾼다', async () => {
+    // 콜백은 옵셔널이다. 안 넘긴 host(배포가 한 주기 뒤처진 host 포함)에서도
+    // 필터 자체는 그대로 동작해야 한다.
+    const { ProductGrid } = await load();
+    render(<ProductGrid />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'audio' }));
+
+    const audio = PRODUCTS.filter((p) => p.category === 'audio');
+    expect(screen.getAllByRole('button', { name: '담기' })).toHaveLength(
+      audio.length,
+    );
+  });
+
+  it('host 가 category 를 되돌리면 화면도 따라간다', async () => {
+    // 뒤로 가기는 URL 만 되돌린다. 여기서 안 맞추면 주소와 화면이 갈라진다.
+    const { ProductGrid } = await load();
+    const { rerender } = render(<ProductGrid category="audio" />);
+
+    rerender(<ProductGrid category="keyboard" />);
+
+    const keyboard = PRODUCTS.filter((p) => p.category === 'keyboard');
+    expect(screen.getAllByRole('button', { name: '담기' })).toHaveLength(
+      keyboard.length,
+    );
+  });
+
   it('어느 remote 가 그렸는지 라벨로 밝힌다', async () => {
     const { ProductGrid } = await load();
     render(<ProductGrid />);

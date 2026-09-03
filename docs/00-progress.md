@@ -1,5 +1,73 @@
 # 진행 상황
 
+## 2026-09-03 (31차) — 카탈로그 필터를 주소에 남긴다 (파이프라인 첫 실전 통과)
+
+30차에서 만든 배포 파이프라인은 아직 **remote·host 를 실제로 배포해 본 적이 없었다.**
+`.github/**` 만 바뀐 커밋만 지나가서 `dokploy-deploy` · `mf-version-check` ·
+`mf-revalidate` 셋이 전부 skip 이었다. 그래서 실제 코드를 넣었다.
+
+### 고친 것 — 필터가 새로고침에서 사라졌다
+
+카테고리 선택이 `ProductGrid`(remote) 안의 `useState` 였다. 새로고침하면 `all` 로
+돌아가고 그 화면을 링크로 건넬 수도 없었다.
+
+**remote 는 URL 을 모른다**(ADR-013). 그래서 remote 는 "바뀌었다"만 알리고, 그걸 주소에
+남길지는 host 가 정한다 — `onSelect` 와 똑같은 규칙이다.
+
+| 쪽     | 무엇                                                                                    |
+| ------ | --------------------------------------------------------------------------------------- |
+| remote | `ProductGridProps.onCategoryChange?` 추가. `category` prop 이 바뀌면 내부 선택도 맞춘다 |
+| host   | `CatalogSlot` 신설 — `?category=` 를 읽고 `router.replace` 로 쓴다                      |
+
+prop 동기화는 `useEffect` 가 아니라 렌더 중에 한다(React `useState` 문서의
+"Adjusting state when a prop changes"). effect 로 하면 옛 값으로 한 번 그린 뒤 다시 그린다.
+필요한 이유는 **뒤로 가기** — 그때는 URL 만 되돌아오므로 안 맞추면 주소와 화면이 갈라진다.
+
+### 밟은 것 — 건드리지도 않은 라우트가 죽었다
+
+처음엔 `useSearchParams` 를 `CatalogSection` 에 넣었다. typecheck 통과, 테스트 655개 통과,
+그리고 `pnpm build` 가 **`/lab/cache`** 에서 죽었다.
+
+```
+Error occurred prerendering page "/lab/cache"   digest: 'CLIENT_HOOK_DYNAMIC'
+```
+
+`CatalogSection` 을 홈만 쓰는 게 아니었다. `LabPanel` 을 거쳐 `/lab/*` 셋이 같이 쓰고
+그쪽은 프리렌더 대상이다. **요청 컨텍스트를 읽는 훅 하나가 소비처 전부의 렌더 방식을
+바꾼다.** `<Suspense>` 로 감싸는 건 답이 아니었다 — lab 패널은 서버 렌더 시각을 비교하는
+것이 목적이라 클라이언트 렌더로 내려가면 실험이 무의미해진다.
+
+경계를 옮겨서 고쳤다. 저장소에 이미 같은 꼴이 있었다 — `CartSlot`(쿠키를 읽는다) ↔
+`CartSection`(받아서 그린다). ADR-020 으로 굳히고 I-9 로 남겼다.
+
+```
+CatalogSlot     useSearchParams · router.replace      홈만 쓴다
+CatalogSection  category · onCategoryChange 를 받는다  홈 · /lab/* 넷이 쓴다
+```
+
+**이 실수는 typecheck 도 test 도 안 잡는다. `pnpm build` 만 잡았다.**
+
+### DTS 가 실제로 한 일
+
+`pnpm mf:types` 한 번으로 host 가 새 prop 을 알게 됐다. 그 전에는 정확히 한 줄이 죽었다.
+
+```
+CatalogSection.tsx(51,9): error TS2353:
+  'onCategoryChange' does not exist in type 'ProductGridProps'
+```
+
+옵셔널 prop 이라 **옛 remote 에서도 안 터진다** — 무시될 뿐이다. 29차가 지적한
+"에러가 안 나서 더 위험한" 바로 그 경우고, 배포 순서가 그 창을 닫는다.
+
+### 테스트
+
+| 어디            | 무엇                                                                                    |
+| --------------- | --------------------------------------------------------------------------------------- |
+| catalog exposes | 필터 변경 통지 / **콜백 없이도 자기 화면은 바뀐다** / prop 되돌림                       |
+| host            | `CatalogSlot` — 모르는 값은 `all` / `replace` / `all` 은 주소에서 뺀다 / 다른 쿼리 보존 |
+
+"콜백 없이도" 는 배포가 한 주기 어긋난 host 를 흉내 낸 것이다.
+
 ## 2026-09-03 (30차) — 배포 워크플로를 순서와 스크립트로 가른다
 
 29차에서 `deploy.yml` 이 280줄이 됐다. 순서(`needs` · `if`)와 각 단계의 bash 가 한 파일에

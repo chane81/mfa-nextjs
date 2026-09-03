@@ -1,5 +1,9 @@
+import { Suspense } from 'react';
+
+import { Skeleton } from '@mfa/ui';
+
 import { CartSlot } from '@/components/CartSlot';
-import { CatalogSection } from '@/components/CatalogSection';
+import { CatalogSlot } from '@/components/CatalogSlot';
 
 /**
  * 장바구니를 `<Suspense>` 밖에서 읽는 라우트 — 프리렌더 검증에서 빠진다.
@@ -35,7 +39,14 @@ export default function HomePage() {
       </section>
 
       <div className="grid grid-cols-[minmax(0,2fr)_minmax(280px,1fr)] items-start gap-6">
-        <CatalogSection />
+        {/*
+          `CatalogSlot` 이 `useSearchParams` 로 필터를 읽는다. 이 라우트는
+          `instant = false` 라 프리렌더 대상이 아니지만, 공식 문서가 요구하는 경계를
+          그 전제와 무관하게 둔다 — `instant` 를 되돌리는 날 빌드가 깨지지 않게.
+        */}
+        <Suspense fallback={<Skeleton label="상품 목록 준비 중…" />}>
+          <CatalogSlot />
+        </Suspense>
         <CartSlot compact />
       </div>
     </>
