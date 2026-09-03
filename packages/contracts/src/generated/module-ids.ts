@@ -22,6 +22,7 @@ export const MODULE_IDS = [
   'cart/CheckoutFlow',
   'catalog/ProductDetail',
   'catalog/ProductGrid',
+  'catalog/RelatedProducts',
 ] as const;
 
 /** 노출 모듈 id. 위 배열에서 파생된다 — 값이 원본이고 타입이 그림자다. */

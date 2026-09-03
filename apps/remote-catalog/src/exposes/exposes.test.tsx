@@ -35,6 +35,7 @@ beforeEach(() => {
 const load = async () => ({
   ProductGrid: (await import('./ProductGrid')).default,
   ProductDetail: (await import('./ProductDetail')).default,
+  RelatedProducts: (await import('./RelatedProducts')).default,
   ProductCard: (await import('../components/ProductCard')).ProductCard,
   StockBadge: (await import('../components/StockBadge')).StockBadge,
   useCart: (await import('@mfa/store')).useCart,
@@ -258,6 +259,72 @@ describe('ProductDetail', () => {
   it('링크를 그리지 않는다 (ADR-013)', async () => {
     const { ProductDetail } = await load();
     const { container } = render(<ProductDetail productId={A.id} />);
+    expect(container.querySelectorAll('a')).toHaveLength(0);
+  });
+});
+
+describe('RelatedProducts', () => {
+  it('기준 상품 자신은 목록에 넣지 않는다', async () => {
+    // host 는 상세 페이지의 `productId` 를 그대로 넘긴다. 거르지 않으면
+    // 보고 있는 상품이 "함께 보는 상품" 에 한 번 더 나온다.
+    const { RelatedProducts } = await load();
+
+    render(<RelatedProducts productId={A.id} limit={PRODUCTS.length} />);
+
+    expect(screen.queryByText(A.name)).not.toBeInTheDocument();
+  });
+
+  it('같은 카테고리를 먼저 채운다', async () => {
+    const { RelatedProducts } = await load();
+    const sameCategory = PRODUCTS.filter(
+      (p) => p.category === A.category && p.id !== A.id,
+    );
+    // 이 성질을 보려면 같은 카테고리 상품이 목 데이터에 둘 이상 있어야 한다
+    expect(sameCategory.length).toBeGreaterThan(0);
+
+    render(<RelatedProducts productId={A.id} limit={sameCategory.length} />);
+
+    for (const product of sameCategory) {
+      expect(screen.getByText(product.name)).toBeInTheDocument();
+    }
+  });
+
+  it('limit 이 개수를 자른다 — 기본값은 3 이다', async () => {
+    const { RelatedProducts } = await load();
+
+    const { container, unmount } = render(
+      <RelatedProducts productId={A.id} limit={2} />,
+    );
+    expect(container.querySelectorAll('article')).toHaveLength(2);
+    unmount();
+
+    const { container: byDefault } = render(
+      <RelatedProducts productId={A.id} />,
+    );
+    expect(byDefault.querySelectorAll('article')).toHaveLength(3);
+  });
+
+  it('모르는 id 여도 빈 화면을 만들지 않는다', async () => {
+    // 그 경우 오류를 알리는 건 ProductDetail 의 몫이다 — 같은 말을 두 번 하지 않는다.
+    const { RelatedProducts } = await load();
+
+    const { container } = render(<RelatedProducts productId="없는-상품" />);
+
+    expect(container.querySelectorAll('article')).toHaveLength(3);
+  });
+
+  it('선택은 콜백으로 위임한다 — 링크를 그리지 않는다 (ADR-013)', async () => {
+    const { RelatedProducts } = await load();
+    const onSelect = vi.fn();
+
+    const { container } = render(
+      <RelatedProducts productId={A.id} limit={1} onSelect={onSelect} />,
+    );
+    // 카드 안 버튼은 둘이다(이름 · 담기). 상세 이동은 **이름** 쪽이다.
+    const card = container.querySelector('article')!;
+    await userEvent.click(within(card).getAllByRole('button')[0]!);
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
     expect(container.querySelectorAll('a')).toHaveLength(0);
   });
 });

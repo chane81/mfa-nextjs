@@ -1,5 +1,6 @@
 import ProductDetail from './exposes/ProductDetail';
 import ProductGrid from './exposes/ProductGrid';
+import RelatedProducts from './exposes/RelatedProducts';
 
 /**
  * SSR 전용 진입점.
@@ -14,6 +15,7 @@ import ProductGrid from './exposes/ProductGrid';
 const exposes = {
   './ProductGrid': ProductGrid,
   './ProductDetail': ProductDetail,
+  './RelatedProducts': RelatedProducts,
 };
 
 export default exposes;

@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { Skeleton } from '@mfa/ui';
 
 import { ProductDetailSection } from '@/components/ProductDetailSection';
+import { RelatedProductsSection } from '@/components/RelatedProductsSection';
 
 /**
  * cacheComponents 를 켜면 `params` 접근도 런타임 데이터로 취급된다.
@@ -12,7 +13,15 @@ import { ProductDetailSection } from '@/components/ProductDetailSection';
  */
 async function ProductDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <ProductDetailSection productId={id} />;
+
+  // 같은 remote 의 모듈 둘을 한 경계 안에서 쓴다. 둘 다 `id` 하나만 필요하므로
+  // params 를 두 번 읽지 않는다.
+  return (
+    <div className="flex flex-col gap-6">
+      <ProductDetailSection productId={id} />
+      <RelatedProductsSection productId={id} />
+    </div>
+  );
 }
 
 export default function ProductPage({
