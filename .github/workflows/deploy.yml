@@ -51,11 +51,13 @@ concurrency:
 permissions:
   contents: read
 
+# 도메인은 저장소 Variables 한 곳에만 둔다. 폴백 리터럴을 두면 변수를 안 넣은 저장소에서
+# 워크플로가 남의 도메인을 조용히 때린다 — 안 붙어야 할 때 붙는 편이 낫다.
 env:
-  HOST_URL: ${{ vars.MF_HOST_URL || 'https://mfa.lakegreen.net' }}
-  CATALOG_URL: ${{ vars.MF_CATALOG_URL || 'https://mfa-catalog.lakegreen.net' }}
-  CART_URL: ${{ vars.MF_CART_URL || 'https://mfa-cart.lakegreen.net' }}
-  DOKPLOY_URL: ${{ vars.DOKPLOY_URL || 'https://dokploy.lakegreen.net' }}
+  HOST_URL: ${{ vars.MF_HOST_URL }}
+  CATALOG_URL: ${{ vars.MF_CATALOG_URL }}
+  CART_URL: ${{ vars.MF_CART_URL }}
+  DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
 
 jobs:
   detect:
