@@ -29,16 +29,18 @@ host 는 번들러 플러그인 없이 `@module-federation/runtime` 만 쓴다. 
 
 ## SSOT 를 지킨다
 
-| 무엇                     | 어디                                                                 |
-| ------------------------ | -------------------------------------------------------------------- |
-| remote 이름 · 포트 · env | `packages/remote-config`                                             |
-| 산출물 파일명 · URL 조립 | 같은 패키지의 `MF_FILES` · `*Url()` · `versionedPath()`              |
-| React external 목록      | 같은 패키지의 `SSR_EXTERNALS` (remote 빌드 · host 셰임이 같이 본다)  |
-| 매니페스트 서명 페이로드 | 같은 패키지의 `signedPayload()` (stamp 와 host 검증이 같이 본다)     |
-| 빌드 버전 · dist 경로    | `@mfa/remote-config/node` — `readBuildVersion()` · `versionedDist()` |
-| remote 모듈 타입 · 목록  | `packages/contracts` 의 `MODULES` (맵·id 목록이 여기서 파생된다)     |
-| 런타임 공유 상태         | `packages/store` — 도메인별 폴더(`cart/`)                            |
-| 레이어를 넘는 host 상태  | `apps/host/src/mf/state/cell.ts` 의 `globalCell()`                   |
+| 무엇                      | 어디                                                                      |
+| ------------------------- | ------------------------------------------------------------------------- |
+| remote 이름 · 포트 · env  | `packages/remote-config`                                                  |
+| 산출물 파일명 · URL 조립  | 같은 패키지의 `MF_FILES` · `*Url()` · `versionedPath()`                   |
+| MF DTS 산출물 이름        | 같은 패키지의 `MF_TYPES_FOLDER` (remote 설정 · host 소비가 같이 본다)     |
+| React external 목록       | 같은 패키지의 `SSR_EXTERNALS` (remote 빌드 · host 셰임이 같이 본다)       |
+| 매니페스트 서명 페이로드  | 같은 패키지의 `signedPayload()` (stamp 와 host 검증이 같이 본다)          |
+| 빌드 버전 · dist 경로     | `@mfa/remote-config/node` — `readBuildVersion()` · `versionedDist()`      |
+| remote 모듈 **이름 목록** | `packages/contracts` 의 `MODULE_IDS` (런타임 값. 타입도 여기서 파생)      |
+| remote 모듈 **타입**      | 같은 파일의 `RemoteModule<K>` — MF DTS 가 준 `loadRemote()` 에서 되꺼낸다 |
+| 런타임 공유 상태          | `packages/store` — 도메인별 폴더(`cart/`)                                 |
+| 레이어를 넘는 host 상태   | `apps/host/src/mf/state/cell.ts` 의 `globalCell()`                        |
 
 `@mfa/remote-config` 는 **진입점이 둘**이다. `index.ts` 는 host 의 브라우저 번들에 실리므로
 node builtin 을 넣을 수 없고, node 전용 코드는 전부 `node.ts`(`@mfa/remote-config/node`) 로 간다.

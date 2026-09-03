@@ -4,14 +4,40 @@
     "paths": {
       "@/*": ["./src/*"],
       // 테스트가 공유하는 셋업·헬퍼 (`vitest.config.ts` 의 alias 와 같은 대상)
-      "@tests/*": ["../../tests/*"]
+      "@tests/*": ["../../tests/*"],
+
+      // MF DTS 가 받아온 remote 타입. 생성물은 `packages/contracts` 가 소유하지만,
+      // 그 `.d.ts` 안의 `typeof import('catalog/ProductGrid')` 는 **읽는 쪽 프로그램**의
+      // `paths` 로 해석된다 — 그래서 host tsconfig 에도 같은 매핑이 필요하다.
+      //
+      // ⚠️ `"*": ["./@mf-types/*"]` 라는 와일드카드로 쓰지 않는다. 그러면 host 소스의
+      // 평범한 import 까지 여기서 먼저 찾게 되어 `Cannot find name 'process'` 같은
+      // 무관한 에러가 쏟아진다(known-issues I-4). remote 이름을 하나씩 적는다.
+      //
+      // remote 를 추가하면 이 줄도 하나 는다. tsconfig 는 JSON 이라
+      // `@mfa/remote-config` 에서 파생할 방법이 없다 — 잊으면 `loader/modules.ts` 의
+      // import 가 해석되지 않아 즉시 컴파일이 죽으므로 조용히 넘어가진 않는다.
+      "catalog/*": [
+        "../../packages/contracts/src/generated/@mf-types/catalog/*"
+      ],
+      "cart/*": ["../../packages/contracts/src/generated/@mf-types/cart/*"]
     }
   },
   "include": [
     "next-env.d.ts",
     "src/**/*",
     "next.config.ts",
-    ".next/types/**/*"
+    ".next/types/**/*",
+
+    // MF DTS 의 **모듈 확장**. `@mfa/contracts/remote` 의 `RemoteModule<K>` 가
+    // `loadRemote()` 의 좁혀진 시그니처에서 타입을 되꺼내는데, 그 확장은 아무도
+    // import 하지 않으므로 프로그램에 저절로 들어오지 않는다.
+    //
+    // ⚠️ 없으면 `RemoteModule<K>` 가 **조용히 `any` 가 된다.** 에러가 아니라 통과다 —
+    // remote 가 필수 prop 을 늘려도 host 가 아무 말 없이 넘어간다(실측).
+    // contracts 쪽 `.d.ts` 의 triple-slash 는 emit 되면서 tsc 가 지우므로
+    // 그것만으로는 여기까지 오지 않는다.
+    "../../packages/contracts/src/generated/@mf-types/index.d.ts"
   ],
   "exclude": ["node_modules", ".next"]
 }

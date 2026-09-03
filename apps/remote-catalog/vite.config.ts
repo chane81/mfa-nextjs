@@ -1,9 +1,15 @@
 import { resolve } from 'node:path';
 
 import { federation } from '@module-federation/vite';
-import { MF_FILES, REMOTES, publicOrigin } from '@mfa/remote-config';
+import {
+  MF_FILES,
+  MF_TYPES_FOLDER,
+  REMOTES,
+  publicOrigin,
+} from '@mfa/remote-config';
 import {
   assetBase,
+  EXPOSE_SCAN,
   createMfDevMiddleware,
   readBuildVersion,
   readExposes,
@@ -40,11 +46,11 @@ const PORT = REMOTE.devPort;
  * 파일이 아니다. **dev 가 볼 게 아닌 이웃 파일이 또 생기면 아래 배열에 한 줄 더 넣는다**
  * (`/\.stories\.tsx$/` 같은 것). 기록: known-issues H-2.
  *
- * 스캔 결과가 `@mfa/contracts` 의 계약과 어긋나면 `src/exposes/contract.test.ts` 가 잡는다.
+ * 스캔 인자는 `EXPOSE_SCAN` 에 있다 — cart(Rsbuild) 와 `gen-module-ids.test.ts` 가 같은
+ * 값을 봐야 하기 때문이다. 셋이 갈리면 검사가 실제 빌드와 다른 것을 보게 된다.
+ * 스캔 결과가 커밋된 `MODULE_IDS` 와 어긋나면 그 테스트가 잡는다.
  */
-const EXPOSED = readExposes('./src/exposes', {
-  ignore: [/\.test\.tsx$/],
-});
+const EXPOSED = readExposes(EXPOSE_SCAN.dir, { ignore: EXPOSE_SCAN.ignore });
 
 /**
  * 이 remote 가 배포된 **공개 오리진**. 자산 URL 접두사(`base`)가 여기서 나온다.
@@ -162,22 +168,77 @@ export default defineConfig(({ command }) => {
         // mf-manifest.json 을 내보내야 host 런타임이 포맷/공유 정보를 자동 판별한다
         manifest: true,
         /**
-         * MF 자동 타입 생성(DTS)을 끈다.
+         * MF 자동 타입 생성(DTS)을 **켠다.**
          *
-         * 이유는 **콘솔 에러가 아니라** 아래 두 가지다.
-         * 1. 타입 계약의 SSOT 는 `@mfa/contracts` 의 RemoteModuleMap 이다. 정보가 중복이다.
-         * 2. host 가 타입을 소비하려면 typecheck 전에 remote 가 HTTP 로 떠 있어야 한다.
-         *    지금은 `pnpm typecheck` 가 네트워크 없이 돈다. 그 성질을 잃고 싶지 않다.
+         * 이 remote 는 생산자다 — 자기 `exposes` 의 시그니처를 컴파일해
+         * `@mf-types.zip` · `@mf-types.d.ts` 로 내보내고, host 가 `mf dts --fetch` 로 받아간다.
+         * 산출물은 웹 번들과 **같은 버전 디렉터리**(`dist/v<version>/`)로 나간다 —
+         * `outputDir` 을 따로 주지 않고 Vite 의 `build.outDir` 을 그대로 쓰기 때문이다.
+         * 매니페스트의 `metaData.types` 에 실리는 경로도 그 `base` 기준 상대경로다.
+         *
+         * ## 그래도 `@mfa/contracts` 가 SSOT 다
+         *
+         * 여기서 나온 타입이 host 의 모듈 타입을 **그대로 만든다**
+         * (`packages/contracts/src/remote-contract.ts`). 그래서 이 remote 가 props 를 바꾸면
+         * host 의 호출부가 컴파일 에러가 된다.
+         *
+         * `@mfa/contracts` 에 남은 건 **어휘**(`Product` 등)와 **런타임 이름 목록**
+         * (`MODULE_IDS`)뿐이다. props 를 그쪽으로 올리면 host 와 이 remote 가 같은
+         * 선언을 가리키게 되어 DTS 가 전달할 정보가 0 이 된다(known-issues I-2).
+         *
+         * ## `dev` 를 함께 끄는 이유
          *
          * `[ dynamic-remote-type-hints-plugin ] err: [object Event]` 는 dts 가 아니라
-         * **dev 옵션** 소관이다. DTS 를 켜고 싶다면 이렇게 하면 된다(실측 확인).
-         *
-         *   dts: true,
-         *   dev: { disableDynamicRemoteTypeHints: true },
+         * **dev 옵션** 소관이다(`DevPlugin` 이 `isDev()` 에서 WS 런타임 플러그인을 주입한다).
+         * DTS 는 켜되 그 WS 만 끈다.
          *
          * 검토 전문: docs/01-research/03-dts-plugin-review.md
          */
-        dts: false,
+        dts: {
+          generateTypes: {
+            /**
+             * 이 remote 의 tsconfig 로 컴파일한다. `noEmit: true` 라도 상관없다 —
+             * dts-plugin 이 임시 tsconfig 를 만들어 `declaration` 을 켜고 돌린다.
+             */
+            tsConfigPath: './tsconfig.json',
+            /**
+             * 폴더 이름은 계약이다. host 가 받을 zip · API 파일명(`MF_FILES.typesApi` ·
+             * `typesArchive`)이 같은 상수에서 파생되므로 여기만 바꿔서 어긋날 수 없다.
+             */
+            typesFolder: MF_TYPES_FOLDER,
+            /** `RemoteKeys` · `PackageType` — host 의 `loadRemote()` 모듈 확장이 이걸 쓴다 */
+            generateAPITypes: true,
+            /**
+             * 타입 생성이 실패하면 빌드를 세운다. 조용히 넘어가면 host 는 타입이 없는 게
+             * 아니라 **옛 타입**을 계속 쓰게 되고, 그 상태가 CI 를 통과한다.
+             */
+            abortOnError: true,
+            /**
+             * `@mfa/contracts` 를 타입 아카이브에 인라인하지 않는다.
+             *
+             * host 도 같은 워크스페이스라 그 패키지를 직접 해석할 수 있고, 인라인하면
+             * 계약의 원본이 두 벌이 된다.
+             *
+             * ⚠️ **이 저장소에서는 켜도 동작하지 않는다.**(실측) `third-party-dts-extractor`
+             * 가 `require.resolve(pkg, …)` 로 패키지를 찾는데, `@mfa/contracts` 는
+             * `type: module` 에 `exports` 에 `require` 조건이 없는 ESM 전용 워크스페이스
+             * 패키지라 그 해석이 실패한다. `extractThirdParty: true` 로 빌드해도 산출물은
+             * 그대로였다 — 여전히 `import { type ProductGridProps } from '@mfa/contracts'`.
+             *
+             * 지금은 필요 없다 — props 가 이 파일들 안에 있으므로 DTS 가 이미 실제
+             * 시그니처를 인라인해서 보낸다. 이 값이 필요해지는 건 remote 가
+             * **다른 저장소로 나가서** `@mfa/contracts` 의 어휘(`Product` 등)까지
+             * 실어 보내야 하는 날이고, 그때는 계약 패키지를 CJS 도 내보내게 만들어야 한다.
+             */
+            extractThirdParty: false,
+          },
+          // 이 remote 는 다른 remote 를 소비하지 않는다 — 받을 타입이 없다
+          consumeTypes: false,
+        },
+        dev: {
+          // WS 기반 동적 타입 힌트만 끈다 (위 주석의 `[object Event]`)
+          disableDynamicRemoteTypeHints: true,
+        },
         exposes: EXPOSED.exposes,
         shared: {
           react: { singleton: true, requiredVersion: '^19.0.0' },

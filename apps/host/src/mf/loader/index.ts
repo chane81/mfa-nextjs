@@ -8,12 +8,8 @@ import * as ReactJSXRuntime from 'react/jsx-runtime';
 import * as ReactDOM from 'react-dom';
 import * as ReactDOMClient from 'react-dom/client';
 
-import {
-  REMOTE_NAMES,
-  type RemoteModuleId,
-  type RemoteModuleMap,
-  type RemoteName,
-} from '@mfa/contracts';
+import type { RemoteModule, RemoteModuleId } from '@mfa/contracts/remote';
+import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts/remote';
 
 import { WEB_ENTRIES } from '../config';
 import { injectedEntry } from '../versions/browser';
@@ -116,14 +112,14 @@ const clientCache = new Map<RemoteModuleId, Promise<unknown>>();
 
 function loadOnClient<K extends RemoteModuleId>(
   id: K,
-): Promise<RemoteModuleMap[K]> {
+): Promise<RemoteModule<K>> {
   ensureInit();
   const cached = clientCache.get(id);
-  if (cached) return cached as Promise<RemoteModuleMap[K]>;
+  if (cached) return cached as Promise<RemoteModule<K>>;
 
   const promise = federationLoadRemote(id).then((mod) => {
     if (!mod) throw new Error(`remote 모듈 '${id}' 이(가) 비어 있습니다`);
-    return mod as RemoteModuleMap[K];
+    return mod as RemoteModule<K>;
   });
 
   clientCache.set(id, promise);
@@ -136,7 +132,7 @@ function loadOnClient<K extends RemoteModuleId>(
  */
 export function loadRemoteModule<K extends RemoteModuleId>(
   id: K,
-): Promise<RemoteModuleMap[K]> {
+): Promise<RemoteModule<K>> {
   if (typeof window === 'undefined') return loadRemoteModuleOnServer(id);
   return loadOnClient(id);
 }

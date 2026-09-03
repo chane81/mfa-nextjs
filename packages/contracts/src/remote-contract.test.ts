@@ -5,12 +5,11 @@ import { MODULE_IDS, REMOTE_NAMES, exposedNames } from './remote-contract';
 /**
  * remote 계약의 성질.
  *
- * **전에 여기 있던 드리프트 검사는 사라졌다.** `RemoteModuleMap` 과 `MODULE_IDS` 가
- * 같은 id 를 두 번 적던 시절에는 둘을 묶는 장치(`satisfies` · 전수 검사)가 필요했는데,
- * 지금은 둘 다 `MODULES` 객체 하나에서 파생되므로 갈라질 수가 없다. 키 형태
- * (`<remote>/<모듈>`)도 그 객체의 `satisfies` 가 선언 자리에서 막는다.
+ * **이 파일에 props 검사는 없다.** props 는 remote 의 expose 파일이 선언하고 host 는
+ * MF DTS 로 받아간다 — 그 대조는 컴파일 타임에 `packages/contracts/src/remote-contract.ts`
+ * 가 한다. 여기 남은 건 **런타임 값인 이름 목록**의 성질뿐이다.
  *
- * 남은 건 타입으로 표현되지 않는 것들이다.
+ * 키 형태(`<remote>/<모듈>`)는 `MODULE_IDS` 선언의 `satisfies` 가 그 자리에서 막는다.
  */
 describe('remote 계약', () => {
   it('모듈 id 의 접두사는 전부 REMOTE_NAMES 안에 있다', () => {
@@ -29,12 +28,17 @@ describe('remote 계약', () => {
   });
 
   it('MODULE_IDS 는 런타임에 실제로 채워진다', () => {
-    // 타입에서 파생된 값이라 빌드가 바뀌면 조용히 비어도 이상하지 않다.
-    // 비면 각 remote 의 expose 계약 테스트가 전부 "통과" 해버린다.
+    // 비면 각 remote 의 expose 계약 테스트가 전부 "통과" 해버린다 —
+    // `exposedNames()` 가 빈 배열을 주고 스캔 결과도 빈 배열과 비교되기 때문이다.
     expect(MODULE_IDS.length).toBeGreaterThan(0);
   });
 
   it('exposedNames 는 접두사를 떼고 이름만 준다', () => {
-    expect(exposedNames('catalog')).toEqual(['ProductGrid', 'ProductDetail']);
+    // 순서는 계약이 아니다. `MODULE_IDS` 는 생성물이고
+    // (`scripts/gen-module-ids.ts`) 출력이 결정적이도록 정렬돼 있을 뿐이다.
+    expect([...exposedNames('catalog')].sort()).toEqual([
+      'ProductDetail',
+      'ProductGrid',
+    ]);
   });
 });

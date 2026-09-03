@@ -4,10 +4,10 @@ import * as ReactJSXRuntime from 'react/jsx-runtime';
 import * as ReactDOM from 'react-dom';
 
 import type {
+  RemoteModule,
   RemoteModuleId,
-  RemoteModuleMap,
   RemoteName,
-} from '@mfa/contracts';
+} from '@mfa/contracts/remote';
 import type { SsrExternal } from '@mfa/remote-config';
 
 import {
@@ -301,7 +301,7 @@ async function getServerBundle(remote: RemoteName): Promise<ExposeMap> {
 /** 서버에서 remote 모듈 하나를 가져온다. 반환 형태는 브라우저 로더와 동일하다. */
 export async function loadRemoteModuleOnServer<K extends RemoteModuleId>(
   id: K,
-): Promise<RemoteModuleMap[K]> {
+): Promise<RemoteModule<K>> {
   const [remote, ...rest] = id.split('/');
   const exposeKey = `./${rest.join('/')}`;
   const exposes = await getServerBundle(remote as RemoteName);
@@ -313,7 +313,7 @@ export async function loadRemoteModuleOnServer<K extends RemoteModuleId>(
         `사용 가능: ${Object.keys(exposes).join(', ') || '(없음)'}`,
     );
   }
-  return { default: Component } as RemoteModuleMap[K];
+  return { default: Component } as RemoteModule<K>;
 }
 
 /** 진단용 — 지금 이 인스턴스가 어느 엔트리를 보고 있는지 */

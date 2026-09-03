@@ -93,3 +93,27 @@ jobs:
       # host 의 build 스크립트가 concurrently 로 그 dist 를 서빙하며 next build 를 돌린다.
       # 프리렌더가 remote SSR 번들을 실제로 fetch + 평가하므로, 여기가 MF 계약 테스트다.
       - run: pnpm build
+
+      # 커밋된 MF DTS 가 방금 빌드한 remote 와 같은가.
+      #
+      # `packages/contracts/src/generated/` 는 생성물인데도 커밋한다 — `remote-contract.ts`
+      # 가 그 타입과 목록을 실제로 쓰기 때문이다. 안 그러면
+      # `pnpm typecheck` 가 remote 기동을 요구하게 되고, 그건 이 저장소가 DTS 를 오래
+      # 껐던 바로 그 이유다.
+      #
+      # 대가는 낡을 수 있다는 것이고, 그걸 여기서 잡는다. remote 의 props 를 고치고
+      # `pnpm mf:types` 를 안 돌리면 host 는 **옛 타입으로 통과한다** — 위 typecheck 는
+      # 커밋된 파일만 보므로 그 어긋남을 못 본다. 이 단계가 그 창을 닫는다.
+      #
+      # 바로 위 `pnpm build` 가 remote dist 를 이미 만들어 뒀으므로 정적 서버만 띄우면
+      # 된다. `--success first` 로 페치가 끝나면 서버가 내려간다.
+      - name: MF DTS 가 최신인지 확인
+        run: |
+          pnpm --filter @mfa/contracts exec concurrently \
+            --kill-others --success first -n catalog,cart,types \
+            "node ../../scripts/serve-remote-dist.ts catalog" \
+            "node ../../scripts/serve-remote-dist.ts cart" \
+            "pnpm mf:types"
+          git diff --exit-code \
+            -- packages/contracts/src/generated \
+            || { echo "::error::커밋된 MF 타입/모듈 목록이 낡았습니다. 로컬에서 'pnpm mf:types' 를 돌리고 결과를 커밋하세요."; exit 1; }

@@ -35,9 +35,16 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 - 라이브러리 API 는 기억으로 쓰지 않는다. `package.json` 의 실제 버전 확인 → context7 조회 → 근거 밝히기.
 - 마크다운 · 코드를 고쳤으면 `pnpm format`. CI 가 `format:check` 로 막는다.
 - 커밋은 목적별로 나눈다. push 는 별도 요청 없으면 하지 않는다.
-- **SSOT 를 복제하지 않는다.** remote 배치는 `packages/remote-config`, remote 모듈 타입은
+- **SSOT 를 복제하지 않는다.** remote 배치는 `packages/remote-config`, 모듈 이름 목록은
   `packages/contracts`, 런타임 공유 상태는 `packages/store`, 디자인 토큰은
   `packages/tailwind-config` 한 곳에만 있다.
+- **remote 모듈의 props 는 remote 가 소유한다.** `apps/remote-*/src/exposes/` 안에 선언하고
+  host 는 MF DTS 로 받아간다. 계약 패키지로 옮기면 host·remote 가 같은 선언을 가리키게
+  되어 DTS 가 아무것도 전달하지 못한다(known-issues I-2).
+- **`packages/contracts/src/generated/` 는 생성물이지만 커밋한다.** `remote-contract.ts` 가
+  그 타입을 쓰기 때문이다. remote 의 props 를 고쳤으면 `pnpm mf:types` 를 돌리고 결과를
+  같이 커밋한다. 그 파일은 **배럴에 실리지 않는다**(`@mfa/contracts/remote` 전용) —
+  실으면 remote 빌드가 자기 산출물을 요구하는 순환이 된다.
 
 ## 명령
 
@@ -47,7 +54,8 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 | `pnpm build`     | 전체 빌드. **host 프리렌더가 remote SSR 번들을 실제로 실행한다**      |
 | `pnpm test`      | Vitest 4. `--project=unit`(node) / `--project=dom`(jsdom) 로 좁힌다   |
 | `pnpm lint`      | ESLint 10 flat config                                                 |
-| `pnpm typecheck` | 네트워크 없이 돈다 (DTS 를 끈 이유)                                   |
+| `pnpm typecheck` | 네트워크 없이 돈다 — `@mf-types` 를 커밋해서 그 성질을 지킨다         |
+| `pnpm mf:types`  | remote 에서 MF DTS 타입을 다시 받아온다 (remote 기동 전제)            |
 | `pnpm format`    | prettier                                                              |
 
 `pnpm build` 통과 = "Next 16 에서 런타임 MF + SSR 이 된다"는 이 저장소의 주장이 아직 참이라는 뜻이다.

@@ -1,10 +1,18 @@
 import { useState } from 'react';
 
-import { formatKRW, type CheckoutFlowProps } from '@mfa/contracts';
+import { formatKRW, type CartLine } from '@mfa/contracts';
 import { cartTotals, useCart, useCartLines } from '@mfa/store';
 import { Badge, Button, Panel } from '@mfa/ui';
 
 import { ORIGIN, ORIGIN_HUE } from '../origin';
+
+/** 이 모듈의 공개 계약 — `initialLines` 의 의미는 `CartPanel.tsx` 의 같은 주석 */
+export interface CheckoutFlowProps {
+  initialLines?: readonly CartLine[];
+  /** 주문 완료 후 host 가 어디로 보낼지 결정 */
+  onDone?: () => void;
+  onContinueShopping?: () => void;
+}
 
 /**
  * host 에 노출되는 모듈: `cart/CheckoutFlow`

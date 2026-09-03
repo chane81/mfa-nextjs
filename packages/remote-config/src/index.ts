@@ -68,6 +68,17 @@ export const MF_SSR_BUNDLE = {
 } as const;
 
 /**
+ * MF 자동 타입 생성(DTS)이 쓰는 폴더 이름.
+ *
+ * remote 는 이 이름으로 `@mf-types/`(풀린 타입) · `@mf-types.zip` · `@mf-types.d.ts` 를
+ * 내보내고, host 는 같은 이름으로 받아 푼다. dts-plugin 의 기본값과 같지만 **기본값에
+ * 기대지 않고 명시한다** — 양쪽 설정에서 이 상수를 가리키면 한쪽만 바꿔서 어긋날 수 없다.
+ *
+ * 아래 `MF_FILES` 의 두 항목이 여기서 파생된다.
+ */
+export const MF_TYPES_FOLDER = '@mf-types';
+
+/**
  * MF 산출물 파일명.
  *
  * remote 가 내보내고 host 가 받아가는 계약이라 양쪽이 같은 이름을 알아야 한다.
@@ -94,6 +105,16 @@ export const MF_FILES = {
    * `/v<version>/` 불변 경로가 맡는다.
    */
   styles: 'style.css',
+  /**
+   * MF 자동 타입 생성(DTS)의 **API 타입** — `RemoteKeys` 와 `PackageType` 이 들어 있다.
+   * host 가 이걸로 `@module-federation/runtime` 의 `loadRemote()` 를 모듈 확장한다.
+   */
+  typesApi: `${MF_TYPES_FOLDER}.d.ts`,
+  /**
+   * 같은 DTS 의 **타입 아카이브**. 각 expose 의 실제 시그니처가 이 안에 있고,
+   * host 는 `mf dts --fetch` 로 받아 `@mf-types/<remote>/` 에 푼다.
+   */
+  typesArchive: `${MF_TYPES_FOLDER}.zip`,
 } as const;
 
 /**
