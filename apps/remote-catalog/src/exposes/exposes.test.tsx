@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 
 import { PRODUCTS, PRODUCT_CATEGORIES, formatKRW } from '@mfa/contracts';
+import { MAX_CART_QUANTITY } from '@mfa/store';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -103,6 +104,21 @@ describe('ProductCard', () => {
 
     await userEvent.click(button);
     expect(useCart.getState().lines).toEqual([]);
+  });
+
+  it('상한까지 담겼으면 더 담지 못한다', async () => {
+    // 쿠키 코덱이 수량을 MAX_CART_QUANTITY 로 자른다. 화면이 그 위로 올라가면
+    // 저장값과 갈려서 새로고침에 조용히 되돌아간다.
+    const { ProductCard, useCart } = await load();
+    useCart.getState().add(A, MAX_CART_QUANTITY);
+
+    render(<ProductCard product={A} />);
+
+    const button = await screen.findByRole('button', { name: '가득' });
+    expect(button).toBeDisabled();
+
+    await userEvent.click(button);
+    expect(useCart.getState().lines[0]!.quantity).toBe(MAX_CART_QUANTITY);
   });
 
   it('상세 이동은 콜백이다 — 링크가 아니다 (ADR-013)', async () => {

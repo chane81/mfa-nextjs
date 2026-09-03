@@ -1,5 +1,10 @@
 import { formatKRW, type CartLine } from '@mfa/contracts';
-import { cartTotals, useCart, useCartLines } from '@mfa/store';
+import {
+  MAX_CART_QUANTITY,
+  cartTotals,
+  useCart,
+  useCartLines,
+} from '@mfa/store';
 import { Button, Panel } from '@mfa/ui';
 
 import { ORIGIN } from '../origin';
@@ -86,8 +91,15 @@ export default function CartPanel({
                 <span className="min-w-5 text-center font-mono text-text">
                   {line.quantity}
                 </span>
+                {/*
+                  쿠키 코덱이 수량을 `MAX_CART_QUANTITY` 로 자른다. 스토어는 안 자르는데
+                  그건 의도된 비대칭이다 — 상한은 **저장 경계**의 규칙이라 거기 한 곳에만
+                  있다. 그래서 화면이 그 위로 못 올라가게 막는 건 이쪽 몫이다.
+                  안 막으면 화면은 100, 쿠키는 99 가 되고 새로고침에서 조용히 되돌아간다.
+                */}
                 <Button
                   variant="ghost"
+                  disabled={line.quantity >= MAX_CART_QUANTITY}
                   onClick={() => setQuantity(line.productId, line.quantity + 1)}
                 >
                   +

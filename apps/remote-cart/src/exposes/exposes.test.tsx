@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 
 import { PRODUCTS } from '@mfa/contracts';
+import { MAX_CART_QUANTITY } from '@mfa/store';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -154,6 +155,26 @@ describe('CartPanel', () => {
     );
 
     expect(useCart.getState().lines[0]!.quantity).toBe(3);
+  });
+
+  it('+ 가 저장 상한에서 멈춘다', async () => {
+    // 쿠키 코덱이 MAX_CART_QUANTITY 로 자르는데 스토어는 안 자른다(의도된 비대칭).
+    // 화면이 그 위로 올라가면 새로고침에서 조용히 되돌아간다.
+    const { CartPanel, useCart } = await load();
+    render(
+      <CartPanel
+        initialLines={await seed([{ product: A, quantity: MAX_CART_QUANTITY }])}
+      />,
+    );
+
+    const plus = await within(await screen.findByRole('listitem')).findByRole(
+      'button',
+      { name: '+' },
+    );
+    expect(plus).toBeDisabled();
+
+    await userEvent.click(plus);
+    expect(useCart.getState().lines[0]!.quantity).toBe(MAX_CART_QUANTITY);
   });
 
   it('− 로 0 이 되면 줄이 사라진다', async () => {
