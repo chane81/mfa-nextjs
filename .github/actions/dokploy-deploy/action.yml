@@ -1,0 +1,106 @@
+name: Dokploy 배포
+description: Dokploy 앱 하나를 배포하고 그 배포가 끝날 때까지 기다린다
+
+# Dokploy 에는 앱 사이의 순서 개념이 없어서 순서는 CI 가 만든다. 그러려면 "배포가 끝났다"를
+# 판정할 수 있어야 하는데, 그 판정을 remote 와 host 가 똑같이 해야 해서 여기 한 벌만 둔다.
+#
+# ## 왜 `mf-version.json` 변화로 판정하지 않나 (처음엔 그렇게 했다)
+#
+# 그 신호는 **이미지가 실제로 바뀐 배포에서만** 도착한다. 빌드 컨텍스트가 이전과 같으면
+# Docker 가 전 레이어를 캐시로 재사용하고, 버전을 정하는 `mf-build-version.ts` 의 `RUN` 도
+# 재사용되어 `.mf-version` 이 그대로다. 그러면 배포는 성공했는데 버전은 안 바뀐다.
+#
+# 실측: `.github/**` · `docs/**` 만 바뀐 커밋(둘 다 `.dockerignore` 로 제외된다)을 배포하니
+# Dokploy 는 4초 만에 `done`, `mf-version.json` 은 그대로였다. 버전을 기다리던 워크플로는
+# 20분 타임아웃으로 죽을 참이었다.
+#
+# 그래서 **배포 상태**로 판정한다. 버전 변화는 그 뒤에 참고로만 본다.
+
+inputs:
+  dokploy-url:
+    description: Dokploy 인스턴스 URL
+    required: true
+  api-key:
+    description: Dokploy API 키
+    required: true
+  application-id:
+    description: 배포할 앱의 applicationId
+    required: true
+  label:
+    description: 로그에 쓸 이름 (catalog · cart · host)
+    required: true
+  timeout-seconds:
+    description: 배포 완료까지 기다릴 최대 시간
+    required: false
+    default: '1800'
+
+runs:
+  using: composite
+  steps:
+    - name: ${{ inputs.label }} 배포 트리거 후 완료까지 대기
+      shell: bash
+      env:
+        DOKPLOY_URL: ${{ inputs.dokploy-url }}
+        API_KEY: ${{ inputs.api-key }}
+        APP_ID: ${{ inputs.application-id }}
+        LABEL: ${{ inputs.label }}
+        TIMEOUT_SECONDS: ${{ inputs.timeout-seconds }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "${API_KEY:-}" ] || [ -z "${APP_ID:-}" ]; then
+          echo "::error::DOKPLOY_API_KEY(Secret) 와 DOKPLOY_APP_*(Variables) 가 필요하다 — $LABEL"
+          exit 1
+        fi
+
+        # `deployment.all` 은 최신이 앞인 **배열**이다(실측). 트리거 전 최신 id 를 기억해
+        # 새 배포가 생겼는지로 판정한다 — 시간 비교보다 안전하다.
+        deployments() {
+          curl -fsS --max-time 30 -H "x-api-key: $API_KEY" \
+            "$DOKPLOY_URL/api/deployment.all?applicationId=$APP_ID"
+        }
+
+        BEFORE_ID="$(deployments | jq -r '.[0].deploymentId // ""')"
+        echo "직전 배포 id: ${BEFORE_ID:-(없음)}"
+
+        curl -fsS --max-time 30 -X POST "$DOKPLOY_URL/api/application.deploy" \
+          -H "x-api-key: $API_KEY" \
+          -H 'content-type: application/json' \
+          -d "{\"applicationId\":\"$APP_ID\"}" > /dev/null
+        echo "트리거 완료 — $LABEL"
+
+        DEADLINE=$(( $(date +%s) + TIMEOUT_SECONDS ))
+
+        while :; do
+          LATEST="$(deployments | jq -c '.[0]' 2>/dev/null || echo '{}')"
+          ID="$(echo "$LATEST" | jq -r '.deploymentId // ""')"
+          STATUS="$(echo "$LATEST" | jq -r '.status // ""')"
+
+          if [ -n "$ID" ] && [ "$ID" != "$BEFORE_ID" ]; then
+            case "$STATUS" in
+              done)
+                echo "배포 완료 — $LABEL (status=done)"
+                echo "- **$LABEL**: 배포 완료" >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+                ;;
+              error)
+                echo "::error::$LABEL 배포 실패 — $(echo "$LATEST" | jq -r '.errorMessage // "(메시지 없음)"')"
+                # 여기서 멈추면 뒤 단계(host)도 안 뜬다. 그게 맞다 —
+                # 옛 remote 위에 새 host 를 올리는 것이 이 파이프라인이 막으려는 상태다.
+                exit 1
+                ;;
+              *)
+                echo "진행 중… status=${STATUS:-?}"
+                ;;
+            esac
+          else
+            echo "새 배포가 아직 목록에 안 나타났다"
+          fi
+
+          if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+            echo "::error::${TIMEOUT_SECONDS}초 안에 $LABEL 배포가 끝나지 않았다 (status=${STATUS:-?})."
+            exit 1
+          fi
+
+          sleep 15
+        done

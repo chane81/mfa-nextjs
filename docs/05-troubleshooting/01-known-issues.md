@@ -50,6 +50,7 @@
 | DTS 를 켰는데 드리프트가 **조용히** 통과한다                                          | 모듈 확장이 프로그램에 없어 `RemoteModule<K>` 가 `any` 다 — [I-5](#i-5-모듈-확장을-include-에-안-넣으면-remotemodulek-가-조용히-any-가-된다)      |
 | 계약 타입이 소비처에서 **통째로 `any`** 인데 검사는 초록이다                          | emit 된 `.d.ts` 가 복사되지 않는 생성물을 참조한다 — [I-6](#i-6-emit-되는-dts-가-생성물을-참조하면-소비처에서-조용히-any-가-된다)                 |
 | 로컬·CI 는 초록인데 **Dokploy 배포만** `Cannot find module './generated/@mf-types/…'` | `.dockerignore` 가 커밋된 생성물을 컨텍스트에서 뺐다 — [I-7](#i-7-dockerignore-가-커밋된-계약을-컨텍스트에서-빼고-있었다)                         |
+| 배포는 `Done` 인데 `mf-version.json` 이 그대로다                                      | 빌드 컨텍스트가 같아 이미지가 재사용됐다 — [I-8](#i-8-배포는-성공했는데-버전이-안-바뀐다--캐시-히트가-완료-신호를-지운다)                         |
 
 ### SSR · hydration
 
@@ -392,6 +393,44 @@ export type RemoteModuleId = CatalogKeys | CartKeys;
 
 > 생성물을 커밋하기로 했으면 **그것을 읽는 모든 경로**에서 빠지지 않는지 확인한다.
 > `.gitignore` · `.prettierignore` 는 이번에 같이 고쳤는데 `.dockerignore` 만 남았다.
+
+### I-8. 배포는 성공했는데 버전이 안 바뀐다 — 캐시 히트가 완료 신호를 지운다
+
+증상: 배포 파이프라인이 remote 를 트리거하고 `mf-version.json` 이 바뀌길 기다리는데
+영영 안 바뀐다. Dokploy 패널은 **`Done`** 이다.
+
+```
+catalog  1. Done   Commit: 7efb4eb…   createdAt 04:43:03 → finishedAt 04:43:07   (4초)
+mf-version.json: tmtkylrrx  (이전 배포 그대로)
+```
+
+원인: 그 커밋이 건드린 게 `.github/**` 와 `docs/**` 뿐인데 **둘 다 `.dockerignore` 로
+제외된다.** 빌드 컨텍스트가 이전과 바이트 단위로 같으니 Docker 가 전 레이어를 캐시로
+재사용하고, 버전을 정하는 `scripts/mf-build-version.ts` 의 `RUN` 도 재사용되어
+`.mf-version` 이 그대로다. 4초 만에 끝난 것이 그 증거다.
+
+**Dokploy 는 정직했다.** 이미지가 안 바뀐 게 맞다. 틀린 건 "버전이 바뀌면 배포가 끝난
+것" 이라는 우리 쪽 가정이다.
+
+#### 왜 그 가정이 오래 멀쩡했나
+
+이전 워크플로(`mf-revalidate`)는 **remote 코드가 바뀐 push 에서만** 돌았다. 그런 push 는
+컨텍스트가 반드시 달라지므로 버전도 반드시 바뀐다. 파이프라인으로 승격시키면서
+"수동 재배포" · "공유 파일만 바뀐 배포" 라는 경우가 새로 생겼고, 거기서 전제가 깨졌다.
+
+#### 고치는 법 — 완료는 배포 상태로 판정한다
+
+```
+GET /api/deployment.all?applicationId=<id>   x-api-key
+→ 최신이 앞인 배열. .[0].status 가 done | error 가 될 때까지 폴링
+```
+
+트리거 **전에** `.[0].deploymentId` 를 기억해 두고 그것과 다른 id 가 나타나야 새 배포로
+본다(시간 비교보다 안전하다). 버전 변화는 그 뒤 참고로만 보고 실패시키지 않는다.
+
+> 응답 형태는 실측했다 — 공식 문서에는 `Returns an empty JSON object {}` 라고만 적혀
+> 있어서(자동 생성 흔적) 그대로는 못 쓴다. 실제로는
+> `[{ deploymentId, status, title, errorMessage, createdAt, startedAt, finishedAt, … }]` 다.
 
 ## H. (26차) 재배치 · dev 기동에서 밟은 것
 

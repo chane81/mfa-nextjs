@@ -153,10 +153,16 @@ POST https://<dokploy>/api/application.deploy
 그래서 `.github/workflows/deploy.yml` 이 파이프라인을 쥔다.
 
 ```
-detect ─┬─ remotes (matrix)  트리거 → mf-version.json 이 바뀔 때까지 대기
-        │                     ↓ 실패하면 여기서 멈춘다
-        ├─ host              remote 가 공표된 **뒤에** 트리거
+detect ─┬─ remotes (matrix)  트리거 → `deployment.all` 의 status 가 done 이 될 때까지 대기
+        │                     ↓ error 거나 타임아웃이면 여기서 멈춘다
+        ├─ host              remote 배포가 끝난 **뒤에** 트리거 (같은 방식으로 대기)
         └─ revalidate        host 를 새로 안 띄웠을 때만 (아래)
+
+완료 판정은 **배포 상태**지 `mf-version.json` 변화가 아니다. 버전은 이미지가 실제로
+바뀐 배포에서만 움직이므로, 캐시가 전부 히트한 재배포에서는 영영 안 온다(known-issues I-8).
+버전은 그 뒤에 참고로만 확인하고 실패시키지 않는다.
+
+두 job 이 같은 판정을 해야 해서 그 로직은 `.github/actions/dokploy-deploy` 한 벌에 있다.
 ```
 
 **전제: 세 앱의 Autodeploy 를 끈다.** 안 끄면 push 로도 뜨고 API 로도 떠서 이중 배포가
@@ -290,10 +296,9 @@ curl -s "$HOST_URL/api/lab/stats?refresh=1" | jq
 
 ## 알려진 한계
 
-- **host 배포의 성공 여부를 파이프라인이 보지 않는다.** 트리거만 하고 끝낸다.
-  remote 는 `mf-version.json` 변화로 완료를 판정할 수 있지만 host 는 자기 버전을
-  공표하지 않는다. `GET /api/deployment.all?applicationId=…` 로 상태를 폴링할 수 있는데
-  응답 형태를 아직 실측하지 않았다 — 확인하면 그때 붙인다.
+- **배포 완료는 Dokploy 가 `done` 이라고 말한 시점이다.** 컨테이너 교체가 몇 초 뒤일 수
+  있어, remote 는 그 뒤 최대 120초 동안 `mf-version.json` 변화를 참고로만 본다.
+  그 창 안에 안 바뀌면 "이미지 재사용" 으로 보고 넘어간다 — 실패시키지 않는다.
 - **멀티 인스턴스 무효화는 TTL 만큼 지연된다.** 웹훅은 한 인스턴스에만 닿는다.
   즉시성이 필요하면 공유 캐시 핸들러를 붙여야 한다.
 - **호스트 빌드가 remote 기동에 의존한다.** Cache Components 에서 `generateStaticParams` 가
