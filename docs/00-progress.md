@@ -1,5 +1,37 @@
 # 진행 상황
 
+## 2026-09-04 (34차) — remote 번들러 비교를 문서로 굳힌다 (Vite vs Rsbuild)
+
+"catalog 는 Vite, cart 는 Rsbuild 인데 어느 쪽이 나은가" 라는 질문이 나왔다. 답은 설정
+파일 주석과 known-issues 여기저기에 흩어져 있었지 **한 곳에 모여 있지 않았다.**
+그래서 [01-research/04-bundler-comparison.md](./01-research/04-bundler-comparison.md) 를 새로 썼다.
+
+### 결론 — MF remote 전용이라면 Rsbuild
+
+이유는 하나다. **MF 의 shared 배리어가 Rspack 런타임 안에 있고, Vite 에서는 어댑터가
+밖에서 흉내낸다.**
+
+| 번들러 | 배리어 위치                         | 결과                                    |
+| ------ | ----------------------------------- | --------------------------------------- |
+| Rspack | `ensureChunk` 의 `f.consumes`       | 순서가 코드 생성으로 보장 → 레이스 없음 |
+| Vite   | 어댑터 가상 모듈, `import()` **뒤** | 콜드 로드 레이스 → 워밍으로 확률적 회피 |
+
+known-issues 의 번들러 원인 분포가 이 구조를 그대로 반영한다 — Vite 5건(전부 MF 통합
+지점), Rsbuild 1건(MF 와 무관한 네이티브 바이너리 설치).
+
+### 새로 확인한 것 — "Rsbuild 는 다 미리 컴파일해서" 가 아니다
+
+이 문서를 쓰다가 내 오해 하나를 정정했다. Rsbuild `dev.lazyCompilation` 기본값은
+`{ imports: true, entries: false }` 라 **cart 도 동적 import 를 지연 컴파일한다.**
+cart 설정도 `@module-federation/rsbuild-plugin` 2.8.2 도 이걸 끄지 않는다(dist 전체
+grep 0건). 그런데도 레이스가 없는 건 지연 컴파일이 **요청을 늦출 뿐 순서를 안 바꾸기**
+때문이다. 근거: Rsbuild 공식 문서 context7 조회(2026-09-04).
+
+### 바꾸지 않은 것
+
+**코드는 안 건드렸다.** 두 번들러 공존이 곧 실험 대상이라 catalog 를 Rsbuild 로 옮기면
+"번들러가 달라도 된다"는 검증이 사라진다. 남긴 건 선택 지침뿐이다.
+
 ## 2026-09-03 (33차) — 수량 상한이 저장 경계에만 있어 화면이 그 위로 올라갔다
 
 32차의 폴링 개선을 **실제 빌드가 도는 배포**에서 재려면 remote 소스가 바뀌어야 했다.

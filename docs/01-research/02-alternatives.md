@@ -110,8 +110,12 @@ $ npm view @module-federation/vite version peerDependencies
 - 하지만 remote 는 번들러가 자유롭다 → 이 저장소는 `remote-catalog` 를 이걸로 빌드했다
 
 `@originjs/vite-plugin-federation` 과 비교: `@module-federation/vite` 는 module-federation
-공식 조직이 관리하고 MF 2.x 런타임 · manifest · DTS 생성과 물려 있다. 신규 프로젝트라면
+공식 조직이 관리하고 MF 2.x 런타임 · manifest · DTS 생성과 물려 있다. Vite 로 간다면
 `@module-federation/vite` 를 고른다.
+
+다만 **Vite 로 갈지 자체**는 별도 판단이다. 이 어댑터는 MF 의 shared 배리어를 Vite dev
+서버 밖에서 흉내내야 해서 콜드 로드 레이스와 dev CSS 문제를 낳는다 —
+Rsbuild 와의 실측 비교는 [04-bundler-comparison.md](./04-bundler-comparison.md).
 
 ### 실제 빌드 산출물 (검증됨)
 
@@ -130,6 +134,11 @@ manifest 가 선언한 shared:
 `remote-cart` 는 일부러 **Rsbuild(Rspack) + `@module-federation/rsbuild-plugin` 2.8.2** 로 빌드했다.
 "번들러가 서로 달라도 런타임 계약만 맞으면 host 가 동일하게 소비한다"는 MF 의 핵심 주장을
 이 저장소에서 실제로 검증하기 위함이다. → 검증 결과는 [04-experiments](../04-experiments/) 참고.
+
+그 검증은 통과했다. 그래서 남은 질문은 "되느냐" 가 아니라 **"새로 만든다면 어느 쪽이냐"**
+이고, 그 비교는 [04-bundler-comparison.md](./04-bundler-comparison.md) 에 있다.
+요약: MF remote 전용이라면 Rsbuild. 배리어가 Rspack 런타임 안에 있어서 Vite 어댑터가
+겪는 레이스가 성립하지 않는다.
 
 ## 출처
 
