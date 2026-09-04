@@ -477,7 +477,6 @@
         padding: 16px 20px;
         margin: 24px 0 30px;
         font-size: 14.5px;
-        max-width: 74ch;
       }
 
       .note .note-h {
@@ -645,8 +644,9 @@
         <p class="lede">
           번들러 플러그인 없이 <code>@module-federation/runtime</code> 만으로
           remote 를 SSR 하고, 경계를 넘어도 소프트 내비게이션을 유지한다. 배포는
-          앱 셋이 각자, 런타임은 host 하나가 합친다. 이 문서는 그 두 축을
-          그림으로 설명한다.
+          앱 셋이 각자 — 다만 <b>순서는 CI 가 쥔다</b>. 런타임은 host 하나가
+          합치고, 계약은 remote 가 소유해 타입으로 흘러온다. 이 문서는 그 두
+          축을 그림으로 설명한다.
         </p>
         <div class="chips">
           <span class="chip hst"
@@ -680,6 +680,9 @@
           <a href="./04-experiments/03-cache-modes.md"
             >04-experiments/03-cache-modes.md</a
           >
+          <a href="./05-troubleshooting/01-known-issues.md"
+            >05-troubleshooting/01-known-issues.md</a
+          >
         </div>
 
         <p class="claim">
@@ -696,7 +699,7 @@
             <svg
               viewBox="0 0 1000 500"
               role="img"
-              aria-label="한 저장소의 푸시가 Watch Paths 로 갈라져 세 이미지 빌드와 세 컨테이너가 되고, host 이미지 빌드는 이미 떠 있는 remote 오리진에 HTTP 로 닿아야 하므로 배포 순서가 remote 다음 host 로 강제된다"
+              aria-label="한 저장소의 푸시를 GitHub Actions 의 detect job 이 받아 배포 대상을 정하고, Dokploy API 로 remote 둘을 먼저 배포해 완료를 기다린 뒤 host 를 배포한다. host 이미지 빌드는 이미 떠 있는 remote 오리진에 HTTP 로 닿아야 하므로 그 순서가 강제된다"
             >
               <defs>
                 <marker
@@ -725,10 +728,18 @@
 
               <!-- 푸시 -->
               <rect x="40" y="16" width="920" height="44" rx="3" class="box" />
-              <text x="500" y="43" text-anchor="middle" class="ttl">
+              <text x="500" y="38" text-anchor="middle" class="ttl">
                 GitHub
                 <tspan class="mono">main</tspan>
-                푸시 — 저장소 하나
+                푸시 — 저장소 하나 →
+                <tspan class="mono">deploy</tspan>
+                워크플로의
+                <tspan class="mono">detect</tspan>
+                job
+              </text>
+              <text x="500" y="54" text-anchor="middle" class="xs mut">
+                Dokploy 의 Autodeploy 는 세 앱 모두 꺼 둔다 — 켜 두면 push 로도
+                뜨고 API 로도 떠서 순서 보장이 사라진다
               </text>
 
               <line
@@ -766,7 +777,9 @@
                 class="box-cat"
               />
               <text x="160" y="106" text-anchor="middle" class="xs mut">
-                Watch Paths
+                detect →
+                <tspan class="mono">remotes</tspan>
+                matrix
               </text>
               <text x="160" y="123" text-anchor="middle" class="xs mono cat">
                 apps/remote-catalog/** + packages/**
@@ -781,7 +794,9 @@
                 class="box-crt"
               />
               <text x="430" y="106" text-anchor="middle" class="xs mut">
-                Watch Paths
+                detect →
+                <tspan class="mono">remotes</tspan>
+                matrix
               </text>
               <text x="430" y="123" text-anchor="middle" class="xs mono crt">
                 apps/remote-cart/** + packages/**
@@ -796,7 +811,9 @@
                 class="box-hst"
               />
               <text x="840" y="106" text-anchor="middle" class="xs mut">
-                Watch Paths
+                detect →
+                <tspan class="mono">host</tspan>
+                job
               </text>
               <text x="840" y="123" text-anchor="middle" class="xs mono hst">
                 apps/host/** + packages/**
@@ -826,6 +843,9 @@
                 class="ed"
                 marker-end="url(#d1a)"
               />
+              <text x="600" y="151" text-anchor="middle" class="xs mut mono">
+                POST /api/application.deploy
+              </text>
 
               <!-- 이미지 빌드 -->
               <rect
@@ -1029,7 +1049,12 @@
                 를 받아 실제로 실행한다
               </text>
               <text x="500" y="490" text-anchor="middle" class="sm hst">
-                → 배포 순서 remote → host 는 권장이 아니라 강제다
+                → 배포 순서 remote → host 는 권장이 아니라 강제다. Dokploy 에 앱
+                사이 순서가 없으므로
+                <tspan class="mono">host</tspan>
+                job 이
+                <tspan class="mono">needs: remotes</tspan>
+                로 그 순서를 만든다
               </text>
             </svg>
             <figcaption>
@@ -1058,7 +1083,137 @@
           </p>
         </div>
 
-        <h3>1-2. remote 아티팩트는 불변, 볼륨에 덧붙인다</h3>
+        <h3>1-2. 순서를 CI 가 쥔다 — job 넷과 그 조건</h3>
+
+        <p class="claim">
+          Dokploy 에는 <strong>앱 사이의 순서 개념이 없다.</strong> 앱마다 “이
+          경로가 바뀌면 나를 빌드해라”(Watch Paths)가 있을 뿐이라, 한 push 가 세
+          앱을 동시에 물면 누가 먼저 끝날지 모른다. 그래서 Watch Paths 를
+          <code>.github/workflows/deploy.yml</code> 로 옮겨왔다 — 무엇을
+          배포할지 도 <b>언제 배포할지</b>도 여기서 정한다.
+        </p>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>job</th>
+                <th>하는 일</th>
+                <th>도는 조건</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>detect</code></td>
+                <td>바뀐 경로 → 배포 대상 판별</td>
+                <td class="num">항상</td>
+              </tr>
+              <tr>
+                <td><code>remotes</code> <span class="tag">matrix</span></td>
+                <td>
+                  배포 전 버전 기록 → 트리거 → <b>완료까지 대기</b> → 새 버전
+                  공표 관측
+                </td>
+                <td class="num">대상 remote 가 있을 때</td>
+              </tr>
+              <tr>
+                <td><code>host</code></td>
+                <td>트리거 → 완료까지 대기</td>
+                <td class="num">
+                  <code>needs: remotes</code> — remote 가 실패하면
+                  <b>안 뜬다</b>
+                </td>
+              </tr>
+              <tr>
+                <td><code>revalidate</code> <span class="tag">matrix</span></td>
+                <td>host 캐시 무효화 웹훅 (재시도 5회)</td>
+                <td class="num">host 를 <b>새로 안 띄웠을 때만</b></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          <em>왜 순서가 필요한가</em> — host 는 <b>커밋된</b> MF DTS 로
+          컴파일되지만 런타임에는 <b>배포된</b> remote 번들을 받는다. 같은
+          커밋에 양쪽을 고쳐도 배포는 앱별로 독립이라, host 가 먼저 뜨면
+          <strong>새 host 코드 + 옛 remote 번들</strong>이 된다. 양쪽이 같은
+          커밋의 타입으로 컴파일되므로
+          <strong>컴파일러는 이 상태를 볼 수 없다.</strong>
+        </p>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>props 를 어떻게 바꿨나</th>
+                <th>옛 remote 컴포넌트에서</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>옵셔널 prop 추가</td>
+                <td>
+                  모르는 prop 이라 무시 —
+                  <span class="tag no">에러 없이 옛 동작</span> 아무도 모르게
+                  지나간다
+                </td>
+              </tr>
+              <tr>
+                <td>필수 prop 추가 · 이름 변경 · 타입 변경</td>
+                <td>
+                  <code>undefined</code> 를 받는다 → 오동작 또는
+                  <code>TypeError</code>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          remote 를 먼저 올리고 <b>그 배포가 끝날 때까지 기다린 뒤</b> host 를
+          올리면 저 조합이 성립하지 않는다. 남는 것은 반대 방향(옛 host + 새
+          remote)뿐이고, 그건 규칙 하나로 덮인다 —
+          <strong>remote 는 한 배포 주기만큼 하위호환을 유지한다.</strong> 그걸
+          못 지키는 변경만 expand/contract 로 두 번에 나눈다: ① remote 가
+          옵셔널로 받게 배포 → ② host 가 쓰기 시작 → ③ remote 에서 옛 것 제거.
+        </p>
+
+        <div class="note">
+          <span class="note-h"
+            >함정 — 완료 신호를 Docker 레이어 캐시가 지웠다</span
+          >
+          <p>
+            처음엔 배포 완료를 <code>mf-version.json</code> 의
+            <b>버전 변화</b>로 판정했다. 그런데 <code>.github/**</code> ·
+            <code>docs/**</code> 만 바뀐 커밋은 둘 다
+            <code>.dockerignore</code> 로 제외되어 빌드 컨텍스트가 바이트 단위로
+            같고, 그러면 버전을 정하는 <code>RUN</code>
+            레이어까지 재사용되어
+            <strong>배포가 끝나도 버전이 안 바뀐다</strong>(known-issues I-8).
+            Dokploy 는 정직했고 틀린 것은 우리 가정이었다. 지금은
+            <code>GET /api/deployment.all</code> 의 배포 <b>상태</b>로 판정한다
+            — 트리거 전 <code>deploymentId</code> 를 기억해 두고, 새 id 의
+            <code>status</code> 가 <code>done</code>·<code>error</code> 가 될
+            때까지 <b>5초</b> 간격으로 폴링한다.
+          </p>
+          <p>
+            버전 공표 확인은 <b>게이트가 아니라 관측</b>으로 남겼다(최대 30초).
+            실측하면 배포 완료부터 공표까지 0.4~0.6초라 실전에서는 첫 폴링에
+            끝나고, 이미지가 재사용된 배포에서는 아무리 기다려도 안 바뀌므로
+            <strong>넉넉한 시한은 버리는 쪽에만 작용한다.</strong>
+          </p>
+          <p>
+            간격을 정한 근거는 실측이다(앱당 10건, 검증일 2026-09-03) — 큐 대기
+            0초, 빌드 p50 은 catalog 21초 · cart 19초 · host 27초. 배포 로그를
+            열면 그 시간이 <b>앱 빌드 레이어 하나</b>로 가고 나머지는 전부
+            <code>CACHED</code> 이거나 0.x초다.
+            <strong>긴 꼬리가 없으니 감지 지연은 전부 순수 낭비</strong>라,
+            폴링을 15초에서 5초로 내렸다(감지 합계 82.5초 → 70.0초).
+          </p>
+        </div>
+
+        <h3>1-3. remote 아티팩트는 불변, 볼륨에 덧붙인다</h3>
 
         <p class="claim">
           컨테이너는 휘발이다. 이미지 안의 <code>dist</code> 만 서빙하면 재배포
@@ -1202,13 +1357,15 @@
           </figure>
         </div>
 
-        <h3>1-3. 재배포를 host 에 알리는 경로</h3>
+        <h3>1-4. 재배포를 host 에 알리는 경로</h3>
 
         <p class="claim">
           remote 를 따로 배포하면 host 는 바뀐 사실을 알 방법이 없다 — 페이지
           캐시가 옛 remote 마크업을 계속 서빙한다. Dokploy 에는 배포 후 훅이
-          없어서, 그 자리를 GitHub Actions 가 <strong>폴링 후 웹훅</strong>으로
-          메운다.
+          없어서, 그 자리를 <code>deploy</code> 워크플로가
+          <strong>폴링 후 웹훅</strong>으로 메운다. 웹훅은
+          <strong>host 를 새로 안 띄운 배포에서만</strong> 쏜다 — host 를 새로
+          띄웠으면 빈 캐시로 뜨므로 첫 요청이 이미 새 remote 로 굽는다.
         </p>
 
         <div class="scroller">
@@ -1216,7 +1373,7 @@
             <svg
               viewBox="0 0 980 560"
               role="img"
-              aria-label="푸시부터 host 캐시 무효화까지의 시퀀스. GitHub Actions 가 remote 의 mf-version.json 버전이 바뀔 때까지 15초 간격으로 폴링한 뒤 host 의 무효화 웹훅을 호출하고, host 는 태그 만료, 생존 확인, warm, 페이지 무효화 순으로 처리한다"
+              aria-label="푸시부터 host 캐시 무효화까지의 시퀀스. GitHub Actions 가 Dokploy API 로 배포를 트리거하고 deployment.all 을 5초 간격으로 폴링해 완료를 확인한 뒤, host 를 새로 띄우지 않은 배포에서만 host 의 무효화 웹훅을 호출하고, host 는 태그 만료, 생존 확인, warm, 페이지 무효화 순으로 처리한다"
             >
               <defs>
                 <marker
@@ -1280,27 +1437,28 @@
               <line
                 x1="80"
                 y1="80"
-                x2="254"
+                x2="624"
                 y2="80"
                 class="ed"
                 marker-end="url(#d3a)"
               />
-              <text x="167" y="73" text-anchor="middle" class="xs mut">
-                Watch Paths 일치 → 자동 빌드
+              <text x="352" y="73" text-anchor="middle" class="xs mut">
+                <tspan class="mono">deploy</tspan>
+                워크플로 —
+                <tspan class="mono">detect</tspan>
+                가 배포 대상을 정한다
               </text>
 
               <line
-                x1="80"
+                x1="624"
                 y1="112"
-                x2="624"
+                x2="266"
                 y2="112"
-                class="ed dash"
+                class="ed"
                 marker-end="url(#d3a)"
               />
-              <text x="352" y="105" text-anchor="middle" class="xs mut">
-                같은 푸시가
-                <tspan class="mono">mf-revalidate</tspan>
-                워크플로도 깨운다
+              <text x="445" y="105" text-anchor="middle" class="xs mut mono">
+                POST /api/application.deploy
               </text>
 
               <line
@@ -1331,26 +1489,27 @@
               <line
                 x1="624"
                 y1="240"
-                x2="446"
+                x2="266"
                 y2="240"
                 class="ed"
                 marker-end="url(#d3a)"
               />
-              <text x="535" y="233" text-anchor="middle" class="xs mut">
-                15초 간격 폴링 (최대 20분)
+              <text x="445" y="233" text-anchor="middle" class="xs mut">
+                <tspan class="mono">deployment.all</tspan>
+                5초 간격 폴링 —
+                <tspan class="ttl">status 가 done 이 될 때까지</tspan>
               </text>
               <line
-                x1="446"
+                x1="624"
                 y1="266"
-                x2="624"
+                x2="446"
                 y2="266"
                 class="ed dash"
                 marker-end="url(#d3a)"
               />
-              <text x="535" y="282" text-anchor="middle" class="xs mut">
-                버전이
-                <tspan class="ttl">바뀌었을 때만</tspan>
-                통과
+              <text x="455" y="284" text-anchor="middle" class="xs mut">
+                새 버전 공표 확인 (최대 30초) —
+                <tspan class="ttl">관측일 뿐 게이트가 아니다</tspan>
               </text>
 
               <line
@@ -1361,7 +1520,14 @@
                 class="ed-hst"
                 marker-end="url(#d3h)"
               />
-              <text x="737" y="308" text-anchor="middle" class="xs hst mono">
+              <text x="737" y="296" text-anchor="middle" class="xs mut">
+                host 를
+                <tspan class="ttl">새로 안 띄운</tspan>
+                배포에서만 —
+                <tspan class="mono">revalidate</tspan>
+                job
+              </text>
+              <text x="737" y="310" text-anchor="middle" class="xs hst mono">
                 POST /api/mf-revalidate
               </text>
 
@@ -1630,7 +1796,7 @@
           </figure>
         </div>
 
-        <h3>1-4. 어디까지가 빌드 시점에 굳는 값인가</h3>
+        <h3>1-5. 어디까지가 빌드 시점에 굳는 값인가</h3>
 
         <div class="tablewrap">
           <table>
@@ -1694,6 +1860,23 @@
                   막는다
                 </td>
               </tr>
+              <tr>
+                <td>
+                  <code>MF_HOST_URL</code> · <code>MF_CATALOG_URL</code> ·
+                  <code>MF_CART_URL</code> · <code>DOKPLOY_URL</code>
+                  <br /><span style="color: var(--ink-2); font-size: 13px"
+                    >배포 파이프라인</span
+                  >
+                </td>
+                <td class="num">저장소 Variables</td>
+                <td><span class="tag no">앱과 무관</span></td>
+                <td>
+                  워크플로 전용이라 이미지에 안 들어간다.
+                  <b>폴백 리터럴을 두지 않는다</b> — 포크나 다른 인스턴스에서
+                  남의 도메인을 조용히 때린다. 대신 넷 다
+                  <strong>필수</strong>가 됐다
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -1722,6 +1905,12 @@
           >
           <a href="./02-architecture/05-styling.md"
             >02-architecture/05-styling.md</a
+          >
+          <a href="./02-architecture/06-host-mf-layout.md"
+            >02-architecture/06-host-mf-layout.md</a
+          >
+          <a href="./01-research/04-bundler-comparison.md"
+            >01-research/04-bundler-comparison.md</a
           >
         </div>
 
@@ -1828,6 +2017,12 @@
               </text>
               <text x="670" y="126" class="xs mono crt">
                 /checkout → cart/CheckoutFlow
+              </text>
+              <text x="670" y="144" class="xs mono mut">
+                헤더 → cart/CartBadge
+              </text>
+              <text x="670" y="162" class="xs mono mut">
+                상세 → catalog/RelatedProducts
               </text>
               <text x="490" y="164" class="sm mut">
                 라우팅은 host, 렌더링은 remote.
@@ -2049,7 +2244,7 @@
             실행한다고요?”</span
           >
           <p>
-            그렇다. 그래서 신뢰 경계를 별도로 설계했다(2-4). 브라우저에서 remote
+            그렇다. 그래서 신뢰 경계를 별도로 설계했다(2-5). 브라우저에서 remote
             청크를 실행하는 것과 신뢰 수준은 같지만, 뚫렸을 때 영향 범위가
             <strong>서버 프로세스</strong>라는 점이 다르다는 게 판단의
             출발점이었다.
@@ -2128,7 +2323,194 @@
           죽어 있어도 “성공”해버린다. 반대로 페이지 계층에서는 SWR 이 맞다.
         </p>
 
-        <h3>2-4. host 서버가 남의 코드를 실행하기 전에 통과시키는 네 겹</h3>
+        <h3>2-4. 계약은 remote 가 소유하고, 타입이 되어 host 로 흘러온다</h3>
+
+        <p class="claim">
+          런타임 MF 는 <b>느슨하다</b> — <code>loadRemote()</code> 는 문자열을
+          받아 <code>unknown</code> 에 가까운 것을 준다. 그 느슨함을 컴파일
+          시점으로 되돌리는 것이 MF 의 <b>DTS</b> 다. 다만 켜는 것만으로는
+          아무것도 안 잡힌다. <strong>props 를 누가 소유하느냐</strong>가
+          먼저다.
+        </p>
+
+        <div class="note">
+          <span class="note-h"
+            >함정 — 계약 패키지가 props 를 소유하면 DTS 가 전달하는 정보는 0
+            이다</span
+          >
+          <p>
+            remote 가 <code>@mfa/contracts</code> 에서 props 를 가져다 쓰면,
+            host 가 받아온 타입도 결국 <b>같은 선언을 다시 가리킨다.</b> 대조는
+            <code>A extends A</code> 를 확인하는 셈이라 계약에 필수 prop 을 넣고
+            대조해도 통과한다(실측). 그래서 방향을 뒤집었다 —
+            <strong>props 는 remote 의 expose 파일 옆에서 선언한다.</strong>
+          </p>
+        </div>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 980 270"
+              role="img"
+              aria-label="remote 의 expose 파일이 props 를 선언하고, MF DTS 가 그 타입을 뽑아 계약 패키지의 generated 디렉터리로 들어오며, host 는 loadRemote 의 반환 타입에서 props 를 되꺼내 쓴다"
+            >
+              <defs>
+                <marker
+                  id="d10a"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk" />
+                </marker>
+              </defs>
+
+              <rect
+                x="20"
+                y="40"
+                width="200"
+                height="96"
+                rx="3"
+                class="box-cat"
+              />
+              <text x="36" y="62" class="sm ttl cat">① remote 가 소유</text>
+              <text x="36" y="84" class="xs mono">src/exposes/*.tsx</text>
+              <text x="36" y="104" class="xs mut">
+                props 선언이 이 파일 안에
+              </text>
+              <text x="36" y="122" class="xs mut">
+                있다 — 주석까지 같이 간다
+              </text>
+
+              <rect x="260" y="40" width="200" height="96" rx="3" class="box" />
+              <text x="276" y="62" class="sm ttl">② remote 가 공표</text>
+              <text x="276" y="84" class="xs mono">dts.generateTypes</text>
+              <text x="276" y="104" class="xs mut">빌드·dev 양쪽에서 같은</text>
+              <text x="276" y="122" class="xs mut">
+                바이트가 나온다 (CI 가 확인)
+              </text>
+
+              <rect x="500" y="40" width="200" height="96" rx="3" class="box" />
+              <text x="516" y="62" class="sm ttl">③ 받아서 커밋</text>
+              <text x="516" y="84" class="xs mono">pnpm mf:types</text>
+              <text x="516" y="104" class="xs mut">
+                <tspan class="mono">contracts/src/generated/</tspan>
+              </text>
+              <text x="516" y="122" class="xs mut">
+                커밋한다 → typecheck 네트워크 0회
+              </text>
+
+              <rect
+                x="740"
+                y="40"
+                width="220"
+                height="96"
+                rx="3"
+                class="box-hst"
+              />
+              <text x="756" y="62" class="sm ttl hst">④ host 가 소비</text>
+              <text x="756" y="84" class="xs mono">RemoteModule&lt;K&gt;</text>
+              <text x="756" y="104" class="xs mut">
+                <tspan class="mono">loadRemote()</tspan>
+                의 반환 타입에서
+              </text>
+              <text x="756" y="122" class="xs mut">
+                props 를 되꺼낸다 — 표가 없다
+              </text>
+
+              <line
+                x1="222"
+                y1="88"
+                x2="256"
+                y2="88"
+                class="ed"
+                marker-end="url(#d10a)"
+              />
+              <line
+                x1="462"
+                y1="88"
+                x2="496"
+                y2="88"
+                class="ed"
+                marker-end="url(#d10a)"
+              />
+              <line
+                x1="702"
+                y1="88"
+                x2="736"
+                y2="88"
+                class="ed"
+                marker-end="url(#d10a)"
+              />
+
+              <rect
+                x="20"
+                y="164"
+                width="940"
+                height="86"
+                rx="3"
+                class="box-plain dash"
+              />
+              <text x="36" y="186" class="sm ttl">
+                손으로 적는 자리는 둘로 줄었다
+              </text>
+              <text x="36" y="208" class="xs mut">
+                <tspan class="mono">MODULE_IDS</tspan>
+                — 런타임에 “모듈이 몇 개인가”를 물으려면 값이 있어야 한다.
+                <tspan class="mono">ModuleIdsAreExhaustive</tspan>
+                가 DTS 의
+                <tspan class="mono">RemoteKeys</tspan>
+                와 전수 대조한다
+              </text>
+              <text x="36" y="228" class="xs mut">
+                remote 의
+                <tspan class="mono">server-entry</tspan>
+                SSR 맵 — 웹
+                <tspan class="mono">exposes</tspan>
+                는 디렉터리 스캔이라 저절로 늘지만 이쪽은 손이다.
+                <tspan class="alr">
+                  빠뜨리면 브라우저에서는 되고 서버 렌더에서만 “expose 없음”
+                </tspan>
+              </text>
+            </svg>
+            <figcaption>
+              <b>모듈을 하나 늘리는 데 손대는 파일은 remote 하나다.</b> remote
+              에 <code>RelatedProducts.tsx</code> 를 놓고
+              <code>pnpm mf:types</code> 를 돌리면 생성물 넷이 따라 움직이고,
+              host 는 그때부터 그 모듈 id 를 쓸 수 있다. 그 전에 쓰면 컴파일이
+              막는다 — <code>RemoteModuleId</code> 에 없는 문자열이기 때문이다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="note">
+          <span class="note-h"
+            >함정 — 배럴에 계약을 실으면 remote 빌드가 자기 산출물을
+            요구한다</span
+          >
+          <p>
+            <code>remote-contract.ts</code> 는 생성된 <code>@mf-types</code> 를
+            읽는데, 그건 remote 를 빌드해야 생긴다. 그런데 remote 의
+            <code>src/exposes</code> 는 배럴에서 <code>Product</code> 같은
+            어휘를 가져다 쓴다. 배럴이 계약까지 재-export 하면
+            <strong>순환</strong>이 된다. 그래서 진입점을 갈랐다 —
+            <code>@mfa/contracts</code>(공통 어휘)와
+            <code>@mfa/contracts/remote</code>(모듈 계약). remote 는 앞의 것만
+            쓰고, ESLint 가 뒤의 것을 import 하지 못하게 막는다.
+          </p>
+        </div>
+
+        <p>
+          <em>DTS 가 못 막는 것</em>도 분명하다. 이건
+          <b>컴파일 시점</b> 계약이라 배포된 번들과 host 코드가 어긋나는
+          <b>런타임 스큐</b>는 못 본다 — 양쪽이 같은 커밋의 타입으로 컴파일되기
+          때문이다. 그 창을 닫는 것은 타입이 아니라 <b>배포 순서</b>다(1-2).
+        </p>
+
+        <h3>2-5. host 서버가 남의 코드를 실행하기 전에 통과시키는 네 겹</h3>
 
         <p class="claim">
           <code>mf-version.json</code> 은
@@ -2205,7 +2587,7 @@
                 아는 주소에서 받은 것만
               </text>
               <text x="262" y="110" text-anchor="middle" class="xs mono mut">
-                ALLOWED_ORIGINS
+                REMOTE_ALLOWED_ORIGINS
               </text>
               <line
                 x1="332"
@@ -2817,7 +3199,7 @@
           </figure>
         </div>
 
-        <h3>2-5. remote 끼리는 서로를 모른다 — 상태는 어떻게 공유하나</h3>
+        <h3>2-6. remote 끼리는 서로를 모른다 — 상태는 어떻게 공유하나</h3>
 
         <p>
           catalog 의 “담기” 버튼이 cart 의 헤더 배지를 바꾼다. 그런데 규칙은
@@ -2843,6 +3225,42 @@
           대가는 <code>/</code>·<code>/cart</code>·<code>/checkout</code> 의
           정적 셸이다(근거: ADR-014).
         </p>
+        <p>
+          <em>통로가 하나만은 아니다.</em> 카탈로그의 카테고리 필터는 스토어가
+          아니라 <strong>주소</strong>에 남는다. 규칙은 같다 —
+          <b>remote 는 URL 을 모른다</b>(ADR-013). remote 는
+          <code>onCategoryChange</code> 로 “바뀌었다”만 알리고, 그걸
+          <code>?category=</code> 에 쓸지는 host 가 정한다. 뒤로 가기는 URL 만
+          되돌아오므로 host 가 <code>category</code> prop 으로 다시 내려주고,
+          remote 는 그 prop 이 바뀌면 <b>렌더 중에</b> 내부 선택을 맞춘다 —
+          <code>useEffect</code> 로 하면 옛 값으로 한 번 그린 뒤 다시 그린다.
+        </p>
+
+        <div class="note">
+          <span class="note-h"
+            >함정 — 요청 컨텍스트를 읽는 훅 하나가 소비처 전부의 렌더 방식을
+            바꾼다</span
+          >
+          <p>
+            <code>useSearchParams</code> 를 <code>CatalogSection</code> 에
+            넣었을 때 <b>건드리지도 않은</b> <code>/lab/cache</code> 프리렌더가
+            죽었다 (<code>CLIENT_HOOK_DYNAMIC</code>). 그 컴포넌트를 lab 페이지
+            셋이 같이 쓰고 있었다. <code>&lt;Suspense&gt;</code> 로 감싸는 것은
+            답이 아니었다 — lab 패널은 <b>서버 렌더 시각</b>을 비교하는 것이
+            목적이라 클라이언트 렌더로 내려가면 실험 자체가 무의미해진다. 경계를
+            옮겨서 고쳤고, 저장소에 이미 같은 꼴이 있었다.
+          </p>
+          <p>
+            <code>Slot</code> 이 요청 컨텍스트를 읽고, <code>Section</code> 은
+            받아서 그린다 — <code>CartSlot</code>(쿠키) ↔
+            <code>CartSection</code> 과 같은 모양이다 (ADR-020, known-issues
+            I-9).
+            <strong
+              >이 실수는 typecheck 도 test 도 안 잡았다.
+              <code>pnpm build</code> 만 잡았다.</strong
+            >
+          </p>
+        </div>
 
         <div class="tablewrap">
           <table>
@@ -2914,6 +3332,41 @@
             </p>
           </div>
           <div>
+            <q>“catalog 는 Vite, cart 는 Rsbuild 다 — 어느 쪽이 나은가”</q>
+            <p>
+              <b>MF remote 전용이라면 Rsbuild 다.</b> 이유는 하나다. MF 의
+              shared 배리어가 <b>Rspack 런타임 안에</b> 있고(<code
+                >ensureChunk</code
+              >
+              의 <code>f.consumes</code>), Vite 에서는 어댑터가
+              <code>import()</code> <b>바깥에서</b> 흉내낸다. 그래서 Vite 쪽은
+              콜드 로드 레이스가 구조적으로 남고 워밍으로 확률을 낮출 뿐이다.
+              저장소의 함정 기록도 그 구조를 그대로 반영한다 — Vite 5건(전부 MF
+              통합 지점), Rsbuild 1건(MF 와 무관한 네이티브 바이너리 설치).
+            </p>
+            <p>
+              그런데도 <b>catalog 를 옮기지 않았다.</b> 두 번들러가 공존한다는
+              것 자체가 이 저장소의 검증 대상이다 — 한쪽으로 통일하면 “번들러가
+              달라도 같은 계약으로 붙는다”는 주장이 사라진다.
+            </p>
+          </div>
+          <div>
+            <q>“host 는 remote 의 props 를 어떻게 아나”</q>
+            <p>
+              MF 의 DTS 로 받는다. 단,
+              <b>props 를 remote 가 소유할 때만</b> 의미가 있다 — 계약 패키지가
+              소유하면 host 가 받아온 타입이 같은 선언을 다시 가리켜 대조가 항상
+              통과한다(2-4). 받아온 타입은 저장소에 커밋해서
+              <code>pnpm typecheck</code> 가 네트워크를 쓰지 않게 하고,
+              낡았는지는 CI 가 <code>pnpm mf:types</code> 재실행 +
+              <code>git diff --exit-code</code> 로 본다.
+            </p>
+            <p>
+              다만 이건 <b>컴파일 시점</b> 계약이다. 배포된 번들과 host 코드가
+              어긋나는 런타임 스큐는 타입이 못 본다 — 그건 배포 순서로 닫는다.
+            </p>
+          </div>
+          <div>
             <q>“remote 를 재배포하면 host 는 그걸 어떻게 아나”</q>
             <p>
               두 경로다. remote 가 <code>mf-version.json</code> 으로 자기 버전을
@@ -2921,7 +3374,9 @@
               <b>스스로 수렴한다</b>. 웹훅은 그 수렴을 즉시로 당기는 최적화일
               뿐이라 유실돼도 정합성이 깨지지 않는다. 다만 이미 캐시된 페이지
               HTML 은 태그를 깨야만 바뀌므로, 웹훅이 warm 을 먼저 하고 성공했을
-              때만 페이지 태그를 무효화한다.
+              때만 페이지 태그를 무효화한다. 웹훅을 쏘는 것은
+              <b>host 를 새로 안 띄운 배포뿐이다</b> — host 컨테이너가
+              교체됐으면 빈 캐시로 뜨므로 무효화할 것이 없다.
             </p>
           </div>
           <div>
@@ -2970,6 +3425,7 @@
           <a href="https://mfa.lakegreen.net">mfa.lakegreen.net</a></span
         >
         <span>문서 지도 <a href="./README.md">docs/README.md</a></span>
+        <span>노출 모듈 6개 · 기준일 2026-09-04 (34차)</span>
         <span
           >이 파일은 지도다. 수치와 실측의 원본은 각 절의 근거 문서에
           있다.</span
