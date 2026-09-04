@@ -1,0 +1,63 @@
+# 문서 공개 — `docs/` 를 GitHub Pages 로 올린다
+#
+# ## 왜 필요한가
+#
+# `docs/anatomy.html` 은 단독 HTML 이다. GitHub 저장소 화면은 HTML 을 **렌더링하지 않고
+# 소스로 보여준다.** 그래서 README 의 링크를 눌러도 그림을 볼 수 없었다 — 받아서 브라우저로
+# 열라는 안내가 붙어 있던 이유다. Pages 로 올리면 그 링크가 바로 열린다.
+#
+#   https://chane81.github.io/mfa-nextjs/anatomy.html
+#
+# ## 왜 `docs/` 통째인가
+#
+# `anatomy.html` 은 각 절에서 `./02-architecture/*.md` 같은 **상대 경로**로 근거 문서를
+# 가리킨다. 파일 하나만 올리면 그 링크가 전부 죽는다. 다만 Pages 는 정적 업로드라 마크다운을
+# 렌더링하지 않으므로, `anatomy.html` 이 Pages 에서 열렸을 때는 `.md` 링크를 GitHub blob
+# 주소로 바꿔 단다(그 파일 안의 스크립트).
+#
+# ## 이 워크플로가 배포와 무관한 이유
+#
+# 앱 배포(`deploy.yml`)와 아무 것도 공유하지 않는다. 여기서 실패해도 앱은 그대로 뜬다.
+# 반대로 `docs/` 만 바뀐 커밋은 앱 이미지를 바꾸지 않으므로(`.dockerignore`) 이쪽만 돈다.
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+# 배포는 하나만 돈다. 다만 취소하지 않는다 — 뒤 실행이 앞 실행을 끊으면 그 커밋의 문서가
+# 아무 데도 안 올라간다.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+# `id-token: write` 는 deploy-pages 가 OIDC 로 배포 토큰을 받는 데 쓴다. 이 워크플로는
+# 저장소에 아무것도 쓰지 않는다.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    name: 문서 배포
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/configure-pages@v6
+
+      # 빌드가 없다. `docs/` 를 그대로 올린다 — 정적 HTML 하나와 마크다운뿐이다.
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs
+
+      - id: deploy
+        uses: actions/deploy-pages@v5

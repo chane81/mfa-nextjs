@@ -4,16 +4,16 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 
 ## 문서 지도
 
-| 폴더                                        | 내용                                                                                                      |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| [anatomy.html](./anatomy.html)              | **전체 구조 해부도** — 배포 파이프라인과 host↔remote 런타임을 그림으로. 브라우저로 연다                  |
-| [00-progress.md](./00-progress.md)          | 작업 진행 기록                                                                                            |
-| [01-research](./01-research/)               | `@module-federation/nextjs-mf` EOL 현황, 대체재 리서치, Vite MF 검토, **DTS 플러그인 검토**               |
-| [02-architecture](./02-architecture/)       | 아키텍처 결정(ADR), 토폴로지, SSR + 소프트 내비게이션 설계, **remote 수명주기(버전·캐시·신뢰)**, 스타일링 |
-| [03-setup](./03-setup/)                     | 실행 방법, 버전 고정 근거(Node·pnpm·TS), **환경변수**, Dokploy 컨테이너 배포                              |
-| [04-experiments](./04-experiments/)         | 실험 A(런타임 MF) / B(Multi-Zones·기각) / **C(ISR·Cache Components)** 결과와 비교                         |
-| [05-troubleshooting](./05-troubleshooting/) | 구축 중 실제로 터진 문제와 해결책                                                                         |
-| [06-testing](./06-testing/)                 | **테스트 계획과 진척도** — 무엇을 왜 테스트하는가, 러너 구조, 테스트를 쓸 때의 함정                       |
+| 폴더                                                              | 내용                                                                                                                             |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| [anatomy.html](https://chane81.github.io/mfa-nextjs/anatomy.html) | **전체 구조 해부도** — 배포 파이프라인과 host↔remote 런타임을 그림으로. GitHub Pages 로 바로 열린다                             |
+| [00-progress.md](./00-progress.md)                                | 작업 진행 기록                                                                                                                   |
+| [01-research](./01-research/)                                     | `@module-federation/nextjs-mf` EOL 현황, 대체재 리서치, Vite MF 검토, DTS 플러그인 검토, **remote 번들러 비교(Vite vs Rsbuild)** |
+| [02-architecture](./02-architecture/)                             | 아키텍처 결정(ADR), 토폴로지, SSR + 소프트 내비게이션 설계, **remote 수명주기(버전·캐시·신뢰)**, 스타일링                        |
+| [03-setup](./03-setup/)                                           | 실행 방법, 버전 고정 근거(Node·pnpm·TS), **환경변수**, Dokploy 컨테이너 배포                                                     |
+| [04-experiments](./04-experiments/)                               | 실험 A(런타임 MF) / B(Multi-Zones·기각) / **C(ISR·Cache Components)** 결과와 비교                                                |
+| [05-troubleshooting](./05-troubleshooting/)                       | 구축 중 실제로 터진 문제와 해결책                                                                                                |
+| [06-testing](./06-testing/)                                       | **테스트 계획과 진척도** — 무엇을 왜 테스트하는가, 러너 구조, 테스트를 쓸 때의 함정                                              |
 
 ## 6줄 요약
 
@@ -32,7 +32,8 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 
 핵심 설계 두 편:
 
-- 그림으로 먼저 보려면 — [anatomy.html](./anatomy.html) (GitHub 화면은 HTML 을 렌더링하지 않는다. 받아서 브라우저로 연다)
+- 그림으로 먼저 보려면 — **[해부도(GitHub Pages)](https://chane81.github.io/mfa-nextjs/anatomy.html)**
+  (저장소 화면은 HTML 을 렌더링하지 않는다. 소스는 [anatomy.html](./anatomy.html))
 - 렌더링 — [02-architecture/03-ssr-and-soft-nav.md](./02-architecture/03-ssr-and-soft-nav.md)
 - 배포·캐시·신뢰 — [02-architecture/04-remote-lifecycle.md](./02-architecture/04-remote-lifecycle.md)
 - 스타일링 — [02-architecture/05-styling.md](./02-architecture/05-styling.md)
@@ -48,9 +49,12 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 - 스타일은 **Tailwind v4** 다. 토큰은 `@mfa/tailwind-config` 한 곳에 두고 각 앱이
   자기 파이프라인에서 컴파일하며, remote 는 자기 CSS 를 `<link precedence>` 로 직접
   선언한다 ([02-architecture/05-styling.md](./02-architecture/05-styling.md)).
+- **배포 순서는 CI 가 쥔다.** `deploy.yml` 이 대상을 판별해 remote 를 먼저 올리고
+  그 배포가 끝난 뒤 host 를 올린다. Dokploy 의 Autodeploy 는 꺼 두었다.
+- 이 폴더는 `pages.yml` 이 GitHub Pages 로도 올린다 — 해부도를 링크로 바로 열 수 있다.
 - 남은 것은 [00-progress.md](./00-progress.md) 의 "다음에 해볼 것".
 
 ## 검증 기준일
 
 - 리서치·버전 조사: 2026-08-14 ~ 15 (npm registry 직접 조회)
-- 구조·실행·배포 기록: 2026-08-19 기준으로 갱신됨
+- 구조·실행·배포 기록: 2026-09-04 기준으로 갱신됨

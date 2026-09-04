@@ -66,7 +66,7 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 | 알고 싶은 것                        | 읽을 파일                                     |
 | ----------------------------------- | --------------------------------------------- |
 | 전체 지도 · 6줄 요약                | `docs/README.md`                              |
-| **구조를 그림으로** (배포 · 런타임) | `docs/anatomy.html` (브라우저로 연다)         |
+| **구조를 그림으로** (배포 · 런타임) | `docs/anatomy.html` (Pages 로도 공개된다)     |
 | 회차별 작업 기록 · 다음에 할 것     | `docs/00-progress.md`                         |
 | **에러 증상으로 원인 찾기**         | `docs/05-troubleshooting/01-known-issues.md`  |
 | 아키텍처 결정과 기각 사유(ADR)      | `docs/02-architecture/01-decision.md`         |

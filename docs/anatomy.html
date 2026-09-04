@@ -3468,6 +3468,25 @@
             }
           });
       })();
+
+      // 근거 문서 링크 — GitHub Pages 에서는 마크다운이 렌더링되지 않는다.
+      // 이 파일이 Pages 로 서빙될 때만 `.md` 상대 링크를 GitHub blob 주소로 돌린다.
+      // 저장소에서 받아 로컬(file://)로 열었을 때는 옆 파일을 그대로 가리켜야 하므로
+      // 건드리지 않는다.
+      (function () {
+        if (location.hostname.indexOf('github.io') === -1) return;
+
+        var BLOB = 'https://github.com/chane81/mfa-nextjs/blob/main/docs/';
+
+        document.querySelectorAll('a[href$=".md"]').forEach(function (a) {
+          var href = a.getAttribute('href');
+          if (href.slice(0, 2) !== './') return;
+
+          a.href = BLOB + href.slice(2);
+          a.target = '_blank';
+          a.rel = 'noopener';
+        });
+      })();
     </script>
   </body>
 </html>

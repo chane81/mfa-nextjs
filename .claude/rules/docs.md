@@ -28,8 +28,14 @@ paths:
 링크가 원본 마크다운을 가리키고, 수치는 거기서 가져온다. 설계가 바뀌면 마크다운을 먼저
 고치고 그림을 따라 고친다. 반대로 하면 두 곳이 갈린다.
 
-단독 HTML 이다. 외부 의존은 Google Fonts 하나뿐이고 스크립트는 테마 토글 하나다.
-빌드에 들어가지 않으므로 라이브러리를 끌어오지 않는다 — SVG 는 손으로 쓴다.
+단독 HTML 이다. 외부 의존은 Google Fonts 하나뿐이고 스크립트는 둘 — 테마 토글과,
+Pages 에서만 도는 `.md` 링크 재작성이다. 빌드에 들어가지 않으므로 라이브러리를 끌어오지
+않는다 — SVG 는 손으로 쓴다.
+
+`docs/` 는 `.github/workflows/pages.yml` 이 GitHub Pages 로 올린다
+(<https://chane81.github.io/mfa-nextjs/anatomy.html>). 그래서 이 폴더에 새 파일을 놓으면
+**공개된다**. Pages 는 마크다운을 렌더링하지 않으므로 해부도의 `.md` 링크는 그 자리에서
+GitHub blob 주소로 바뀐다 — 상대 경로(`./02-architecture/…`)를 유지해야 그 치환이 먹는다.
 
 ## 형식
 
