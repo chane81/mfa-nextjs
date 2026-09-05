@@ -51,8 +51,17 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY apps/host/package.json apps/host/
 COPY apps/remote-cart/package.json apps/remote-cart/
 COPY apps/remote-catalog/package.json apps/remote-catalog/
+# ⚠️ 워크스페이스 패키지를 **하나도 빠뜨리면 안 된다.** 빠뜨려도 `pnpm install` 은
+# 성공한다 — pnpm 이 없는 디렉터리로 심링크를 먼저 만들기 때문이다. 대신 그 패키지의
+# `node_modules` 가 안 생겨서, `COPY . .` 로 소스가 채워진 뒤 빌드가 그 패키지의
+# 의존성을 못 푼다(`packages/store` → zustand, `packages/tailwind-config` → tailwindcss).
+# 실제로 셋이 빠져 있었고 아무 검사도 그걸 못 봤다. 지금은 `scripts/docker-context.ts`
+# 가 이 목록을 워크스페이스와 대조하고 `pnpm test` 에서 죽는다.
 COPY packages/contracts/package.json packages/contracts/
 COPY packages/eslint-config/package.json packages/eslint-config/
+COPY packages/remote-config/package.json packages/remote-config/
+COPY packages/store/package.json packages/store/
+COPY packages/tailwind-config/package.json packages/tailwind-config/
 COPY packages/typescript-config/package.json packages/typescript-config/
 COPY packages/ui/package.json packages/ui/
 # 이 이미지는 host 만 빌드하므로 remote 의 툴체인을 받을 이유가 없다.
