@@ -228,6 +228,85 @@ export function assertRemoteName(value: string): RemoteName {
   return value as RemoteName;
 }
 
+/**
+ * CI 가 remote 별로 읽는 저장소 Variable 이름들.
+ *
+ * ## 왜 이게 여기 있나
+ *
+ * 배포 워크플로가 remote 마다 두 값을 필요로 한다 — 공개 URL 과 Dokploy 애플리케이션 id.
+ * 예전에는 그 매핑을 GHA 표현식 안에 삼항 사슬로 적었다.
+ *
+ *   REMOTE_URL="$([ "$REMOTE" = catalog ] && echo "$CATALOG_URL" || echo "$CART_URL")"
+ *
+ * 이 형태는 remote 가 셋이 되는 순간 **조용히 틀린다.** catalog 가 아닌 모든 remote 가
+ * cart 의 URL 을 읽고, 그 URL 로 배포 전후 버전을 비교해 "성공" 으로 끝난다.
+ * 같은 함정을 `application-id` 쪽에서 이미 한 번 밟았다(deploy.yml 의 ⚠️ 주석).
+ *
+ * 그래서 매핑을 **이름 규칙**으로 바꾸고 그 규칙을 여기 한 곳에 둔다. 워크플로는
+ * `toJSON(vars)` 로 저장소 Variables 전체를 받아 이 이름으로 찾아가므로, remote 가
+ * 늘어도 YAML 은 한 글자도 안 바뀐다. 없는 키는 `jq -e` 가 **즉시 실패**시킨다.
+ *
+ * 규칙: 이름을 대문자로 올리고 `-` 를 `_` 로 바꾼다(`REMOTES` 키에 쓸 수 있는 문자 중
+ * 셸 변수명에 못 들어가는 건 하이픈뿐이다).
+ */
+function envSlug(remote: RemoteName): string {
+  return remote.toUpperCase().replace(/-/g, '_');
+}
+
+/** remote 의 공개 URL 이 담긴 저장소 Variable 이름 (예 `MF_CATALOG_URL`) */
+export function ciUrlVar(remote: RemoteName): string {
+  return `MF_${envSlug(remote)}_URL`;
+}
+
+/** remote 의 Dokploy 애플리케이션 id 가 담긴 저장소 Variable 이름 */
+export function ciDokployAppVar(remote: RemoteName): string {
+  return `DOKPLOY_APP_${envSlug(remote)}`;
+}
+
+/**
+ * 배포 워크플로의 matrix 한 항목.
+ *
+ * 이름만 넘기면 워크플로가 다시 변수 이름을 조립해야 하고, 그러면 규칙이 두 곳에 산다.
+ * 조립까지 끝낸 객체를 넘겨서 YAML 쪽에는 **규칙이 존재하지 않게** 한다.
+ */
+export interface RemoteDeployTarget {
+  readonly name: RemoteName;
+  readonly urlVar: string;
+  readonly appVar: string;
+  /** 이 경로 아래가 바뀌면 그 remote 를 배포한다 */
+  readonly workspaceDir: string;
+}
+
+/**
+ * host 의 워크스페이스 디렉터리.
+ *
+ * `REMOTES` 에는 host 가 없다 — host 는 remote 를 소비하는 쪽이라 배치가 다르다.
+ * 그래도 "어느 경로가 바뀌면 host 를 배포하나" 는 배치 지식이라 여기 둔다.
+ */
+export const HOST_WORKSPACE_DIR = 'apps/host';
+
+/**
+ * 이 경로들이 바뀌면 **세 이미지 전부** 다시 빌드해야 한다.
+ *
+ * `.dockerignore` 가 목록에 있는 이유: 그 파일이 빌드 컨텍스트를 정하므로 이미지가
+ * 통째로 달라진다. 빠뜨려서 배포가 안 물었던 적이 있다(known-issues I-7).
+ */
+export const SHARED_DEPLOY_PATHS: readonly string[] = [
+  'packages/',
+  'scripts/',
+  'pnpm-lock.yaml',
+  '.dockerignore',
+];
+
+export function deployTarget(remote: RemoteName): RemoteDeployTarget {
+  return {
+    name: remote,
+    urlVar: ciUrlVar(remote),
+    appVar: ciDokployAppVar(remote),
+    workspaceDir: REMOTES[remote].workspaceDir,
+  };
+}
+
 /** 로컬 개발 오리진. env 가 없을 때의 기본값들이 전부 여기서 나온다. */
 export function devOrigin(remote: RemoteName): string {
   return `http://localhost:${REMOTES[remote].devPort}`;
