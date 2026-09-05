@@ -5,6 +5,9 @@ import {
   REMOTE_NAMES,
   REMOTES,
   assertRemoteName,
+  ciDokployAppVar,
+  ciUrlVar,
+  deployTarget,
   devOrigin,
   publicOrigin,
   signedPayload,
@@ -181,5 +184,45 @@ describe('signedPayload', () => {
       ssrEntry: fields.ssrEntry,
     };
     expect(signedPayload(shuffled)).toBe(signedPayload(fields));
+  });
+});
+
+describe('CI 변수 이름 파생', () => {
+  /**
+   * 이 규칙이 깨지면 배포가 **조용히** 틀린다 — 워크플로는 `jq -e` 로 죽지만,
+   * 죽기 전에 규칙이 바뀐 걸 여기서 먼저 잡는 편이 싸다.
+   */
+  it('remote 이름을 대문자로 올려 Variable 이름을 만든다', () => {
+    expect(ciUrlVar('catalog')).toBe('MF_CATALOG_URL');
+    expect(ciDokployAppVar('catalog')).toBe('DOKPLOY_APP_CATALOG');
+  });
+
+  it('모든 remote 가 서로 다른 Variable 이름을 갖는다', () => {
+    // 이름이 겹치면 두 remote 가 같은 주소로 배포된다.
+    const names = REMOTE_NAMES.flatMap((r) => [
+      ciUrlVar(r),
+      ciDokployAppVar(r),
+    ]);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('Variable 이름이 셸 변수명으로 쓸 수 있는 문자만 쓴다', () => {
+    // `-` 가 든 remote 이름이 들어와도 `MF_A-B_URL` 같은 걸 만들지 않는다.
+    for (const name of REMOTE_NAMES) {
+      expect(ciUrlVar(name)).toMatch(/^[A-Z0-9_]+$/);
+      expect(ciDokployAppVar(name)).toMatch(/^[A-Z0-9_]+$/);
+    }
+  });
+
+  it('deployTarget 은 워크플로가 필요한 걸 전부 담는다', () => {
+    // YAML 쪽에 규칙이 남지 않게 하는 게 이 객체의 목적이다.
+    for (const name of REMOTE_NAMES) {
+      expect(deployTarget(name)).toEqual({
+        name,
+        urlVar: ciUrlVar(name),
+        appVar: ciDokployAppVar(name),
+        workspaceDir: REMOTES[name].workspaceDir,
+      });
+    }
   });
 });

@@ -53,11 +53,26 @@ permissions:
 
 # 도메인은 저장소 Variables 한 곳에만 둔다. 폴백 리터럴을 두면 변수를 안 넣은 저장소에서
 # 워크플로가 남의 도메인을 조용히 때린다 — 안 붙어야 할 때 붙는 편이 낫다.
+#
+# ## remote 별 변수를 여기 나열하지 않는다
+#
+# 예전에는 `CATALOG_URL` · `CART_URL` 을 적고 아래에서 삼항으로 골랐다.
+#
+#   REMOTE_URL="$([ "$REMOTE" = catalog ] && echo "$CATALOG_URL" || echo "$CART_URL")"
+#
+# remote 가 셋이 되는 순간 **catalog 가 아닌 모든 remote 가 cart 의 URL 을 읽는다.**
+# 그리고 그 URL 로 배포 전후 버전을 비교해 성공으로 끝난다 — 로그에 아무 흔적이 없다.
+# `application-id` 쪽에서 같은 함정을 이미 한 번 밟았다(아래 주석 참고).
+#
+# 그래서 remote → 변수 이름 매핑을 `@mfa/remote-config` 의 `ciUrlVar` · `ciDokployAppVar`
+# 로 옮기고, 여기서는 저장소 Variables **전체**를 JSON 한 덩이로 받는다. matrix 항목이
+# 자기 변수 이름을 들고 오므로 remote 가 늘어도 이 파일은 안 바뀐다.
+#
+# `vars` 는 정의상 비밀이 아니다(비밀은 `secrets`). 통째로 넘겨도 노출되는 게 없다.
 env:
   HOST_URL: ${{ vars.MF_HOST_URL }}
-  CATALOG_URL: ${{ vars.MF_CATALOG_URL }}
-  CART_URL: ${{ vars.MF_CART_URL }}
   DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
+  ALL_VARS: ${{ toJSON(vars) }}
 
 jobs:
   detect:
@@ -80,7 +95,7 @@ jobs:
           after: ${{ github.sha }}
 
   remotes:
-    name: ${{ matrix.remote }} 배포
+    name: ${{ matrix.remote.name }} 배포
     needs: detect
     if: needs.detect.outputs.remotes != '[]'
     runs-on: ubuntu-latest
@@ -88,20 +103,49 @@ jobs:
       # 한 remote 가 실패해도 다른 remote 는 끝까지 간다. 둘은 독립된 배포다.
       fail-fast: false
       matrix:
+        # 항목은 문자열이 아니라 `{ name, urlVar, appVar, workspaceDir }` 객체다.
+        # 변수 이름 규칙은 `@mfa/remote-config` 가 정하고 detect 가 실어 보낸다.
         remote: ${{ fromJSON(needs.detect.outputs.remotes) }}
     steps:
       # 로컬 composite action 을 쓰려면 저장소가 체크아웃돼 있어야 한다.
       - uses: actions/checkout@v5
 
+      - id: cfg
+        name: 이 remote 의 배포 설정 찾기
+        env:
+          REMOTE: ${{ matrix.remote.name }}
+          URL_VAR: ${{ matrix.remote.urlVar }}
+          APP_VAR: ${{ matrix.remote.appVar }}
+        run: |
+          set -euo pipefail
+
+          # `jq -e` 는 결과가 null 이면 **0 이 아닌 코드로 끝난다.** 변수를 안 만들어 둔
+          # remote 를 배포하려 하면 여기서 죽는다 — 옛 삼항 사슬처럼 다른 remote 의 값으로
+          # 조용히 넘어가지 않는다. 그게 이 step 이 존재하는 이유다.
+          # ⚠️ `echo "x=$(pick …)"` 로 쓰면 안 된다. `pick` 이 서브셸에서 죽어도 바깥
+          # `echo` 는 성공해서 **빈 값이 그대로 출력으로 나간다.** 변수에 먼저 받아야
+          # `set -e` 가 command substitution 의 실패를 잡는다.
+          pick() {
+            jq -er --arg k "$1" '.[$k] // empty' <<<"$ALL_VARS" || {
+              echo "::error::저장소 Variable '$1' 이(가) 없습니다 (remote '$REMOTE'). Settings > Variables 에 추가하세요."
+              return 1
+            }
+          }
+
+          REMOTE_URL="$(pick "$URL_VAR")"
+          APP_ID="$(pick "$APP_VAR")"
+
+          {
+            echo "remote_url=$REMOTE_URL"
+            echo "app_id=$APP_ID"
+          } >> "$GITHUB_OUTPUT"
+
       - id: baseline
         name: 배포 전 버전 기록
         env:
-          REMOTE: ${{ matrix.remote }}
+          REMOTE_URL: ${{ steps.cfg.outputs.remote_url }}
         run: |
           set -euo pipefail
-          REMOTE_URL="$([ "$REMOTE" = catalog ] && echo "$CATALOG_URL" || echo "$CART_URL")"
-          echo "remote_url=$REMOTE_URL" >> "$GITHUB_OUTPUT"
-
           # 못 읽어도 진행한다 — 첫 배포이거나 remote 가 잠깐 안 뜬 것이다.
           BEFORE="$(curl -fsS --max-time 10 "$REMOTE_URL/mf-version.json" | jq -r '.version' || echo '')"
           echo "before=$BEFORE" >> "$GITHUB_OUTPUT"
@@ -111,16 +155,12 @@ jobs:
         with:
           dokploy-url: ${{ env.DOKPLOY_URL }}
           api-key: ${{ secrets.DOKPLOY_API_KEY }}
-          # GHA 에는 삼항이 없어서 `조건 && A || B` 를 쓴다(공식 문서 관용구).
-          # ⚠️ **두 조건을 다 적어야 한다.** 빈 문자열은 falsy 라
-          # `catalog && CATALOG || CART` 로 쓰면 CATALOG 가 비었을 때 **cart 의 id 로 넘어간다** —
-          # catalog 를 배포하라는 job 이 조용히 cart 를 배포하고 로그에는 성공으로 남는다.
-          application-id: "${{ (matrix.remote == 'catalog' && vars.DOKPLOY_APP_CATALOG) || (matrix.remote == 'cart' && vars.DOKPLOY_APP_CART) || '' }}"
-          label: ${{ matrix.remote }}
+          application-id: ${{ steps.cfg.outputs.app_id }}
+          label: ${{ matrix.remote.name }}
 
       - uses: ./.github/actions/mf-version-check
         with:
-          remote-url: ${{ steps.baseline.outputs.remote_url }}
+          remote-url: ${{ steps.cfg.outputs.remote_url }}
           before: ${{ steps.baseline.outputs.before }}
 
   host:
@@ -146,7 +186,7 @@ jobs:
           label: host
 
   revalidate:
-    name: ${{ matrix.remote }} 캐시 무효화
+    name: ${{ matrix.remote.name }} 캐시 무효화
     needs: [detect, remotes, host]
     # **host 를 새로 배포했으면 필요 없다.** 새 컨테이너는 빈 캐시로 뜨므로 첫 요청이
     # 이미 새 remote 로 굽는다. 무효화는 "host 는 그대로인데 remote 만 바뀐" 경우의 것이다.
@@ -166,5 +206,5 @@ jobs:
       - uses: ./.github/actions/mf-revalidate
         with:
           host-url: ${{ env.HOST_URL }}
-          remote: ${{ matrix.remote }}
+          remote: ${{ matrix.remote.name }}
           secret: ${{ secrets.MF_REVALIDATE_SECRET }}

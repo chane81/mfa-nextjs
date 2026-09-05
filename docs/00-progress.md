@@ -1,5 +1,119 @@
 # 진행 상황
 
+## 2026-09-05 (38차) — remote 가 늘어날 때 조용히 틀리는 자리를 없앤다
+
+"remote 와 컴포넌트가 더 늘어나도 이 구조가 버티나" 를 기준으로 훑었다. 런타임은 이미
+열려 있었고(ADR-017 덕이다) **배포 · CI · Docker 계층이 안 열려 있었다.**
+
+### 무엇이 깨져 있었나
+
+이미지 빌드가 **실제로 깨진 상태였다**(I-10). 세 Dockerfile 의 `deps` 스테이지가
+워크스페이스 package.json 을 손으로 나열하는데 그 목록이 셋 적었다 —
+`remote-config` · `store` · `tailwind-config`. 그런데도 `pnpm install --frozen-lockfile`
+은 성공한다. pnpm 이 없는 디렉터리를 향해 심링크를 먼저 만들고, `COPY . .` 가 소스를
+덮으면 그 링크가 살아나기 때문이다.
+
+살아나지 않는 건 그 패키지들의 `node_modules` 다. deps 스테이지를 임시 디렉터리로
+재현해 확인했다.
+
+```
+packages/store           → require.resolve('zustand')     MODULE_NOT_FOUND
+packages/tailwind-config → require.resolve('tailwindcss') MODULE_NOT_FOUND
+```
+
+Dockerfile 은 08-30 에도 손댔고 세 패키지는 08-19 ~ 08-25 에 생겼다. 드리프트가 난 채로
+계속 있었는데 `pnpm build` · `pnpm test` · CI 어디에도 이걸 보는 자리가 없었다 —
+**배포가 최초 검증**이었다.
+
+`typescript-config` 도 같이 빠져 있었지만 아무 일도 안 났다. 런타임 의존성이 없어서다.
+그래서 이 함정은 **패키지를 추가한 시점이 아니라 그 패키지에 의존성이 생기는 시점에**
+드러난다.
+
+### 이름이 박혀 있던 자리
+
+| 자리                           | 빠뜨렸을 때                                      | 어떻게 됐나             |
+| ------------------------------ | ------------------------------------------------ | ----------------------- |
+| `detect-targets` 의 이름 6곳   | 그 remote 의 배포 job 이 안 생긴다 (로그도 정상) | 스크립트 + SSOT 로 파생 |
+| `deploy.yml` 의 URL 삼항       | 남의 remote 주소로 배포 검증이 통과한다          | matrix 객체 + `jq -e`   |
+| Dockerfile `COPY` 목록         | 이미지 빌드가 깨진다                             | 목록 유지 + 대조 테스트 |
+| `host` build · ci 의 정적 서버 | 그 remote 만 프리렌더에서 ECONNREFUSED           | `serve-all-remotes.ts`  |
+| `turbo.json` 의 dependsOn      | 같음                                             | 텍스트 대조 테스트      |
+| `MfWarmup` 의 remote 분기      | warm 에서 조용히 빠진다                          | `MODULE_IDS` 에서 파생  |
+
+원칙은 ADR-021 에 남겼다 — **파생할 수 있으면 파생하고, 못 하면 어긋남을 죽는 검사로
+바꾼다.** 조용히 틀리는 자리를 없애는 게 목표지 자동화가 목표가 아니다.
+
+### warm 은 렌더가 아니라 적재였다
+
+처음에는 `MfWarmup` 의 remote 별 분기(`remotes.includes('catalog')`)를 **타입이 강제하는
+맵**으로 바꿨다. 그런데 그건 SSOT 를 세워놓고 옆에 목록을 하나 더 만든 것이다 —
+remote 가 늘면 그 맵도 같이 늘어난다.
+
+목록이 필요했던 이유는 warm 이 그 모듈을 **렌더**했기 때문이다. 렌더하면 필수 prop 이
+있는 모듈(`catalog/ProductDetail` 의 `productId`)은 못 쓰므로 사람이 골라야 했다.
+
+그런데 warm 의 값은 렌더가 아니라 **번들 적재**다. fetch · 무결성 검사 ·
+`new Function` 평가 · expose 존재 확인이 전부 `loadRemoteModule` 안에서 끝나고
+`markBundleReady` 도 거기서 불린다. 적재만 하고 `null` 을 그리면 **어느 모듈이든
+상관없어진다** — 그래서 `MODULE_IDS` 에서 그 remote 의 첫 번째를 그냥 쓴다.
+
+실측으로 확인했다. `/internal/mf-warm` 만 호출한 상태의 `/api/lab/stats`:
+
+```json
+{ "stats": { "fetches": 2, "evals": 2, "loads": { "catalog": 1, "cart": 1 } } }
+```
+
+`MfWarmup` 에 remote 이름도 모듈 이름도 남지 않았다.
+
+### 검사를 어디에 뒀나
+
+| 무엇                     | 어디                             | 언제        |
+| ------------------------ | -------------------------------- | ----------- |
+| 배포 대상 판별 규칙      | `scripts/deploy-targets.test.ts` | `pnpm test` |
+| COPY 목록 ≡ 워크스페이스 | `scripts/docker-context.test.ts` | `pnpm test` |
+| 이미지가 실제로 빌드되나 | `ci.yml` 의 docker job 셋        | CI          |
+
+### 한 번 늘렸다가 되돌린 것
+
+처음에는 검사를 여섯 벌 만들었다 — `turbo.json` 의 dependsOn 대조, warm 맵 런타임 확인,
+SSR 번들의 require 집합, `serve-all-remotes` 의 목록 확인까지. **파일이 12개 늘었다.**
+
+절반을 걷어냈다. 기준은 하나다 — **이미 죽는 자리에 검사를 하나 더 얹지 않는다.**
+
+| 걷어낸 것                          | 왜                                                           |
+| ---------------------------------- | ------------------------------------------------------------ |
+| `turbo-config.test.ts`             | 빠뜨리면 `serve-all-remotes` 가 "dist 가 없습니다" 로 죽는다 |
+| `warm-modules.test.ts`             | `satisfies` 가 컴파일 타임에 이미 잡는다                     |
+| `serve-all-remotes.test.ts`        | 검사 대상이 `REMOTE_LIST.map` 한 줄이라 자명하다             |
+| `check-ssr-externals.ts` (+테스트) | 한 번도 안 밟은 문제다. 밟으면 그때 만든다                   |
+| `warm-modules.ts` 파일 분리        | 목록 자체가 없어졌다 — 아래 참고                             |
+| `docker-context.ts` 파일 분리      | 소비처가 테스트 하나뿐이라 그 안으로 접었다                  |
+
+`check-ssr-externals` 가 막으려던 것(remote 가 뭘 externalize 하면 SSR 만 죽는다)은
+실재하는 구멍이다. 다만 **가정이지 증상이 아니다.** 실제로 밟으면 known-issues 에
+증상과 함께 남기고 그때 검사를 만든다 — 이 저장소가 다른 함정을 다뤄온 방식 그대로다.
+
+### 기각한 것
+
+`apps/host/tsconfig.json` 의 `catalog/*` · `cart/*` 매핑을 `"*"` 와일드카드로 접으려다
+말았다. **이미 밟고 기각한 길이다**(I-4) — 평범한 import 까지 그 경로에서 먼저 찾아
+`Cannot find name 'process'` 같은 무관한 에러가 쏟아진다. 두 tsconfig 의 주석에 그
+근거가 적혀 있었다. 빠뜨리면 컴파일이 즉시 죽으므로 조용한 자리도 아니다.
+
+`@mfa/store` 를 MF `shared` 로 올리는 것도 기각했다(ADR-022). 복제를 없애는 대신 버전
+협상이 붙는데, 그러면 한 remote 의 배포가 다른 remote 의 런타임을 바꾼다.
+
+### 다음에 할 것
+
+- `apps/host/src/components/` 를 `remote/<remote>/` 로 가른다. 지금은 평평하고
+  remote 컴포넌트당 Section · Slot 2파일이라 remote 가 늘면 한 폴더에 수십 개가 쌓인다.
+  ⚠️ Section 을 레지스트리로 접지는 않는다 — props 타입이 module id 별로 오므로
+  (`PropsOf<K>`) 제네릭 맵으로 접으면 그 타입이 죽는다. 폴더만 가른다.
+- `pnpm mf:types` 가 remote 전체 기동을 요구하고 `abortOnError: true` 다. remote 가
+  4~5개를 넘기면 `MF_TYPES_ONLY` 같은 좁히기가 필요하다. CI 는 계속 전체를 돈다.
+- remote 당 `style.css` 가 Tailwind 를 통째로 담는다(12~16K). 5개를 넘기면 preflight 를
+  host 만 내보내는 갈래를 다시 잰다 — 지금 바꿀 근거는 없다(ADR-011).
+
 ## 2026-09-05 (37차) — 해부도 본문을 "결론 먼저" 로 바꾼다
 
 그림과 표는 훑으면 되는데 본문 문단은 끝까지 읽어야 결론이 나왔다. `<p>` 41개 중 18개가

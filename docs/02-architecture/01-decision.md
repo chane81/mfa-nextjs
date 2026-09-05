@@ -885,3 +885,100 @@ CatalogSection  category · onCategoryChange 를 받는다  홈 · /lab/* 넷이
 - ❌ 파일이 하나 는다. 소비처가 하나뿐인 컴포넌트에는 과한 분리다 — **둘 이상이
   쓰기 시작할 때** 가르는 것으로 충분하다.
 - ❌ 이 규칙을 어겨도 `typecheck` · `test` 는 안 잡는다. `pnpm build` 만 잡는다(I-9).
+
+## ADR-021 — remote 개수에 비례해 늘어나는 지식은 CI · Docker 계층까지 SSOT 에서 파생한다
+
+**날짜** 2026-09-05 (38차) · **상태** 채택
+
+### 맥락
+
+"remote 가 더 늘어나도 이 구조가 버티나" 를 기준으로 저장소를 훑었다. 결과가 갈렸다.
+
+런타임 계층은 이미 열려 있었다. host 로더 · `next.config.ts` · 신뢰 경계 ·
+`wait-for-remotes` · `serve-remote-dist` 가 전부 `REMOTE_LIST` 를 순회하고,
+`turbo.json` 도 `REMOTE_*` 와일드카드로 받는다(ADR-017 이 세운 것).
+
+**배포 계층은 아니었다.** remote 를 하나 추가할 때 이름을 손으로 적어야 하는 자리가
+열 곳 넘게 남아 있었고, 그중 셋은 빠뜨려도 `typecheck` · `test` · `build` 가 전부
+통과하고 **배포에서만 조용히 틀렸다**(I-10 · I-11).
+
+| 자리                         | 빠뜨렸을 때                                      |
+| ---------------------------- | ------------------------------------------------ |
+| `detect-targets` 의 이름 6곳 | 그 remote 의 배포 job 이 안 생긴다 (로그도 정상) |
+| `deploy.yml` 의 URL 삼항     | 남의 remote 주소로 배포 검증이 통과한다          |
+| Dockerfile 의 `COPY` 목록    | 이미지 빌드가 깨진다 (설치는 성공한다)           |
+
+### 결정
+
+**remote 개수에 비례해 늘어나는 지식은 전부 `@mfa/remote-config` 에서 파생한다.**
+파생할 수 없는 형식(JSONC · YAML · Dockerfile)이면, 파생 대신 **어긋남을 죽는 검사로
+바꾼다.** 조용히 틀리는 자리를 남기지 않는 것이 목표지 자동화 자체가 목표가 아니다.
+
+세 갈래로 처리했다.
+
+| 갈래                    | 어디                                         |
+| ----------------------- | -------------------------------------------- |
+| 코드가 SSOT 를 순회한다 | `deploy-targets.ts` · `serve-all-remotes.ts` |
+| 타입이 강제한다         | `contract-check.ts` 의 `RemoteKeys` 유니온   |
+| 검사가 대조한다         | `docker-context.test.ts` · ci 의 docker job  |
+
+변수 이름 규칙(`MF_<NAME>_URL` · `DOKPLOY_APP_<NAME>`)도 SSOT 에 둔다. 워크플로는
+`toJSON(vars)` 로 저장소 Variables 를 통째로 받아 그 이름으로 찾고, 없으면 `jq -e` 가
+그 자리에서 죽는다 — GHA 표현식에서 이름을 분기하지 않는다.
+
+### 왜 스크립트가 `pnpm install` 없이 도나
+
+`deploy-targets.ts` 는 `@mfa/remote-config` 를 **상대 경로로** 들인다. 배포 대상을
+정하는 job 이 의존성 전체를 받을 이유가 없기 때문이다. 그게 가능한 건
+`packages/remote-config/src/index.ts` 에 **import 가 하나도 없어서**다(ADR-017 이
+그렇게 만든 것 — 다섯 종류의 소비처가 빌드 없이 읽어야 했다).
+
+⚠️ 그래서 그 파일에 import 를 추가하면 detect job 이 깨진다. 상수 모듈로 유지한다.
+
+### 결과
+
+- ⭕ remote 추가 시 손대야 하는 자리가 열 곳 넘음 → **`REMOTES` + 그 앱의 파일들** 로 줄었다.
+- ⭕ 남은 수동 자리(`turbo.json` · Dockerfile · tsconfig `paths`)는 전부 **잊으면 죽는다.**
+  `pnpm test` 나 `pnpm typecheck` 가 어느 파일에 무엇을 넣어야 하는지 말한다.
+- ⭕ 배포 전에 이미지 빌드를 본다. 예전에는 배포가 최초 검증이었다.
+- ❌ Dockerfile 의 `COPY` 목록은 여전히 O(n²) 다. 없애는 쪽(`COPY packages ./packages`)은
+  소스 한 줄만 바꿔도 설치 레이어를 무효화해서 매 배포마다 `pnpm install` 이 다시 돈다.
+  캐시를 지키고 검사를 붙이는 쪽을 골랐다.
+- ❌ CI 가 길어진다. docker job 셋이 늘었다 — remote 이미지 전체 + host 의 `deps`.
+- ❌ 저장소 Variables 이름이 계약이 됐다. 이름을 바꾸려면 SSOT 와 GitHub 설정을 같이 고친다.
+
+## ADR-022 — `@mfa/store` 와 `@mfa/ui` 는 MF `shared` 에 올리지 않는다
+
+**날짜** 2026-09-05 (38차) · **상태** 채택
+
+### 맥락
+
+remote 의 `shared` 에는 `react` · `react-dom` 둘뿐이다. `@mfa/store` 와 `@mfa/ui` 는
+각 remote 번들에 **복제**된다. remote 가 늘면 전송량도 그만큼 는다.
+
+런타임 정합성은 이미 지켜지고 있다 — `packages/store/src/utils/global-singleton.ts` 가
+스토어 인스턴스를 `globalThis` 에 걸어두므로 복제본이 몇 벌이든 상태는 하나다.
+그래서 지금 깨지는 건 없고, 남는 건 payload 와 **버전 스큐 표면**이다.
+
+### 결정
+
+**올리지 않는다.** 복제를 받아들인다.
+
+`shared` 로 올리면 그 모듈에 **버전 협상**이 붙는다. MF 는 `requiredVersion` 이 맞는
+쪽 하나를 골라 모두에게 준다. 그러면 remote A 를 배포하려고 store 를 올렸을 때
+remote B 가 그 새 store 위에서 돌게 된다 — **한 remote 의 배포가 다른 remote 의 런타임을
+바꾼다.** 이 저장소가 증명하려는 독립 배포가 그 지점에서 깨진다.
+
+복제는 반대 성질을 준다. remote 는 자기가 빌드한 store 만 쓰고, 배포는 서로를 안 건드린다.
+공유해야 하는 건 코드가 아니라 **상태**인데 그건 `globalThis` 싱글턴이 이미 하고 있다.
+
+### 결과
+
+- ⭕ remote 배포가 서로 독립이다. store 를 올려도 다른 remote 는 옛 코드 그대로 돈다.
+- ⭕ 버전 협상 실패(`#RUNTIME-015` 류)의 표면이 react 넷으로 유지된다.
+- ❌ payload 가 remote 수에 비례한다. `style.css` 도 같은 성질이다(ADR-011).
+  remote 5개를 넘기면 다시 잰다 — 지금은 remote 당 gzip 수 KB 수준이다.
+- ❌ 상태 계약(`globalThis` 키와 스토어 모양)이 **암묵적 공유 ABI** 가 된다. remote 가
+  서로 다른 store 버전을 들고도 같은 싱글턴을 만지므로, `@mfa/store` 의 상태 모양을
+  바꾸는 변경은 **모든 remote 를 같이 배포해야 한다.** `detect-targets` 가
+  `packages/` 변경을 전부 배포로 보는 이유가 이것이다.
