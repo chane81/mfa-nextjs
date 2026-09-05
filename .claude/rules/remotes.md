@@ -121,3 +121,48 @@ host 가 받을 주소가 거기서 파생되므로 설정에 문자열을 다�
 
 `scripts/wait-for-remotes.ts` 가 host 앞에 게이트를 건다. 단 **HTTP 200 만** 보므로 모듈 레벨
 초기화 실패는 못 막는다. 60초 뒤에는 경고만 찍고 통과한다 — 로그에 `준비됨` 네 줄을 확인한다.
+
+## remote 를 하나 더 추가할 때
+
+배치의 원본은 `packages/remote-config` 하나다(ADR-017). 거기에 항목을 넣으면 **런타임 ·
+스크립트 · 번들러 설정 · CI 배포 판별 · turbo env** 는 저절로 따라온다 — 손댈 곳이 없다.
+
+손으로 해야 하는 건 아래 일곱 곳이고, **새 앱 디렉터리를 뺀 전부가 빠뜨리면 죽는다.**
+
+| 무엇                                       | 안 하면                                                |
+| ------------------------------------------ | ------------------------------------------------------ |
+| `REMOTES` 에 항목 추가                     | `assertRemoteName` 이 거부한다                         |
+| `apps/remote-<name>/` (번들러 설정 포함)   | —                                                      |
+| `turbo.json` 의 `@mfa/host#build`          | `serve-all-remotes` 가 dist 없다고 죽는다              |
+| 세 Dockerfile 의 `COPY … package.json`     | `docker-context.test.ts` 가 줄까지 알려준다            |
+| `contract-check.ts` 의 `RemoteKeys` 유니온 | `pnpm typecheck` 이 죽는다                             |
+| `apps/host/tsconfig.json` 의 `<name>/*`    | host 컴파일이 즉시 죽는다 (I-4 때문에 와일드카드 불가) |
+| `packages/contracts/tsconfig.json` 도 같이 | 같음                                                   |
+
+저장소 Variables 두 개도 필요하다 — 이름은 `ciUrlVar` · `ciDokployAppVar` 가 정한다.
+
+```
+MF_<NAME>_URL          공개 URL
+DOKPLOY_APP_<NAME>     Dokploy 애플리케이션 id
+```
+
+없으면 배포 job 이 `jq -e` 에서 죽고 어느 변수가 없는지 말한다. **삼항으로 남의 remote
+주소를 읽던 예전 방식이 조용히 틀리던 자리다**(I-11).
+
+`docker-compose.yml` 과 `scripts/docker-host-local.sh` 는 로컬 검증 전용이라 손으로 맞춘다
+(정적 YAML · 셸이라 SSOT 를 못 읽는다). 안 고쳐도 배포에는 영향이 없다.
+
+## 컴포넌트를 하나 더 추가할 때
+
+`src/exposes/` 에 파일을 놓고 `pnpm mf:types` 를 돌린다. 웹 `exposes` 는 스캔이라 등록할
+자리가 없고, `MODULE_IDS` 는 DTS 에서 뽑힌다.
+
+손으로 하는 건 둘이다.
+
+| 무엇                                    | 안 하면                                                 |
+| --------------------------------------- | ------------------------------------------------------- |
+| `src/server-entry.ts` 의 맵             | `src/server-entry.test.tsx` 가 죽는다                   |
+| host 의 `*Section` (+ 필요하면 `*Slot`) | 아무 데서도 안 쓰이는 모듈이 된다 — 의도한 것일 수 있다 |
+
+`*Section` 을 레지스트리로 접지 않는다. props 타입이 module id 별로 오므로(`PropsOf<K>`)
+제네릭 맵으로 접으면 그 타입이 통째로 죽는다.
