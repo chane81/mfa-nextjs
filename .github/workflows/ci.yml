@@ -106,14 +106,11 @@ jobs:
       # 커밋된 파일만 보므로 그 어긋남을 못 본다. 이 단계가 그 창을 닫는다.
       #
       # 바로 위 `pnpm build` 가 remote dist 를 이미 만들어 뒀으므로 정적 서버만 띄우면
-      # 된다. `--success first` 로 페치가 끝나면 서버가 내려간다.
+      # 된다. `serve-all-remotes` 가 `REMOTE_LIST` 를 순회해 전부 띄우고, 페치가 끝나면
+      # 같이 내린다 — remote 를 추가해도 이 파일은 안 바뀐다.
       - name: MF DTS 가 최신인지 확인
         run: |
-          pnpm --filter @mfa/contracts exec concurrently \
-            --kill-others --success first -n catalog,cart,types \
-            "node ../../scripts/serve-remote-dist.ts catalog" \
-            "node ../../scripts/serve-remote-dist.ts cart" \
-            "pnpm mf:types"
+          node scripts/serve-all-remotes.ts -- pnpm mf:types
           git diff --exit-code \
             -- packages/contracts/src/generated \
             || { echo "::error::커밋된 MF 타입/모듈 목록이 낡았습니다. 로컬에서 'pnpm mf:types' 를 돌리고 결과를 커밋하세요."; exit 1; }
