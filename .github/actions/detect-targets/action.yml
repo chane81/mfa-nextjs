@@ -4,7 +4,21 @@ description: 바뀐 경로로 어떤 앱을 배포할지 정한다 (Dokploy Watc
 # Dokploy 의 Watch Paths 를 쓰지 않고 여기서 판별한다. Watch Paths 로는 "누가 먼저 끝나는가"를
 # 정할 수 없어 이 저장소가 막으려는 버전 스큐가 그대로 남기 때문이다(deploy.yml 상단 참고).
 #
-# 판별 결과는 JSON 배열 문자열이다 — 호출부가 `fromJSON` 으로 matrix 에 그대로 꽂는다.
+# ## 판별 자체는 여기 없다
+#
+# 예전에는 이 파일의 bash 안에 remote 이름이 여섯 번 리터럴로 박혀 있었다. remote 를
+# 추가하고 그중 하나만 빠뜨리면 CI 는 초록인데 그 remote 의 배포 job 이 **안 생긴다** —
+# 로그에는 `대상 — remotes=[] host=false` 라고 정상처럼 찍힌다.
+#
+# 지금은 `scripts/deploy-targets.ts` 가 `@mfa/remote-config` 를 읽어 판별하고, 그 규칙에는
+# 테스트가 붙어 있다(`scripts/deploy-targets.test.ts`). 여기 남은 일은 git 에게 바뀐 경로를
+# 물어보는 것뿐이다.
+#
+# 그 스크립트는 `pnpm install` 을 요구하지 않는다 — 상대 경로로 SSOT 를 직접 읽고 Node 24
+# 타입 스트리핑으로 돈다. 배포 대상을 정하려고 의존성 전체를 받을 이유가 없다.
+#
+# 출력의 `remotes` 는 **객체 배열**이다. 이름만 넘기면 워크플로가 저장소 Variable 이름을
+# 다시 조립해야 하고, 그러면 그 규칙이 YAML 과 SSOT 두 곳에 산다.
 
 inputs:
   event-name:
@@ -24,7 +38,9 @@ inputs:
 
 outputs:
   remotes:
-    description: 배포할 remote 이름의 JSON 배열 (예 `["catalog","cart"]`)
+    description: >
+      배포할 remote 의 JSON 배열. 각 항목은
+      `{ name, urlVar, appVar, workspaceDir }` 로, 호출부가 `fromJSON` 으로 matrix 에 꽂는다.
     value: ${{ steps.pick.outputs.remotes }}
   host:
     description: host 를 배포할지 여부 (`true` · `false`)
@@ -34,60 +50,50 @@ runs:
   using: composite
   steps:
     # `git diff` 를 쓰므로 호출부가 `fetch-depth: 0` 으로 체크아웃해 둬야 한다.
+    - id: changed
+      name: 바뀐 경로 모으기
+      shell: bash
+      env:
+        BEFORE: ${{ inputs.before }}
+        AFTER: ${{ inputs.after }}
+      run: |
+        set -euo pipefail
+
+        # 첫 푸시·force push 후에는 BEFORE 커밋이 없을 수 있다. 그때는 CHANGED 를
+        # **설정하지 않는다** — 판별 스크립트가 "기준 없음 → 전부 배포" 로 읽는다.
+        # 빈 문자열로 넘기면 "바뀐 게 없다" 가 되어 아무것도 배포하지 않는다. 다른 뜻이다.
+        # ⚠️ "바뀐 파일이 0개" 와 "비교할 기준이 없다" 는 **다른 뜻**이다. 전자는 아무것도
+        # 배포하지 않고, 후자는 전부 배포한다. 빈 문자열로는 둘을 구분할 수 없어서
+        # 별도 플래그를 낸다.
+        if [ -z "$BEFORE" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+          echo "기준 커밋 없음 — 전부 배포한다"
+          echo "has_base=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        echo "has_base=true" >> "$GITHUB_OUTPUT"
+        {
+          echo 'changed<<GSTACK_EOF'
+          git diff --name-only "$BEFORE" "$AFTER"
+          echo 'GSTACK_EOF'
+        } >> "$GITHUB_OUTPUT"
+
     - id: pick
       name: 무엇을 배포할지 결정
       shell: bash
       env:
         EVENT: ${{ inputs.event-name }}
         TARGET: ${{ inputs.target }}
-        BEFORE: ${{ inputs.before }}
-        AFTER: ${{ inputs.after }}
+        HAS_BASE: ${{ steps.changed.outputs.has_base }}
+        CHANGED_FILES: ${{ steps.changed.outputs.changed }}
       run: |
         set -euo pipefail
 
-        emit() {
-          echo "remotes=$1" >> "$GITHUB_OUTPUT"
-          echo "host=$2" >> "$GITHUB_OUTPUT"
-          echo "대상 — remotes=$1 host=$2"
-        }
-
-        if [ "$EVENT" = "workflow_dispatch" ] && [ "$TARGET" != "auto" ]; then
-          case "$TARGET" in
-            all)     emit '["catalog","cart"]' true ;;
-            remotes) emit '["catalog","cart"]' false ;;
-            host)    emit '[]' true ;;
-          esac
-          exit 0
-        fi
-
-        # 첫 푸시·force push 후에는 BEFORE 커밋이 없을 수 있다. 그때는 전부 대상으로 본다.
-        if [ -z "$BEFORE" ] || ! git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-          emit '["catalog","cart"]' true
-          exit 0
-        fi
-
-        CHANGED="$(git diff --name-only "$BEFORE" "$AFTER")"
-
-        # 공유 코드는 세 이미지가 전부 다시 빌드해야 한다.
-        # `.dockerignore` 가 여기 있는 이유: 그 파일이 빌드 컨텍스트를 정하므로 이미지가
-        # 통째로 달라진다. 빠뜨려서 배포가 안 물었던 적이 있다(known-issues I-7).
-        if echo "$CHANGED" | grep -qE '^(packages/|scripts/|pnpm-lock\.yaml|\.dockerignore)'; then
-          emit '["catalog","cart"]' true
-          exit 0
-        fi
-
-        # `grep -q … && ARR+=(…)` 는 못 쓴다. 매치가 없으면 그 문장이 실패로 끝나
-        # `set -e` 가 스크립트를 죽인다.
-        SELECTED=()
-        if echo "$CHANGED" | grep -q '^apps/remote-catalog/'; then SELECTED+=('"catalog"'); fi
-        if echo "$CHANGED" | grep -q '^apps/remote-cart/'; then SELECTED+=('"cart"'); fi
-
-        HOST=false
-        if echo "$CHANGED" | grep -q '^apps/host/'; then HOST=true; fi
-
-        if [ ${#SELECTED[@]} -eq 0 ]; then
-          emit '[]' "$HOST"
+        # 스크립트는 `CHANGED` 의 **존재 여부**로 기준 유무를 읽는다.
+        if [ "$HAS_BASE" = "true" ]; then
+          export CHANGED="$CHANGED_FILES"
         else
-          IFS=,
-          emit "[${SELECTED[*]}]" "$HOST"
+          unset CHANGED || true
         fi
+
+        node "$GITHUB_WORKSPACE/scripts/deploy-targets.ts"
