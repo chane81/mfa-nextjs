@@ -487,6 +487,42 @@
         margin-bottom: 0;
       }
 
+      /* ------------------------------------------------ 결론 먼저 · 포인트 */
+      .lead {
+        font-weight: 600;
+        margin: 0 0 8px;
+      }
+      .pts {
+        list-style: none;
+        margin: 0 0 22px;
+        padding: 0;
+      }
+      .pts li {
+        position: relative;
+        padding-left: 18px;
+        margin: 0 0 5px;
+        font-size: 15px;
+        line-height: 1.65;
+      }
+      .pts li::before {
+        content: '–';
+        position: absolute;
+        left: 3px;
+        color: var(--line-2);
+      }
+      .note .pts {
+        margin-bottom: 0;
+      }
+      .note .pts li {
+        font-size: 14px;
+      }
+      .claim + .pts {
+        margin-top: -8px;
+      }
+      .note .pts + .lead {
+        margin-top: 14px;
+      }
+
       /* ---------------------------------------------------------- Q&A */
       .qa {
         display: grid;
@@ -636,11 +672,13 @@
         >
         <h1>Next 16 페더레이션 해부도</h1>
         <p class="lede">
-          번들러 플러그인 없이 <code>@module-federation/runtime</code> 만으로
-          remote 를 SSR 하고, 경계를 넘어도 소프트 내비게이션을 유지한다. 배포는
-          앱 셋이 각자 — 다만 <b>순서는 CI 가 쥔다</b>. 런타임은 host 하나가
-          합치고, 계약은 remote 가 소유해 타입으로 흘러온다. 그리고 remote 둘은
-          일부러 다른 번들러로 짓는다. 이 문서는 그 세 축을 그림으로 설명한다.
+          <b
+            >번들러 플러그인 없이 <code>@module-federation/runtime</code> 만으로
+            remote 를 SSR 하고, 경계를 넘어도 소프트 내비게이션을 유지한다.</b
+          >
+          이 문서는 세 축을 그림으로 본다 — 배포(앱 셋이 각자, 순서는 CI 가
+          쥔다) · 런타임(host 하나가 합치고, 계약은 remote 가 소유) ·
+          번들러(remote 둘을 일부러 다르게).
         </p>
         <div class="chips">
           <span class="chip hst"
@@ -680,13 +718,18 @@
         </div>
 
         <p class="claim">
-          마이크로 프론트엔드의 값어치는 <strong>독립 배포</strong> 하나로
-          결정된다. 그래서 세 앱을 한 Compose 로 묶지 않고 각각 별도의
-          Application 으로 올린다 — catalog 만 고쳐서 배포했을 때 host 가
-          무중단인지가 이 구조가 증명하려는 것이다.
+          <b>독립 배포</b>가 이 구조의 값어치다 — 그래서 세 앱을 한 Compose 로
+          묶지 않고 각각 별도 Application 으로 올린다. 증명할 것:
+          <b>catalog 만 고쳐 배포해도 host 는 무중단</b>.
         </p>
 
         <h3>1-1. 푸시 하나에서 배포 셋이 갈라진다</h3>
+
+        <p class="claim">
+          push 하나 → <code>detect</code> job 이 바뀐 경로를 보고 배포 셋을
+          가른다. 순서는 <b>remote → host</b> — host 빌드가 remote 를 실제로
+          실행하기 때문이다.
+        </p>
 
         <div class="scroller">
           <figure>
@@ -1052,39 +1095,46 @@
               </text>
             </svg>
             <figcaption>
-              <b>여기서 한 문장만 가져간다면:</b> host 의
-              <code>next build</code> 는 순수 컴파일이 아니다. 프리렌더가 remote
-              서버 번들을 HTTP 로 받아 실행하므로, remote 가 안 떠 있으면
-              <code>ECONNREFUSED</code> 로 빌드가 죽는다. 그래서 CI 의
-              <code>pnpm build</code> 통과 자체가 “Next 16 에서 런타임 MF + SSR
-              이 된다”는 주장의 회귀 테스트다.
+              <b>host 의 <code>next build</code> 는 순수 컴파일이 아니다.</b>
+              프리렌더가 remote 서버 번들을 HTTP 로 받아 실행한다 → remote 가 안
+              떠 있으면 <code>ECONNREFUSED</code> 로 빌드가 죽는다 → CI 의
+              <code>pnpm build</code> 통과 = “Next 16 에서 런타임 MF + SSR 이
+              된다”의 회귀 테스트.
             </figcaption>
           </figure>
         </div>
 
         <div class="note">
           <span class="note-h"
-            >함정 — 왜 host 이미지는 <code>build</code> 가 아니라
-            <code>docker:build</code> 를 부르나</span
+            >함정 — 왜 host 이미지는 build 가 아니라 docker:build 를
+            부르나</span
           >
-          <p>
-            로컬 <code>build</code> 는 워크스페이스 remote 를 먼저 빌드해서
-            띄운다. 그런데 이미지 안에서 remote 는 이미 배포된 공개 도메인이다.
-            같은 태스크 이름을 쓰면
-            <strong>catalog 빌드 실패가 host 배포까지 끌고 내려가</strong>
-            빌드 그래프에서 독립 배포가 다시 묶인다. 그래서 remote 게이트만 뺀
-            태스크로 이름을 갈랐다.
+          <p class="lead">
+            로컬 <code>build</code> 와 이미지의 <code>docker:build</code> 는
+            remote 를 다르게 본다.
           </p>
+          <ul class="pts">
+            <li>
+              로컬 <code>build</code>: 워크스페이스 remote 를 먼저 빌드해서
+              띄운다
+            </li>
+            <li>이미지 안: remote 는 이미 배포된 공개 도메인이다</li>
+            <li>
+              같은 태스크 이름을 쓰면 → catalog 빌드 실패가 host 배포까지 끌고
+              내려간다 → 빌드 그래프에서 독립 배포가 다시 묶인다
+            </li>
+            <li>그래서 remote 게이트만 뺀 태스크로 이름을 갈랐다</li>
+          </ul>
         </div>
 
         <h3>1-2. 순서를 CI 가 쥔다 — job 넷과 그 조건</h3>
 
         <p class="claim">
-          Dokploy 에는 <strong>앱 사이의 순서 개념이 없다.</strong> 앱마다 “이
-          경로가 바뀌면 나를 빌드해라”(Watch Paths)가 있을 뿐이라, 한 push 가 세
-          앱을 동시에 물면 누가 먼저 끝날지 모른다. 그래서 Watch Paths 를
-          <code>.github/workflows/deploy.yml</code> 로 옮겨왔다 — 무엇을
-          배포할지 도 <b>언제 배포할지</b>도 여기서 정한다.
+          순서는 <code>.github/workflows/deploy.yml</code> 이 쥔다 — Dokploy
+          에는 앱 사이의 순서 개념이 없어서다. 앱마다 Watch Paths(“이 경로가
+          바뀌면 나를 빌드해라”)뿐이라 한 push 가 세 앱을 동시에 물면 누가 먼저
+          끝날지 모른다. 그래서 Watch Paths 를 워크플로로 옮겼다 —
+          <b>무엇을</b> 배포할지도 <b>언제</b> 배포할지도 여기서 정한다.
         </p>
 
         <div class="tablewrap">
@@ -1127,14 +1177,21 @@
           </table>
         </div>
 
-        <p>
-          <em>왜 순서가 필요한가</em> — host 는 <b>커밋된</b> MF DTS 로
-          컴파일되지만 런타임에는 <b>배포된</b> remote 번들을 받는다. 같은
-          커밋에 양쪽을 고쳐도 배포는 앱별로 독립이라, host 가 먼저 뜨면
-          <strong>새 host 코드 + 옛 remote 번들</strong>이 된다. 양쪽이 같은
-          커밋의 타입으로 컴파일되므로
-          <strong>컴파일러는 이 상태를 볼 수 없다.</strong>
+        <p class="lead">
+          순서가 필요한 이유 — host 가 먼저 뜨면
+          <b>새 host 코드 + 옛 remote 번들</b>이 된다.
         </p>
+        <ul class="pts">
+          <li>
+            host 는 커밋된 MF DTS 로 컴파일된다 → 런타임에는 배포된 remote
+            번들을 받는다
+          </li>
+          <li>같은 커밋에 양쪽을 고쳐도 배포는 앱별로 독립이다</li>
+          <li>
+            양쪽이 같은 커밋의 타입으로 컴파일되므로
+            <b>컴파일러는 이 상태를 못 본다</b>
+          </li>
+        </ul>
 
         <div class="tablewrap">
           <table>
@@ -1164,56 +1221,87 @@
           </table>
         </div>
 
-        <p>
-          remote 를 먼저 올리고 <b>그 배포가 끝날 때까지 기다린 뒤</b> host 를
-          올리면 저 조합이 성립하지 않는다. 남는 것은 반대 방향(옛 host + 새
-          remote)뿐이고, 그건 규칙 하나로 덮인다 —
-          <strong>remote 는 한 배포 주기만큼 하위호환을 유지한다.</strong> 그걸
-          못 지키는 변경만 expand/contract 로 두 번에 나눈다: ① remote 가
-          옵셔널로 받게 배포 → ② host 가 쓰기 시작 → ③ remote 에서 옛 것 제거.
+        <p class="lead">
+          remote 먼저 → 완료 대기 → host. 그러면 저 조합이 성립하지 않는다.
         </p>
+        <ul class="pts">
+          <li>
+            남는 건 반대 방향(옛 host + 새 remote)뿐 → 규칙 하나로 덮는다:
+            <b>remote 는 한 배포 주기만큼 하위호환을 유지한다</b>
+          </li>
+          <li>
+            못 지키는 변경만 expand/contract 로 두 번에 나눈다: ① remote 가
+            옵셔널로 받게 배포 → ② host 가 쓰기 시작 → ③ remote 에서 옛 것 제거
+          </li>
+        </ul>
 
         <div class="note">
           <span class="note-h"
             >함정 — 완료 신호를 Docker 레이어 캐시가 지웠다</span
           >
-          <p>
-            처음엔 배포 완료를 <code>mf-version.json</code> 의
-            <b>버전 변화</b>로 판정했다. 그런데 <code>.github/**</code> ·
-            <code>docs/**</code> 만 바뀐 커밋은 둘 다
-            <code>.dockerignore</code> 로 제외되어 빌드 컨텍스트가 바이트 단위로
-            같고, 그러면 버전을 정하는 <code>RUN</code>
-            레이어까지 재사용되어
-            <strong>배포가 끝나도 버전이 안 바뀐다</strong>(known-issues I-8).
-            Dokploy 는 정직했고 틀린 것은 우리 가정이었다. 지금은
-            <code>GET /api/deployment.all</code> 의 배포 <b>상태</b>로 판정한다
-            — 트리거 전 <code>deploymentId</code> 를 기억해 두고, 새 id 의
-            <code>status</code> 가 <code>done</code>·<code>error</code> 가 될
-            때까지 <b>5초</b> 간격으로 폴링한다.
+          <p class="lead">
+            배포 완료를 <code>mf-version.json</code> 의 버전 변화로 판정했더니,
+            끝나도 버전이 안 바뀌는 배포가 있었다.
           </p>
-          <p>
-            버전 공표 확인은 <b>게이트가 아니라 관측</b>으로 남겼다(최대 30초).
-            실측하면 배포 완료부터 공표까지 0.4~0.6초라 실전에서는 첫 폴링에
-            끝나고, 이미지가 재사용된 배포에서는 아무리 기다려도 안 바뀌므로
-            <strong>넉넉한 시한은 버리는 쪽에만 작용한다.</strong>
-          </p>
-          <p>
-            간격을 정한 근거는 실측이다(앱당 10건, 검증일 2026-09-03) — 큐 대기
-            0초, 빌드 p50 은 catalog 21초 · cart 19초 · host 27초. 배포 로그를
-            열면 그 시간이 <b>앱 빌드 레이어 하나</b>로 가고 나머지는 전부
-            <code>CACHED</code> 이거나 0.x초다.
-            <strong>긴 꼬리가 없으니 감지 지연은 전부 순수 낭비</strong>라,
-            폴링을 15초에서 5초로 내렸다(감지 합계 82.5초 → 70.0초).
-          </p>
+          <ul class="pts">
+            <li>
+              <code>.github/**</code> · <code>docs/**</code> 만 바뀐 커밋 → 둘
+              다 <code>.dockerignore</code> 로 제외 → 빌드 컨텍스트가 바이트
+              단위로 같다 → 버전을 정하는 <code>RUN</code> 레이어까지 재사용 →
+              배포가 끝나도 버전 그대로 (known-issues I-8)
+            </li>
+            <li>Dokploy 는 정직했다. 틀린 것은 우리 가정이다</li>
+            <li>
+              지금은 <code>GET /api/deployment.all</code> 의 <b>배포 상태</b>로
+              판정한다 — 트리거 전 <code>deploymentId</code> 를 기억해 두고, 새
+              id 의 <code>status</code> 가 <code>done</code>·<code>error</code>
+              가 될 때까지 5초 간격으로 폴링
+            </li>
+          </ul>
         </div>
+
+        <p class="lead">
+          버전 공표 확인은 게이트가 아니라 <b>관측</b>이다(최대 30초).
+        </p>
+        <ul class="pts">
+          <li>
+            실측: 배포 완료 → 공표까지 0.4~0.6초. 실전에서는 첫 폴링에 끝난다
+          </li>
+          <li>
+            이미지가 재사용된 배포는 아무리 기다려도 안 바뀐다 → 넉넉한 시한은
+            버리는 쪽에만 작용한다
+          </li>
+        </ul>
+        <p class="lead">
+          폴링 간격 15초 → 5초. 근거는 실측이다(앱당 10건, 검증일 2026-09-03).
+        </p>
+        <ul class="pts">
+          <li>큐 대기 0초 · 빌드 p50 catalog 21초 · cart 19초 · host 27초</li>
+          <li>
+            배포 로그를 열면 그 시간이 앱 빌드 레이어 하나로 가고, 나머지는 전부
+            <code>CACHED</code> 이거나 0.x초 → 긴 꼬리가 없다
+          </li>
+          <li>
+            긴 꼬리가 없으니 감지 지연은 전부 순수 낭비 → 감지 합계 82.5초 →
+            70.0초
+          </li>
+        </ul>
 
         <h3>1-3. remote 아티팩트는 불변, 볼륨에 덧붙인다</h3>
 
         <p class="claim">
-          컨테이너는 휘발이다. 이미지 안의 <code>dist</code> 만 서빙하면 재배포
-          순간 이전 버전이 사라지고, 이미 캐시된 host HTML 이 가리키던 옛 청크가
-          <strong>hydration 단계에서 404</strong> 가 된다.
+          remote 아티팩트는 버전 경로에 <b>불변</b>으로 쌓고 볼륨에 덧붙인다 —
+          컨테이너는 휘발이라서.
         </p>
+        <ul class="pts">
+          <li>
+            이미지 안의 <code>dist</code> 만 서빙하면 → 재배포 순간 이전 버전이
+            사라진다
+          </li>
+          <li>
+            이미 캐시된 host HTML 이 가리키던 옛 청크 → hydration 단계에서 404
+          </li>
+        </ul>
 
         <div class="scroller">
           <figure>
@@ -1342,11 +1430,10 @@
               </text>
             </svg>
             <figcaption>
-              <b>배포 계약이 “불변 아티팩트”라는 뜻:</b>
+              <b>불변 아티팩트 = 롤백이 배포가 아니라 파일 한 개 교체다.</b>
               <code>/v&lt;ver&gt;/…</code> 는 한 번 올라가면 내용이 바뀌지 않고,
               루트의 <code>mf-version.json</code> 하나가 “지금 어느 버전인지”만
-              공표한다. 그래서 롤백이 배포가 아니라 <b>파일 한 개 교체</b>로
-              끝난다.
+              공표한다.
             </figcaption>
           </figure>
         </div>
@@ -1354,13 +1441,17 @@
         <h3>1-4. 재배포를 host 에 알리는 경로</h3>
 
         <p class="claim">
-          remote 를 따로 배포하면 host 는 바뀐 사실을 알 방법이 없다 — 페이지
-          캐시가 옛 remote 마크업을 계속 서빙한다. Dokploy 에는 배포 후 훅이
-          없어서, 그 자리를 <code>deploy</code> 워크플로가
-          <strong>폴링 후 웹훅</strong>으로 메운다. 웹훅은
-          <strong>host 를 새로 안 띄운 배포에서만</strong> 쏜다 — host 를 새로
-          띄웠으면 빈 캐시로 뜨므로 첫 요청이 이미 새 remote 로 굽는다.
+          remote 만 재배포하면 host 는 모른다 — 페이지 캐시가 옛 remote 마크업을
+          계속 서빙한다. 그 자리를
+          <b><code>deploy</code> 워크플로가 폴링 후 웹훅</b>으로 메운다.
         </p>
+        <ul class="pts">
+          <li>Dokploy 에는 배포 후 훅이 없다</li>
+          <li>
+            웹훅은 <b>host 를 새로 안 띄운 배포</b>에서만 쏜다 — host 를 새로
+            띄웠으면 빈 캐시로 뜨므로 첫 요청이 이미 새 remote 로 굽는다
+          </li>
+        </ul>
 
         <div class="scroller">
           <figure>
@@ -1568,10 +1659,9 @@
               </text>
             </svg>
             <figcaption>
-              <b>순서가 전부다.</b> 무효화를 먼저 하면, 재생성 렌더가 remote
-              번들을 네트워크로 받는 동안
-              <b>Suspense 스켈레톤 상태로 캐시에 굳는다</b>. 그 엔트리는 이후
-              계속 HIT 로 서빙된다.
+              <b>warm 이 먼저, 무효화는 그다음 — 순서가 전부다.</b> 무효화를
+              먼저 하면 재생성 렌더가 remote 번들을 받는 동안 Suspense 스켈레톤
+              상태로 캐시에 굳고, 그 엔트리가 이후 계속 HIT 로 서빙된다.
             </figcaption>
           </figure>
         </div>
@@ -1784,8 +1874,8 @@
               </text>
             </svg>
             <figcaption>
-              warm 이 실패하면 페이지 캐시를 아예 건드리지 않고 502 로 중단한다.
-              판단 기준은 하나다 — <b>옛 화면이 스켈레톤보다 낫다.</b>
+              <b>warm 실패 = 페이지 캐시를 건드리지 않고 502 로 중단.</b> 기준은
+              하나 — 옛 화면이 스켈레톤보다 낫다.
             </figcaption>
           </figure>
         </div>
@@ -1909,12 +1999,17 @@
         </div>
 
         <p class="claim">
-          요구사항은 두 개였다. <strong>remote 영역이 SSR 될 것</strong>, 그리고
-          <strong>경계를 넘어도 소프트 내비게이션일 것</strong>. Multi-Zones 는
-          두 번째에서, CSR 전용 MF 는 첫 번째에서 탈락한다.
+          요구사항 둘 — remote 영역이 <b>SSR</b> 될 것, 경계를 넘어도
+          <b>소프트 내비게이션</b>일 것. Multi-Zones 는 둘째에서, CSR 전용 MF 는
+          첫째에서 탈락한다.
         </p>
 
         <h3>2-1. 라우터를 하나만 둔다 — 소프트 내비게이션의 정체</h3>
+
+        <p class="claim">
+          라우터는 host 에 하나뿐이다. remote 는 라우터를 모르고, 이동은
+          콜백으로 host 에 넘긴다 — 그래서 경계를 넘어도 document 요청이 0 이다.
+        </p>
 
         <div class="scroller">
           <figure>
@@ -2032,9 +2127,9 @@
               <text x="490" y="228" class="sm crt">document 요청 0</text>
             </svg>
             <figcaption>
-              경계에서 하드 내비게이션이 나는 이유는 하나다 —
-              <b>라우터가 둘이기 때문</b>이다. 그래서 해결책도 하나다. remote 는
-              여전히 라우터를 모르고, 이동만 host 에 콜백으로 넘긴다.
+              <b>하드 내비게이션의 원인은 하나 — 라우터가 둘이라는 것.</b>
+              그래서 해결도 하나다. remote 는 여전히 라우터를 모르고, 이동만
+              host 에 콜백으로 넘긴다.
             </figcaption>
           </figure>
         </div>
@@ -2042,12 +2137,20 @@
         <h3>2-2. 같은 호출이 실행 환경에 따라 두 갈래로 갈린다</h3>
 
         <p class="claim">
-          <code>@module-federation/nextjs-mf</code> 는 Next 16 을 지원하지 않고,
-          <code>@module-federation/node</code> 는 peer 가 webpack 이다. host 는
-          Turbopack 이라 webpack 이 없다. 그래서 host 에는
-          <strong>번들러 플러그인을 아예 넣지 않고</strong>, 런타임 라이브러리만
-          평범하게 쓴다.
+          host 에는 번들러 플러그인이 없다 —
+          <code>@module-federation/runtime</code> 만 평범한 라이브러리로 쓴다.
         </p>
+        <ul class="pts">
+          <li><code>@module-federation/nextjs-mf</code>: Next 16 미지원</li>
+          <li>
+            <code>@module-federation/node</code>: peer 가 webpack. host 는
+            Turbopack 이라 webpack 이 없다
+          </li>
+          <li>
+            그래서 같은 <code>loadRemoteModule()</code> 호출이 실행 환경에 따라
+            두 갈래로 갈린다 (아래)
+          </li>
+        </ul>
 
         <div class="scroller">
           <figure>
@@ -2223,11 +2326,13 @@
               </text>
             </svg>
             <figcaption>
-              <b>이게 이 저장소의 핵심 주장이다.</b> 서버는
-              <code>mf-server.cjs</code> 로, 브라우저는
-              <code>remoteEntry</code> 로 렌더하지만 소스가 같으므로 마크업이
-              일치한다. 검증은 브라우저 없이 한 줄로 끝난다 —
-              <code>curl -s /checkout | grep -c "주문서"</code> → <b>1</b>.
+              <b
+                >핵심 주장 — 서버는 <code>mf-server.cjs</code>, 브라우저는
+                <code>remoteEntry</code> 로 렌더하지만 소스가 같으니 마크업이
+                일치한다.</b
+              >
+              검증은 브라우저 없이 한 줄:
+              <code>curl -s /checkout | grep -c "주문서"</code> → 1.
             </figcaption>
           </figure>
         </div>
@@ -2237,31 +2342,37 @@
             >여기서 가장 자주 걸리는 질문 — “남의 코드를 서버에서
             실행한다고요?”</span
           >
-          <p>
-            그렇다. 그래서 신뢰 경계를 별도로 설계했다(2-5). 브라우저에서 remote
-            청크를 실행하는 것과 신뢰 수준은 같지만, 뚫렸을 때 영향 범위가
-            <strong>서버 프로세스</strong>라는 점이 다르다는 게 판단의
-            출발점이었다.
-          </p>
+          <p class="lead">그렇다. 그래서 신뢰 경계를 따로 설계했다(2-5).</p>
+          <ul class="pts">
+            <li>신뢰 수준은 브라우저에서 remote 청크를 실행하는 것과 같다</li>
+            <li>
+              다른 것은 뚫렸을 때 영향 범위 — <b>서버 프로세스</b>. 판단은
+              여기서 출발했다
+            </li>
+          </ul>
         </div>
 
         <h3>2-3. remote 를 소비하는 자리는 단 하나다</h3>
 
-        <p>
-          모든 remote 소비가 <code>RemoteComponent</code> 하나를 지난다. 이
-          진입점이 세 가지를 한 번에 감싼다 — 서버·브라우저 두 로딩 경로, remote
-          하나가 죽어도 host 는 사는 장애 격리(<code>RemoteBoundary</code>),
-          그리고 <strong>remote 의 스타일시트</strong>다.
+        <p class="claim">
+          remote 소비는 <code>RemoteComponent</code> 하나를 지난다 —
+          서버·브라우저 두 로딩 경로, remote 하나가 죽어도 host 는 사는 장애
+          격리(<code>RemoteBoundary</code>), 그리고 remote 의
+          <b>스타일시트</b>를 여기서 한 번에 감싼다.
         </p>
-        <p>
-          CSS 는 두 로딩 경로 어디로도 따라오지 않는다. 브라우저에서는 MF
-          런타임이 모듈만 가져오고, 서버에서는 CJS 문자열을 평가할 뿐이라
-          스타일시트를 실을 자리가 없다. 그래서 host 가 소비하는 자리에서
-          <code>&lt;link rel="stylesheet" precedence&gt;</code> 를 함께 건다 —
-          React 19 가 <code>&lt;head&gt;</code> 로 올리고 같은
-          <code>href</code> 를 중복 제거하므로, 한 화면에 같은 remote 를 몇 개
-          놓든 링크는 하나다.
+        <p class="lead">
+          CSS 는 어느 로딩 경로로도 따라오지 않는다 — host 가 소비하는 자리에서
+          <code>&lt;link rel="stylesheet" precedence&gt;</code> 를 같이 건다.
         </p>
+        <ul class="pts">
+          <li>브라우저: MF 런타임이 모듈만 가져온다</li>
+          <li>서버: CJS 문자열을 평가할 뿐 → 스타일시트를 실을 자리가 없다</li>
+          <li>
+            React 19 가 <code>&lt;head&gt;</code> 로 올리고 같은
+            <code>href</code> 를 중복 제거 → 한 화면에 같은 remote 를 몇 개 놓든
+            링크는 하나
+          </li>
+        </ul>
 
         <div class="tablewrap">
           <table>
@@ -2308,37 +2419,58 @@
           </table>
         </div>
 
-        <p>
-          <em>태그를 세 개로 나눈 이유</em>가 여기 있다. 하나로 묶으면 순서를
-          만들 수 없다 — 번들을 깨는 순간 페이지도 같이 깨져서 재생성이 warm
-          보다 먼저 일어난다. 그리고 1·2 는 <code>expire:0</code>, 4 는
-          <code>"max"</code> 다. <code>"max"</code> 는 stale-while-revalidate 라
-          번들 계층에 쓰면 warm 이 <strong>옛 코드</strong>를 데우고 remote 가
-          죽어 있어도 “성공”해버린다. 반대로 페이지 계층에서는 SWR 이 맞다.
+        <p class="lead">
+          태그를 셋으로 나눈 이유 — 하나로 묶으면 순서를 만들 수 없다.
         </p>
+        <ul class="pts">
+          <li>
+            번들을 깨는 순간 페이지도 같이 깨진다 → 재생성이 warm 보다 먼저
+            일어난다
+          </li>
+          <li>1·2 는 <code>expire:0</code>, 4 는 <code>"max"</code></li>
+          <li>
+            <code>"max"</code> 는 stale-while-revalidate — 번들 계층에 쓰면 warm
+            이 <b>옛 코드</b>를 데우고, remote 가 죽어 있어도 “성공”해버린다
+          </li>
+          <li>반대로 페이지 계층에서는 SWR 이 맞다</li>
+        </ul>
 
         <h3>2-4. 계약은 remote 가 소유하고, 타입이 되어 host 로 흘러온다</h3>
 
         <p class="claim">
-          런타임 MF 는 <b>느슨하다</b> — <code>loadRemote()</code> 는 문자열을
-          받아 <code>unknown</code> 에 가까운 것을 준다. 그 느슨함을 컴파일
-          시점으로 되돌리는 것이 MF 의 <b>DTS</b> 다. 다만 켜는 것만으로는
-          아무것도 안 잡힌다. <strong>props 를 누가 소유하느냐</strong>가
-          먼저다.
+          DTS 는 <b>props 를 remote 가 소유할 때만</b> 잡는다.
         </p>
+        <ul class="pts">
+          <li>
+            런타임 MF 는 느슨하다 — <code>loadRemote()</code> 는 문자열을 받아
+            <code>unknown</code> 에 가까운 것을 준다
+          </li>
+          <li>그 느슨함을 컴파일 시점으로 되돌리는 것이 MF 의 DTS 다</li>
+          <li>
+            켜는 것만으로는 아무것도 안 잡힌다 — 누가 props 를 소유하느냐가
+            먼저다
+          </li>
+        </ul>
 
         <div class="note">
           <span class="note-h"
             >함정 — 계약 패키지가 props 를 소유하면 DTS 가 전달하는 정보는 0
             이다</span
           >
-          <p>
+          <p class="lead">
             remote 가 <code>@mfa/contracts</code> 에서 props 를 가져다 쓰면,
-            host 가 받아온 타입도 결국 <b>같은 선언을 다시 가리킨다.</b> 대조는
-            <code>A extends A</code> 를 확인하는 셈이라 계약에 필수 prop 을 넣고
-            대조해도 통과한다(실측). 그래서 방향을 뒤집었다 —
-            <strong>props 는 remote 의 expose 파일 옆에서 선언한다.</strong>
+            host 가 받아온 타입도 결국 <b>같은 선언을 다시 가리킨다.</b>
           </p>
+          <ul class="pts">
+            <li>
+              대조가 <code>A extends A</code> 를 확인하는 셈 → 계약에 필수 prop
+              을 넣고 대조해도 통과한다(실측)
+            </li>
+            <li>
+              그래서 방향을 뒤집었다 —
+              <b>props 는 remote 의 expose 파일 옆에서 선언한다</b>
+            </li>
+          </ul>
         </div>
 
         <div class="scroller">
@@ -2471,11 +2603,11 @@
               </text>
             </svg>
             <figcaption>
-              <b>모듈을 하나 늘리는 데 손대는 파일은 remote 하나다.</b> remote
-              에 <code>RelatedProducts.tsx</code> 를 놓고
-              <code>pnpm mf:types</code> 를 돌리면 생성물 넷이 따라 움직이고,
-              host 는 그때부터 그 모듈 id 를 쓸 수 있다. 그 전에 쓰면 컴파일이
-              막는다 — <code>RemoteModuleId</code> 에 없는 문자열이기 때문이다.
+              <b>모듈을 하나 늘리는 데 손대는 파일은 remote 하나다.</b>
+              <code>RelatedProducts.tsx</code> 를 놓고
+              <code>pnpm mf:types</code> → 생성물 넷이 따라 움직인다 → host 는
+              그때부터 그 모듈 id 를 쓸 수 있다. 그 전에 쓰면
+              <code>RemoteModuleId</code> 에 없는 문자열이라 컴파일이 막는다.
             </figcaption>
           </figure>
         </div>
@@ -2485,34 +2617,42 @@
             >함정 — 배럴에 계약을 실으면 remote 빌드가 자기 산출물을
             요구한다</span
           >
-          <p>
-            <code>remote-contract.ts</code> 는 생성된 <code>@mf-types</code> 를
-            읽는데, 그건 remote 를 빌드해야 생긴다. 그런데 remote 의
-            <code>src/exposes</code> 는 배럴에서 <code>Product</code> 같은
-            어휘를 가져다 쓴다. 배럴이 계약까지 재-export 하면
-            <strong>순환</strong>이 된다. 그래서 진입점을 갈랐다 —
-            <code>@mfa/contracts</code>(공통 어휘)와
-            <code>@mfa/contracts/remote</code>(모듈 계약). remote 는 앞의 것만
-            쓰고, ESLint 가 뒤의 것을 import 하지 못하게 막는다.
-          </p>
+          <p class="lead">배럴이 계약까지 재-export 하면 <b>순환</b>이다.</p>
+          <ul class="pts">
+            <li>
+              <code>remote-contract.ts</code> 는 생성된
+              <code>@mf-types</code> 를 읽는다 → 그건 remote 를 빌드해야 생긴다
+            </li>
+            <li>
+              그런데 remote 의 <code>src/exposes</code> 는 배럴에서
+              <code>Product</code> 같은 어휘를 가져다 쓴다
+            </li>
+            <li>
+              그래서 진입점을 갈랐다 — <code>@mfa/contracts</code>(공통 어휘) ·
+              <code>@mfa/contracts/remote</code>(모듈 계약). remote 는 앞의 것만
+              쓰고, ESLint 가 뒤의 것 import 를 막는다
+            </li>
+          </ul>
         </div>
 
-        <p>
-          <em>DTS 가 못 막는 것</em>도 분명하다. 이건
-          <b>컴파일 시점</b> 계약이라 배포된 번들과 host 코드가 어긋나는
-          <b>런타임 스큐</b>는 못 본다 — 양쪽이 같은 커밋의 타입으로 컴파일되기
-          때문이다. 그 창을 닫는 것은 타입이 아니라 <b>배포 순서</b>다(1-2).
+        <p class="lead">
+          DTS 는 <b>컴파일 시점</b> 계약이다 — 런타임 스큐는 못 본다.
         </p>
+        <ul class="pts">
+          <li>
+            배포된 번들과 host 코드가 어긋나도, 양쪽이 같은 커밋의 타입으로
+            컴파일되므로 통과한다
+          </li>
+          <li>그 창을 닫는 것은 타입이 아니라 <b>배포 순서</b>다(1-2)</li>
+        </ul>
 
         <h3>2-5. host 서버가 남의 코드를 실행하기 전에 통과시키는 네 겹</h3>
 
         <p class="claim">
-          <code>mf-version.json</code> 은
-          <strong>remote 가 주는 값</strong>이다. 그대로 믿으면 “이 주소에서 이
-          파일을 받아 실행하라”는 지시를 그대로 따르게 된다. 그래서 실행 전에 두
-          가지를 확인한다 —
-          <strong>받은 파일이 도중에 바뀌지 않았나</strong>(내용), 그리고
-          <strong>이 지시를 정말 우리 remote 빌드가 냈나</strong>(출처).
+          <code>mf-version.json</code> 은 remote 가 주는 값이다 — 그대로 믿으면
+          “이 주소에서 이 파일을 받아 실행하라”는 지시를 그대로 따르는 셈이다.
+          그래서 실행 전에 둘을 확인한다: <b>내용</b>(받은 파일이 도중에 바뀌지
+          않았나) · <b>출처</b>(이 지시를 정말 우리 remote 빌드가 냈나).
         </p>
 
         <div class="scroller">
@@ -2734,10 +2874,12 @@
               </text>
             </svg>
             <figcaption>
-              <b>변조 후 배포를 실제로 시도한 결과:</b> 번들 바이트 변조 ·
-              매니페스트가 외부 오리진 지정 · 경로 탈출 · 서명 없이 매니페스트
-              교체 · 서명 두고 해시 값만 교체 — 다섯 시나리오 모두
-              <b>502 로 거부</b>, 서비스는 마지막 정상 remote 로 계속 유지됐다.
+              <b
+                >변조 배포 5종 전부 502 로 거부, 서비스는 마지막 정상 remote 로
+                유지.</b
+              >
+              번들 바이트 변조 · 매니페스트가 외부 오리진 지정 · 경로 탈출 ·
+              서명 없이 매니페스트 교체 · 서명 두고 해시 값만 교체.
             </figcaption>
           </figure>
         </div>
@@ -3009,12 +3151,8 @@
               </text>
             </svg>
             <figcaption>
-              <b
-                >해시는 “내용이 바뀌었나”에 답하고, 서명은 “누가 만들었나”에
-                답한다.</b
-              >
-              둘은 대체재가 아니라 서로 다른 질문이다 — 그래서 겹을 나눠 둘 다
-              통과시킨다.
+              <b>해시는 “내용이 바뀌었나”, 서명은 “누가 만들었나”.</b> 대체재가
+              아니라 서로 다른 질문이다 — 그래서 겹을 나눠 둘 다 통과시킨다.
             </figcaption>
           </figure>
         </div>
@@ -3184,76 +3322,113 @@
               </text>
             </svg>
             <figcaption>
-              키를 만드는 명령은 <code>node scripts/gen-signing-key.ts</code> 한
-              줄이다. 개인키는 remote 빌드에 BuildKit secret 으로, 공개키는 host
-              런타임 env 로 들어간다. 시크릿을 넘기지 않으면 서명 없이 빌드되고,
-              그때 host 의 <code>MF_REQUIRE_SIGNATURE=1</code> 은 remote 로드를
-              전부 거부한다 — 해시 대조는 서명과 무관하게 계속 동작한다.
+              <b
+                >키 생성은 <code>node scripts/gen-signing-key.ts</code> 한
+                줄.</b
+              >
+              개인키는 remote 빌드에 BuildKit secret 으로, 공개키는 host 런타임
+              env 로 들어간다. 시크릿을 넘기지 않으면 서명 없이 빌드되고, 그때
+              host 의 <code>MF_REQUIRE_SIGNATURE=1</code> 은 remote 로드를 전부
+              거부한다 — 해시 대조는 서명과 무관하게 계속 동작한다.
             </figcaption>
           </figure>
         </div>
 
         <h3>2-6. remote 끼리는 서로를 모른다 — 상태는 어떻게 공유하나</h3>
 
-        <p>
-          catalog 의 “담기” 버튼이 cart 의 헤더 배지를 바꾼다. 그런데 규칙은
-          <strong>“remote 는 host 하고만 대화한다”</strong> 다. remote 가 다른
-          remote 를 import 하면 독립 배포 전제가 깨지고, 한쪽이 스토어를 expose
-          하면 remote → remote 의존이 생긴다.
+        <p class="claim">
+          답 — 스토어는 <code>@mfa/store</code> 싱글턴 하나. 전부 host 페이지
+          안이라 <b>메모리로 공유</b>된다. 저장은 쿠키, 카테고리 필터는 URL.
         </p>
-        <p>
-          그래서 스토어를 공유 패키지(<code>@mfa/store</code>)에 두고
-          <code>globalSingleton</code> 으로 한 인스턴스만 살린다. 전부 host
-          페이지 안이라
-          <strong>소프트 내비게이션 중 상태가 메모리에 그대로 남는다</strong> —
-          저장소는 새로고침 복원용이지 경계 통신 수단이 아니다. Multi-Zones
-          였다면 경계마다 그 왕복이 강제됐다.
+
+        <p class="lead">
+          스토어는 공유 패키지 <code>@mfa/store</code> 에 두고, 인스턴스는
+          <code>globalSingleton</code> 으로 하나만 살린다.
         </p>
-        <p>
-          그 저장소는 <strong>쿠키</strong>다(<code>mfa-cart</code>). 처음엔
-          <code>localStorage</code> 였는데, 그러면 서버가 장바구니를 모르니 첫
-          HTML 이 항상 비어 있고 하이드레이션 커밋에서 값이 한 프레임에 바뀐다 —
-          사용자에게는 깜빡임이다. 쿠키는 요청에 실려 가므로 host 가 읽어
-          <code>initialLines</code> props 로 remote 에 넘길 수 있다. 담는 것은
-          <code>[{id, q}]</code> 뿐이고 이름·가격은 카탈로그에서 복원한다.
-          대가는 <code>/</code>·<code>/cart</code>·<code>/checkout</code> 의
-          정적 셸이다(근거: ADR-014).
+        <ul class="pts">
+          <li>
+            전부 host 페이지 안 →
+            <b>소프트 내비게이션 중 상태가 메모리에 그대로 남는다</b>. catalog
+            의 “담기” 가 cart 의 헤더 배지를 바꾸는 통로가 이것이다
+          </li>
+          <li>
+            공유 <em>패키지</em>인 이유 — <b>remote 는 host 하고만 대화한다.</b>
+            remote 가 remote 를 import 하면 독립 배포가 깨지고, 한쪽이 스토어를
+            expose 하면 remote → remote 의존이 생긴다
+          </li>
+          <li>저장소(아래)는 새로고침 복원용이다. 경계 통신 수단이 아니다</li>
+          <li>Multi-Zones 였다면 경계마다 그 저장소 왕복이 강제됐다</li>
+        </ul>
+
+        <p class="lead">
+          저장소는 <b>쿠키</b>(<code>mfa-cart</code>)다 — 서버가 첫 HTML 부터
+          장바구니를 알아야 해서.
         </p>
-        <p>
-          <em>통로가 하나만은 아니다.</em> 카탈로그의 카테고리 필터는 스토어가
-          아니라 <strong>주소</strong>에 남는다. 규칙은 같다 —
-          <b>remote 는 URL 을 모른다</b>(ADR-013). remote 는
-          <code>onCategoryChange</code> 로 “바뀌었다”만 알리고, 그걸
-          <code>?category=</code> 에 쓸지는 host 가 정한다. 뒤로 가기는 URL 만
-          되돌아오므로 host 가 <code>category</code> prop 으로 다시 내려주고,
-          remote 는 그 prop 이 바뀌면 <b>렌더 중에</b> 내부 선택을 맞춘다 —
-          <code>useEffect</code> 로 하면 옛 값으로 한 번 그린 뒤 다시 그린다.
+        <ul class="pts">
+          <li>
+            <code>localStorage</code> 였을 때: 서버가 모름 → 첫 HTML 비어 있음 →
+            하이드레이션에서 한 프레임 깜빡임
+          </li>
+          <li>
+            쿠키: 요청에 실려 옴 → host 가 읽어 <code>initialLines</code> props
+            로 remote 에 넘김
+          </li>
+          <li>
+            담는 건 <code>[{id, q}]</code> 뿐. 이름·가격은 카탈로그에서 복원
+          </li>
+          <li>
+            대가: <code>/</code> · <code>/cart</code> · <code>/checkout</code>
+            의 정적 셸 포기 (ADR-014)
+          </li>
+        </ul>
+
+        <p class="lead">
+          두 번째 통로 — 카테고리 필터는 스토어가 아니라 <b>주소</b>에 남는다.
+          규칙은 같다: <b>remote 는 URL 을 모른다</b> (ADR-013).
         </p>
+        <ul class="pts">
+          <li>remote: <code>onCategoryChange</code> 로 “바뀌었다”만 알린다</li>
+          <li>host: 그걸 <code>?category=</code> 에 쓸지 정한다</li>
+          <li>
+            뒤로 가기: URL 만 되돌아온다 → host 가 <code>category</code> prop
+            으로 다시 내려준다
+          </li>
+          <li>
+            remote 는 그 prop 이 바뀌면 <b>렌더 중에</b> 내부 선택을 맞춘다.
+            <code>useEffect</code> 로 하면 옛 값으로 한 번 그린 뒤 다시 그린다
+          </li>
+        </ul>
 
         <div class="note">
           <span class="note-h"
             >함정 — 요청 컨텍스트를 읽는 훅 하나가 소비처 전부의 렌더 방식을
             바꾼다</span
           >
-          <p>
-            <code>useSearchParams</code> 를 <code>CatalogSection</code> 에
-            넣었을 때 <b>건드리지도 않은</b> <code>/lab/cache</code> 프리렌더가
-            죽었다 (<code>CLIENT_HOOK_DYNAMIC</code>). 그 컴포넌트를 lab 페이지
-            셋이 같이 쓰고 있었다. <code>&lt;Suspense&gt;</code> 로 감싸는 것은
-            답이 아니었다 — lab 패널은 <b>서버 렌더 시각</b>을 비교하는 것이
-            목적이라 클라이언트 렌더로 내려가면 실험 자체가 무의미해진다. 경계를
-            옮겨서 고쳤고, 저장소에 이미 같은 꼴이 있었다.
+          <p class="lead">
+            <code>useSearchParams</code> 를 <code>CatalogSection</code> 에 넣자
+            <b>건드리지도 않은</b> <code>/lab/cache</code> 프리렌더가 죽었다
+            (<code>CLIENT_HOOK_DYNAMIC</code>). lab 페이지 셋이 그 컴포넌트를
+            같이 쓰고 있었다.
           </p>
-          <p>
-            <code>Slot</code> 이 요청 컨텍스트를 읽고, <code>Section</code> 은
-            받아서 그린다 — <code>CartSlot</code>(쿠키) ↔
-            <code>CartSection</code> 과 같은 모양이다 (ADR-020, known-issues
-            I-9).
-            <strong
-              >이 실수는 typecheck 도 test 도 안 잡았다.
-              <code>pnpm build</code> 만 잡았다.</strong
-            >
-          </p>
+          <ul class="pts">
+            <li>
+              <code>&lt;Suspense&gt;</code> 로 감싸기 — 답이 아니다. lab 패널은
+              <b>서버 렌더 시각</b> 비교가 목적이라 클라이언트 렌더로 내려가면
+              실험이 무의미해진다
+            </li>
+            <li>
+              고친 방법 — 경계를 옮겼다. <code>Slot</code> 이 요청 컨텍스트를
+              읽고 <code>Section</code> 은 받아서 그린다.
+              <code>CartSlot</code>(쿠키) ↔ <code>CartSection</code> 과 같은 꼴
+              (ADR-020, known-issues I-9)
+            </li>
+            <li>
+              <b
+                >typecheck 도 test 도 못 잡았다. <code>pnpm build</code> 만
+                잡았다</b
+              >
+            </li>
+          </ul>
         </div>
 
         <div class="tablewrap">
@@ -3317,21 +3492,20 @@
         </div>
 
         <p class="claim">
-          catalog 는 Vite 8, cart 는 Rsbuild 2 다. 취향이 아니라
-          <strong>검증 대상</strong>이다 — “번들러가 달라도 런타임 계약만 맞으면
-          host 가 똑같이 소비한다”를 확인하려면 다른 번들러 둘이 필요하다. 그
-          검증은 통과했다. 이 파트는 그 다음 질문을 다룬다 —
+          catalog 는 Vite 8, cart 는 Rsbuild 2 — 취향이 아니라
+          <b>검증 대상</b>이다. “번들러가 달라도 런타임 계약만 맞으면 host 가
+          똑같이 소비한다”는 통과했다. 이 파트의 질문은 그다음이다:
           <b>새로 remote 를 만든다면 어느 쪽인가.</b>
         </p>
 
         <h3>3-1. 갈리는 지점은 하나다 — 배리어가 런타임 안이냐 밖이냐</h3>
 
-        <p>
-          결론부터. <b>MF remote 전용이라면 Rsbuild 다.</b> Vite 가 나쁜
-          도구라서가 아니다. MF 의 shared 해석(<code>loadShare</code>)이 Rspack
-          에서는 <b>청크 로드 파이프라인의 구성원</b>이고, Vite 에서는 어댑터가
+        <p class="claim">
+          <b>MF remote 전용이라면 Rsbuild 다.</b> Vite 가 나쁜 도구라서가 아니다
+          — MF 의 shared 해석(<code>loadShare</code>)이 Rspack 에서는 청크 로드
+          파이프라인의 <b>구성원</b>이고, Vite 에서는 어댑터가
           <code>import()</code> <b>바깥에서</b> 순서를 손으로 만든다. 아래 두
-          줄기가 그 차이의 전부이고, 나머지 차이는 여기서 파생된다.
+          줄기가 그 차이의 전부이고, 나머지는 여기서 파생된다.
         </p>
 
         <div class="scroller">
@@ -3648,13 +3822,13 @@
             </svg>
             <figcaption>
               <b
-                >왼쪽은 순서를 어댑터가 “만든다”, 오른쪽은 순서가 코드 생성의
+                >왼쪽은 순서를 어댑터가 “만들고”, 오른쪽은 순서가 코드 생성의
                 결과다.</b
               >
               그래서 Vite 쪽 회피책은 전부 확률적이다 — 워밍 없이 2/2 실패, 워밍
               후 4/4 성공(dev 재시작 + 새 브라우저 세션 기준). expose 가
-              커지거나 머신이 느려지면 다시 깨질 수 있는 종류다. 근본 해결은
-              상류에서 배리어 순서를 고쳐야 나온다.
+              커지거나 머신이 느려지면 다시 깨질 수 있다. 근본 해결은 상류에서
+              배리어 순서를 고쳐야 나온다.
             </figcaption>
           </figure>
         </div>
@@ -3663,23 +3837,31 @@
           <span class="note-h"
             >오해 — “Rsbuild 는 미리 다 컴파일해서”가 아니다</span
           >
-          <p>
-            Rsbuild 의 <code>dev.lazyCompilation</code> 기본값은
-            <code>{ imports: true, entries: false }</code> —
-            <b>동적 import 는 기본이 지연 컴파일</b>이고 cart 설정도 플러그인도
-            이걸 끄지 않는다(<code>@module-federation/rsbuild-plugin</code>
-            2.8.2 의 <code>dist</code> 전체에 <code>lazyCompilation</code> 언급
-            0건). cart 역시 “요청 시점에 컴파일”을 한다.
+          <p class="lead">
+            <code>dev.lazyCompilation</code> 기본값은
+            <code>{ imports: true, entries: false }</code> — 동적 import 는
+            기본이 <b>지연 컴파일</b>이고, cart 도 이걸 끄지 않는다.
           </p>
-          <p>
-            그런데도 레이스가 없는 이유는 지연 컴파일이
-            <strong>요청을 늦출 뿐 순서를 바꾸지 않기</strong> 때문이다.
-            컴파일이 언제 끝나든 <code>consumes</code> 는 여전히 팩토리 실행보다
-            앞이다.
-          </p>
+          <ul class="pts">
+            <li>
+              <code>@module-federation/rsbuild-plugin</code> 2.8.2 의
+              <code>dist</code> 전체에 <code>lazyCompilation</code> 언급 0건 →
+              cart 역시 “요청 시점에 컴파일”을 한다
+            </li>
+            <li>
+              그런데도 레이스가 없는 이유: 지연 컴파일은
+              <b>요청을 늦출 뿐 순서를 바꾸지 않는다</b> → 컴파일이 언제 끝나든
+              <code>consumes</code> 는 팩토리 실행보다 앞이다
+            </li>
+          </ul>
         </div>
 
         <h3>3-2. 그 하나의 차이가 나머지 전부를 낳는다</h3>
+
+        <p class="claim">
+          아래 표의 Vite 쪽 차이는 전부 “배리어가 밖에 있다”에서 파생된다. 함정
+          분포도 같은 얘기를 한다 — 개수보다 <b>성격</b>이 갈린다.
+        </p>
 
         <div class="tablewrap">
           <table>
@@ -3756,17 +3938,15 @@
 
         <p>
           줄 수는 빈 줄·주석을 뺀 값이다. 주석까지 세면
-          <b>Vite 411줄 / Rsbuild 209줄</b> 인데, 그 주석 대부분이
-          <b>함정 해설</b>이라는 것이 그 자체로 하나의 지표다.
+          <b>Vite 411줄 / Rsbuild 209줄</b> — 그 주석 대부분이
+          <b>함정 해설</b>이라는 것이 그 자체로 지표다.
         </p>
 
-        <p>
-          <em>함정의 분포도 같은 얘기를 한다.</em> 이 저장소가 밟은 여섯 건을
-          원인 번들러로 갈라 보면 한쪽으로 쏠려 있고, 더 중요한 것은
-          <b>성격이 다르다</b>는 점이다 — Vite 쪽 다섯은 전부
-          <b>MF 통합 지점</b>에서 났고, Rsbuild 쪽 하나는 MF 와 무관한
-          <b>설치</b> 문제다.
-        </p>
+        <p class="lead">이 저장소가 밟은 여섯 건을 원인 번들러로 가르면:</p>
+        <ul class="pts">
+          <li>Vite 5건 — 전부 <b>MF 통합 지점</b>에서 났다</li>
+          <li>Rsbuild 1건 — MF 와 무관한 <b>설치</b> 문제다</li>
+        </ul>
 
         <div class="tablewrap">
           <table>
@@ -3823,11 +4003,13 @@
 
         <h3>3-3. Rsbuild 쪽 대가와, 그럼에도 바꾸지 않는 이유</h3>
 
-        <p>
-          기울어진 표만 남기지 않기 위해 반대편도 적는다. 다만 이 넷은 전부
-          <b>한 번 적으면 끝나는 잡일</b>이다 — 런타임 레이스나 확률적 회피와는
-          비용의 종류가 다르다.
+        <p class="claim">
+          Rsbuild 의 대가 넷은 <b>한 번 적으면 끝나는 잡일</b>이다 — 런타임
+          레이스나 확률적 회피와는 비용의 종류가 다르다. 그럼에도 catalog 는
+          옮기지 않는다.
         </p>
+
+        <p>기울어진 표만 남기지 않기 위해 반대편도 적는다.</p>
 
         <div class="tablewrap">
           <table>
@@ -3872,13 +4054,21 @@
           </table>
         </div>
 
-        <p>
-          <em>그럼에도 catalog 를 옮기지 않는다.</em> 두 번들러의 공존이 곧 실험
-          대상이라, 한쪽으로 통일하는 순간 “번들러가 달라도 같은 계약으로
-          붙는다”는 이 저장소의 주장이 증거를 잃는다. catalog 의 Vite 삽질
-          기록은 여기서 가장 값진 산출물 중 하나다 — 지우지 않는다. 남기는 것은
-          선택 지침뿐이다.
+        <p class="lead">
+          catalog 를 옮기지 않는 이유 —
+          <b>두 번들러의 공존이 곧 실험 대상</b>이다.
         </p>
+        <ul class="pts">
+          <li>
+            한쪽으로 통일하는 순간 “번들러가 달라도 같은 계약으로 붙는다”는 이
+            저장소의 주장이 증거를 잃는다
+          </li>
+          <li>
+            catalog 의 Vite 삽질 기록은 여기서 가장 값진 산출물 중 하나다 —
+            지우지 않는다
+          </li>
+          <li>남기는 것은 선택 지침뿐이다(아래)</li>
+        </ul>
 
         <div class="tablewrap">
           <table>
@@ -3924,22 +4114,27 @@
           <div>
             <q>“그냥 Multi-Zones 를 쓰면 되지 않나”</q>
             <p>
-              zone 마다 Next 라우터가 따로 있어서 <code>next/link</code> 로
-              경계를 넘을 수 없다. 넘을 때마다 하드 내비게이션이 강제되는데,
-              그러면 SPA 를 유지할 이유가 사라진다. 대조군으로 실제 zone 앱을
-              두고 쟀고 document 요청이 +1 로 나왔다. 측정이 끝난 뒤 그 앱은
-              지웠다.
+              <b
+                >zone 마다 Next 라우터가 따로 있어 <code>next/link</code> 로
+                경계를 넘을 수 없다.</b
+              >
+              넘을 때마다 하드 내비게이션이 강제되고, 그러면 SPA 를 유지할
+              이유가 사라진다. 대조군으로 실제 zone 앱을 두고 쟀고 document
+              요청이 +1 로 나왔다. 측정이 끝난 뒤 그 앱은 지웠다.
             </p>
           </div>
           <div>
             <q>“왜 공식 플러그인을 쓰지 않나”</q>
             <p>
+              <b
+                >host 에는 번들러 플러그인을 넣지 않고
+                <code>@module-federation/runtime</code> 만 평범한 라이브러리로
+                쓴다 — Turbopack 이 MF 를 몰라도 된다.</b
+              >
               <code>@module-federation/nextjs-mf</code> 는 peer 가 Next 15 에서
               끊기고 App Router 를 지원한 적이 없으며 업스트림이 maintenance
               mode 다. <code>@module-federation/node</code> 는 peer 가 webpack
-              인데 host 는 Turbopack 이다. 그래서 host 에는 번들러 플러그인을
-              넣지 않고 <code>@module-federation/runtime</code> 만 평범한
-              라이브러리로 쓴다 — Turbopack 이 MF 를 몰라도 된다.
+              인데 host 는 Turbopack 이다.
             </p>
           </div>
           <div>
@@ -3956,66 +4151,73 @@
           <div>
             <q>“host 는 remote 의 props 를 어떻게 아나”</q>
             <p>
-              MF 의 DTS 로 받는다. 단,
-              <b>props 를 remote 가 소유할 때만</b> 의미가 있다 — 계약 패키지가
-              소유하면 host 가 받아온 타입이 같은 선언을 다시 가리켜 대조가 항상
-              통과한다(2-4). 받아온 타입은 저장소에 커밋해서
+              <b
+                >MF 의 DTS 로 받는다 — 단, props 를 remote 가 소유할 때만 의미가
+                있다.</b
+              >
+              계약 패키지가 소유하면 host 가 받아온 타입이 같은 선언을 다시
+              가리켜 대조가 항상 통과한다(2-4). 받아온 타입은 저장소에 커밋해서
               <code>pnpm typecheck</code> 가 네트워크를 쓰지 않게 하고,
               낡았는지는 CI 가 <code>pnpm mf:types</code> 재실행 +
               <code>git diff --exit-code</code> 로 본다.
             </p>
             <p>
-              다만 이건 <b>컴파일 시점</b> 계약이다. 배포된 번들과 host 코드가
+              <b>다만 컴파일 시점 계약이다.</b> 배포된 번들과 host 코드가
               어긋나는 런타임 스큐는 타입이 못 본다 — 그건 배포 순서로 닫는다.
             </p>
           </div>
           <div>
             <q>“remote 를 재배포하면 host 는 그걸 어떻게 아나”</q>
             <p>
-              두 경로다. remote 가 <code>mf-version.json</code> 으로 자기 버전을
-              공표하고, host 는 그 파일을 30초 TTL 로 읽어
-              <b>스스로 수렴한다</b>. 웹훅은 그 수렴을 즉시로 당기는 최적화일
-              뿐이라 유실돼도 정합성이 깨지지 않는다. 다만 이미 캐시된 페이지
-              HTML 은 태그를 깨야만 바뀌므로, 웹훅이 warm 을 먼저 하고 성공했을
-              때만 페이지 태그를 무효화한다. 웹훅을 쏘는 것은
-              <b>host 를 새로 안 띄운 배포뿐이다</b> — host 컨테이너가
-              교체됐으면 빈 캐시로 뜨므로 무효화할 것이 없다.
+              <b
+                >두 경로다 — remote 가 <code>mf-version.json</code> 으로 버전을
+                공표하고, host 는 그 파일을 30초 TTL 로 읽어 스스로 수렴한다.
+                웹훅은 그 수렴을 즉시로 당기는 최적화일 뿐이다.</b
+              >
+              유실돼도 정합성은 깨지지 않는다. 다만 이미 캐시된 페이지 HTML 은
+              태그를 깨야만 바뀌므로, 웹훅이 warm 을 먼저 하고 성공했을 때만
+              페이지 태그를 무효화한다. 웹훅을 쏘는 것은 host 를 새로 안 띄운
+              배포뿐이다 — host 컨테이너가 교체됐으면 빈 캐시로 뜨므로 무효화할
+              것이 없다.
             </p>
           </div>
           <div>
             <q>“host 서버에서 remote 코드를 실행하는 게 위험하지 않나”</q>
             <p>
-              브라우저에서 remote 청크를 실행하는 것과 신뢰 수준은 같지만,
-              뚫렸을 때 영향 범위가 서버 프로세스라 다르다. 그래서 실행 전에 네
-              가지를 확인한다 — 아는 주소에서 받았는가, 경로가 뒤틀리지
-              않았는가, <b>받은 파일의 내용이 그대로인가</b>, 그리고
-              <b>이 목록을 정말 우리 빌드가 냈는가</b>.
+              <b
+                >신뢰 수준은 브라우저에서 remote 청크를 실행하는 것과 같다. 다른
+                것은 뚫렸을 때 영향 범위 — 서버 프로세스다.</b
+              >
+              그래서 실행 전에 넷을 확인한다 — 아는 주소에서 받았는가 · 경로가
+              뒤틀리지 않았는가 · 받은 파일의 내용이 그대로인가 · 이 목록을 정말
+              우리 빌드가 냈는가.
             </p>
             <p>
-              앞의 세 개만으로는 부족하다. 파일 내용 대조에 쓰는 해시를
-              <b>remote 가 같이 보내주기</b>
-              때문에, 오리진이 털리면 공격자가 파일을 바꾸고 해시도 다시 계산해
-              써넣으면 그대로 통과한다. 자기가 낸 답을 자기가 채점하는 구조다.
+              <b>앞의 셋만으로는 부족하다.</b> 파일 내용 대조에 쓰는 해시를
+              remote 가 같이 보내주기 때문에, 오리진이 털리면 공격자가 파일을
+              바꾸고 해시도 다시 계산해 써넣으면 그대로 통과한다 — 자기가 낸
+              답을 자기가 채점하는 구조다.
             </p>
             <p>
-              그래서 마지막 겹에 <b>비대칭키 서명</b>을 쓴다. 서명을 만들 수
-              있는 열쇠(개인키)는 remote 의 빌드 파이프라인에만 두고, host 에는
-              <b>확인만 되는 열쇠</b>(공개키)를 둔다. 오리진을 장악해도 서명은
-              만들 수 없으니 거기서 걸린다. 반대로 host 와 remote 가 같은 비밀을
-              나눠 갖는 방식이었다면 host 가 털리는 순간 가짜 remote 를 서명할
-              수 있게 된다. 변조 배포 5종을 직접 시도해 전부 502 로 거부되는
-              것까지 확인했다.
+              <b>그래서 마지막 겹은 비대칭키 서명이다.</b> 서명을 만들 수 있는
+              열쇠(개인키)는 remote 의 빌드 파이프라인에만 두고, host 에는
+              확인만 되는 열쇠(공개키)를 둔다. 오리진을 장악해도 서명은 만들 수
+              없으니 거기서 걸린다. 같은 비밀을 나눠 갖는 방식이었다면 host 가
+              털리는 순간 가짜 remote 를 서명할 수 있게 된다. 변조 배포 5종을
+              직접 시도해 전부 502 로 거부되는 것까지 확인했다.
             </p>
           </div>
           <div>
             <q>“이 구조의 한계는 무엇인가”</q>
             <p>
-              remote 를 웹 · 노드 두 타깃으로 빌드해야 하고, remote 는 여전히
-              클라이언트 컴포넌트라 서버 컴포넌트를 federate 할 수 없다.
-              <code>new Function</code> 평가가 필요해 Edge 런타임도 쓸 수 없다.
-              그리고 웹훅은 인스턴스 하나에만 닿으므로 멀티 인스턴스 무효화는
-              TTL 만큼 지연된다 — 즉시성이 필요하면 공유 캐시 핸들러를 붙여야
-              한다.
+              <b
+                >remote 를 웹·노드 두 타깃으로 빌드해야 하고, 서버 컴포넌트는
+                federate 할 수 없으며, Edge 런타임도 못 쓴다.</b
+              >
+              remote 는 여전히 클라이언트 컴포넌트다.
+              <code>new Function</code> 평가가 필요해 Edge 가 막힌다. 웹훅은
+              인스턴스 하나에만 닿으므로 멀티 인스턴스 무효화는 TTL 만큼
+              지연된다 — 즉시성이 필요하면 공유 캐시 핸들러를 붙여야 한다.
             </p>
           </div>
         </div>
@@ -4028,7 +4230,7 @@
           <a href="https://mfa.lakegreen.net">mfa.lakegreen.net</a></span
         >
         <span>문서 지도 <a href="./README.md">docs/README.md</a></span>
-        <span>노출 모듈 6개 · 기준일 2026-09-05 (36차)</span>
+        <span>노출 모듈 6개 · 기준일 2026-09-05 (37차)</span>
         <span
           >이 파일은 지도다. 수치와 실측의 원본은 각 절의 근거 문서에
           있다.</span
