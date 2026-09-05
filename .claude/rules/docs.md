@@ -11,14 +11,14 @@ paths:
 
 ## 어디에 쓰나
 
-| 성격                         | 파일                                         |
-| ---------------------------- | -------------------------------------------- |
-| 회차 단위 작업 · 다음 할 것  | `docs/00-progress.md` (최신이 맨 위)         |
-| 밟은 함정 · 재현 조건 · 해결 | `docs/05-troubleshooting/01-known-issues.md` |
-| 설계 판단(채택 · 기각 사유)  | `docs/02-architecture/01-decision.md` (ADR)  |
-| 계약 · 구조                  | `docs/02-architecture/0*.md`                 |
-| 버전 고정 근거               | `docs/03-setup/02-versions.md`               |
-| 구조 도해(배포 · 런타임)     | `docs/anatomy.html`                          |
+| 성격                              | 파일                                         |
+| --------------------------------- | -------------------------------------------- |
+| 회차 단위 작업 · 다음 할 것       | `docs/00-progress.md` (최신이 맨 위)         |
+| 밟은 함정 · 재현 조건 · 해결      | `docs/05-troubleshooting/01-known-issues.md` |
+| 설계 판단(채택 · 기각 사유)       | `docs/02-architecture/01-decision.md` (ADR)  |
+| 계약 · 구조                       | `docs/02-architecture/0*.md`                 |
+| 버전 고정 근거                    | `docs/03-setup/02-versions.md`               |
+| 구조 도해(배포 · 런타임 · 번들러) | `docs/anatomy.html`                          |
 
 같은 내용을 두 곳에 쓰지 않는다. 진행 기록은 요약 + 링크, 상세는 해당 문서에 둔다.
 

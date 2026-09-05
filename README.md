@@ -112,8 +112,8 @@ remote CSS 에 대한 지식이 없다. 근거와 실측은
 
 전부 [`docs/`](./docs/) 에 있다. 핵심은 **SSR + 소프트 내비게이션 설계**.
 
-- **[전체 구조 해부도](https://chane81.github.io/mfa-nextjs/anatomy.html)** — 배포 파이프라인과
-  host↔remote 런타임을 그림으로. 단독 HTML 이라 저장소 화면에서는 소스로 보이므로
+- **[전체 구조 해부도](https://chane81.github.io/mfa-nextjs/anatomy.html)** — 배포 파이프라인,
+  host↔remote 런타임, remote 번들러(Vite vs Rsbuild) 비교를 그림으로. 단독 HTML 이라 저장소 화면에서는 소스로 보이므로
   **GitHub Pages 로 올려 둔다**([소스](./docs/anatomy.html) · 로컬은 `open docs/anatomy.html`)
 - [진행 상황](./docs/00-progress.md)
 - [nextjs-mf 가 왜 죽었나](./docs/01-research/01-nextjs-mf-eol.md)

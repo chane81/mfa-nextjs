@@ -114,10 +114,6 @@
         padding: 0 28px 96px;
       }
 
-      .prose {
-        max-width: 68ch;
-      }
-
       /* ---------------------------------------------------------- 헤더 */
       header.masthead {
         padding: 72px 0 40px;
@@ -146,7 +142,6 @@
       }
 
       .lede {
-        max-width: 62ch;
         font-size: 17.5px;
         color: var(--ink-2);
         margin: 0;
@@ -241,7 +236,6 @@
         padding-left: 16px;
         color: var(--ink);
         margin: 0 0 22px;
-        max-width: 66ch;
       }
 
       code {
@@ -645,8 +639,8 @@
           번들러 플러그인 없이 <code>@module-federation/runtime</code> 만으로
           remote 를 SSR 하고, 경계를 넘어도 소프트 내비게이션을 유지한다. 배포는
           앱 셋이 각자 — 다만 <b>순서는 CI 가 쥔다</b>. 런타임은 host 하나가
-          합치고, 계약은 remote 가 소유해 타입으로 흘러온다. 이 문서는 그 두
-          축을 그림으로 설명한다.
+          합치고, 계약은 remote 가 소유해 타입으로 흘러온다. 그리고 remote 둘은
+          일부러 다른 번들러로 짓는다. 이 문서는 그 세 축을 그림으로 설명한다.
         </p>
         <div class="chips">
           <span class="chip hst"
@@ -3172,7 +3166,7 @@
               <line x1="648" y1="170" x2="662" y2="186" class="ed-alr" />
               <line x1="662" y1="170" x2="648" y2="186" class="ed-alr" />
               <text x="700" y="182" class="xs alr">
-                공개키로 서명을 만드는 방향은 성립하지 않는다 (되돌리기 불가)
+                공개키로는 서명을 만들 수 없다 — 되돌아가지 않는 방향이다
               </text>
 
               <text x="20" y="228" class="xs mut">
@@ -3302,6 +3296,623 @@
         </div>
       </section>
 
+      <!-- ============================================================ PART 3 -->
+      <section>
+        <div class="part-head">
+          <span class="part-num">PART 3</span>
+          <h2>번들러 — remote 둘을 일부러 다른 도구로 지었다</h2>
+        </div>
+
+        <div class="srcdocs">
+          <span class="srcdocs-h">근거 문서</span>
+          <a href="./01-research/04-bundler-comparison.md"
+            >01-research/04-bundler-comparison.md</a
+          >
+          <a href="./01-research/02-alternatives.md"
+            >01-research/02-alternatives.md</a
+          >
+          <a href="./05-troubleshooting/01-known-issues.md"
+            >05-troubleshooting/01-known-issues.md</a
+          >
+        </div>
+
+        <p class="claim">
+          catalog 는 Vite 8, cart 는 Rsbuild 2 다. 취향이 아니라
+          <strong>검증 대상</strong>이다 — “번들러가 달라도 런타임 계약만 맞으면
+          host 가 똑같이 소비한다”를 확인하려면 다른 번들러 둘이 필요하다. 그
+          검증은 통과했다. 이 파트는 그 다음 질문을 다룬다 —
+          <b>새로 remote 를 만든다면 어느 쪽인가.</b>
+        </p>
+
+        <h3>3-1. 갈리는 지점은 하나다 — 배리어가 런타임 안이냐 밖이냐</h3>
+
+        <p>
+          결론부터. <b>MF remote 전용이라면 Rsbuild 다.</b> Vite 가 나쁜
+          도구라서가 아니다. MF 의 shared 해석(<code>loadShare</code>)이 Rspack
+          에서는 <b>청크 로드 파이프라인의 구성원</b>이고, Vite 에서는 어댑터가
+          <code>import()</code> <b>바깥에서</b> 순서를 손으로 만든다. 아래 두
+          줄기가 그 차이의 전부이고, 나머지 차이는 여기서 파생된다.
+        </p>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 980 480"
+              role="img"
+              aria-label="같은 remote 모듈 하나를 가져오는 순서를 두 번들러로 나란히 놓았다. Vite 쪽은 shared 배리어가 import 뒤에 있어 콜드 로드에서 jsxDEV 가 undefined 로 굳고, Rspack 쪽은 배리어가 ensureChunk 안의 consumes 핸들러라 모듈 팩토리보다 항상 먼저 끝난다"
+            >
+              <defs>
+                <marker
+                  id="d11a"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk" />
+                </marker>
+                <marker
+                  id="d11x"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk-alr" />
+                </marker>
+                <marker
+                  id="d11r"
+                  viewBox="0 0 10 10"
+                  refX="9"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M0 0 L10 5 L0 10 Z" class="mk-crt" />
+                </marker>
+              </defs>
+
+              <line x1="490" y1="14" x2="490" y2="466" class="life" />
+
+              <text x="20" y="26" class="sm ttl cat">
+                catalog — Vite 8 · @module-federation/vite 1.20.7
+              </text>
+              <text x="20" y="46" class="xs mut">
+                배리어를 어댑터가
+                <tspan class="mono">import()</tspan>
+                밖에서 만든다
+              </text>
+
+              <text x="510" y="26" class="sm ttl crt">
+                cart — Rsbuild 2 · @module-federation/rsbuild-plugin 2.8.2
+              </text>
+              <text x="510" y="46" class="xs mut">
+                배리어가 Rspack 런타임 안에 있다
+              </text>
+
+              <rect x="20" y="68" width="450" height="52" rx="3" class="box" />
+              <text x="38" y="90" class="xs mono">
+                container.get('./ProductGrid')
+              </text>
+              <text x="38" y="108" class="xs mut">
+                host 의
+                <tspan class="mono">loadRemote()</tspan>
+                가 여기로 들어온다 (2-3)
+              </text>
+
+              <rect x="20" y="136" width="450" height="52" rx="3" class="box" />
+              <text x="38" y="158" class="xs mono">
+                virtual:mf-exposes — 어댑터가 생성한 로더
+              </text>
+              <text x="38" y="176" class="xs mut">
+                <tspan class="mono">await Promise.all([])</tspan>
+                ← 비어 있다. 기다릴 것이 없다
+              </text>
+
+              <rect
+                x="20"
+                y="204"
+                width="450"
+                height="52"
+                rx="3"
+                class="box-alr"
+              />
+              <text x="38" y="226" class="xs mono">
+                import('/src/exposes/ProductGrid.tsx')
+              </text>
+              <text x="38" y="244" class="xs mut">
+                automatic JSX 라
+                <tspan class="mono">jsx-dev-runtime</tspan>
+                을 정적 import 한다
+              </text>
+
+              <rect
+                x="20"
+                y="272"
+                width="450"
+                height="52"
+                rx="3"
+                class="box-alr"
+              />
+              <text x="38" y="294" class="xs mono">
+                loadShare(react/jsx-dev-runtime) — 캐시 miss
+              </text>
+              <text x="38" y="312" class="xs alr">
+                jsxDEV 가 undefined 인 채로 굳는다 · 실제 모듈은 20ms 뒤에 온다
+              </text>
+
+              <rect
+                x="20"
+                y="340"
+                width="450"
+                height="52"
+                rx="3"
+                class="box-plain dash"
+              />
+              <text x="38" y="362" class="xs mono">
+                await dependencyPending ← 배리어는 여기
+              </text>
+              <text x="38" y="380" class="xs alr">
+                import 뒤라 이미 늦다. 기다려도 굳은 값은 안 바뀐다
+              </text>
+
+              <rect
+                x="20"
+                y="410"
+                width="450"
+                height="54"
+                rx="3"
+                class="box-alr"
+              />
+              <text x="38" y="432" class="sm ttl alr">
+                결과 — _jsxDEV is not a function (0-4c)
+              </text>
+              <text x="38" y="452" class="xs mut">
+                회피는
+                <tspan class="mono">server.warmup</tspan>
+                +
+                <tspan class="mono">optimizeDeps</tspan>
+                둘 다 — 확률을 낮출 뿐이다
+              </text>
+
+              <line
+                x1="245"
+                y1="121"
+                x2="245"
+                y2="133"
+                class="ed"
+                marker-end="url(#d11a)"
+              />
+              <line
+                x1="245"
+                y1="189"
+                x2="245"
+                y2="201"
+                class="ed"
+                marker-end="url(#d11a)"
+              />
+              <line
+                x1="245"
+                y1="257"
+                x2="245"
+                y2="269"
+                class="ed-alr"
+                marker-end="url(#d11x)"
+              />
+              <line
+                x1="245"
+                y1="325"
+                x2="245"
+                y2="337"
+                class="ed-alr"
+                marker-end="url(#d11x)"
+              />
+              <line
+                x1="245"
+                y1="393"
+                x2="245"
+                y2="407"
+                class="ed-alr"
+                marker-end="url(#d11x)"
+              />
+
+              <rect x="510" y="68" width="450" height="52" rx="3" class="box" />
+              <text x="528" y="90" class="xs mono">
+                container.get('./CartBadge')
+              </text>
+              <text x="528" y="108" class="xs mut">
+                같은 진입점이다 — host 코드는 양쪽에서 한 글자도 다르지 않다
+              </text>
+
+              <rect
+                x="510"
+                y="136"
+                width="450"
+                height="52"
+                rx="3"
+                class="box"
+              />
+              <text x="528" y="158" class="xs mono">
+                __webpack_require__.e(chunkId)
+              </text>
+              <text x="528" y="176" class="xs mut">
+                ensureChunk — 등록된 핸들러를 순서대로 돌린다
+              </text>
+
+              <rect
+                x="510"
+                y="204"
+                width="450"
+                height="52"
+                rx="3"
+                class="box-crt"
+              />
+              <text x="528" y="226" class="xs mono">
+                __webpack_require__.f.consumes ← 배리어는 여기
+              </text>
+              <text x="528" y="244" class="xs mut">
+                shared 해석이 ensureChunk
+                <tspan class="crt">안에서</tspan>
+                끝난다
+              </text>
+
+              <rect
+                x="510"
+                y="272"
+                width="450"
+                height="52"
+                rx="3"
+                class="box"
+              />
+              <text x="528" y="294" class="xs mono">
+                __webpack_require__.f.j — 청크 로드
+              </text>
+              <text x="528" y="312" class="xs mut">
+                <tspan class="mono">lazyCompilation</tspan>
+                이면 컴파일을 여기서 기다린다
+              </text>
+
+              <rect
+                x="510"
+                y="340"
+                width="450"
+                height="52"
+                rx="3"
+                class="box"
+              />
+              <text x="528" y="362" class="xs mono">모듈 팩토리 실행</text>
+              <text x="528" y="380" class="xs crt">
+                이 시점엔 shared 가 이미 해석 완료다
+              </text>
+
+              <rect
+                x="510"
+                y="410"
+                width="450"
+                height="54"
+                rx="3"
+                class="box-crt"
+              />
+              <text x="528" y="432" class="sm ttl crt">
+                결과 — 레이스가 성립하지 않는다
+              </text>
+              <text x="528" y="452" class="xs mut">
+                순서가 코드 생성 규칙이라 머신이 느려져도 뒤집히지 않는다
+              </text>
+
+              <line
+                x1="735"
+                y1="121"
+                x2="735"
+                y2="133"
+                class="ed"
+                marker-end="url(#d11a)"
+              />
+              <line
+                x1="735"
+                y1="189"
+                x2="735"
+                y2="201"
+                class="ed-crt"
+                marker-end="url(#d11r)"
+              />
+              <line
+                x1="735"
+                y1="257"
+                x2="735"
+                y2="269"
+                class="ed-crt"
+                marker-end="url(#d11r)"
+              />
+              <line
+                x1="735"
+                y1="325"
+                x2="735"
+                y2="337"
+                class="ed-crt"
+                marker-end="url(#d11r)"
+              />
+              <line
+                x1="735"
+                y1="393"
+                x2="735"
+                y2="407"
+                class="ed-crt"
+                marker-end="url(#d11r)"
+              />
+            </svg>
+            <figcaption>
+              <b
+                >왼쪽은 순서를 어댑터가 “만든다”, 오른쪽은 순서가 코드 생성의
+                결과다.</b
+              >
+              그래서 Vite 쪽 회피책은 전부 확률적이다 — 워밍 없이 2/2 실패, 워밍
+              후 4/4 성공(dev 재시작 + 새 브라우저 세션 기준). expose 가
+              커지거나 머신이 느려지면 다시 깨질 수 있는 종류다. 근본 해결은
+              상류에서 배리어 순서를 고쳐야 나온다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="note">
+          <span class="note-h"
+            >오해 — “Rsbuild 는 미리 다 컴파일해서”가 아니다</span
+          >
+          <p>
+            Rsbuild 의 <code>dev.lazyCompilation</code> 기본값은
+            <code>{ imports: true, entries: false }</code> —
+            <b>동적 import 는 기본이 지연 컴파일</b>이고 cart 설정도 플러그인도
+            이걸 끄지 않는다(<code>@module-federation/rsbuild-plugin</code>
+            2.8.2 의 <code>dist</code> 전체에 <code>lazyCompilation</code> 언급
+            0건). cart 역시 “요청 시점에 컴파일”을 한다.
+          </p>
+          <p>
+            그런데도 레이스가 없는 이유는 지연 컴파일이
+            <strong>요청을 늦출 뿐 순서를 바꾸지 않기</strong> 때문이다.
+            컴파일이 언제 끝나든 <code>consumes</code> 는 여전히 팩토리 실행보다
+            앞이다.
+          </p>
+        </div>
+
+        <h3>3-2. 그 하나의 차이가 나머지 전부를 낳는다</h3>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>항목</th>
+                <th>catalog — Vite 8</th>
+                <th>cart — Rsbuild 2</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>MF 플러그인</td>
+                <td>MF 조직이 관리하는 <b>어댑터</b></td>
+                <td><b>1급 통합</b></td>
+              </tr>
+              <tr>
+                <td>shared 배리어 위치</td>
+                <td>가상 모듈 — <code>import()</code> <b>뒤</b></td>
+                <td><code>ensureChunk</code> <b>안</b></td>
+              </tr>
+              <tr>
+                <td>콜드 dev 레이스</td>
+                <td><span class="tag no">있다 (0-4c)</span></td>
+                <td><span class="tag ok">없다</span></td>
+              </tr>
+              <tr>
+                <td>회피 장치</td>
+                <td>
+                  <code>server.warmup</code> + <code>optimizeDeps</code> 둘 다
+                </td>
+                <td>없음</td>
+              </tr>
+              <tr>
+                <td>dev CSS</td>
+                <td>JS 래퍼로 서빙 → 자작 미들웨어 필요 (C-1)</td>
+                <td>실제 파일로 나온다. 대응 코드 0</td>
+              </tr>
+              <tr>
+                <td>SSR(node) 번들</td>
+                <td>
+                  <code>rollupOptions.output.format: 'cjs'</code> 수동 조립
+                </td>
+                <td><code>library: { type: 'commonjs2' }</code> 한 줄</td>
+              </tr>
+              <tr>
+                <td>shared 자동 확장</td>
+                <td>
+                  <code>react/jsx-runtime</code> ·
+                  <code>react-dom/client</code> 를 <b>몰래 추가</b>했다
+                </td>
+                <td>선언한 것만 오른다</td>
+              </tr>
+              <tr>
+                <td>매니페스트(dev)</td>
+                <td>
+                  <code>remoteEntry.js</code> 뿐 — 게이트가 청크를 못 본다
+                </td>
+                <td>실제 청크 경로를 다 싣는다</td>
+              </tr>
+              <tr>
+                <td>설치</td>
+                <td>순수 JS</td>
+                <td><b>네이티브 바이너리</b> — 이슈 8</td>
+              </tr>
+              <tr>
+                <td>설정 줄 수 (웹 / SSR)</td>
+                <td class="num">140 / 23</td>
+                <td class="num">78 / 29</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          줄 수는 빈 줄·주석을 뺀 값이다. 주석까지 세면
+          <b>Vite 411줄 / Rsbuild 209줄</b> 인데, 그 주석 대부분이
+          <b>함정 해설</b>이라는 것이 그 자체로 하나의 지표다.
+        </p>
+
+        <p>
+          <em>함정의 분포도 같은 얘기를 한다.</em> 이 저장소가 밟은 여섯 건을
+          원인 번들러로 갈라 보면 한쪽으로 쏠려 있고, 더 중요한 것은
+          <b>성격이 다르다</b>는 점이다 — Vite 쪽 다섯은 전부
+          <b>MF 통합 지점</b>에서 났고, Rsbuild 쪽 하나는 MF 와 무관한
+          <b>설치</b> 문제다.
+        </p>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>known-issues</th>
+                <th>증상</th>
+                <th>원인 번들러</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="num">0-4c</td>
+                <td>
+                  콜드 dev 첫 로드에서 <code>_jsxDEV is not a function</code>
+                </td>
+                <td><span class="tag">Vite</span></td>
+              </tr>
+              <tr>
+                <td class="num">0-4d</td>
+                <td>host 가 서브엔트리 공유를 빼면 Vite remote 가 깨진다</td>
+                <td><span class="tag">Vite</span></td>
+              </tr>
+              <tr>
+                <td class="num">C-1</td>
+                <td>
+                  dev 에서 Vite remote 의 CSS 를 브라우저가 통째로 무시한다
+                </td>
+                <td><span class="tag">Vite</span></td>
+              </tr>
+              <tr>
+                <td class="num">H-2</td>
+                <td>
+                  dev 워밍 glob 이 테스트 파일까지 잡아 사전 transform 실패
+                </td>
+                <td><span class="tag">Vite</span></td>
+              </tr>
+              <tr>
+                <td class="num">I-3</td>
+                <td>
+                  <code>extractThirdParty</code> 가 ESM 전용 워크스페이스
+                  패키지를 못 집는다
+                </td>
+                <td><span class="tag">Vite</span></td>
+              </tr>
+              <tr>
+                <td class="num">8</td>
+                <td>pnpm 설치 중 rspack 바이너리 타임아웃</td>
+                <td><span class="tag">Rsbuild</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>3-3. Rsbuild 쪽 대가와, 그럼에도 바꾸지 않는 이유</h3>
+
+        <p>
+          기울어진 표만 남기지 않기 위해 반대편도 적는다. 다만 이 넷은 전부
+          <b>한 번 적으면 끝나는 잡일</b>이다 — 런타임 레이스나 확률적 회피와는
+          비용의 종류가 다르다.
+        </p>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>대가</th>
+                <th>내용</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>네이티브 바이너리</td>
+                <td>
+                  <code>@rspack/binding-*</code> 다운로드가 막히면 설치 자체가
+                  멈춘다. 사내망·CI 에서 실제로 겪었다
+                </td>
+              </tr>
+              <tr>
+                <td><code>externals</code> 를 손으로 조립</td>
+                <td>
+                  Rspack 은 “어떤 형태로 가져올지”까지 받는다 —
+                  <code>[id, `commonjs ${id}`]</code>
+                </td>
+              </tr>
+              <tr>
+                <td>출력 경로를 계약에 맞춰 누른다</td>
+                <td>
+                  <code>distPath.css: ''</code> — 기본이
+                  <code>static/css/</code> 라 두면 host 의 주소 조립식이
+                  갈라진다
+                </td>
+              </tr>
+              <tr>
+                <td>생태계</td>
+                <td>
+                  Vite 플러그인 생태계가 더 넓다.
+                  <code>@tailwindcss/vite</code> 같은 1급 통합이 Rsbuild 에선
+                  postcss 경유다
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          <em>그럼에도 catalog 를 옮기지 않는다.</em> 두 번들러의 공존이 곧 실험
+          대상이라, 한쪽으로 통일하는 순간 “번들러가 달라도 같은 계약으로
+          붙는다”는 이 저장소의 주장이 증거를 잃는다. catalog 의 Vite 삽질
+          기록은 여기서 가장 값진 산출물 중 하나다 — 지우지 않는다. 남기는 것은
+          선택 지침뿐이다.
+        </p>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>상황</th>
+                <th>고를 것</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>MF remote 를 새로 만든다</td>
+                <td><b>Rsbuild</b></td>
+              </tr>
+              <tr>
+                <td>이 저장소에 remote 를 더 붙인다</td>
+                <td>번들러를 또 늘리지 말고 둘 중 하나</td>
+              </tr>
+              <tr>
+                <td>기존 Vite 앱을 remote 로 바꾼다</td>
+                <td>Vite 유지 + 3-1 의 회피 장치를 그대로 복사</td>
+              </tr>
+              <tr>
+                <td>remote 가 독립 실행 앱을 겸한다</td>
+                <td>
+                  Vite 도 후보. 단 remote 는 host 페이지 안에서 로드되므로
+                  <b>HMR 이점 대부분을 못 쓴다</b>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- ============================================================ FAQ -->
       <section>
         <div class="part-head">
@@ -3334,20 +3945,12 @@
           <div>
             <q>“catalog 는 Vite, cart 는 Rsbuild 다 — 어느 쪽이 나은가”</q>
             <p>
-              <b>MF remote 전용이라면 Rsbuild 다.</b> 이유는 하나다. MF 의
-              shared 배리어가 <b>Rspack 런타임 안에</b> 있고(<code
-                >ensureChunk</code
-              >
-              의 <code>f.consumes</code>), Vite 에서는 어댑터가
-              <code>import()</code> <b>바깥에서</b> 흉내낸다. 그래서 Vite 쪽은
-              콜드 로드 레이스가 구조적으로 남고 워밍으로 확률을 낮출 뿐이다.
-              저장소의 함정 기록도 그 구조를 그대로 반영한다 — Vite 5건(전부 MF
-              통합 지점), Rsbuild 1건(MF 와 무관한 네이티브 바이너리 설치).
-            </p>
-            <p>
-              그런데도 <b>catalog 를 옮기지 않았다.</b> 두 번들러가 공존한다는
-              것 자체가 이 저장소의 검증 대상이다 — 한쪽으로 통일하면 “번들러가
-              달라도 같은 계약으로 붙는다”는 주장이 사라진다.
+              <b>MF remote 전용이라면 Rsbuild 다.</b> 이유는 하나로 모인다 —
+              shared 배리어가 Rspack 에서는 런타임 안(<code>ensureChunk</code>
+              의 <code>f.consumes</code>)이고 Vite 에서는 어댑터가
+              <code>import()</code> 밖에서 흉내낸다. 순서를 나란히 놓은 그림과
+              함정 분포는 <b>PART 3</b> 에 있다. 그럼에도 catalog 를 옮기지 않는
+              이유도 거기 적었다 — 두 번들러의 공존이 곧 검증 대상이다.
             </p>
           </div>
           <div>
@@ -3425,7 +4028,7 @@
           <a href="https://mfa.lakegreen.net">mfa.lakegreen.net</a></span
         >
         <span>문서 지도 <a href="./README.md">docs/README.md</a></span>
-        <span>노출 모듈 6개 · 기준일 2026-09-04 (34차)</span>
+        <span>노출 모듈 6개 · 기준일 2026-09-05 (36차)</span>
         <span
           >이 파일은 지도다. 수치와 실측의 원본은 각 절의 근거 문서에
           있다.</span
