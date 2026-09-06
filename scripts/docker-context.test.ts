@@ -11,9 +11,10 @@ import { describe, expect, it } from 'vitest';
  * 목록이 어긋나도 `pnpm install --frozen-lockfile` 은 성공하고 빌드가 한참 뒤에 죽는다 —
  * 재현 조건과 왜 안 죽는지는 known-issues I-10 에 있다.
  *
- * CI 의 docker job 이 실제 이미지를 빌드하므로 결국 거기서도 잡힌다. 이 테스트는
- * **빠르고, 무슨 줄을 넣어야 하는지 말해준다** — docker job 은 몇 분 뒤에
- * `Cannot find module 'zustand'` 만 던진다.
+ * **이게 유일한 방어선이다.** CI 에서 이미지를 빌드해보던 job 은 39차에 뺐다(ADR-023) —
+ * 게이트가 아니어서 아무것도 못 막았다. 여기서 놓치면 다음 검증은 배포다.
+ * 대신 이건 오프라인이고 빠르며 **어느 파일에 무슨 줄을 넣어야 하는지 말해준다** —
+ * 배포는 몇 분 뒤에 `Cannot find module 'zustand'` 만 던진다.
  */
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 

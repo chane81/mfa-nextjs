@@ -7,37 +7,31 @@
 # 그래서 빌드가 통과한다는 건 "Next 16 에서 런타임 MF + SSR 이 된다"는 이 저장소의 유일한
 # 주장이 아직 참이라는 뜻이다. 빌드를 빼면 그 주장이 깨져도 PR 이 초록으로 통과한다.
 #
-# ## 왜 job 을 나누나
+# ## 왜 세 job 인가
 #
 # 나눈 이유는 피드백 속도와 **실패 원인의 분리**다. 붙여두면 빠른 신호가 느린 신호를
 # 기다리고, 무엇보다 체크 이름만 보고는 "포맷이 틀렸나 테스트가 깨졌나"를 구분할 수 없다.
 #
-# | job            | 무엇                               | 대략 |
-# | -------------- | ---------------------------------- | ---- |
-# | verify         | lint · typecheck · format:check    | 짧다 |
-# | test           | vitest 단위 · 통합 (39파일 616개)  | 중간 |
-# | build          | remote → host, 프리렌더가 SSR 실행 | 길다 |
-# | docker-targets | 이미지 빌드 대상을 SSOT 에서 뽑는다 | 짧다 |
-# | docker-remotes | remote 이미지를 끝까지 빌드한다     | 길다 |
-# | docker-host    | host 이미지를 `deps` 까지 빌드한다  | 중간 |
+# | job    | 무엇                               | 대략 |
+# | ------ | ---------------------------------- | ---- |
+# | verify | lint · typecheck · format:check    | 짧다 |
+# | test   | vitest 단위 · 통합 (48파일 672개)  | 중간 |
+# | build  | remote → host, 프리렌더가 SSR 실행 | 길다 |
 #
-# 의존은 **하나뿐**이다 — `docker-remotes` 가 `needs: docker-targets` 다. matrix 는 job
-# 단위라 대상 목록을 만드는 job 이 따로 있어야 하기 때문이고, 그 목록은 SSOT 에서 나온다
-# (`scripts/deploy-targets.ts`). 나머지 넷은 서로를 안 기다린다.
+# 셋은 서로 의존하지 않아 동시에 돈다.
 #
 # remote → host 순서와 빌드 중 dist 서빙은 turbo 와 host 의 build 스크립트가 처리한다.
 # 배경: docs/03-setup/01-getting-started.md 의 "host 빌드는 remote 가 떠 있어야 끝난다"
 #
-# ## 왜 docker job 이 생겼나
+# ## 왜 이미지 빌드가 여기 없나
 #
-# `pnpm build` 는 워크스페이스 전체가 설치된 상태에서 돈다. **이미지 빌드는 다르다** —
-# `deps` 스테이지가 워크스페이스 package.json 을 손으로 나열해 부분 설치를 하고, 그 목록이
-# 어긋나도 설치는 성공한다. 재현 조건 · 왜 안 죽나 · 무엇이 안 생기나는 known-issues I-10
-# 하나에 있다: docs/05-troubleshooting/01-known-issues.md
+# 한때 있었다(38차). 39차에 뺐다 — **아무것도 막지 못했기 때문이다.**
+# `deploy` 워크플로에 `needs: ci` 도 `workflow_run` 도 없고 main 에 브랜치 보호도 없어서
+# 두 워크플로가 같은 push 에 나란히 뜬다. CI 가 빨개도 배포는 그대로 나갔다.
+# 게다가 `push: false` 라 만든 이미지를 버리고 Dokploy 가 같은 Dockerfile 로 다시 빌드했다.
 #
-# 요점은 그 상태를 **배포 전에 본 적이 한 번도 없었다**는 것이다.
-# `scripts/docker-context.test.ts` 가 목록 드리프트를 `pnpm test` 에서 잡지만 그건 목록만
-# 본다. 이 job 이 실제 이미지를 만들어 본다.
+# 이미지가 깨지면 `dokploy-deploy` 가 `deployment.all` 의 status 로 잡는다. 근거는 ADR-023.
+# 목록 드리프트(I-10) 자체는 `scripts/docker-context.test.ts` 가 `pnpm test` 에서 잡는다.
 name: ci
 
 on:
@@ -130,60 +124,3 @@ jobs:
           git diff --exit-code \
             -- packages/contracts/src/generated \
             || { echo "::error::커밋된 MF 타입/모듈 목록이 낡았습니다. 로컬에서 'pnpm mf:types' 를 돌리고 결과를 커밋하세요."; exit 1; }
-
-  # 배포 대상 목록을 SSOT 에서 뽑는다. matrix 는 job 단위라 따로 있어야 한다.
-  docker-targets:
-    runs-on: ubuntu-latest
-    outputs:
-      remotes: ${{ steps.targets.outputs.remotes }}
-    steps:
-      - uses: actions/checkout@v7
-      - id: targets
-        env:
-          EVENT: workflow_dispatch
-          TARGET: all
-        # 이 스크립트는 SSOT 를 상대 경로로 직접 읽어 `pnpm install` 없이 돈다.
-        run: node scripts/deploy-targets.ts
-
-  # remote 배포 이미지가 실제로 빌드되나. 왜 `pnpm build` 로는 못 보는지는 위 머리말과
-  # known-issues I-10 에 있다.
-  #
-  # 빌드 인자(`REMOTE_*_PUBLIC_URL`)는 주지 않는다. 없으면 `publicOrigin` 이 localhost
-  # 로 떨어지는데, 이 job 은 이미지를 배포하지 않고 **만들어지는지만** 본다.
-  docker-remotes:
-    needs: docker-targets
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        remote: ${{ fromJSON(needs.docker-targets.outputs.remotes) }}
-    name: docker (${{ matrix.remote.name }})
-    steps:
-      - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ${{ matrix.remote.workspaceDir }}/Dockerfile
-          push: false
-          cache-from: type=gha,scope=docker-${{ matrix.remote.name }}
-          cache-to: type=gha,scope=docker-${{ matrix.remote.name }},mode=max
-
-  # host 이미지는 `deps` 스테이지까지만 본다.
-  #
-  # 그 이미지의 `docker:build` 는 프리렌더에서 **배포된 remote 오리진**을 실제로 부른다 —
-  # 그게 이 저장소의 주장이라 CI 안에서 끝까지 갈 수 없다. 깨져 있던 자리가 `deps` 였고,
-  # 거기까지는 여기서 본다.
-  docker-host:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/host/Dockerfile
-          target: deps
-          push: false
-          cache-from: type=gha,scope=docker-host-deps
-          cache-to: type=gha,scope=docker-host-deps,mode=max
