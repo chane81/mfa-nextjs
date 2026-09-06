@@ -107,7 +107,12 @@ services:
       MF_REVALIDATE_SECRET: local-dev-secret
       # 로컬 compose 는 서명 없이 빌드된다(build secret 미전달). 강제하면 안 뜬다.
       MF_REQUIRE_SIGNATURE: '0'
-    depends_on: [remote-catalog, remote-cart]
+    # 기본값 `service_started` 는 서빙 전에도 통과한다. 재기동·통짜 `up` 에서 걸린다.
+    depends_on:
+      remote-catalog:
+        condition: service_healthy
+      remote-cart:
+        condition: service_healthy
     # host 는 부팅이 remote 보다 느리다(standalone 기동 + 첫 요청). retries 를 넉넉히 둔다.
     healthcheck:
       test:
