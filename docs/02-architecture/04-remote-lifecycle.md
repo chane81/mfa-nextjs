@@ -38,7 +38,7 @@ apps/remote-catalog/dist/          ← 빌드 산출. 최신 한 벌만 남는�
 /data/                             ← 서빙 볼륨. 여기에 옛 버전이 쌓인다
 ├── mf-version.json                ← 항상 최신으로 교체
 ├── v<version>/
-└── v<이전 버전>/ …                 ← REMOTE_KEEP_VERSIONS 만큼 보존 (기본 5)
+└── v<이전 버전>/ …                 ← 최근 5개까지 보존 (entrypoint 의 KEEP 상수)
 ```
 
 **보존 개수를 정하는 자리는 볼륨 쪽 하나다.** 빌드 dist 는 `stamp` 가 최신 한 벌만 남기고

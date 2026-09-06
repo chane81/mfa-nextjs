@@ -104,7 +104,7 @@ export function signManifest(
  *
  * 빌드 산출 dist 는 방금 만든 한 벌만 들고 있으면 된다. 배포는 이 디렉터리를 서빙 볼륨으로
  * **복사**하는 것이고(`scripts/docker/remote-entrypoint.sh`), 롤백에 필요한 옛 버전은
- * 거기에 쌓인다. 그러니 보존 개수를 정하는 자리는 볼륨 쪽 `REMOTE_KEEP_VERSIONS` 하나다.
+ * 거기에 쌓인다. 그러니 보존 개수를 정하는 자리는 볼륨 쪽 entrypoint 의 `KEEP` 하나다.
  *
  * 예전에는 이 파일도 자체 보존 개수(`KEEP_VERSIONS`)를 세었다. 대상도 수명도 다른 두 값이
  * 이름만 닮아 있어서 **어느 쪽이 롤백 범위를 정하는지 읽히지 않았고**, `0` 의 의미까지

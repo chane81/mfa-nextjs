@@ -26,7 +26,7 @@ remote 배포 계약은 불변 아티팩트다(`scripts/stamp-remote-version.ts`
 - 새 버전 디렉터리 → 추가
 - 기존 버전 디렉터리 → 덮어쓰지 않음
 - `mf-version.json` → 항상 교체 (현재 버전 공표)
-- 보존 개수는 `REMOTE_KEEP_VERSIONS`(기본 5). `0` 이면 정리하지 않는다.
+- 보존 개수는 5개 고정 — `scripts/docker/remote-entrypoint.sh` 의 `KEEP` 상수.
 
 **롤백**: 볼륨의 `mf-version.json` 을 옛 버전 것으로 바꾸면 된다. 자산은 남아 있다.
 
