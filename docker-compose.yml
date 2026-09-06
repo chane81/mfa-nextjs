@@ -28,10 +28,6 @@ services:
         REMOTE_CATALOG_PUBLIC_URL: http://${MFA_HOST_IP:-unset-mfa-host-ip}:3001
     ports: ['3001:3001']
     volumes: ['catalog-dist:/data']
-    environment:
-      # 볼륨에 남길 버전 개수. 기본값과 같은 값이지만 명시한다 — 폴백만 도는 env 는
-      # 주입 지점을 찾는 사람에게 "어디서 넣는지 없다"는 의문만 남긴다.
-      REMOTE_KEEP_VERSIONS: '5'
     # `up --wait` 가 기다리는 조건. node:slim 에 curl 이 없어 node fetch 로 확인한다.
     healthcheck:
       test:
@@ -54,8 +50,6 @@ services:
         REMOTE_CART_PUBLIC_URL: http://${MFA_HOST_IP:-unset-mfa-host-ip}:3002
     ports: ['3002:3002']
     volumes: ['cart-dist:/data']
-    environment:
-      REMOTE_KEEP_VERSIONS: '5'
     healthcheck:
       test:
         [

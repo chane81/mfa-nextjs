@@ -21,18 +21,10 @@ set -eu
 BUILD_DIST=/app/dist
 DATA_DIR="${REMOTE_DIST_DIR:-/data}"
 PORT="${PORT:-3001}"
-# 볼륨에 남길 버전 개수. 주입 지점은 docker-compose.yml(로컬)과 Dokploy
-# Application env(실서버)다 — 값을 넣는 자리 없이 폴백만 도는 상태를 만들지 않는다.
-KEEP="${REMOTE_KEEP_VERSIONS:-5}"
-
-# 숫자가 아니면 부팅에서 죽는다. `[ -gt ]` 가 조용히 거짓이 되어 정리를 건너뛰면
-# 볼륨이 무한히 커지는데 신호가 로그 한 줄뿐이다.
-case "$KEEP" in
-  ''|*[!0-9]*)
-    echo "[entrypoint] REMOTE_KEEP_VERSIONS 는 0 이상의 정수여야 합니다: $KEEP" >&2
-    exit 1
-    ;;
-esac
+# 볼륨에 남길 버전 개수. 한때 env(`REMOTE_KEEP_VERSIONS`)였는데 값을 넣는 경로가
+# 없었다 — Actions 는 컨테이너 env 에 닿지 못하고(배포 트리거만 한다), Dokploy
+# Application env 에도 넣은 적이 없어 항상 폴백만 돌았다. 바꾸려면 이 줄을 고친다.
+KEEP=5
 
 mkdir -p "$DATA_DIR"
 
@@ -56,14 +48,12 @@ else
   exit 1
 fi
 
-# 오래된 버전 정리. 0 이면 정리하지 않는다(볼륨 보존 정책을 외부에 맡기는 경우).
-if [ "$KEEP" -gt 0 ]; then
-  # shellcheck disable=SC2012 # mtime 정렬이 목적이라 ls -t 를 쓴다. 버전 문자열은 정렬 불가.
-  ls -1dt "$DATA_DIR"/v*/ 2>/dev/null | tail -n "+$((KEEP + 1))" | while read -r stale; do
-    rm -rf "$stale"
-    echo "[entrypoint] 오래된 버전 정리: $(basename "$stale")"
-  done
-fi
+# 오래된 버전 정리.
+# shellcheck disable=SC2012 # mtime 정렬이 목적이라 ls -t 를 쓴다. 버전 문자열은 정렬 불가.
+ls -1dt "$DATA_DIR"/v*/ 2>/dev/null | tail -n "+$((KEEP + 1))" | while read -r stale; do
+  rm -rf "$stale"
+  echo "[entrypoint] 오래된 버전 정리: $(basename "$stale")"
+done
 
 # ⚠️ 포트를 **숫자로** 넘긴다. 이 이미지에는 `node_modules` 가 없어서 서버 스크립트가
 # `@mfa/remote-config` 를 못 읽기 때문이다. 그쪽(remote 이름) 경로는 워크스페이스를
