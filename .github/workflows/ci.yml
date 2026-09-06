@@ -16,12 +16,24 @@
 # | verify  | lint · typecheck · format:check   | 짧다 |
 # | test    | vitest 단위 · 통합 (39파일 616개) | 중간 |
 # | build   | remote → host, 프리렌더가 SSR 실행 | 길다 |
+# | docker  | 배포 이미지가 실제로 빌드되나      | 길다 |
 #
 # 셋은 서로 의존하지 않아 동시에 돈다. 붙여두면 빠른 신호가 느린 신호를 기다리고,
 # 무엇보다 체크 이름만 보고는 "포맷이 틀렸나 테스트가 깨졌나"를 구분할 수 없다.
 #
 # remote → host 순서와 빌드 중 dist 서빙은 turbo 와 host 의 build 스크립트가 처리한다.
 # 배경: docs/03-setup/01-getting-started.md 의 "host 빌드는 remote 가 떠 있어야 끝난다"
+#
+# ## 왜 docker job 이 생겼나
+#
+# `pnpm build` 는 워크스페이스 전체가 설치된 상태에서 돈다. **이미지 빌드는 다르다** —
+# `deps` 스테이지가 워크스페이스 package.json 을 손으로 나열해 부분 설치를 한다.
+# 그 목록이 워크스페이스보다 셋 적었는데도 `pnpm install` 은 성공했고(pnpm 이 없는
+# 디렉터리로 심링크를 먼저 만든다), 정작 그 패키지들의 `node_modules` 가 안 생겨서
+# 빌드가 zustand · tailwindcss 를 못 풀었다. 그 상태를 **배포 전에 본 적이 한 번도 없다.**
+#
+# `scripts/docker-context.test.ts` 가 목록 드리프트를 `pnpm test` 에서 잡지만, 그건 목록만
+# 본다. 이 job 이 실제 이미지를 만들어 본다.
 name: ci
 
 on:
@@ -114,3 +126,65 @@ jobs:
           git diff --exit-code \
             -- packages/contracts/src/generated \
             || { echo "::error::커밋된 MF 타입/모듈 목록이 낡았습니다. 로컬에서 'pnpm mf:types' 를 돌리고 결과를 커밋하세요."; exit 1; }
+
+  # 배포 대상 목록을 SSOT 에서 뽑는다. matrix 는 job 단위라 따로 있어야 한다.
+  docker-targets:
+    runs-on: ubuntu-latest
+    outputs:
+      remotes: ${{ steps.targets.outputs.remotes }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: targets
+        env:
+          EVENT: workflow_dispatch
+          TARGET: all
+        # 이 스크립트는 SSOT 를 상대 경로로 직접 읽어 `pnpm install` 없이 돈다.
+        run: node scripts/deploy-targets.ts
+
+  # remote 배포 이미지가 실제로 빌드되나.
+  #
+  # `pnpm build` 로는 못 보는 자리다 — 이미지의 `deps` 스테이지는 워크스페이스
+  # package.json 을 손으로 나열해 **부분 설치**를 한다. 그 목록이 워크스페이스보다
+  # 셋 적었는데도 `pnpm install` 은 성공했고(pnpm 이 없는 디렉터리로 심링크를 먼저
+  # 만든다) 정작 그 패키지들의 `node_modules` 가 안 생겨 빌드가 zustand · tailwindcss 를
+  # 못 풀었다. 그 상태를 배포 전에 본 적이 한 번도 없었다.
+  #
+  # 빌드 인자(`REMOTE_*_PUBLIC_URL`)는 주지 않는다. 없으면 `publicOrigin` 이 localhost
+  # 로 떨어지는데, 이 job 은 이미지를 배포하지 않고 **만들어지는지만** 본다.
+  docker-remotes:
+    needs: docker-targets
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        remote: ${{ fromJSON(needs.docker-targets.outputs.remotes) }}
+    name: docker (${{ matrix.remote.name }})
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.remote.workspaceDir }}/Dockerfile
+          push: false
+          cache-from: type=gha,scope=docker-${{ matrix.remote.name }}
+          cache-to: type=gha,scope=docker-${{ matrix.remote.name }},mode=max
+
+  # host 이미지는 `deps` 스테이지까지만 본다.
+  #
+  # 그 이미지의 `docker:build` 는 프리렌더에서 **배포된 remote 오리진**을 실제로 부른다 —
+  # 그게 이 저장소의 주장이라 CI 안에서 끝까지 갈 수 없다. 깨져 있던 자리가 `deps` 였고,
+  # 거기까지는 여기서 본다.
+  docker-host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/host/Dockerfile
+          target: deps
+          push: false
+          cache-from: type=gha,scope=docker-host-deps
+          cache-to: type=gha,scope=docker-host-deps,mode=max
