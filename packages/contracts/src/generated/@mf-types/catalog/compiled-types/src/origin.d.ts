@@ -6,7 +6,7 @@
  * 하나만 어긋나도 그 컴포넌트가 다른 remote 인 것처럼 보인다.
  */
 export declare const ORIGIN: {
-    readonly origin: "remote: catalog · vite";
+    readonly origin: "remote: catalog · rsbuild";
     readonly originHue: 280;
 };
 /** `<Badge>` 등 Panel 밖에서 같은 색을 쓸 때 */

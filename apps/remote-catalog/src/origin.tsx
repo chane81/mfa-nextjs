@@ -8,7 +8,7 @@ import type { PanelProps } from '@mfa/ui';
  * 하나만 어긋나도 그 컴포넌트가 다른 remote 인 것처럼 보인다.
  */
 export const ORIGIN = {
-  origin: 'remote: catalog · vite',
+  origin: 'remote: catalog · rsbuild',
   originHue: 280,
 } as const satisfies Pick<PanelProps, 'origin' | 'originHue'>;
 
