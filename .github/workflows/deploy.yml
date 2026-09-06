@@ -56,13 +56,8 @@ permissions:
 #
 # ## remote 별 변수를 여기 나열하지 않는다
 #
-# 예전에는 `CATALOG_URL` · `CART_URL` 을 적고 아래에서 삼항으로 골랐다.
-#
-#   REMOTE_URL="$([ "$REMOTE" = catalog ] && echo "$CATALOG_URL" || echo "$CART_URL")"
-#
-# remote 가 셋이 되는 순간 **catalog 가 아닌 모든 remote 가 cart 의 URL 을 읽는다.**
-# 그리고 그 URL 로 배포 전후 버전을 비교해 성공으로 끝난다 — 로그에 아무 흔적이 없다.
-# `application-id` 쪽에서 같은 함정을 이미 한 번 밟았다(아래 주석 참고).
+# 예전에는 `CATALOG_URL` · `CART_URL` 을 적고 아래에서 삼항으로 골랐다. remote 가 셋이
+# 되는 순간 조용히 틀리는 형태였다 — 증상과 재현 조건은 known-issues I-11 에 있다.
 #
 # 그래서 remote → 변수 이름 매핑을 `@mfa/remote-config` 의 `ciUrlVar` · `ciDokployAppVar`
 # 로 옮기고, 여기서는 저장소 Variables **전체**를 JSON 한 덩이로 받는다. matrix 항목이
@@ -125,9 +120,14 @@ jobs:
           # ⚠️ `echo "x=$(pick …)"` 로 쓰면 안 된다. `pick` 이 서브셸에서 죽어도 바깥
           # `echo` 는 성공해서 **빈 값이 그대로 출력으로 나간다.** 변수에 먼저 받아야
           # `set -e` 가 command substitution 의 실패를 잡는다.
+          #
+          # ⚠️ 에러 메시지는 반드시 `>&2` 다. 호출부가 `$(pick …)` 이라 stdout 은 통째로
+          # 변수에 흡수된다 — `>&2` 가 없으면 `::error::` 줄이 로그에 한 글자도 안 찍히고
+          # **메시지 없는 종료코드 1** 만 남는다. 그러면 "어느 변수가 없는지 말한다"는
+          # 이 step 의 존재 이유가 사라진다(I-11).
           pick() {
             jq -er --arg k "$1" '.[$k] // empty' <<<"$ALL_VARS" || {
-              echo "::error::저장소 Variable '$1' 이(가) 없습니다 (remote '$REMOTE'). Settings > Variables 에 추가하세요."
+              echo "::error::저장소 Variable '$1' 이(가) 없습니다 (remote '$REMOTE'). Settings > Variables 에 추가하세요." >&2
               return 1
             }
           }
