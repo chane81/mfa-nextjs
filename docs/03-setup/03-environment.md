@@ -42,7 +42,7 @@ $ npx rsbuild inspect
 dist/.rsbuild/rsbuild.config.mjs:80:  assetPrefix: 'http://envtest.local:9999',
 dist/.rsbuild/rspack.config.web.mjs:29: publicPath: 'http://envtest.local:9999/',
 
-# apps/remote-catalog/.env.local 에 REMOTE_CATALOG_PUBLIC_URL=http://envtest.local:9999 (38차)
+# apps/remote-catalog/.env.local 에 REMOTE_CATALOG_PUBLIC_URL=http://envtest.local:9999 (41차)
 $ npx rsbuild inspect
 dist/.rsbuild/rsbuild.config.mjs:80:  assetPrefix: 'http://envtest.local:9999',
 dist/.rsbuild/rspack.config.web.mjs:29: publicPath: 'http://envtest.local:9999/',
@@ -59,7 +59,7 @@ REMOTE_CATALOG_PUBLIC_URL=https://cdn.example.com pnpm --filter @mfa/remote-cata
 > catalog 가 Vite 였을 때는 **아예 동작하지 않았다.** Vite 는 `.env*` 로딩을 user config
 > 해석 이후로 미루므로(읽을 파일 목록이 `root`·`envDir`·`mode` 에 달려 있다) `vite.config.ts`
 > 평가 시점의 `process.env` 는 비어 있었고, 최종적으로도 `VITE_` 접두사 값만
-> `import.meta.env` 로 노출됐다. 38차에 Rsbuild 로 옮기면서 이 비대칭이 사라졌다.
+> `import.meta.env` 로 노출됐다. 41차에 Rsbuild 로 옮기면서 이 비대칭이 사라졌다.
 
 ### 루트 `.env` — 로드되지 않는다
 

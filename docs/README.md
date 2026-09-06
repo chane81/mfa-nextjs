@@ -8,7 +8,7 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [anatomy.html](https://chane81.github.io/mfa-nextjs/anatomy.html) | **전체 구조 해부도** — 배포 파이프라인 · host↔remote 런타임 · remote 번들러 비교를 그림으로. GitHub Pages 로 바로 열린다                                 |
 | [00-progress.md](./00-progress.md)                                | 작업 진행 기록                                                                                                                                            |
-| [01-research](./01-research/)                                     | `@module-federation/nextjs-mf` EOL 현황, 대체재 리서치, Vite MF 검토, DTS 플러그인 검토, **remote 번들러 비교(Vite vs Rsbuild — 38차에 Rsbuild 로 통일)** |
+| [01-research](./01-research/)                                     | `@module-federation/nextjs-mf` EOL 현황, 대체재 리서치, Vite MF 검토, DTS 플러그인 검토, **remote 번들러 비교(Vite vs Rsbuild — 41차에 Rsbuild 로 통일)** |
 | [02-architecture](./02-architecture/)                             | 아키텍처 결정(ADR), 토폴로지, SSR + 소프트 내비게이션 설계, **remote 수명주기(버전·캐시·신뢰)**, 스타일링                                                 |
 | [03-setup](./03-setup/)                                           | 실행 방법, 버전 고정 근거(Node·pnpm·TS), **환경변수**, Dokploy 컨테이너 배포                                                                              |
 | [04-experiments](./04-experiments/)                               | 실험 A(런타임 MF) / B(Multi-Zones·기각) / **C(ISR·Cache Components)** 결과와 비교                                                                         |

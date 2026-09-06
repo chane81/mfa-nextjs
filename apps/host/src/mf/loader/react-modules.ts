@@ -44,7 +44,7 @@ export const REACT_VERSION = '19.2.8';
  *     [Module Federation] Failed to bridge external shared module "react-dom/client"
  *     [ Federation Runtime ]: Remote container initialization failed. #RUNTIME-015
  *
- * 38차에 catalog 를 Rsbuild 로 옮기면서 **두 remote 의 매니페스트가 둘 다 react·react-dom
+ * 41차에 catalog 를 Rsbuild 로 옮기면서 **두 remote 의 매니페스트가 둘 다 react·react-dom
  * 둘만 올린다**(실측). 그래서 서브엔트리 셋은 지금은 아무도 요구하지 않는다 — 남겨 둔
  * 것이지 필요해서 있는 게 아니다. 지우려면 프로덕션 빌드만으로 부족하고 **dev 콜드
  * 로드까지** 확인해야 한다(0-4d 교훈).

@@ -256,7 +256,7 @@ loadRemoteModule("cart/CheckoutFlow")
 ## 공유 모듈 목록
 
 host 는 브라우저 쪽에 5개를 공유한다. 루트만으로 충분해 보이지만, catalog 가 Vite 였을 때
-`@module-federation/vite` 가 서브엔트리를 shared 목록에 자동으로 올렸다. 38차에 두 remote 가
+`@module-federation/vite` 가 서브엔트리를 shared 목록에 자동으로 올렸다. 41차에 두 remote 가
 Rsbuild 로 통일되면서 **매니페스트에는 `react` · `react-dom` 둘만 오른다**(실측) — 지금
 서브엔트리 셋은 남겨 둔 것이지 요구받는 것이 아니다. 지우려면 dev 콜드 로드까지 확인해야
 한다(known-issues 0-4d).

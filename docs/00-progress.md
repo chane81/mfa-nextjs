@@ -1,12 +1,12 @@
 # 진행 상황
 
-## 2026-09-06 (38차) — catalog 를 Vite 에서 Rsbuild 로 옮긴다
+## 2026-09-06 (41차) — catalog 를 Vite 에서 Rsbuild 로 옮긴다
 
 두 remote 를 **일부러 다른 번들러**로 둔 것이 이 저장소의 주장 중 하나였다. 그 주장은
 [04-bundler-comparison.md](./01-research/04-bundler-comparison.md) 에서 검증을 마쳤고
 (둘 다 host 가 똑같이 소비한다), 결론은 "MF remote 전용이라면 Rsbuild" 였다.
 그 결론을 실행했다 — 판단과 대가는
-[ADR-021](./02-architecture/01-decision.md#adr-021--catalog-를-vite-에서-rsbuild-로-옮긴다-번들러-다양성을-코드에서-뺀다).
+[ADR-024](./02-architecture/01-decision.md#adr-024--catalog-를-vite-에서-rsbuild-로-옮긴다-번들러-다양성을-코드에서-뺀다).
 
 ### 무엇이 줄었나
 

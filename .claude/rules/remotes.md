@@ -7,9 +7,9 @@ paths:
 
 # remote 앱(catalog · cart) 규칙
 
-두 remote 는 **Rsbuild 2 + `@module-federation/rsbuild-plugin`** 이다. 38차 전에는 catalog 가
+두 remote 는 **Rsbuild 2 + `@module-federation/rsbuild-plugin`** 이다. 41차 전에는 catalog 가
 Vite 8 이었고 그게 "번들러 자유도" 주장의 증거였다 — 그 증거는
-[ADR-021](../../docs/02-architecture/01-decision.md) 과
+[ADR-024](../../docs/02-architecture/01-decision.md) 과
 [번들러 비교](../../docs/01-research/04-bundler-comparison.md) 에 기록으로 남기고,
 **코드에서는 계약만 지킨다.**
 

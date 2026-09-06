@@ -1,7 +1,7 @@
 # remote 번들러 비교 — Vite vs Rsbuild
 
-> **이 비교의 결론을 38차에 실행했다.** catalog 를 Vite 에서 Rsbuild 로 옮겨 두 remote 가
-> 같은 번들러가 되었다([ADR-021](../02-architecture/01-decision.md#adr-021--catalog-를-vite-에서-rsbuild-로-옮긴다-번들러-다양성을-코드에서-뺀다)).
+> **이 비교의 결론을 41차에 실행했다.** catalog 를 Vite 에서 Rsbuild 로 옮겨 두 remote 가
+> 같은 번들러가 되었다([ADR-024](../02-architecture/01-decision.md#adr-024--catalog-를-vite-에서-rsbuild-로-옮긴다-번들러-다양성을-코드에서-뺀다)).
 > 아래는 **둘을 나란히 돌리며 실측한 기록**이라 그대로 둔다 — 이 문서가 그 결정의 근거다.
 
 검증일: 2026-09-04

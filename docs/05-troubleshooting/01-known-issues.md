@@ -36,7 +36,7 @@
 
 | 증상                                                                                    | 항목                                                                                                                                                |
 | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `_jsxDEV is not a function` (dev, catalog 첫 로드)                                      | [0-4c](#0-4c-콜드-dev-첫-로드에서-_jsxdev-is-not-a-function) — 38차 이후 재현 안 됨([J-2](#j-2-0-4c--0-4d-는-이제-재현되지-않는다-원인이-사라졌다)) |
+| `_jsxDEV is not a function` (dev, catalog 첫 로드)                                      | [0-4c](#0-4c-콜드-dev-첫-로드에서-_jsxdev-is-not-a-function) — 41차 이후 재현 안 됨([J-2](#j-2-0-4c--0-4d-는-이제-재현되지-않는다-원인이-사라졌다)) |
 | `Invalid hook call` / React 2벌 로드                                                    | [0-3](#0-3-remote-서버-번들이-자기-react-를-들고-오면-서버에서도-훅이-깨진다), [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다)   |
 | `Failed to bridge external shared module` / `#RUNTIME-015`                              | [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) — host 의 `shared` 에서 서브엔트리를 뺐다                                        |
 | host 의 `shared` 를 고쳤는데 뭘 확인해야 하나                                           | [0-4e](#0-4e-shared-를-고쳤을-때의-dev-검증-절차) — 빌드만으로는 부족하다                                                                           |
@@ -116,9 +116,9 @@
 | -------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련) | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다) |
 
-## J. (38차) catalog 를 Vite 에서 Rsbuild 로 옮기며 밟은 것
+## J. (41차) catalog 를 Vite 에서 Rsbuild 로 옮기며 밟은 것
 
-배경과 판단은 [ADR-021](../02-architecture/01-decision.md#adr-021--catalog-를-vite-에서-rsbuild-로-옮긴다-번들러-다양성을-코드에서-뺀다).
+배경과 판단은 [ADR-024](../02-architecture/01-decision.md#adr-024--catalog-를-vite-에서-rsbuild-로-옮긴다-번들러-다양성을-코드에서-뺀다).
 
 ### J-1. 주석에 경로 글롭을 적었더니 TS 파일이 통째로 깨졌다
 
@@ -1766,7 +1766,7 @@ dts: false,
 
 ### 0-4c. 콜드 dev 첫 로드에서 `_jsxDEV is not a function`
 
-> ⚠️ **38차 이후로는 재현되지 않는다.** catalog 가 Rsbuild 로 옮겨가면서 원인(Vite dev 의
+> ⚠️ **41차 이후로는 재현되지 않는다.** catalog 가 Rsbuild 로 옮겨가면서 원인(Vite dev 의
 > expose 로더)이 사라졌고 `server.warmup` · `optimizeDeps` 도 같이 지웠다. 아래는 그 전
 > 기록이다 — [J-2](#j-2-0-4c--0-4d-는-이제-재현되지-않는다-원인이-사라졌다).
 
@@ -1882,7 +1882,7 @@ dev 서버가 자기 페이지를 새로고침해 해결하는 종류의 문제�
 
 ### 0-4d. host 가 서브엔트리 공유를 빼면 Vite remote 가 깨진다
 
-> ⚠️ **38차 이후로는 재현되지 않는다** — 두 remote 매니페스트가 `react` · `react-dom` 둘만
+> ⚠️ **41차 이후로는 재현되지 않는다** — 두 remote 매니페스트가 `react` · `react-dom` 둘만
 > 올린다. 다만 host 의 `SHARED_PROBES` 는 그대로 5개다. 지우려면 여기 교훈대로 dev 콜드
 > 로드까지 확인한다 — [J-2](#j-2-0-4c--0-4d-는-이제-재현되지-않는다-원인이-사라졌다).
 
@@ -2192,5 +2192,5 @@ TimeoutError: The operation was aborted due to timeout
    `react` / `react-dom` / `react/jsx-runtime` 이 다 들어있는지 확인
 5. 모듈 이름 불일치 → `/debug` 의 `exposes` 목록과
    `packages/contracts/src/remote-contract.ts` 의 `RemoteModuleMap` 키 대조
-6. `_jsxDEV is not a function` (dev) → 38차 이후로는 재현되지 않는다(J-2). 그 전 기록은
+6. `_jsxDEV is not a function` (dev) → 41차 이후로는 재현되지 않는다(J-2). 그 전 기록은
    0-4c 에 있다 — Vite dev 의 모듈 평가 순서 문제였고, 원인이 된 번들러를 걷어냈다.
