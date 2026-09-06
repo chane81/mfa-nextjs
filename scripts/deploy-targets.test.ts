@@ -1,7 +1,12 @@
 import { REMOTE_NAMES } from '@mfa/remote-config';
 import { describe, expect, it } from 'vitest';
 
-import { plan, toOutputLines } from './deploy-targets.ts';
+import {
+  assertDeployTarget,
+  plan,
+  toOutputLines,
+  type DeployTargetOption,
+} from './deploy-targets.ts';
 
 const push = (changed: readonly string[] | null) =>
   plan({ eventName: 'push', target: 'auto', changed });
@@ -38,14 +43,19 @@ describe('배포 대상 판별', () => {
     expect(push(['apps/remote-cartography/src/x.tsx']).remotes).toEqual([]);
   });
 
-  it('workflow_dispatch 는 고른 대상을 따르고, 모르는 값이면 죽는다', () => {
-    const d = (target: string) =>
+  it('workflow_dispatch 는 고른 대상을 따른다', () => {
+    const d = (target: DeployTargetOption) =>
       plan({ eventName: 'workflow_dispatch', target, changed: [] });
 
     expect(names(d('all'))).toEqual([...REMOTE_NAMES]);
     expect(d('remotes').host).toBe(false);
     expect(d('host').remotes).toEqual([]);
-    expect(() => d('catalog')).toThrow(/알 수 없는 배포 대상/);
+  });
+
+  it('모르는 대상은 경계에서 죽는다', () => {
+    // 검증이 `plan` 밖에 있으므로 여기서 본다. YAML 이 오타를 보내면 이 자리다.
+    expect(assertDeployTarget('host')).toBe('host');
+    expect(() => assertDeployTarget('catalog')).toThrow(/알 수 없는 배포 대상/);
   });
 
   it('matrix 가 변수 이름까지 받아간다', () => {

@@ -31,12 +31,13 @@ import { createServer, type Server } from 'node:http';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { REMOTE_LIST } from '@mfa/remote-config';
+import { REMOTE_LIST, type RemoteName } from '@mfa/remote-config';
 
 import { createHandler } from './serve-remote-dist.ts';
 
 export interface RemoteServerSpec {
-  name: string;
+  /** `RemoteName` 이다 — `string` 으로 두면 SSOT 밖 이름이 여기로 흘러들 수 있다. */
+  name: RemoteName;
   port: number;
   dist: string;
 }
