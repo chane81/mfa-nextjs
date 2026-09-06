@@ -79,6 +79,11 @@ emit 하지 않는 나머지(host · remote 둘 · remote-config)는 파일 하�
 `vitest.config.ts` 의 alias 가 `src` 를 직접 가리키므로 `pnpm build` 없이 돈다 —
 turbo 태스크에 `^build` 를 걸 필요도 없다.
 
+> ⚠️ **그래서 alias 목록에 빠진 진입점은 로컬에서 안 걸린다.** 로컬에는 한 번이라도
+> 빌드해 둔 `dist` 가 남아 있어 `exports` 를 타고 그냥 풀린다. CI 는 fresh clone 이라
+> 거기서만 죽는다 — 40차에 `@mfa/contracts/remote` 로 실제로 밟았다(I-13).
+> 서브패스 진입점을 새로 import 하는 테스트를 쓸 때는 **`dist` 를 치우고 한 번 돌려본다.**
+
 ## 진척도
 
 ### Phase 0 — 인프라

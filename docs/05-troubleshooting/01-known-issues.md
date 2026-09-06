@@ -33,28 +33,29 @@
 
 ### remote 가 안 뜨거나 깨짐
 
-| 증상                                                                                  | 항목                                                                                                                                              |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `_jsxDEV is not a function` (dev, catalog 첫 로드)                                    | [0-4c](#0-4c-콜드-dev-첫-로드에서-_jsxdev-is-not-a-function)                                                                                      |
-| `Invalid hook call` / React 2벌 로드                                                  | [0-3](#0-3-remote-서버-번들이-자기-react-를-들고-오면-서버에서도-훅이-깨진다), [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) |
-| `Failed to bridge external shared module` / `#RUNTIME-015`                            | [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) — host 의 `shared` 에서 서브엔트리를 뺐다                                      |
-| host 의 `shared` 를 고쳤는데 뭘 확인해야 하나                                         | [0-4e](#0-4e-shared-를-고쳤을-때의-dev-검증-절차) — 빌드만으로는 부족하다                                                                         |
-| `예상 밖 모듈을 require 했습니다`                                                     | 번들러 externals — [0-5](#0-5-shared-모듈-네임스페이스-interop)                                                                                   |
-| `[ dynamic-remote-type-hints-plugin ] err: [object Event]`                            | [0-4b](#0-4b--dynamic-remote-type-hints-plugin--err-object-event)                                                                                 |
-| `SSR 번들을 가져오지 못했습니다` / `ECONNREFUSED` (dev)                               | remote 미기동. 살아있는데도 나면 [0-4](#0-4-dev-에서-ssr-번들이-안-내려옴)                                                                        |
-| 배럴 import 가 Server Component 를 오염                                               | [3](#3-공유-ui-패키지-배럴이-server-component-를-오염시킴)                                                                                        |
-| `Pre-transform error: Failed to resolve import "@tests/…"` (dev 기동 로그)            | 워밍 glob 이 테스트 파일을 잡았다 — [H-2](#h-2-dev-워밍-glob-이-테스트-파일까지-잡아-사전-transform-이-실패했다)                                  |
-| DTS 를 켰는데 계약 드리프트가 안 잡힌다                                               | props 가 계약 패키지에 있다 — [I-2](#i-2-dts-를-켜도-props-드리프트가-안-잡혔다--생성-타입이-계약을-되-import-했다)                               |
-| `extractThirdParty: true` 인데 산출물이 그대로다                                      | ESM 전용 워크스페이스 패키지를 못 집는다 — [I-3](#i-3-extractthirdparty-는-esm-전용-워크스페이스-패키지를-못-집는다)                              |
-| tsconfig 에 `@mf-types` 매핑을 넣었더니 `Cannot find name 'process'`                  | `paths` 에 `*` 와일드카드를 썼다 — [I-4](#i-4-paths-에--와일드카드를-쓰면-무관한-에러가-쏟아진다)                                                 |
-| DTS 를 켰는데 드리프트가 **조용히** 통과한다                                          | 모듈 확장이 프로그램에 없어 `RemoteModule<K>` 가 `any` 다 — [I-5](#i-5-모듈-확장을-include-에-안-넣으면-remotemodulek-가-조용히-any-가-된다)      |
-| 계약 타입이 소비처에서 **통째로 `any`** 인데 검사는 초록이다                          | emit 된 `.d.ts` 가 복사되지 않는 생성물을 참조한다 — [I-6](#i-6-emit-되는-dts-가-생성물을-참조하면-소비처에서-조용히-any-가-된다)                 |
-| 로컬·CI 는 초록인데 **Dokploy 배포만** `Cannot find module './generated/@mf-types/…'` | `.dockerignore` 가 커밋된 생성물을 컨텍스트에서 뺐다 — [I-7](#i-7-dockerignore-가-커밋된-계약을-컨텍스트에서-빼고-있었다)                         |
-| 배포는 `Done` 인데 `mf-version.json` 이 그대로다                                      | 빌드 컨텍스트가 같아 이미지가 재사용됐다 — [I-8](#i-8-배포는-성공했는데-버전이-안-바뀐다--캐시-히트가-완료-신호를-지운다)                         |
-| 로컬·CI 는 다 초록인데 **이미지 빌드만** `Cannot find module 'zustand'` 류로 죽는다   | `deps` 스테이지 COPY 목록이 워크스페이스와 어긋났다 — [I-10](#i-10-이미지의-deps-스테이지가-워크스페이스-패키지를-빠뜨려도-설치는-성공한다)       |
-| remote 를 추가했는데 배포 job 이 안 생기거나 남의 주소로 검증이 통과한다              | remote 이름이 GHA 표현식에 박혀 있었다 — [I-11](#i-11-remote-이름이-gha-표현식에-박히면-세-번째-remote-가-조용히-틀린다)                          |
-| 배포 job 이 **메시지 없이** 종료코드 1 로 죽는다                                      | `$(…)` 로 값을 받는 셸 함수가 에러를 stdout 에 썼다 — [I-11 의 `>&2` 절](#그-메시지가-안-나오던-자리--2-하나)                                     |
-| `ERR_UNKNOWN_FILE_EXTENSION: Unknown file extension ".ts"` (GHA)                      | 그 job 이 러너 이미지의 Node 를 그냥 쓰고 있다 — [I-12](#i-12-ts-를-러너의-주변-node-로-돌리면-이미지가-바뀔-때-조용히-깨진다)                    |
+| 증상                                                                                    | 항목                                                                                                                                              |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `_jsxDEV is not a function` (dev, catalog 첫 로드)                                      | [0-4c](#0-4c-콜드-dev-첫-로드에서-_jsxdev-is-not-a-function)                                                                                      |
+| `Invalid hook call` / React 2벌 로드                                                    | [0-3](#0-3-remote-서버-번들이-자기-react-를-들고-오면-서버에서도-훅이-깨진다), [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) |
+| `Failed to bridge external shared module` / `#RUNTIME-015`                              | [0-4d](#0-4d-host-가-서브엔트리-공유를-빼면-vite-remote-가-깨진다) — host 의 `shared` 에서 서브엔트리를 뺐다                                      |
+| host 의 `shared` 를 고쳤는데 뭘 확인해야 하나                                           | [0-4e](#0-4e-shared-를-고쳤을-때의-dev-검증-절차) — 빌드만으로는 부족하다                                                                         |
+| `예상 밖 모듈을 require 했습니다`                                                       | 번들러 externals — [0-5](#0-5-shared-모듈-네임스페이스-interop)                                                                                   |
+| `[ dynamic-remote-type-hints-plugin ] err: [object Event]`                              | [0-4b](#0-4b--dynamic-remote-type-hints-plugin--err-object-event)                                                                                 |
+| `SSR 번들을 가져오지 못했습니다` / `ECONNREFUSED` (dev)                                 | remote 미기동. 살아있는데도 나면 [0-4](#0-4-dev-에서-ssr-번들이-안-내려옴)                                                                        |
+| 배럴 import 가 Server Component 를 오염                                                 | [3](#3-공유-ui-패키지-배럴이-server-component-를-오염시킴)                                                                                        |
+| `Pre-transform error: Failed to resolve import "@tests/…"` (dev 기동 로그)              | 워밍 glob 이 테스트 파일을 잡았다 — [H-2](#h-2-dev-워밍-glob-이-테스트-파일까지-잡아-사전-transform-이-실패했다)                                  |
+| DTS 를 켰는데 계약 드리프트가 안 잡힌다                                                 | props 가 계약 패키지에 있다 — [I-2](#i-2-dts-를-켜도-props-드리프트가-안-잡혔다--생성-타입이-계약을-되-import-했다)                               |
+| `extractThirdParty: true` 인데 산출물이 그대로다                                        | ESM 전용 워크스페이스 패키지를 못 집는다 — [I-3](#i-3-extractthirdparty-는-esm-전용-워크스페이스-패키지를-못-집는다)                              |
+| tsconfig 에 `@mf-types` 매핑을 넣었더니 `Cannot find name 'process'`                    | `paths` 에 `*` 와일드카드를 썼다 — [I-4](#i-4-paths-에--와일드카드를-쓰면-무관한-에러가-쏟아진다)                                                 |
+| DTS 를 켰는데 드리프트가 **조용히** 통과한다                                            | 모듈 확장이 프로그램에 없어 `RemoteModule<K>` 가 `any` 다 — [I-5](#i-5-모듈-확장을-include-에-안-넣으면-remotemodulek-가-조용히-any-가-된다)      |
+| 계약 타입이 소비처에서 **통째로 `any`** 인데 검사는 초록이다                            | emit 된 `.d.ts` 가 복사되지 않는 생성물을 참조한다 — [I-6](#i-6-emit-되는-dts-가-생성물을-참조하면-소비처에서-조용히-any-가-된다)                 |
+| 로컬·CI 는 초록인데 **Dokploy 배포만** `Cannot find module './generated/@mf-types/…'`   | `.dockerignore` 가 커밋된 생성물을 컨텍스트에서 뺐다 — [I-7](#i-7-dockerignore-가-커밋된-계약을-컨텍스트에서-빼고-있었다)                         |
+| 배포는 `Done` 인데 `mf-version.json` 이 그대로다                                        | 빌드 컨텍스트가 같아 이미지가 재사용됐다 — [I-8](#i-8-배포는-성공했는데-버전이-안-바뀐다--캐시-히트가-완료-신호를-지운다)                         |
+| 로컬·CI 는 다 초록인데 **이미지 빌드만** `Cannot find module 'zustand'` 류로 죽는다     | `deps` 스테이지 COPY 목록이 워크스페이스와 어긋났다 — [I-10](#i-10-이미지의-deps-스테이지가-워크스페이스-패키지를-빠뜨려도-설치는-성공한다)       |
+| remote 를 추가했는데 배포 job 이 안 생기거나 남의 주소로 검증이 통과한다                | remote 이름이 GHA 표현식에 박혀 있었다 — [I-11](#i-11-remote-이름이-gha-표현식에-박히면-세-번째-remote-가-조용히-틀린다)                          |
+| 배포 job 이 **메시지 없이** 종료코드 1 로 죽는다                                        | `$(…)` 로 값을 받는 셸 함수가 에러를 stdout 에 썼다 — [I-11 의 `>&2` 절](#그-메시지가-안-나오던-자리--2-하나)                                     |
+| `ERR_UNKNOWN_FILE_EXTENSION: Unknown file extension ".ts"` (GHA)                        | 그 job 이 러너 이미지의 Node 를 그냥 쓰고 있다 — [I-12](#i-12-ts-를-러너의-주변-node-로-돌리면-이미지가-바뀔-때-조용히-깨진다)                    |
+| 로컬 `pnpm test` 는 초록인데 **CI 의 test job 만** `Failed to resolve import` 로 죽는다 | `vitest.config.ts` 의 alias 에 그 진입점이 없다 — [I-13](#i-13-vitest-alias-에-빠진-진입점은-로컬에서만-통과한다)                                 |
 
 ### SSR · hydration
 
@@ -637,6 +638,47 @@ ci.yml 과 같은 범위 표현으로 고정한다.
 
 > 교훈: **확장자 없는 실행에 기대는 스크립트는 그 실행기를 자기가 고정해야 한다.**
 > "의존성이 필요 없다" 와 "런타임이 아무거나 되어도 된다" 는 다른 말이다.
+
+### I-13. vitest alias 에 빠진 진입점은 **로컬에서만 통과한다**
+
+40차에 밟았다. 로컬 `pnpm test` 는 677개 전부 초록인데 CI 의 test job 만 죽었다.
+
+```
+FAIL  dom  apps/host/src/components/lab/MfWarmup.test.tsx
+Error: Failed to resolve import "@mfa/contracts/remote" from
+       "apps/host/src/components/lab/MfWarmup.tsx". Does the file exist?
+```
+
+워크스페이스 패키지의 `exports` 는 `./dist/*.js` 를 가리키고, 테스트는 그걸 안 타도록
+`vitest.config.ts` 의 alias 가 `src` 를 직접 가리킨다. 그런데 그 목록에
+`@mfa/contracts/remote` 가 **없었다.** 배럴 항목은 `/^@mfa\/contracts$/` 라 서브패스를
+안 삼킨다(그건 의도다 — 접두사 매치의 부작용을 피하려고 정규식을 `$` 로 닫았다).
+
+로컬에서 안 걸린 이유는 하나다. **`dist` 가 남아 있었다.** alias 가 없으면 `exports` 로
+떨어지는데 로컬에는 한 번이라도 빌드한 산출물이 있어서 그대로 풀린다. CI 는 fresh clone
+이고 test job 은 빌드를 안 돌리므로 거기서만 없다.
+
+| 환경 | alias 없을 때 무엇을 타나 | 결과      |
+| ---- | ------------------------- | --------- |
+| 로컬 | `packages/*/dist/*.js`    | 통과      |
+| CI   | 없음                      | 해석 실패 |
+
+`vi.mock('@mfa/contracts/remote', factory)` 로 모킹해도 **안 막힌다.** 죽는 주체는 러너가
+아니라 vite 의 import-analysis 이고, 그건 테스트 파일이 아니라 **소스 파일**(`MfWarmup.tsx`)의
+import 를 해석하다 죽는다.
+
+alias 를 한 줄 추가해 고쳤다. 그리고 모킹을 걷어내 진짜 `MODULE_IDS` 를 쓰게 했다 —
+alias 가 있으면 모킹할 이유가 없고, 진짜를 쓰면 remote 이름이 계약에서 온다는 것도 같이 지킨다.
+
+재현·검증은 `dist` 를 치우고 돌리면 된다.
+
+```
+$ mv packages/*/dist apps/remote-*/dist <어딘가>   # fresh clone 흉내
+$ pnpm test
+```
+
+> 교훈: **서브패스 진입점을 새로 import 하는 테스트는 `dist` 없이 한 번 돌려본다.**
+> 로컬의 초록이 CI 의 초록을 뜻하지 않는 자리가 여기다.
 
 ## H. (26차) 재배치 · dev 기동에서 밟은 것
 
