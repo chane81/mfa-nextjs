@@ -38,7 +38,7 @@ import { loadRemoteModuleOnServer } from './server';
 
 /**
  * 브라우저가 remote 에 넘기는 모듈 실체. **여기는 다섯 개 전부** — `react-dom/client`
- * 까지 포함한다(catalog 의 Vite 플러그인이 매니페스트에 올린다).
+ * 까지 포함한다(catalog 의 MF 플러그인이 매니페스트에 올린다).
  *
  * `satisfies` 가 표의 키를 하나라도 빠뜨리는 걸 막는다.
  */
