@@ -1,5 +1,217 @@
 # 진행 상황
 
+## 2026-09-06 (39차) — 38차를 두 축으로 리뷰하고 기록을 코드에 맞춘다
+
+38차 브랜치(`main...HEAD`, 8커밋)를 **Standards**(저장소 규칙 · 코드 스멜)와
+**Spec**(기록이 실제와 맞나) 두 축으로 나눠 리뷰했다. 축을 섞지 않은 게 핵심이다 —
+"규칙은 다 지켰는데 기록이 틀렸다" 가 실제로 나왔고, 한 축으로 봤으면 묻혔다.
+
+이 저장소는 GitHub 이슈를 안 쓰므로 Spec 축의 기준은 **이 diff 가 스스로 쓴 문서**
+(진행 기록 38차 · ADR-021/022 · I-10/I-11)였다. 즉 자기선언 스펙이라, "구현이 스펙과
+다른가" 만큼 **"기록이 코드보다 많이 주장하는가"** 를 같이 봤다. 후자가 더 많이 나왔다.
+
+### 배포가 조용히 죽던 자리 — `>&2` 하나
+
+가장 나쁜 것 하나. I-11 이 "없으면 `jq -e` 가 죽고 **어느 변수가 없는지 말한다**" 라고
+약속했는데 **그 메시지가 로그에 한 글자도 안 찍혔다.** `pick()` 이 `::error::` 를
+stdout 에 썼고 호출부가 `$(pick …)` 이라 그 문자열이 통째로 변수로 흡수됐다.
+"조용히 틀리던 자리" 를 "조용히 죽는 자리" 로 바꾼 절반짜리 상태였다.
+
+교훈은 `jq -e` 가 아니라 **셸 함수의 출력 채널**이라 I-11 안에 절을 만들고 증상 색인에도
+한 줄 넣었다. `$(…)` 로 값을 받는 함수는 사람이 읽을 출력을 stdout 에 쓸 수 없다.
+
+### 기록이 코드보다 많이 주장하던 곳
+
+| 어디              | 무엇을 주장했나                                 | 실제                                                      |
+| ----------------- | ----------------------------------------------- | --------------------------------------------------------- |
+| 38차 표           | `turbo.json` 을 "텍스트 대조 테스트" 가 지킨다  | 그 테스트는 같은 절에서 걷어냈다고 적혀 있다              |
+| `ci.yml` 머리말   | "왜 **세** job 인가", "셋은 서로 의존하지 않아" | 그때 job 이 6개였고 `docker-remotes` 에 `needs` 가 있었다 |
+| ADR-021 결과      | 남은 수동 자리 셋                               | `remotes.md` 는 일곱 곳 + Variables 둘로 센다             |
+| ADR-021 "세 갈래" | `contract-check.ts` 를 이번 결과처럼 실었다     | 27차에 이미 있던 것                                       |
+
+수동 자리 목록은 **`.claude/rules/remotes.md` 를 SSOT 로 삼고** ADR 은 그리로 넘긴다.
+두 곳에 세면 다시 갈린다 — 이번에 갈린 방식 그대로다.
+
+### 같은 서사가 여섯 벌이던 것
+
+I-10(심링크 → zustand·tailwindcss)과 I-11(삼항 → 남의 remote 주소)의 **설명 전체**가
+코드 주석 · 워크플로 · 테스트 헤더에 반복돼 있었다. `ci.yml` 안에서만 두 번이었다.
+`docs/05-troubleshooting/01-known-issues.md` 를 SSOT 로 두고 나머지는 **한 줄 링크**로 줄였다.
+"같은 내용을 두 곳에 쓰지 않는다"(`.claude/rules/docs.md`)를 우리가 어기고 있었다.
+
+### 그 정정이 데려온 질문 — CI 의 docker job 은 무엇을 막나
+
+`ci.yml` 머리말을 고치다 job 목록을 다시 세게 됐고, 거기서 질문이 나왔다.
+**"이 셋이 실제로 뭘 막나."** 답은 **아무것도** 였다.
+
+| 사실                                              | 확인                                             |
+| ------------------------------------------------- | ------------------------------------------------ |
+| `deploy` 에 `needs: ci` 도 `workflow_run` 도 없다 | `deploy.yml` 의 `on:`                            |
+| `main` 에 브랜치 보호가 없다                      | `gh api …/branches/main/protection` → 404        |
+| 두 워크플로가 같은 push 에 나란히 뜬다            | 위 둘의 귀결 — CI 가 빨개도 배포는 나갔다        |
+| `push: false` 라 이미지를 버린다                  | Dokploy 가 자기 호스트에서 다시 빌드한다         |
+| 이미지가 깨지면 배포가 실제로 죽는다              | `dokploy-deploy` 가 `deployment.all` status 폴링 |
+
+그래서 **뺐다**(ADR-023). 38차에 만든 걸 다음 회차에 되돌린 셈인데, 되돌린 이유가
+비용이 아니라 **값이 0 이어서**다 — 실측 비용은 GHA 캐시 덕에 총 1분 남짓이었고,
+38차 주석의 "길다" 는 재보지 않고 쓴 말이었다.
+
+게이트로 만드는 안도 봤다(브랜치 보호 + required checks). 기각했다 — main 에 들어온
+머지 10건 중 PR 을 거친 건 하나뿐이고 나머지는 로컬 `Merge branch` 다. 그 경로에서는
+required check 가 아무것도 안 막으면서 push 만 거부한다.
+
+> 교훈은 **"검사를 만들었다"와 "무언가를 막는다"는 다른 말**이라는 것이다. 38차는
+> 앞의 것만 하고 뒤의 것을 확인하지 않았고, ADR-021 도 "배포 전에 이미지 빌드를 본다"
+> 라고만 적어 게이트인 척도 아닌 척도 하지 않았다. 다음에 검사를 얹을 때는
+> **무엇을 막는지 한 줄로 적을 수 있는지** 부터 본다.
+
+### 코드에서 고친 것
+
+| 무엇                                           | 왜                                                                                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `MfWarmup` 의 throw 를 `lazy` 안으로           | `remotes.map` 은 `RemoteBoundary` **밖**이라, remote 하나가 페이지를 죽였다                                                                |
+| warm 캐시 키를 `remoteCacheKey` 로 통일        | 캐시가 둘인데 규칙도 둘이었고 warm 쪽에만 **버전이 빠져** 있었다                                                                           |
+| `SHARED_DEPLOY_PATHS` 에 넷 추가               | `tsconfig.json`·`turbo.json`·`pnpm-workspace.yaml`·루트 `package.json` — `COPY . .` 로 이미지에 들어가는데 목록엔 없었다(I-7 과 같은 모양) |
+| `docker-context.test.ts` 의 워크스페이스 목록  | 배열 리터럴이 `pnpm-workspace.yaml` 의 복제였다. 이제 YAML 에서 읽는다                                                                     |
+| `plan()` 의 `target: string` → 유니온          | 검증을 `assertDeployTarget` 으로 경계에 뺐다                                                                                               |
+| `RemoteServerSpec.name: string` → `RemoteName` | SSOT 밖 이름이 흘러들 수 있었다                                                                                                            |
+| `plan()` 의 `deployTarget` 중복 호출           | filter 와 map 에서 두 번 조립했다. filter 는 `REMOTES[name]` 이면 된다                                                                     |
+| `mf-runtime.md` 에 `scripts/` 예외 명시        | "확장자를 붙이지 않는다(전역 규칙)" 인데 `scripts/*.ts` 셋이 붙이고 있었다 — 규칙과 코드가 갈려 있었다                                     |
+
+### 고치지 않고 근거만 남긴 것
+
+- **`HOST_WORKSPACE_DIR` 이 remote 배치 패키지에 host 지식을 들인다.** 배포 전용 모듈로
+  가르려면 그 모듈도 `scripts/deploy-targets.ts` 가 상대 경로로 import 없이 읽을 수 있어야
+  하고, 그러면 **두 파일이 같은 제약을 진다.** 한쪽에 import 가 들어가는 순간 detect job 이
+  깨지므로 파일 하나가 지는 쪽을 유지하고 주석에 그 이유를 적었다.
+- **`plan()` 의 `eventName: string`.** GitHub 이벤트 이름은 열린 집합이고 이 판별이 보는
+  건 `workflow_dispatch` 하나뿐이다. 좁히면 GHA 가 새 이벤트를 낼 때마다 여기가 깨진다.
+- **`RemoteComponent` 의 `reloadKey` prop.** 유일한 프로덕션 소비자였던 `MfWarmup` 이
+  떠나 지금은 자기 테스트만 쓴다. 지우지 않고 **주석을 사실로 고쳤다** — 롤백 강제
+  재적재는 실재하는 필요고 검증된 탈출구다. 다음 소비자가 안 생기면 그때 지운다.
+- **ADR-022 를 별도 커밋으로 가르는 것.** 이미 `docs:` 커밋에 들어갔고, 가르려면 히스토리를
+  다시 써야 한다. 다음 회차부터 ADR 은 주제별로 나눠 커밋한다.
+
+### 확인
+
+`pnpm typecheck` · `pnpm lint` · `pnpm test`(48파일 672개) · `pnpm build` 전부 통과.
+
+`MfWarmup` 은 직접 테스트가 없고 `/internal/mf-warm` 은 프리렌더를 안 타므로 **실제로
+돌려서 봤다.** dev 기동 후 warm 을 세 번 호출한 델타:
+
+```
+review-2 delta: fetches=2 evals=2 loads={"catalog":1,"cart":1}
+review-3 delta: fetches=2 evals=2 loads={"catalog":1,"cart":1}
+remote=catalog delta: loads={"catalog":1,"cart":0}
+```
+
+38차 실측과 같다. 첫 호출만 `cart:2` 로 나오는데 그건 dev 최초 컴파일 아티팩트다 —
+델타를 두 번 더 재서 확인했다. **한 번만 재면 이걸 회귀로 오진한다.**
+
+## 2026-09-05 (38차) — remote 가 늘어날 때 조용히 틀리는 자리를 없앤다
+
+"remote 와 컴포넌트가 더 늘어나도 이 구조가 버티나" 를 기준으로 훑었다. 런타임은 이미
+열려 있었고(ADR-017 덕이다) **배포 · CI · Docker 계층이 안 열려 있었다.**
+
+### 이 훑기가 먼저 찾아낸 것 — 이미 깨져 있던 이미지 빌드
+
+세 Dockerfile 의 `deps` 목록이 워크스페이스보다 셋 적었고, 그래서 **배포 이미지 빌드가
+이미 깨져 있었다**(I-10). 원인이 remote 확장과 무관해서 **고침은 따로 뺐다** — 그쪽은
+Dockerfile 목록과 오프라인 대조 테스트만 담는다.
+
+여기 남는 것은 그 사건이 드러낸 **구조 문제**다. `pnpm build` · `pnpm test` · CI 어디에도
+이미지 빌드를 보는 자리가 없어서 배포가 최초 검증이었다. 그래서 CI 에 docker job 을
+만들었고, 그 job 의 대상 목록은 아래와 같은 이유로 SSOT 에서 뽑는다.
+
+> **39차에 그 job 셋을 다시 뺐다**(ADR-023). 게이트가 아니어서 아무것도 못 막았다 —
+> `deploy` 에 `needs: ci` 가 없어 두 워크플로가 나란히 뜬다. 아래 이 회차의 서술은
+> 그때 판단 그대로 남긴다.
+
+### 이름이 박혀 있던 자리
+
+| 자리                           | 빠뜨렸을 때                                      | 어떻게 됐나             |
+| ------------------------------ | ------------------------------------------------ | ----------------------- |
+| `detect-targets` 의 이름 6곳   | 그 remote 의 배포 job 이 안 생긴다 (로그도 정상) | 스크립트 + SSOT 로 파생 |
+| `deploy.yml` 의 URL 삼항       | 남의 remote 주소로 배포 검증이 통과한다          | matrix 객체 + `jq -e`   |
+| Dockerfile `COPY` 목록         | 이미지 빌드가 깨진다                             | 목록 유지 + 대조 테스트 |
+| `host` build · ci 의 정적 서버 | 그 remote 만 프리렌더에서 ECONNREFUSED           | `serve-all-remotes.ts`  |
+| `turbo.json` 의 dependsOn      | 같음                                             | 그대로 — 이미 죽는다    |
+| `MfWarmup` 의 remote 분기      | warm 에서 조용히 빠진다                          | `MODULE_IDS` 에서 파생  |
+
+원칙은 ADR-021 에 남겼다 — **파생할 수 있으면 파생하고, 못 하면 어긋남을 죽는 검사로
+바꾼다.** 조용히 틀리는 자리를 없애는 게 목표지 자동화가 목표가 아니다.
+
+### warm 은 렌더가 아니라 적재였다
+
+처음에는 `MfWarmup` 의 remote 별 분기(`remotes.includes('catalog')`)를 **타입이 강제하는
+맵**으로 바꿨다. 그런데 그건 SSOT 를 세워놓고 옆에 목록을 하나 더 만든 것이다 —
+remote 가 늘면 그 맵도 같이 늘어난다.
+
+목록이 필요했던 이유는 warm 이 그 모듈을 **렌더**했기 때문이다. 렌더하면 필수 prop 이
+있는 모듈(`catalog/ProductDetail` 의 `productId`)은 못 쓰므로 사람이 골라야 했다.
+
+그런데 warm 의 값은 렌더가 아니라 **번들 적재**다. fetch · 무결성 검사 ·
+`new Function` 평가 · expose 존재 확인이 전부 `loadRemoteModule` 안에서 끝나고
+`markBundleReady` 도 거기서 불린다. 적재만 하고 `null` 을 그리면 **어느 모듈이든
+상관없어진다** — 그래서 `MODULE_IDS` 에서 그 remote 의 첫 번째를 그냥 쓴다.
+
+실측으로 확인했다. `/internal/mf-warm` 만 호출한 상태의 `/api/lab/stats`:
+
+```json
+{ "stats": { "fetches": 2, "evals": 2, "loads": { "catalog": 1, "cart": 1 } } }
+```
+
+`MfWarmup` 에 remote 이름도 모듈 이름도 남지 않았다.
+
+### 검사를 어디에 뒀나
+
+| 무엇                         | 어디                             | 언제                |
+| ---------------------------- | -------------------------------- | ------------------- |
+| 배포 대상 판별 규칙          | `scripts/deploy-targets.test.ts` | `pnpm test`         |
+| COPY 목록 ≡ 워크스페이스     | `scripts/docker-context.test.ts` | `pnpm test`         |
+| ~~이미지가 실제로 빌드되나~~ | ~~`ci.yml` 의 docker job 셋~~    | 39차에 뺌 (ADR-023) |
+
+### 한 번 늘렸다가 되돌린 것
+
+처음에는 검사를 여섯 벌 만들었다 — `turbo.json` 의 dependsOn 대조, warm 맵 런타임 확인,
+SSR 번들의 require 집합, `serve-all-remotes` 의 목록 확인까지. **파일이 12개 늘었다.**
+
+절반을 걷어냈다. 기준은 하나다 — **이미 죽는 자리에 검사를 하나 더 얹지 않는다.**
+
+| 걷어낸 것                          | 왜                                                           |
+| ---------------------------------- | ------------------------------------------------------------ |
+| `turbo-config.test.ts`             | 빠뜨리면 `serve-all-remotes` 가 "dist 가 없습니다" 로 죽는다 |
+| `warm-modules.test.ts`             | `satisfies` 가 컴파일 타임에 이미 잡는다                     |
+| `serve-all-remotes.test.ts`        | 검사 대상이 `REMOTE_LIST.map` 한 줄이라 자명하다             |
+| `check-ssr-externals.ts` (+테스트) | 한 번도 안 밟은 문제다. 밟으면 그때 만든다                   |
+| `warm-modules.ts` 파일 분리        | 목록 자체가 없어졌다 — 아래 참고                             |
+| `docker-context.ts` 파일 분리      | 소비처가 테스트 하나뿐이라 그 안으로 접었다                  |
+
+`check-ssr-externals` 가 막으려던 것(remote 가 뭘 externalize 하면 SSR 만 죽는다)은
+실재하는 구멍이다. 다만 **가정이지 증상이 아니다.** 실제로 밟으면 known-issues 에
+증상과 함께 남기고 그때 검사를 만든다 — 이 저장소가 다른 함정을 다뤄온 방식 그대로다.
+
+### 기각한 것
+
+`apps/host/tsconfig.json` 의 `catalog/*` · `cart/*` 매핑을 `"*"` 와일드카드로 접으려다
+말았다. **이미 밟고 기각한 길이다**(I-4) — 평범한 import 까지 그 경로에서 먼저 찾아
+`Cannot find name 'process'` 같은 무관한 에러가 쏟아진다. 두 tsconfig 의 주석에 그
+근거가 적혀 있었다. 빠뜨리면 컴파일이 즉시 죽으므로 조용한 자리도 아니다.
+
+`@mfa/store` 를 MF `shared` 로 올리는 것도 기각했다(ADR-022). 복제를 없애는 대신 버전
+협상이 붙는데, 그러면 한 remote 의 배포가 다른 remote 의 런타임을 바꾼다.
+
+### 다음에 할 것
+
+- `apps/host/src/components/` 를 `remote/<remote>/` 로 가른다. 지금은 평평하고
+  remote 컴포넌트당 Section · Slot 2파일이라 remote 가 늘면 한 폴더에 수십 개가 쌓인다.
+  ⚠️ Section 을 레지스트리로 접지는 않는다 — props 타입이 module id 별로 오므로
+  (`PropsOf<K>`) 제네릭 맵으로 접으면 그 타입이 죽는다. 폴더만 가른다.
+- `pnpm mf:types` 가 remote 전체 기동을 요구하고 `abortOnError: true` 다. remote 가
+  4~5개를 넘기면 `MF_TYPES_ONLY` 같은 좁히기가 필요하다. CI 는 계속 전체를 돈다.
+- remote 당 `style.css` 가 Tailwind 를 통째로 담는다(12~16K). 5개를 넘기면 preflight 를
+  host 만 내보내는 갈래를 다시 잰다 — 지금 바꿀 근거는 없다(ADR-011).
+
 ## 2026-09-05 (37차) — 해부도 본문을 "결론 먼저" 로 바꾼다
 
 그림과 표는 훑으면 되는데 본문 문단은 끝까지 읽어야 결론이 나왔다. `<p>` 41개 중 18개가

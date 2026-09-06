@@ -94,3 +94,17 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 | 테스트를 추가했다    | `docs/06-testing/01-test-plan.md` 의 체크박스                             |
 
 문서 커밋은 코드 커밋과 분리한다(`docs:` 접두사).
+
+## Agent skills
+
+### Issue tracker
+
+이슈는 GitHub Issues(`chane81/mfa-nextjs`)에 둔다 — `gh` CLI. `docs/agents/issue-tracker.md` 참고.
+
+### Triage labels
+
+표준 다섯 역할 이름을 라벨 문자열로 그대로 쓴다. `docs/agents/triage-labels.md` 참고.
+
+### Domain docs
+
+단일 컨텍스트. ADR 은 `docs/02-architecture/01-decision.md`. `docs/agents/domain.md` 참고.

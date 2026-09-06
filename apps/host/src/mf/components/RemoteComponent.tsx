@@ -67,11 +67,18 @@ interface RemoteComponentProps<K extends RemoteModuleId> {
   props?: PropsOf<K>;
   fallbackLabel?: string;
   /**
-   * lazy 캐시를 우회하는 키. warm 경로 전용이다.
+   * lazy 캐시를 우회하는 키.
    *
    * 같은 버전으로 되돌리는 롤백에서는 그 버전의 lazy 엔트리가 이미 캐시에 남아 있어
-   * 로더가 호출되지 않는다. 그러면 "무엇을 적재했는지"가 갱신되지 않아 warm 이
-   * 성공을 증명하지 못한다. 이 키를 매번 바꾸면 로더를 반드시 한 번 태운다.
+   * 로더가 호출되지 않는다. 그러면 "무엇을 적재했는지"가 갱신되지 않는다.
+   * 이 키를 매번 바꾸면 로더를 반드시 한 번 태운다.
+   *
+   * ⚠️ **지금 이 prop 을 쓰는 프로덕션 호출부는 없다.** 유일한 소비자였던 `MfWarmup` 이
+   * 38차에 `RemoteComponent` 를 떠났다 — warm 은 렌더가 아니라 적재라서 이제
+   * `loadRemoteModule` 을 직접 부르고, 같은 `remoteCacheKey` 규칙에 nonce 를 얹는다.
+   * 규칙 자체(`remoteCacheKey` 의 두 번째 인자)는 그쪽이 계속 쓰므로 남겨 둔다.
+   * 이 prop 도 남긴다 — 롤백 강제 재적재는 실재하는 필요고 테스트가 붙어 있다.
+   * 다만 **다음 소비자가 생기기 전까지는 검증된 탈출구이지 쓰이는 경로가 아니다.**
    */
   reloadKey?: string;
 }

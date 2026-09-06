@@ -9,19 +9,29 @@
 #
 # ## 왜 세 job 인가
 #
-# 나눈 이유는 피드백 속도와 **실패 원인의 분리**다.
+# 나눈 이유는 피드백 속도와 **실패 원인의 분리**다. 붙여두면 빠른 신호가 느린 신호를
+# 기다리고, 무엇보다 체크 이름만 보고는 "포맷이 틀렸나 테스트가 깨졌나"를 구분할 수 없다.
 #
-# | job     | 무엇                              | 대략 |
-# | ------- | --------------------------------- | ---- |
-# | verify  | lint · typecheck · format:check   | 짧다 |
-# | test    | vitest 단위 · 통합 (39파일 616개) | 중간 |
-# | build   | remote → host, 프리렌더가 SSR 실행 | 길다 |
+# | job    | 무엇                               | 대략 |
+# | ------ | ---------------------------------- | ---- |
+# | verify | lint · typecheck · format:check    | 짧다 |
+# | test   | vitest 단위 · 통합 (48파일 672개)  | 중간 |
+# | build  | remote → host, 프리렌더가 SSR 실행 | 길다 |
 #
-# 셋은 서로 의존하지 않아 동시에 돈다. 붙여두면 빠른 신호가 느린 신호를 기다리고,
-# 무엇보다 체크 이름만 보고는 "포맷이 틀렸나 테스트가 깨졌나"를 구분할 수 없다.
+# 셋은 서로 의존하지 않아 동시에 돈다.
 #
 # remote → host 순서와 빌드 중 dist 서빙은 turbo 와 host 의 build 스크립트가 처리한다.
 # 배경: docs/03-setup/01-getting-started.md 의 "host 빌드는 remote 가 떠 있어야 끝난다"
+#
+# ## 왜 이미지 빌드가 여기 없나
+#
+# 한때 있었다(38차). 39차에 뺐다 — **아무것도 막지 못했기 때문이다.**
+# `deploy` 워크플로에 `needs: ci` 도 `workflow_run` 도 없고 main 에 브랜치 보호도 없어서
+# 두 워크플로가 같은 push 에 나란히 뜬다. CI 가 빨개도 배포는 그대로 나갔다.
+# 게다가 `push: false` 라 만든 이미지를 버리고 Dokploy 가 같은 Dockerfile 로 다시 빌드했다.
+#
+# 이미지가 깨지면 `dokploy-deploy` 가 `deployment.all` 의 status 로 잡는다. 근거는 ADR-023.
+# 목록 드리프트(I-10) 자체는 `scripts/docker-context.test.ts` 가 `pnpm test` 에서 잡는다.
 name: ci
 
 on:
@@ -106,14 +116,11 @@ jobs:
       # 커밋된 파일만 보므로 그 어긋남을 못 본다. 이 단계가 그 창을 닫는다.
       #
       # 바로 위 `pnpm build` 가 remote dist 를 이미 만들어 뒀으므로 정적 서버만 띄우면
-      # 된다. `--success first` 로 페치가 끝나면 서버가 내려간다.
+      # 된다. `serve-all-remotes` 가 `REMOTE_LIST` 를 순회해 전부 띄우고, 페치가 끝나면
+      # 같이 내린다 — remote 를 추가해도 이 파일은 안 바뀐다.
       - name: MF DTS 가 최신인지 확인
         run: |
-          pnpm --filter @mfa/contracts exec concurrently \
-            --kill-others --success first -n catalog,cart,types \
-            "node ../../scripts/serve-remote-dist.ts catalog" \
-            "node ../../scripts/serve-remote-dist.ts cart" \
-            "pnpm mf:types"
+          node scripts/serve-all-remotes.ts -- pnpm mf:types
           git diff --exit-code \
             -- packages/contracts/src/generated \
             || { echo "::error::커밋된 MF 타입/모듈 목록이 낡았습니다. 로컬에서 'pnpm mf:types' 를 돌리고 결과를 커밋하세요."; exit 1; }

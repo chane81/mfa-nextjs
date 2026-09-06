@@ -52,11 +52,9 @@ COPY apps/host/package.json apps/host/
 COPY apps/remote-cart/package.json apps/remote-cart/
 COPY apps/remote-catalog/package.json apps/remote-catalog/
 # ⚠️ 워크스페이스 패키지를 **하나도 빠뜨리면 안 된다.** 빠뜨려도 `pnpm install` 은
-# 성공한다 — pnpm 이 없는 디렉터리로 심링크를 먼저 만들기 때문이다. 대신 그 패키지의
-# `node_modules` 가 안 생겨서, `COPY . .` 로 소스가 채워진 뒤 빌드가 그 패키지의
-# 의존성을 못 푼다(`packages/store` → zustand, `packages/tailwind-config` → tailwindcss).
-# 실제로 셋이 빠져 있었고 아무 검사도 그걸 못 봤다. 지금은 `scripts/docker-context.test.ts`
-# 가 이 목록을 워크스페이스와 대조하고 `pnpm test` 에서 죽는다.
+# 성공하고 빌드가 한참 뒤에 죽는다. 왜 그런지는 known-issues I-10 하나에 있다:
+# docs/05-troubleshooting/01-known-issues.md
+# 이 목록이 워크스페이스와 같은지는 `scripts/docker-context.test.ts` 가 본다.
 COPY packages/contracts/package.json packages/contracts/
 COPY packages/eslint-config/package.json packages/eslint-config/
 COPY packages/remote-config/package.json packages/remote-config/

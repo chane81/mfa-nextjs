@@ -228,6 +228,97 @@ export function assertRemoteName(value: string): RemoteName {
   return value as RemoteName;
 }
 
+/**
+ * CI 가 remote 별로 읽는 저장소 Variable 이름들.
+ *
+ * 배포 워크플로가 remote 마다 두 값을 필요로 한다 — 공개 URL 과 Dokploy 애플리케이션 id.
+ * 그 매핑이 GHA 표현식 안에 삼항 사슬로 있던 때 **remote 가 셋이 되면 조용히 틀렸다.**
+ * 증상과 재현 조건은 known-issues I-11 에 있다.
+ *
+ * 그래서 매핑을 **이름 규칙**으로 바꾸고 그 규칙을 여기 한 곳에 둔다. 워크플로는
+ * `toJSON(vars)` 로 저장소 Variables 전체를 받아 이 이름으로 찾아가므로, remote 가
+ * 늘어도 YAML 은 한 글자도 안 바뀐다. 없는 키는 `jq -e` 가 **즉시 실패**시킨다.
+ *
+ * 규칙: 이름을 대문자로 올리고 `-` 를 `_` 로 바꾼다(`REMOTES` 키에 쓸 수 있는 문자 중
+ * 셸 변수명에 못 들어가는 건 하이픈뿐이다).
+ */
+function envSlug(remote: RemoteName): string {
+  return remote.toUpperCase().replace(/-/g, '_');
+}
+
+/** remote 의 공개 URL 이 담긴 저장소 Variable 이름 (예 `MF_CATALOG_URL`) */
+export function ciUrlVar(remote: RemoteName): string {
+  return `MF_${envSlug(remote)}_URL`;
+}
+
+/** remote 의 Dokploy 애플리케이션 id 가 담긴 저장소 Variable 이름 */
+export function ciDokployAppVar(remote: RemoteName): string {
+  return `DOKPLOY_APP_${envSlug(remote)}`;
+}
+
+/**
+ * 배포 워크플로의 matrix 한 항목.
+ *
+ * 이름만 넘기면 워크플로가 다시 변수 이름을 조립해야 하고, 그러면 규칙이 두 곳에 산다.
+ * 조립까지 끝낸 객체를 넘겨서 YAML 쪽에는 **규칙이 존재하지 않게** 한다.
+ */
+export interface RemoteDeployTarget {
+  readonly name: RemoteName;
+  readonly urlVar: string;
+  readonly appVar: string;
+  /** 이 경로 아래가 바뀌면 그 remote 를 배포한다 */
+  readonly workspaceDir: string;
+}
+
+/**
+ * host 의 워크스페이스 디렉터리.
+ *
+ * `REMOTES` 에는 host 가 없다 — host 는 remote 를 소비하는 쪽이라 배치가 다르다.
+ * 그래도 "어느 경로가 바뀌면 host 를 배포하나" 는 배치 지식이라 여기 둔다.
+ *
+ * ⚠️ 이 상수와 아래 `SHARED_DEPLOY_PATHS` · `deployTarget` 때문에 이 모듈은 remote 배치
+ * 하나가 아니라 **배포 배치 전체**를 진다. 배포 전용 모듈로 가르는 쪽을 봤지만 안 갈랐다 —
+ * `scripts/deploy-targets.ts` 가 이 파일을 **상대 경로로, import 없이** 읽어야 하는데
+ * (detect job 은 `pnpm install` 을 안 한다) 가르면 그 제약을 두 파일이 같이 져야 하고,
+ * 한쪽에 import 가 들어가는 순간 job 이 깨진다. 파일 하나가 그 제약을 지는 쪽이 낫다.
+ */
+export const HOST_WORKSPACE_DIR = 'apps/host';
+
+/**
+ * 이 경로들이 바뀌면 **세 이미지 전부** 다시 빌드해야 한다.
+ *
+ * 기준은 "이미지 빌드 결과를 바꾸는가" 다. 세 갈래가 들어 있다.
+ *
+ *   공유 소스        `packages/` · `scripts/`
+ *   설치 · 빌드 입력  `pnpm-lock.yaml` · `pnpm-workspace.yaml` · `package.json` ·
+ *                    `tsconfig.json` · `turbo.json`
+ *   컨텍스트 자체     `.dockerignore`
+ *
+ * 가운데 갈래가 특히 조용하다. 세 Dockerfile 이 전부 `COPY . .` 로 루트 설정 파일을
+ * 이미지에 넣고 `pnpm turbo run …` 으로 빌드하므로, 그 파일들이 바뀌면 산출물이 달라지는데
+ * **어느 앱 디렉터리도 안 바뀐다** — 목록에서 빠지면 배포가 그냥 안 물린다.
+ * `.dockerignore` 를 빠뜨려 같은 형태로 당한 적이 있다(known-issues I-7).
+ */
+export const SHARED_DEPLOY_PATHS: readonly string[] = [
+  'packages/',
+  'scripts/',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'package.json',
+  'tsconfig.json',
+  'turbo.json',
+  '.dockerignore',
+];
+
+export function deployTarget(remote: RemoteName): RemoteDeployTarget {
+  return {
+    name: remote,
+    urlVar: ciUrlVar(remote),
+    appVar: ciDokployAppVar(remote),
+    workspaceDir: REMOTES[remote].workspaceDir,
+  };
+}
+
 /** 로컬 개발 오리진. env 가 없을 때의 기본값들이 전부 여기서 나온다. */
 export function devOrigin(remote: RemoteName): string {
   return `http://localhost:${REMOTES[remote].devPort}`;

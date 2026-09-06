@@ -52,6 +52,8 @@
 | 로컬·CI 는 초록인데 **Dokploy 배포만** `Cannot find module './generated/@mf-types/…'` | `.dockerignore` 가 커밋된 생성물을 컨텍스트에서 뺐다 — [I-7](#i-7-dockerignore-가-커밋된-계약을-컨텍스트에서-빼고-있었다)                         |
 | 배포는 `Done` 인데 `mf-version.json` 이 그대로다                                      | 빌드 컨텍스트가 같아 이미지가 재사용됐다 — [I-8](#i-8-배포는-성공했는데-버전이-안-바뀐다--캐시-히트가-완료-신호를-지운다)                         |
 | 로컬·CI 는 다 초록인데 **이미지 빌드만** `Cannot find module 'zustand'` 류로 죽는다   | `deps` 스테이지 COPY 목록이 워크스페이스와 어긋났다 — [I-10](#i-10-이미지의-deps-스테이지가-워크스페이스-패키지를-빠뜨려도-설치는-성공한다)       |
+| remote 를 추가했는데 배포 job 이 안 생기거나 남의 주소로 검증이 통과한다              | remote 이름이 GHA 표현식에 박혀 있었다 — [I-11](#i-11-remote-이름이-gha-표현식에-박히면-세-번째-remote-가-조용히-틀린다)                          |
+| 배포 job 이 **메시지 없이** 종료코드 1 로 죽는다                                      | `$(…)` 로 값을 받는 셸 함수가 에러를 stdout 에 썼다 — [I-11 의 `>&2` 절](#그-메시지가-안-나오던-자리--2-하나)                                     |
 
 ### SSR · hydration
 
@@ -467,7 +469,7 @@ CatalogSection  ← category · onCategoryChange 만 받는다   홈 · lab 셋�
 ### I-10. 이미지의 `deps` 스테이지가 워크스페이스 패키지를 빠뜨려도 설치는 성공한다
 
 증상 — **없다.** 그게 문제다. `pnpm build` · `pnpm test` · CI 가 전부 초록인데
-배포 이미지 빌드만 죽는다. 그리고 이 저장소의 CI 에는 이미지 빌드가 없으므로
+배포 이미지 빌드만 죽는다. 그리고 이 저장소의 CI 에는 이미지 빌드가 없었으므로
 **배포가 최초 검증**이었다.
 
 세 Dockerfile 의 `deps` 스테이지는 레이어 캐시를 위해 워크스페이스 package.json 을
@@ -496,6 +498,8 @@ node_modules/@mfa/remote-config -> ../../packages/remote-config   ← 대상이 
 없었으므로 아예 만들어지지 않고, `COPY . .` 는 그걸 만들어주지 않는다. pnpm 은
 isolated 링커라 패키지가 자기 의존성을 자기 `node_modules` 로 본다.
 
+deps 스테이지를 임시 디렉터리로 재현해 확인한 결과:
+
 ```
 packages/store           node_modules 없음 → require.resolve('zustand')     MODULE_NOT_FOUND
 packages/tailwind-config node_modules 없음 → require.resolve('tailwindcss') MODULE_NOT_FOUND
@@ -510,24 +514,96 @@ packages/tailwind-config node_modules 없음 → require.resolve('tailwindcss') 
 
 목록을 없애는 쪽(`COPY packages ./packages`)이 O(n²) 를 없애지만, 소스 한 줄만 바꿔도
 설치 레이어가 무효화되어 매 배포마다 `pnpm install` 이 다시 돈다. 캐시를 지키는 대신
-검사를 붙였다.
+목록이 워크스페이스와 어긋나면 **오프라인 테스트가 죽게** 했다.
 
-`scripts/docker-context.test.ts` 가 세 Dockerfile 의 `COPY … package.json` 목록을
-`apps/*` · `packages/*` 실제 디렉터리와 대조한다. 오프라인이고 **어느 파일에 무슨 줄을
-넣어야 하는지 출력한다.**
+| 무엇                     | 어디                             | 언제        |
+| ------------------------ | -------------------------------- | ----------- |
+| COPY 목록 ≡ 워크스페이스 | `scripts/docker-context.test.ts` | `pnpm test` |
+
+그 테스트는 `pnpm-workspace.yaml` 의 글롭을 읽어 실제 패키지 목록을 만들고, 어긋나면
+**어느 파일에 무슨 줄을 넣어야 하는지 출력한다.**
+
+> 38차에 CI 에 docker job 셋을 얹어 실제 이미지도 빌드해봤는데 **39차에 뺐다.**
+> 게이트가 아니어서 아무것도 못 막았고(deploy 가 `needs: ci` 없이 나란히 뜬다),
+> 같은 이미지를 Dokploy 가 어차피 다시 빌드했다. 근거는 ADR-023.
+> 그래서 **이 함정의 다른 형태가 나오면 여전히 배포가 최초 검증이다** — 위 테스트가
+> 막는 건 목록 드리프트 하나뿐이다.
+
+### I-11. remote 이름이 GHA 표현식에 박히면 세 번째 remote 가 조용히 틀린다
+
+증상 — 역시 **없다.** remote 를 추가했는데 그 remote 만 배포가 안 되거나, 더 나쁘게는
+**다른 remote 의 주소로 검증이 통과한다.**
+
+두 자리였다.
+
+```bash
+# .github/workflows/deploy.yml — catalog 가 아니면 무조건 cart
+REMOTE_URL="$([ "$REMOTE" = catalog ] && echo "$CATALOG_URL" || echo "$CART_URL")"
+```
+
+```bash
+# .github/actions/detect-targets — 이름이 여섯 번 리터럴로
+all)     emit '["catalog","cart"]' true ;;
+if echo "$CHANGED" | grep -q '^apps/remote-catalog/'; then SELECTED+=('"catalog"'); fi
+```
+
+앞의 것은 새 remote 를 배포하면서 cart 의 `mf-version.json` 을 baseline 으로 읽고
+"버전이 안 바뀌었네" 를 잘못된 대상에 대해 판정한다. 뒤의 것은 새 remote 의 배포 job 을
+아예 안 만들고 `대상 — remotes=[] host=false` 라고 정상처럼 찍는다.
+
+> 같은 함정을 `application-id` 에서 한 번 밟았었다. GHA 에 삼항이 없어
+> `조건 && A || B` 를 쓰는데, 빈 문자열이 falsy 라 **A 가 비면 B 로 넘어간다** —
+> catalog 를 배포하라는 job 이 cart 를 배포하고 로그에는 성공으로 남는다.
+> 그때는 조건을 둘 다 적는 것으로 막았지만, 그건 remote 가 늘면 다시 깨지는 방식이었다.
+
+#### 고치는 법 — YAML 에 이름도 규칙도 두지 않는다
+
+판별을 `scripts/deploy-targets.ts` 로 옮겨 `@mfa/remote-config` 를 읽게 했다. 그 스크립트는
+SSOT 를 **상대 경로로** 들여서 `pnpm install` 없이 돈다(`packages/remote-config/src/index.ts`
+는 import 가 하나도 없는 순수 상수 모듈이고 Node 24 가 타입 스트리핑으로 실행한다) —
+배포 대상을 정하려고 의존성 전체를 받을 이유가 없다.
+
+matrix 항목은 이름이 아니라 객체다.
+
+```json
+{
+  "name": "catalog",
+  "urlVar": "MF_CATALOG_URL",
+  "appVar": "DOKPLOY_APP_CATALOG",
+  "workspaceDir": "apps/remote-catalog"
+}
+```
+
+변수 이름 규칙은 `ciUrlVar` · `ciDokployAppVar` 가 정하고, 워크플로는 `toJSON(vars)` 로
+받은 저장소 Variables 에서 그 이름으로 찾는다. **없으면 `jq -e` 가 그 자리에서 죽는다** —
+다른 remote 의 값으로 조용히 넘어가지 않는다.
 
 ```
-AssertionError: apps/remote-cart/Dockerfile 을 이렇게 맞추세요:
-COPY apps/host/package.json apps/host/
-…
-COPY packages/remote-config/package.json packages/remote-config/
+::error::저장소 Variable 'MF_NEWREMOTE_URL' 이(가) 없습니다 (remote 'newremote').
 ```
 
-`pnpm-workspace.yaml` 의 글롭이 늘면 이 검사가 조용히 덜 세게 되므로, 그 글롭이
-`apps/*` · `packages/*` 둘인지도 같은 파일에서 확인한다.
+#### 그 메시지가 안 나오던 자리 — `>&2` 하나
 
-> 실제 이미지를 끝까지 빌드해 보는 CI job 은 아직 없다. 이 테스트는 **목록만** 본다 —
-> 목록이 맞는데 이미지가 깨지는 종류는 여전히 배포가 최초 검증이다.
+위 문장이 **한동안 거짓이었다.** 죽기는 죽는데 메시지가 로그에 한 글자도 안 찍혔다.
+
+```bash
+pick() {
+  jq -er --arg k "$1" '.[$k] // empty' <<<"$ALL_VARS" || {
+    echo "::error::저장소 Variable '$1' 이(가) 없습니다 …"   # ← stdout
+    return 1
+  }
+}
+REMOTE_URL="$(pick "$URL_VAR")"                              # ← 그 stdout 을 삼킨다
+```
+
+호출부가 command substitution 이라 함수의 stdout 은 전부 변수로 흡수된다. `jq -er` 는
+없는 키에 대해 stderr 에 아무것도 안 쓰므로, 남는 건 **메시지 없는 종료코드 1** 이다.
+"조용히 틀리던 자리" 를 "조용히 죽는 자리" 로 바꾼 셈이라 절반만 고친 상태였다.
+
+`echo … >&2` 로 고쳤다. GHA 는 stderr 의 `::error::` 도 애노테이션으로 받는다.
+
+> 교훈은 `jq -e` 쪽이 아니라 **셸 함수의 출력 채널**이다. `$(…)` 로 값을 받는 함수는
+> 사람이 읽을 출력을 stdout 에 쓸 수 없다. 이 저장소의 다른 `pick` 류를 추가할 때도 같다.
 
 ## H. (26차) 재배치 · dev 기동에서 밟은 것
 
