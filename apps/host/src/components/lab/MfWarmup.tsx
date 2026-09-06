@@ -10,6 +10,7 @@ import {
 
 import { WEB_ENTRIES } from '@/mf/config';
 import { RemoteBoundary } from '@/mf/components/RemoteBoundary';
+import { remoteCacheKey } from '@/mf/components/RemoteComponent';
 import { loadRemoteModule } from '@/mf/loader';
 
 /**
@@ -25,32 +26,44 @@ import { loadRemoteModule } from '@/mf/loader';
  * 그래서 적재만 하고 `null` 을 그리면 **어느 모듈이든 상관없어진다.**
  *
  * 그러면 고를 이유가 없으니 그냥 첫 번째를 쓴다.
+ *
+ * ⚠️ 없을 때 **여기서 던지지 않는다.** 이 함수는 `remotes.map` 콜백에서 불리는데 그
+ * 자리는 `RemoteBoundary` **바깥**이라, 던지면 remote 하나 때문에 warm 페이지가 통째로
+ * 죽는다 — "remote 하나가 죽어도 페이지는 산다" 는 이 저장소의 규약과 반대다.
+ * 던지는 자리는 아래 `lazy` 안이고, 거기서 던지면 그 remote 의 경계가 받는다.
  */
-function warmTarget(remote: RemoteName): RemoteModuleId {
-  const id = MODULE_IDS.find((moduleId) => moduleId.startsWith(`${remote}/`));
-  if (!id) {
-    throw new Error(
-      `remote '${remote}' 에 노출 모듈이 없습니다. 'pnpm mf:types' 를 돌렸는지 확인하세요.`,
-    );
-  }
-  return id;
+function warmTarget(remote: RemoteName): RemoteModuleId | undefined {
+  return MODULE_IDS.find((moduleId) => moduleId.startsWith(`${remote}/`));
 }
 
 /**
  * `lazy` 를 쓰는 이유는 서스펜스 규약 때문이다 — 같은 프라미스를 재사용해야 React 가
  * 무한히 다시 시도하지 않는다. `RemoteComponent` 의 `lazyCache` 와 같은 이유다.
  *
- * 키에 `nonce` 가 들어가는 것도 같다. 없으면 롤백처럼 "이미 본 적 있는 버전" 으로 갈 때
- * 로더가 아예 호출되지 않아 warm 이 아무것도 증명하지 못한다.
+ * **키 규칙도 같은 것을 쓴다**(`remoteCacheKey`). 캐시가 둘이라 규칙까지 둘이 되면
+ * 한쪽에만 버전이 빠지는 식으로 조용히 갈린다 — 실제로 그랬다. 버전이 키에 없으면
+ * 재배포 후에도 옛 엔트리가 맞아버려 warm 이 적재를 증명하지 못한다.
+ *
+ * `nonce` 는 그 위에 하나 더 얹는다. 롤백처럼 "이미 본 적 있는 버전" 으로 갈 때는
+ * 버전까지 같아서, 그것만으로는 로더가 아예 호출되지 않는다.
  */
 const warmCache = new Map<string, ComponentType>();
 
-function warmLoader(id: RemoteModuleId, nonce: string): ComponentType {
-  const key = `${id}#${nonce}`;
+function warmLoader(remote: RemoteName, nonce: string): ComponentType {
+  const id = warmTarget(remote);
+  const key = id
+    ? remoteCacheKey(id, nonce)
+    : `${remote}/(노출 모듈 없음)#${nonce}`;
+
   const cached = warmCache.get(key);
   if (cached) return cached;
 
   const Loader = lazy(async () => {
+    if (!id) {
+      throw new Error(
+        `remote '${remote}' 에 노출 모듈이 없습니다. 'pnpm mf:types' 를 돌렸는지 확인하세요.`,
+      );
+    }
     await loadRemoteModule(id);
     // 적재만 하면 끝이다. 그리지 않으므로 props 도 필요 없다.
     return { default: () => null };
@@ -76,7 +89,7 @@ export function MfWarmup({
   return (
     <div hidden aria-hidden>
       {remotes.map((remote) => {
-        const Loader = warmLoader(warmTarget(remote), nonce);
+        const Loader = warmLoader(remote, nonce);
         return (
           <RemoteBoundary
             key={remote}
