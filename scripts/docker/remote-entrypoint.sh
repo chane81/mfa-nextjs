@@ -21,7 +21,18 @@ set -eu
 BUILD_DIST=/app/dist
 DATA_DIR="${REMOTE_DIST_DIR:-/data}"
 PORT="${PORT:-3001}"
+# 볼륨에 남길 버전 개수. 주입 지점은 docker-compose.yml(로컬)과 Dokploy
+# Application env(실서버)다 — 값을 넣는 자리 없이 폴백만 도는 상태를 만들지 않는다.
 KEEP="${REMOTE_KEEP_VERSIONS:-5}"
+
+# 숫자가 아니면 부팅에서 죽는다. `[ -gt ]` 가 조용히 거짓이 되어 정리를 건너뛰면
+# 볼륨이 무한히 커지는데 신호가 로그 한 줄뿐이다.
+case "$KEEP" in
+  ''|*[!0-9]*)
+    echo "[entrypoint] REMOTE_KEEP_VERSIONS 는 0 이상의 정수여야 합니다: $KEEP" >&2
+    exit 1
+    ;;
+esac
 
 mkdir -p "$DATA_DIR"
 
