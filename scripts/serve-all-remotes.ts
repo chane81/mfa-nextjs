@@ -117,4 +117,26 @@ if (
     console.error(`명령을 실행하지 못했습니다: ${command}`, error);
     shutdown(1);
   });
+
+  /**
+   * 받은 시그널을 자식에게 넘긴다. `concurrently --kill-others` 가 해주던 일이다.
+   *
+   * 안 넘기면 CI 취소나 turbo 의 태스크 종료처럼 **이 프로세스만** SIGTERM 을 받는 경우에
+   * `next build` 가 고아로 남아 `.next` 에 계속 쓴다. 감독은 사라졌으니 아무도 안 내리고,
+   * 다음 빌드가 반쯤 쓰인 산출물을 문다.
+   *
+   * 자식이 죽으면 위의 `exit` 핸들러가 서버를 내리고 나간다. 자식이 시그널에 응답하지
+   * 않는 경우를 위해서만 강제 종료를 건다 — 시그널 핸들러를 등록한 시점에 Node 의 기본
+   * 종료 동작이 사라지고, 정적 서버가 열려 있는 한 이벤트 루프도 비지 않기 때문이다.
+   */
+  const forward = (signal: NodeJS.Signals): void => {
+    child.kill(signal);
+    setTimeout(() => {
+      child.kill('SIGKILL');
+      shutdown(1);
+    }, 5_000).unref();
+  };
+
+  process.on('SIGINT', () => forward('SIGINT'));
+  process.on('SIGTERM', () => forward('SIGTERM'));
 }
