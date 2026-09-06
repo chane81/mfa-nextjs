@@ -113,24 +113,28 @@ TypeError: fetch failed ... ECONNREFUSED
 | 조각                             | 담당                                                |
 | -------------------------------- | --------------------------------------------------- |
 | remote 를 먼저 빌드한다          | turbo — `turbo.json` 의 `@mfa/host#build.dependsOn` |
-| 빌드하는 동안 `dist` 를 서빙한다 | host 의 `build` 스크립트 (`concurrently`)           |
+| 빌드하는 동안 `dist` 를 서빙한다 | host 의 `build` 스크립트 (`serve-all-remotes.ts`)   |
 
 ```jsonc
 // apps/host/package.json
-"build": "concurrently --kill-others --success first -n catalog,cart,next \
-  \"node ../../scripts/serve-remote-dist.ts catalog\" \
-  \"node ../../scripts/serve-remote-dist.ts cart\" \
-  \"next build\""
+"build": "node ../../scripts/serve-all-remotes.ts -- next build"
 ```
 
-포트도 `dist` 위치도 인자로 안 넘긴다. remote 이름만 주면
-`packages/remote-config` 에서 파생한다 — 그래야 포트 지식이 호출부마다 복사되지 않는다.
+**remote 이름이 여기 없다.** 무엇을 띄울지는 `packages/remote-config` 의 `REMOTE_LIST` 가
+정하고 포트도 `dist` 위치도 거기서 파생한다 — remote 를 추가해도 이 줄은 안 바뀐다.
+한때 `concurrently` 로 remote 를 하나씩 나열했는데, 그러면 "어떤 remote 를 띄워야 하나" 가
+여기와 CI 에 한 벌씩 더 살았고 빠뜨린 remote 만 프리렌더에서 ECONNREFUSED 로 죽었다.
 
-`--success first` 는 "먼저 끝난 프로세스의 종료 코드를 쓴다"는 뜻이다. 서버는 안 끝나므로
-그건 항상 `next build` 다. `--kill-others` 가 빌드가 끝나는 즉시 서버를 내린다.
+`--` 뒤가 실행할 명령이다. 명령이 끝나면 스크립트가 서버를 내리고 그 종료 코드로 나간다.
+SIGINT · SIGTERM 도 자식에게 넘긴다 — CI 취소나 turbo 의 태스크 종료로 감독만 죽으면
+`next build` 가 고아로 남아 `.next` 에 계속 쓰기 때문이다.
+
+`dist` 가 없으면 **서버를 띄우기 전에** 멈추고 어느 remote 인지 말한다. 없는 채로 띄우면
+모든 요청이 404 가 되고, 실패는 한참 뒤 "SSR 번들 응답 404" 로 원인에서 먼 자리에 나타난다.
 
 **준비 대기는 없다.** 필요 없어서다 — 서버 바인딩은 `+1ms`, `next build` 의 첫 remote 요청은
-`+6451ms` 다(실측). 컴파일과 타입체크가 그 앞을 다 막고 있다.
+`+6451ms` 다(실측). 컴파일과 타입체크가 그 앞을 다 막고 있다. 그래도 이 스크립트는 서버가
+listen 한 **뒤에** 명령을 띄운다. 그 실측에 기대지 않는 편이 낫다.
 
 두 번째 조각을 turbo 로 못 쓰는 이유(`with` 사이드카는 `turbo run build` 를 종료시키지
 못한다)는 [05-troubleshooting/01-known-issues.md](../05-troubleshooting/01-known-issues.md) 에
