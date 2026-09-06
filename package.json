@@ -10,6 +10,9 @@
   "scripts": {
     "dev": "turbo run dev",
     "dev:wait-remotes": "node scripts/wait-for-remotes.ts",
+    "docker:up": "export MFA_HOST_IP=$(ipconfig getifaddr en0 || ipconfig getifaddr en1) && docker compose up -d --build --wait remote-catalog remote-cart && docker compose up -d --build --wait host",
+    "docker:down": "docker compose down --remove-orphans",
+    "docker:reset": "docker compose down --remove-orphans --volumes",
     "build": "turbo run build",
     "start": "pnpm build && turbo run start",
     "test": "vitest run",

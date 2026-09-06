@@ -11,8 +11,7 @@
      * 여기 복제하지 않아도 된다.
      *
      *   REMOTE_*  → remote 오리진(…_PUBLIC_URL — remote 당 이거 하나다),
-     *               신뢰 경계(REMOTE_ALLOWED_ORIGINS),
-     *               버전 보존 개수(REMOTE_KEEP_VERSIONS)
+     *               신뢰 경계(REMOTE_ALLOWED_ORIGINS)
      *
      * 브라우저용 매니페스트 URL 과 host 서버용 SSR 번들 URL 은 전부 `…_PUBLIC_URL` 에서
      * 파생된다. 파일명은 `MF_FILES` 에 있고 코드가 붙인다 — env 로 오지 않는다.

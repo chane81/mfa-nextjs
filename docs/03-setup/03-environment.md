@@ -181,11 +181,10 @@ node scripts/gen-signing-key.ts
 
 ### 빌드 · 개발 편의
 
-| 이름                       | 읽는 곳                               | 설정 위치    | 기본값       |
-| -------------------------- | ------------------------------------- | ------------ | ------------ |
-| `WAIT_FOR_REMOTES_TIMEOUT` | `scripts/wait-for-remotes.ts`         | **셸**       | `60000` (ms) |
-| `REMOTE_KEEP_VERSIONS`     | `scripts/docker/remote-entrypoint.sh` | 컨테이너 env | `5`          |
-| `NODE_ENV`                 | 여러 곳                               | 도구가 설정  | —            |
+| 이름                       | 읽는 곳                       | 설정 위치   | 기본값       |
+| -------------------------- | ----------------------------- | ----------- | ------------ |
+| `WAIT_FOR_REMOTES_TIMEOUT` | `scripts/wait-for-remotes.ts` | **셸**      | `60000` (ms) |
+| `NODE_ENV`                 | 여러 곳                       | 도구가 설정 | —            |
 
 ### 직접 설정하지 않는 것
 

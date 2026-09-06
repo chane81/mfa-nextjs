@@ -129,7 +129,7 @@ describe('signManifest', () => {
 describe('staleVersionDirs — 정리 경계', () => {
   it('현재 버전만 남기고 전부 지운다', () => {
     // 빌드 dist 는 방금 만든 한 벌만 들고 있으면 된다. 롤백용 옛 버전은
-    // 서빙 볼륨이 REMOTE_KEEP_VERSIONS 만큼 들고 있다.
+    // 서빙 볼륨이 entrypoint 의 KEEP 개수만큼 들고 있다.
     makeVersion('t1');
     makeVersion('t2');
     makeVersion('t3');
