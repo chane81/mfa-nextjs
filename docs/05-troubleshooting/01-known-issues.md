@@ -54,6 +54,7 @@
 | 로컬·CI 는 다 초록인데 **이미지 빌드만** `Cannot find module 'zustand'` 류로 죽는다   | `deps` 스테이지 COPY 목록이 워크스페이스와 어긋났다 — [I-10](#i-10-이미지의-deps-스테이지가-워크스페이스-패키지를-빠뜨려도-설치는-성공한다)       |
 | remote 를 추가했는데 배포 job 이 안 생기거나 남의 주소로 검증이 통과한다              | remote 이름이 GHA 표현식에 박혀 있었다 — [I-11](#i-11-remote-이름이-gha-표현식에-박히면-세-번째-remote-가-조용히-틀린다)                          |
 | 배포 job 이 **메시지 없이** 종료코드 1 로 죽는다                                      | `$(…)` 로 값을 받는 셸 함수가 에러를 stdout 에 썼다 — [I-11 의 `>&2` 절](#그-메시지가-안-나오던-자리--2-하나)                                     |
+| `ERR_UNKNOWN_FILE_EXTENSION: Unknown file extension ".ts"` (GHA)                      | 그 job 이 러너 이미지의 Node 를 그냥 쓰고 있다 — [I-12](#i-12-ts-를-러너의-주변-node-로-돌리면-이미지가-바뀔-때-조용히-깨진다)                    |
 
 ### SSR · hydration
 
@@ -604,6 +605,38 @@ REMOTE_URL="$(pick "$URL_VAR")"                              # ← 그 stdout �
 
 > 교훈은 `jq -e` 쪽이 아니라 **셸 함수의 출력 채널**이다. `$(…)` 로 값을 받는 함수는
 > 사람이 읽을 출력을 stdout 에 쓸 수 없다. 이 저장소의 다른 `pick` 류를 추가할 때도 같다.
+
+### I-12. `.ts` 를 러너의 **주변 Node** 로 돌리면 이미지가 바뀔 때 조용히 깨진다
+
+40차 리뷰에서 잡았다. 아직 안 터졌지만 터지는 조건이 우리 손 밖에 있어서 남긴다.
+
+`.github/actions/detect-targets` 는 `node "$GITHUB_WORKSPACE/scripts/deploy-targets.ts"` 를
+그대로 부른다. 이게 도는 이유는 **타입 스트리핑**이다(Node 22.18+, 무플래그 23.6+).
+그런데 그 job 에는 런타임을 고정하는 스텝이 없었다 — 이 액션이 `pnpm install` 없이 도는 걸
+장점으로 삼다가 런타임 고정까지 같이 뺀 것이다. 그래서 실제로 쓰는 Node 는
+`ubuntu-latest` 이미지에 딸려 오는 것이었다.
+
+```
+node:internal/modules/esm/get_format:189
+  throw new ERR_UNKNOWN_FILE_EXTENSION(ext, filepath);
+TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension ".ts"
+```
+
+| 자리                   | Node 고정                                 |
+| ---------------------- | ----------------------------------------- |
+| `ci.yml` 의 세 job     | O — `pnpm/setup` `runtime: node@^24.19.0` |
+| `package.json` engines | O — `>=24.19.0 <25`                       |
+| **detect job**         | **X — 러너 이미지가 정했다**              |
+
+`deploy` 워크플로는 `detect` 없이는 아무 job 도 못 뜬다. 그래서 이건 remote 하나가 아니라
+**배포 전체**가 막히는 자리다. 게다가 러너 이미지 갱신은 우리 커밋과 무관하게 일어나므로,
+깨지는 순간은 "아무것도 안 고친 날" 이 된다.
+
+`pnpm/setup@v2` 를 `install: false` 로 넣어 고쳤다. 의존성은 여전히 안 받고 런타임만
+ci.yml 과 같은 범위 표현으로 고정한다.
+
+> 교훈: **확장자 없는 실행에 기대는 스크립트는 그 실행기를 자기가 고정해야 한다.**
+> "의존성이 필요 없다" 와 "런타임이 아무거나 되어도 된다" 는 다른 말이다.
 
 ## H. (26차) 재배치 · dev 기동에서 밟은 것
 
@@ -1256,6 +1289,13 @@ host 빌드가 끝나도 죽지 않는다. 문서도 "중단 시(Ctrl-C) 모든 
 | 이미 뜬 오리진이면 no-op | 이미지가 `docker:build` 로 갈라져서 이 스크립트를 안 탄다  |
 | `.env.local` 파싱        | 그 파일이 코드 기본값을 그대로 다시 적은 것이라 삭제했다   |
 | dev 점유 감지            | 무결성 에러로 죽는다. 힌트를 그 에러 메시지에 넣었다       |
+
+> **지금은 `concurrently` 가 아니다.** 38차에 `scripts/serve-all-remotes.ts` 로 옮겼다 —
+> 띄울 remote 를 손으로 나열하는 게 SSOT 복제였고, 그 목록이 여기와 CI 두 곳에 있었다.
+> 결론("마지막 한 걸음은 host 의 `build` 스크립트가 처리한다")은 그대로고 그 한 줄의
+> 내용만 바뀌었다. 40차에 시그널 전달을 더 얹었다 — `--kill-others` 가 해주던 일이라
+> 옮기면서 빠졌고, 그게 없으면 감독만 SIGTERM 을 받았을 때 `next build` 가 고아로 남는다.
+> 현재 형태는 [03-setup/01-getting-started.md](../03-setup/01-getting-started.md) 에 있다.
 
 ### B-3. 그 게이트를 host 이미지가 타면 안 된다 — 끊는 건 **이름**으로
 
