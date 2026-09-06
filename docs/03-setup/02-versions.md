@@ -12,17 +12,15 @@
 | `typescript`                        | 7.0.2  | **6.0.3** ⚠️ | 아래 참고                     |
 | `eslint`                            | 10.8.1 | **10.8.1**   | flat config                   |
 | `typescript-eslint`                 | 8.67.0 | **8.67.0**   | eslint 10 지원                |
-| `vite`                              | 8.2.1  | **8.2.1**    |                               |
-| `@vitejs/plugin-react`              | 6.0.5  | **6.0.5**    |                               |
-| `@module-federation/vite`           | 1.20.7 | **1.20.7**   | peer `vite ^5~^8`             |
+| `vite`                              | 8.2.1  | **8.2.1**    | 테스트 러너(vitest)만 쓴다    |
+| `@vitejs/plugin-react`              | 6.0.5  | **6.0.5**    | 〃                            |
 | `@rsbuild/core`                     | 2.1.13 | **2.1.13**   |                               |
 | `@rsbuild/plugin-react`             | 2.1.0  | **2.1.0**    |                               |
 | `@module-federation/rsbuild-plugin` | 2.8.2  | **2.8.2**    |                               |
 | `@module-federation/runtime`        | 2.8.2  | **2.8.2**    | host 가 쓰는 유일한 MF 패키지 |
 | `eslint-plugin-react`               | 7.37.5 | **7.37.5**   | ⚠️ 아래 참고                  |
 | `tailwindcss`                       | 4.3.3  | **4.3.3**    | v4 — 설정이 CSS 안에 있다     |
-| `@tailwindcss/postcss`              | 4.3.3  | **4.3.3**    | host · cart                   |
-| `@tailwindcss/vite`                 | 4.3.3  | **4.3.3**    | catalog                       |
+| `@tailwindcss/postcss`              | 4.3.3  | **4.3.3**    | 세 앱 전부                    |
 | `eslint-plugin-react-hooks`         | 7.1.1  | **7.1.1**    | eslint 10 OK                  |
 | `zustand`                           | 5.0.15 | **5.0.15**   | `@mfa/store` 전용             |
 | `use-sync-external-store`           | 1.6.0  | **1.6.0**    | `zustand/traditional` 의 peer |
@@ -38,7 +36,7 @@
 | `@testing-library/dom`        | 10.4.1 | **10.4.1** | 위의 peer                                 |
 | `@testing-library/user-event` | 14.6.6 | **14.6.6** | 클릭 · 입력                               |
 | `@testing-library/jest-dom`   | 7.0.1  | **7.0.1**  | `toBeInTheDocument` 등 DOM 매처           |
-| `@vitejs/plugin-react`        | 6.0.5  | **6.0.5**  | remote-catalog 와 같은 버전               |
+| `@vitejs/plugin-react`        | 6.0.5  | **6.0.5**  | vitest 의 JSX 변환용                      |
 
 전부 **루트 devDependency** 다. 테스트는 소스 옆에 두지만 러너·매처 설정은 루트
 `vitest.config.ts` · `tsconfig.test.json` 한 곳에만 있다 — 근거는
@@ -82,7 +80,7 @@ settings: { react: { version: "19.2" } },
 
 ## Tailwind 는 세 앱이 같은 버전이어야 한다
 
-`tailwindcss` · `@tailwindcss/postcss` · `@tailwindcss/vite` 를 세 앱과
+`tailwindcss` · `@tailwindcss/postcss` 를 세 앱과
 `@mfa/tailwind-config` 에서 모두 `^4.3.3` 으로 맞춘다. 공유 CSS 를 빌드해 배포하는 대신
 **각 앱이 같은 `theme.css` 를 자기 파이프라인에서 컴파일**하기 때문이다
 ([05-styling.md](../02-architecture/05-styling.md)). 버전이 갈리면 같은 소스에서 서로 다른
@@ -132,8 +130,7 @@ node 요구가 next 16 의 `>=20.9.0` 보다 높은 이유는 `packages/remote-c
 
 ```bash
 for p in next turbo typescript eslint react tailwindcss \
-         @tailwindcss/postcss @tailwindcss/vite \
-         @module-federation/vite @module-federation/runtime \
+         @tailwindcss/postcss @module-federation/runtime \
          @module-federation/rsbuild-plugin @rsbuild/core \
          @module-federation/nextjs-mf; do
   printf "%-40s %s\n" "$p" "$(npm view "$p" version)"

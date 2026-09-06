@@ -1,7 +1,7 @@
 # 스타일링 — MFA 에서 Tailwind CSS 를 어떻게 나눠 갖나
 
-세 앱이 서로 다른 번들러를 쓰고(Next 16/Turbopack · Vite 8 · Rsbuild 2) 각자 독립
-배포된다. 그 위에서 하나의 디자인 시스템을 쓰려면 두 가지를 정해야 한다.
+세 앱(host = Next 16/Turbopack, catalog · cart = Rsbuild 2)이 각자 독립 배포된다.
+그 위에서 하나의 디자인 시스템을 쓰려면 두 가지를 정해야 한다.
 
 1. **CSS 를 누가 컴파일하나** — 이 문서
 2. **remote 의 CSS 가 host 페이지에 어떻게 도달하나** —
@@ -33,7 +33,7 @@ Turborepo 의 일반적인 Tailwind 가이드는 공유 UI 패키지가 자기 C
 | 앱      | 연동                                          | CSS 진입점                     |
 | ------- | --------------------------------------------- | ------------------------------ |
 | host    | `postcss.config.mjs` → `@tailwindcss/postcss` | `src/app/globals.css`          |
-| catalog | `@tailwindcss/vite` 플러그인                  | `src/styles.css` (`main.tsx`)  |
+| catalog | `postcss.config.mjs` → `@tailwindcss/postcss` | `src/styles.css` (`index.tsx`) |
 | cart    | `postcss.config.mjs` → `@tailwindcss/postcss` | `src/styles.css` (`index.tsx`) |
 
 PostCSS 설정 자체는 `@mfa/tailwind-config/postcss` 를 재-export 한다. 값은 세 줄이지만

@@ -48,7 +48,7 @@ node builtin 을 넣을 수 없고, node 전용 코드는 전부 `node.ts`(`@mfa
 
 상대 import 경로에는 **확장자를 붙이지 않는다**(저장소 전역 규칙). 모든 소비가 번들러를
 거치기 때문이다 — host 는 `transpilePackages` 로 `@mfa/ui`·`@mfa/contracts` 를 직접 번들하고,
-remote 는 Vite·Rsbuild 가 번들한다. 근거: known-issues D-1.
+remote 는 Rsbuild 가 번들한다. 근거: known-issues D-1.
 
 **예외는 `scripts/` 다.** 거기서는 `.ts` 를 붙인다. 그 파일들은 번들러를 안 거치고
 `node scripts/x.ts` 로 직접 도는데, Node 의 ESM 해석기는 상대 경로의 확장자를 보정하지
@@ -67,7 +67,8 @@ tsc 가 막는다(`TS5097`). 이 패키지는 빌드 산출물이 없어서 소�
 15차에 양쪽을 다 밟고 나온 결론이다.
 
 경로 문자열(`/mf-server.cjs`, `/style.css`, `/v<version>/…`)을 호출부에서 **직접 조립하지 않는다.**
-번들러별 디렉터리 규칙이 계약에 새면 catalog(Vite)와 cart(Rsbuild)가 갈라진다.
+번들러별 디렉터리 규칙이 계약에 새면 두 remote 가 갈라진다. 지금은 둘 다 Rsbuild 지만,
+번들러 자유도를 되찾으려면 이 계약이 번들러를 모르는 상태여야 한다.
 
 `packages/remote-config` 는 빌드 산출물이 없다 — `exports` 가 소스 `.ts` 를 직접 가리키고
 Node 의 타입 스트리핑에 기댄다. 그래서 이 패키지에는 런타임 의존성을 넣지 않는다.

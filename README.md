@@ -9,7 +9,7 @@ Next.js 16 에서 **remote 가 SSR 되고, 모든 경계 이동이 소프트 내
 
 | 링크                                            | 뭘 보나                                                                |
 | ----------------------------------------------- | ---------------------------------------------------------------------- |
-| [/](https://mfa.lakegreen.net)                  | 보라 점선 = catalog(Vite), 초록 점선 = cart(Rsbuild). 담기 → 헤더 배지 |
+| [/](https://mfa.lakegreen.net)                  | 보라 점선 = catalog, 초록 점선 = cart. 담기 → 헤더 배지                |
 | [/checkout](https://mfa.lakegreen.net/checkout) | 결제까지 remote 다. 헤더에서 눌러 이동하면 document 요청이 안 늘어난다 |
 | [/debug](https://mfa.lakegreen.net/debug)       | MF 진단 — 두 remote 의 실제 entry 와 exposes                           |
 | [/lab](https://mfa.lakegreen.net/lab)           | SSR · ISR 등가 · 태그 무효화 세 모드 비교                              |
@@ -96,14 +96,14 @@ loadRemoteModule("cart/CheckoutFlow")
 | 앱                    | 포트 | 번들러                 | 역할                                     |
 | --------------------- | ---- | ---------------------- | ---------------------------------------- |
 | `apps/host`           | 3000 | Next.js 16 / Turbopack | 셸 · 라우팅 · remote 소비(서버+브라우저) |
-| `apps/remote-catalog` | 3001 | **Vite 8**             | 상품 목록 / 상세                         |
+| `apps/remote-catalog` | 3001 | **Rsbuild 2 (Rspack)** | 상품 목록 / 상세                         |
 | `apps/remote-cart`    | 3002 | **Rsbuild 2 (Rspack)** | 장바구니 / 배지 / 결제                   |
 
 remote 를 일부러 다른 번들러로 만들었다.
 "번들러가 달라도 런타임 계약만 맞으면 된다"를 실제로 확인하기 위해서다.
 
 스타일도 같은 원칙이다. 토큰은 `@mfa/tailwind-config` 한 곳에 두고 **각 앱이 자기
-파이프라인에서 컴파일**하며(Next/PostCSS · Vite 플러그인 · Rsbuild/PostCSS), remote 는
+파이프라인에서 컴파일**하며(Next/PostCSS · Rsbuild/PostCSS), remote 는
 자기 CSS 주소를 `<link rel="stylesheet" precedence>` 로 직접 렌더한다 — host 코드에는
 remote CSS 에 대한 지식이 없다. 근거와 실측은
 [스타일링 전략](./docs/02-architecture/05-styling.md)에 있다.
@@ -113,7 +113,7 @@ remote CSS 에 대한 지식이 없다. 근거와 실측은
 전부 [`docs/`](./docs/) 에 있다. 핵심은 **SSR + 소프트 내비게이션 설계**.
 
 - **[전체 구조 해부도](https://chane81.github.io/mfa-nextjs/anatomy.html)** — 배포 파이프라인,
-  host↔remote 런타임, remote 번들러(Vite vs Rsbuild) 비교를 그림으로. 단독 HTML 이라 저장소 화면에서는 소스로 보이므로
+  host↔remote 런타임, remote 번들러 비교를 그림으로. 단독 HTML 이라 저장소 화면에서는 소스로 보이므로
   **GitHub Pages 로 올려 둔다**([소스](./docs/anatomy.html) · 로컬은 `open docs/anatomy.html`)
 - [진행 상황](./docs/00-progress.md)
 - [nextjs-mf 가 왜 죽었나](./docs/01-research/01-nextjs-mf-eol.md)
