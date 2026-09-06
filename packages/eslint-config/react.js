@@ -5,7 +5,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 
 import { baseConfig } from './base.js';
 
-/** Vite / Rsbuild 기반 순수 React remote 용 설정 */
+/** Rsbuild 기반 순수 React remote 용 설정 */
 export const reactConfig = defineConfig([
   ...baseConfig,
   {

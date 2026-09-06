@@ -148,14 +148,6 @@ describe('assetBase', () => {
     expect(assetBase(URL_, null)).toBe(URL_);
   });
 
-  it('trailingSlash 를 켜면 뒤에 슬래시를 붙인다', () => {
-    // Vite `base` 는 슬래시가 없으면 마지막 세그먼트를 디렉터리가 아니라 파일로 붙인다.
-    expect(assetBase(URL_, 't1abc', { trailingSlash: true })).toBe(
-      `${URL_}/vt1abc/`,
-    );
-    expect(assetBase(URL_, null, { trailingSlash: true })).toBe(`${URL_}/`);
-  });
-
   it('기본값은 슬래시 없음 — Rsbuild assetPrefix 가 그걸 기대한다', () => {
     expect(assetBase(URL_, 't1abc').endsWith('/')).toBe(false);
   });

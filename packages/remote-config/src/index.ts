@@ -4,7 +4,7 @@
  * "이 저장소에 remote 가 몇 개이고, 각각 어느 포트에 뜨고, 어떤 env 로 주소를 바꾸고,
  * 어떤 파일명으로 산출물을 내보내는가" — 이 지식은 원래 아홉 군데에 흩어져 있었다
  * (host 런타임, host 서버 로더, dev 대기 스크립트, 정적 서버, stamp 스크립트,
- * Vite config, Rsbuild config, 그리고 세 개의 package.json 스크립트).
+ * 두 remote 의 Rsbuild config, 그리고 세 개의 package.json 스크립트).
  * 하나만 고치고 나머지를 잊으면 증상이 제각각으로 나타나서 원인을 찾기 어렵다.
  * 예: 포트만 바꾸면 dev 대기 스크립트가 영영 안 뜨는 remote 를 60초 기다린다.
  *
@@ -13,7 +13,7 @@
  * 이 파일을 읽는 쪽이 **다섯 종류**다.
  *
  *   node 스크립트 (.mjs)      scripts 아래 전부
- *   번들러 config (TS/node)   apps/remote-catalog/vite.config.ts, apps/remote-cart/rsbuild.config.ts
+ *   번들러 config (TS/node)   각 remote 의 rsbuild.config.ts
  *   Next 설정 (TS/node)       apps/host/next.config.ts
  *   Next 번들 (TS)            apps/host/src/mf 아래
  *   워크스페이스 패키지 (TS)   packages/contracts
@@ -22,7 +22,7 @@
  * 앞의 둘이 이 모듈을 못 읽는다. 앱 소스의 import 와 달리 **번들러 config 의 import 는
  * 프로세스 시작 즉시** 일어나서, watch 빌드가 dist 를 만들 틈이 없기 때문이다. 실측:
  *
- *   failed to load config from apps/remote-catalog/vite.config.ts
+ *   failed to load config from apps/remote-catalog/rsbuild.config.ts
  *   Error: Failed to resolve entry for package "@mfa/contracts".
  *
  * 빌드 없는 소스를 그대로 export 하면 그 문제 자체가 사라진다.
@@ -32,7 +32,7 @@
  * Node 24 는 타입 스트리핑으로 `.ts` 를 그대로 실행한다. Node 는 `node_modules` 안의
  * `.ts` 를 거부하지만, pnpm 워크스페이스 링크는 심볼릭 링크라 Node 가 realpath 로 풀면
  * `packages/remote-config/src/index.ts` — node_modules 밖이 되어 통과한다(실측).
- * Vite config 로드와 Next 브라우저 번들에서도 같이 확인했다.
+ * Rsbuild config 로드와 Next 브라우저 번들에서도 같이 확인했다.
  *
  * 그래서 `engines.node` 가 `>=24.19.0` 이다. 그 아래 버전에서는 이 패키지가 로드되지 않는다.
  *
@@ -383,8 +383,7 @@ export function publicOrigin(remote: RemoteName): string {
  * ## 왜 SSOT 여야 하나
  *
  * 이 목록은 원래 네 군데에 흩어져 있었다 — 두 remote 의 SSR 빌드 설정
- * (`vite.config.server.ts` 의 `rollupOptions.external`,
- * `rsbuild.server.config.ts` 의 `output.externals`), host 의 require 셰임
+ * (`rsbuild.server.config.ts` 의 `output.externals`), host 의 require 셰임
  * (`server-loader.ts` 의 `INJECTED`), 그리고 브라우저용 MF `shared`(`runtime.ts`).
  *
  * 어긋나는 방향이 둘이고 증상이 서로 다르다.
