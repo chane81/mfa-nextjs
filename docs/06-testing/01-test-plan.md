@@ -79,6 +79,11 @@ emit 하지 않는 나머지(host · remote 둘 · remote-config)는 파일 하�
 `vitest.config.ts` 의 alias 가 `src` 를 직접 가리키므로 `pnpm build` 없이 돈다 —
 turbo 태스크에 `^build` 를 걸 필요도 없다.
 
+> ⚠️ **그래서 alias 목록에 빠진 진입점은 로컬에서 안 걸린다.** 로컬에는 한 번이라도
+> 빌드해 둔 `dist` 가 남아 있어 `exports` 를 타고 그냥 풀린다. CI 는 fresh clone 이라
+> 거기서만 죽는다 — 40차에 `@mfa/contracts/remote` 로 실제로 밟았다(I-13).
+> 서브패스 진입점을 새로 import 하는 테스트를 쓸 때는 **`dist` 를 치우고 한 번 돌려본다.**
+
 ## 진척도
 
 ### Phase 0 — 인프라
@@ -167,6 +172,19 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
       스캔 결과. 웹 쪽은 스캔인데 이 맵만 손으로 적는다(정적 import 여야 번들이 갈리지
       않는다). 빠뜨리면 **브라우저는 되는데 서버 렌더만 "expose 없음"** 이 되고,
       그 전까지는 `pnpm build` 의 host 프리렌더가 유일한 감지 지점이었다
+- [x] 41. `scripts/docker-context.test.ts` — Dockerfile `deps` 스테이지의 COPY 목록 ≡
+      워크스페이스 패키지 집합(I-10). 40차에 파서를 `packages:` **블록 한정**으로 좁히고
+      **못 읽는 글롭에는 던지게** 바꿨다 — 예전에는 `'<dir>/*'` 아닌 항목을 조용히 건너뛰어
+      그 디렉터리가 대조에서 통째로 빠졌다. 이 검사가 막으려던 드리프트가 검사 안에서
+      재발하던 자리다
+- [x] 42. `scripts/deploy-targets.test.ts` — **"기준 커밋 없음" 과 "변경 0개" 를 가른다**
+      (전자는 전부 배포, 후자는 아무것도 안 한다) / 디렉터리 경계(`remote-cart` 가
+      `remote-cartography` 를 안 끌어온다) / 출력이 `{ name, urlVar, appVar, workspaceDir }`
+      객체 배열이다(I-11)
+- [x] 43. `apps/host/src/components/lab/MfWarmup.test.tsx` — warm 의 `lazy` 캐시가
+      **remote 수를 넘지 않는다.** nonce 는 요청마다 유일해서(`버전-Date.now()`) 키를 쌓으면
+      warm 한 번마다 엔트리가 늘고 host 는 장수 프로세스라 영영 안 준다. 코드로는 회귀를
+      알아채기 어렵고 증상이 한참 뒤 메모리로만 나와서 크기를 직접 본다(40차)
 
 ## vitest 밖의 검사 — MF DTS 가 `pnpm typecheck` 안에서 돈다
 

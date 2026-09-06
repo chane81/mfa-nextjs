@@ -100,7 +100,8 @@ jobs:
           cache: true
 
       # turbo 가 `@mfa/host#build.dependsOn` 으로 remote 를 먼저 빌드하고,
-      # host 의 build 스크립트가 concurrently 로 그 dist 를 서빙하며 next build 를 돌린다.
+      # host 의 build 스크립트가 `serve-all-remotes` 로 그 dist 를 서빙하며 next build 를
+      # 돌린다 — 띄울 remote 는 `REMOTE_LIST` 가 정하므로 remote 가 늘어도 여긴 안 바뀐다.
       # 프리렌더가 remote SSR 번들을 실제로 fetch + 평가하므로, 여기가 MF 계약 테스트다.
       - run: pnpm build
 

@@ -46,17 +46,35 @@ function warmTarget(remote: RemoteName): RemoteModuleId | undefined {
  *
  * `nonce` 는 그 위에 하나 더 얹는다. 롤백처럼 "이미 본 적 있는 버전" 으로 갈 때는
  * 버전까지 같아서, 그것만으로는 로더가 아예 호출되지 않는다.
+ *
+ * ## 그래서 **remote 당 한 칸만** 쓴다
+ *
+ * 웹훅이 주는 nonce 는 요청마다 유일하다(`api/mf-revalidate` 가 `버전-Date.now()` 로
+ * 만든다). 키를 그대로 쌓으면 warm 한 번마다 엔트리가 하나씩 늘고, 축출이 없는 데다
+ * host 서버는 장수 프로세스라 영영 줄지 않는다 — `lazy` 가 붙든 payload 까지 같이 남는다.
+ *
+ * 캐시가 필요한 이유는 "한 렌더 안에서 같은 프라미스를 재사용" 뿐이라 과거 nonce 를
+ * 들고 있을 이유가 없다. 그래서 새 nonce 가 오면 그 remote 의 칸을 덮어쓴다.
+ * 밀려난 컴포넌트를 이미 렌더 중인 트리는 자기 참조를 계속 들고 있으므로 영향이 없다.
  */
-const warmCache = new Map<string, ComponentType>();
+const warmCache = new Map<RemoteName, { key: string; Loader: ComponentType }>();
 
-function warmLoader(remote: RemoteName, nonce: string): ComponentType {
+/**
+ * 캐시가 remote 수를 넘지 않는지 **테스트가 본다**.
+ *
+ * 축출은 코드를 읽어서는 깨진 걸 알기 어렵다 — 키를 하나 바꾸면 조용히 무한 증가로
+ * 돌아가고, 증상은 몇 주 뒤 메모리로만 나타난다. 그래서 크기를 관찰 가능하게 둔다.
+ */
+export const warmCacheSize = (): number => warmCache.size;
+
+export function warmLoader(remote: RemoteName, nonce: string): ComponentType {
   const id = warmTarget(remote);
   const key = id
     ? remoteCacheKey(id, nonce)
     : `${remote}/(노출 모듈 없음)#${nonce}`;
 
-  const cached = warmCache.get(key);
-  if (cached) return cached;
+  const cached = warmCache.get(remote);
+  if (cached?.key === key) return cached.Loader;
 
   const Loader = lazy(async () => {
     if (!id) {
@@ -68,7 +86,7 @@ function warmLoader(remote: RemoteName, nonce: string): ComponentType {
     // 적재만 하면 끝이다. 그리지 않으므로 props 도 필요 없다.
     return { default: () => null };
   });
-  warmCache.set(key, Loader);
+  warmCache.set(remote, { key, Loader });
   return Loader;
 }
 

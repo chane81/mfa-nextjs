@@ -38,6 +38,18 @@ export default defineConfig({
         find: /^@mfa\/store$/,
         replacement: at('./packages/store/src/index.ts'),
       },
+      /**
+       * ⚠️ 배럴과 **별개로** 적어야 한다. `@mfa/contracts/remote` 는 배럴에 실리지 않는
+       * 별도 진입점이고(부트스트랩 순환 때문 — `remote-contract.ts` 참고), 위 항목이
+       * `$` 로 끝나는 정규식이라 이 경로를 안 삼킨다.
+       *
+       * 빠뜨리면 `exports` 를 타고 `dist` 로 간다. 그러면 **한 번이라도 빌드해 본
+       * 로컬에서는 통과하고 CI 에서만 죽는다** — test job 은 빌드 없이 돌기 때문이다.
+       */
+      {
+        find: /^@mfa\/contracts\/remote$/,
+        replacement: at('./packages/contracts/src/remote-contract.ts'),
+      },
       {
         find: /^@mfa\/contracts$/,
         replacement: at('./packages/contracts/src/index.ts'),
