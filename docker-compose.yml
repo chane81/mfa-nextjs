@@ -1,44 +1,22 @@
-# 배포 전 로컬 검증용 compose.
-#
-# Dokploy 는 앱마다 **별도 Application** 으로 올린다(remote 만 재배포해도 host 가 안 죽는지
-# 검증하는 게 이 저장소의 미완 항목이라, 한 덩어리로 묶으면 그 검증이 불가능하다).
-# 이 파일은 "이미지 3개가 실제로 뜨고 서로 물리는지"를 로컬에서 먼저 확인하는 용도다.
-#
-# ## 실행
+# 배포 전 로컬 검증용 compose. 배포는 앱마다 별도 Application 이다(remote 단독 재배포 검증).
 #
 #   pnpm docker:up                                  # LAN IP 해석 → remote → host
 #   curl -s localhost:3000/checkout | grep 주문서   # remote SSR 확인
 #   pnpm docker:down
 #
-# `MFA_HOST_IP` 는 `docker:up` 이 그 자리에서 셸 변수로 넘긴다 — 파일로 안 남긴다.
-# 아래 기본값 `unset-mfa-host-ip` 는 **그 변수 없이도 `down`·`logs`·`ps` 가 돌게** 하려고
-# 있다(compose 는 어느 서비스를 대상으로 하든 파일 전체를 보간한다). 이 기본값으로
-# **빌드**가 돌아가면 DNS 가 그 이름에서 즉시 죽어 원인이 이름으로 드러난다.
+# **주소가 맥의 LAN IP 인 이유**: 같은 remote 주소를 브라우저 · host 빌드(compose 네트워크
+# 밖) · host 런타임(안) 셋이 읽는다. 셋 다에서 통하는 건 LAN IP 뿐 — localhost 도
+# `remote-catalog` 도 `host.docker.internal` 도 셋 중 하나에서 깨진다.
+# `MFA_HOST_IP` 는 `docker:up` 이 셸 변수로 넘긴다. `:-unset-mfa-host-ip` 는 그 변수 없이도
+# `down`·`logs`·`ps` 가 돌게 하는 폴백이다(compose 는 파일 전체를 보간한다). 빌드에 걸리면
+# DNS 가 이 이름에서 죽어 원인이 드러난다.
 #
-# 두 번에 나눠 올리는 이유: host **빌드**가 프리렌더 도중 remote 의 SSR 번들을 HTTP 로 받아
-# 실행한다(docs/03-setup/01-getting-started.md). 그래서 host 이미지를 만들기 전에 remote 가
-# 실제로 떠 있어야 한다. `depends_on` 은 런타임 순서지 빌드 순서가 아니라서 이걸 못 해준다.
-# 그 대기는 아래 `healthcheck` + `up --wait` 가 맡는다.
+# **두 번에 나눠 올리는 이유**: host 빌드가 프리렌더 중 remote SSR 번들을 HTTP 로 받아
+# 실행한다. `depends_on` 은 런타임 순서지 빌드 순서가 아니라 이걸 못 한다 — `healthcheck`
+# + `up --wait` 가 맡는다. (docs/03-setup/01-getting-started.md)
 #
-# ## 왜 localhost 가 아니라 맥의 LAN IP 인가
-#
-# 같은 remote 주소를 **세 곳**이 읽는데 셋의 네트워크 위치가 다르다.
-#
-#   맥의 브라우저      → 퍼블리시된 포트
-#   host 빌드 컨테이너 → compose 네트워크에 붙지 않는다 (빌드 시점엔 존재하지도 않는다)
-#   host 런타임 컨테이너 → compose 네트워크 안
-#
-# `localhost` 는 컨테이너 안에서 자기 자신을 가리키고, `remote-catalog` 는 맥에서 안 풀리고,
-# `host.docker.internal` 은 맥에서 안 풀린다. **셋 다에서 같은 곳을 가리키는 주소는 맥의
-# LAN IP 뿐이다.** 그래서 remote 당 주소가 하나로 끝나고, 환경변수도 하나로 끝난다.
-# (예전에는 이 자리 때문에 브라우저용·SSR용 변수를 따로 뒀다.)
-#
-# ⚠️ 이 이미지는 배포용이 아니다 — 오리진이 LAN IP 로 굳는다.
-# ⚠️ 네트워크를 바꾸면(Wi-Fi ↔ 테더링) IP 가 바뀐다. 이미지에 구워진 값이라 재빌드해야 한다.
-#
-# ⚠️ 아래 포트·env 이름의 **원본은 `packages/remote-config`** 다. compose 는 정적 YAML 이라
-# 그 모듈을 읽을 수 없어서 여기만 손으로 맞춘다 — 코드·스크립트·번들러 설정·turbo.json 은
-# 전부 SSOT 에서 파생되므로 손댈 곳이 없다. 로컬 검증 전용이라 그 예외를 감수한다.
+# ⚠️ 배포용 아님 — 오리진이 LAN IP 로 굳는다. 네트워크가 바뀌면 재빌드해야 한다.
+# ⚠️ 포트·env 이름의 원본은 `packages/remote-config`. 정적 YAML 이라 여기만 손으로 맞춘다.
 #
 services:
   remote-catalog:
@@ -50,9 +28,7 @@ services:
         REMOTE_CATALOG_PUBLIC_URL: http://${MFA_HOST_IP:-unset-mfa-host-ip}:3001
     ports: ['3001:3001']
     volumes: ['catalog-dist:/data']
-    # `up --wait` 가 기다리는 조건. 이게 없으면 compose 는 "컨테이너가 떴다"까지만 보고,
-    # host **빌드**가 아직 서빙 안 하는 오리진을 때려 프리렌더에서 죽는다.
-    # node:slim 에는 curl 이 없어서 node 의 fetch 로 확인한다.
+    # `up --wait` 가 기다리는 조건. node:slim 에 curl 이 없어 node fetch 로 확인한다.
     healthcheck:
       test:
         [
@@ -92,15 +68,12 @@ services:
       context: .
       dockerfile: apps/host/Dockerfile
       args:
-        # 빌드 시점에 두 가지가 이 값에서 나온다.
-        #   ① 브라우저 번들에 구워지는 매니페스트 URL
-        #   ② 프리렌더가 실제로 받아가는 SSR 번들 URL
+        # ① 번들에 구워지는 매니페스트 URL ② 프리렌더가 받아가는 SSR 번들 URL
         REMOTE_CATALOG_PUBLIC_URL: http://${MFA_HOST_IP:-unset-mfa-host-ip}:3001
         REMOTE_CART_PUBLIC_URL: http://${MFA_HOST_IP:-unset-mfa-host-ip}:3002
     ports: ['3000:3000']
     environment:
-      # host **서버**가 런타임에 읽는 값. 빌드 인자와 같은 값이다.
-      # (①은 이미 번들에 구워졌고, 여기서 다시 읽는 건 ②뿐이다)
+      # host 서버가 런타임에 읽는 값(②뿐 — ①은 이미 번들에 구워졌다).
       REMOTE_CATALOG_PUBLIC_URL: http://${MFA_HOST_IP:-unset-mfa-host-ip}:3001
       REMOTE_CART_PUBLIC_URL: http://${MFA_HOST_IP:-unset-mfa-host-ip}:3002
       # REMOTE_ALLOWED_ORIGINS 는 생략한다. 미설정이면 위 오리진만 허용이라 이미 정확하다.
@@ -113,7 +86,7 @@ services:
         condition: service_healthy
       remote-cart:
         condition: service_healthy
-    # host 는 부팅이 remote 보다 느리다(standalone 기동 + 첫 요청). retries 를 넉넉히 둔다.
+    # host 는 부팅이 느리다(standalone 기동 + 첫 요청). retries 를 넉넉히 둔다.
     healthcheck:
       test:
         [
