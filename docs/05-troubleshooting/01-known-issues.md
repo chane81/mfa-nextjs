@@ -51,6 +51,7 @@
 | 계약 타입이 소비처에서 **통째로 `any`** 인데 검사는 초록이다                          | emit 된 `.d.ts` 가 복사되지 않는 생성물을 참조한다 — [I-6](#i-6-emit-되는-dts-가-생성물을-참조하면-소비처에서-조용히-any-가-된다)                 |
 | 로컬·CI 는 초록인데 **Dokploy 배포만** `Cannot find module './generated/@mf-types/…'` | `.dockerignore` 가 커밋된 생성물을 컨텍스트에서 뺐다 — [I-7](#i-7-dockerignore-가-커밋된-계약을-컨텍스트에서-빼고-있었다)                         |
 | 배포는 `Done` 인데 `mf-version.json` 이 그대로다                                      | 빌드 컨텍스트가 같아 이미지가 재사용됐다 — [I-8](#i-8-배포는-성공했는데-버전이-안-바뀐다--캐시-히트가-완료-신호를-지운다)                         |
+| 로컬·CI 는 다 초록인데 **이미지 빌드만** `Cannot find module 'zustand'` 류로 죽는다   | `deps` 스테이지 COPY 목록이 워크스페이스와 어긋났다 — [I-10](#i-10-이미지의-deps-스테이지가-워크스페이스-패키지를-빠뜨려도-설치는-성공한다)       |
 
 ### SSR · hydration
 
@@ -462,6 +463,71 @@ CatalogSection  ← category · onCategoryChange 만 받는다   홈 · lab 셋�
 
 > **타입 검사도 테스트도 이걸 못 잡는다.** `pnpm typecheck` · `pnpm test` 는 전부 통과했고
 > `pnpm build` 만 죽었다. 공유 컴포넌트에 동적 훅을 넣는 변경은 빌드까지 돌려야 안다.
+
+### I-10. 이미지의 `deps` 스테이지가 워크스페이스 패키지를 빠뜨려도 설치는 성공한다
+
+증상 — **없다.** 그게 문제다. `pnpm build` · `pnpm test` · CI 가 전부 초록인데
+배포 이미지 빌드만 죽는다. 그리고 이 저장소의 CI 에는 이미지 빌드가 없으므로
+**배포가 최초 검증**이었다.
+
+세 Dockerfile 의 `deps` 스테이지는 레이어 캐시를 위해 워크스페이스 package.json 을
+손으로 나열한다. 그 목록이 실제 워크스페이스보다 셋 적었다.
+
+```
+워크스페이스: contracts eslint-config remote-config store tailwind-config typescript-config ui
+COPY 목록  : contracts eslint-config                                typescript-config ui
+```
+
+`remote-config` · `store` · `tailwind-config` 셋은 08-19 ~ 08-25 에 생겼고 Dockerfile 은
+08-30 에도 손댔다. 즉 드리프트가 난 채로 계속 배포되고 있었다.
+
+#### 왜 `pnpm install` 이 안 죽나
+
+pnpm 은 **없는 워크스페이스 디렉터리를 향해 심링크를 먼저 만든다.**
+
+```
+node_modules/@mfa/remote-config -> ../../packages/remote-config   ← 대상이 아직 없다
+```
+
+그다음 builder 스테이지의 `COPY . .` 가 진짜 소스를 덮으면 그 링크가 살아난다.
+겉보기에는 아무 문제가 없다.
+
+살아나지 않는 게 하나 있다 — **그 패키지들의 `node_modules`.** 설치 시점에 디렉터리가
+없었으므로 아예 만들어지지 않고, `COPY . .` 는 그걸 만들어주지 않는다. pnpm 은
+isolated 링커라 패키지가 자기 의존성을 자기 `node_modules` 로 본다.
+
+```
+packages/store           node_modules 없음 → require.resolve('zustand')     MODULE_NOT_FOUND
+packages/tailwind-config node_modules 없음 → require.resolve('tailwindcss') MODULE_NOT_FOUND
+```
+
+`packages/typescript-config` 도 `node_modules` 가 없지만 그쪽은 런타임 의존성이 없어서
+(JSON 설정만 있다) 아무 일도 안 난다. 즉 **빠뜨린 패키지 중 의존성이 있는 것만** 터진다 —
+그래서 이 함정은 패키지를 추가한 시점이 아니라 **그 패키지에 의존성이 생기는 시점**에
+드러난다.
+
+#### 고치는 법 — 목록은 남기고, 어긋나면 죽게 한다
+
+목록을 없애는 쪽(`COPY packages ./packages`)이 O(n²) 를 없애지만, 소스 한 줄만 바꿔도
+설치 레이어가 무효화되어 매 배포마다 `pnpm install` 이 다시 돈다. 캐시를 지키는 대신
+검사를 붙였다.
+
+`scripts/docker-context.test.ts` 가 세 Dockerfile 의 `COPY … package.json` 목록을
+`apps/*` · `packages/*` 실제 디렉터리와 대조한다. 오프라인이고 **어느 파일에 무슨 줄을
+넣어야 하는지 출력한다.**
+
+```
+AssertionError: apps/remote-cart/Dockerfile 을 이렇게 맞추세요:
+COPY apps/host/package.json apps/host/
+…
+COPY packages/remote-config/package.json packages/remote-config/
+```
+
+`pnpm-workspace.yaml` 의 글롭이 늘면 이 검사가 조용히 덜 세게 되므로, 그 글롭이
+`apps/*` · `packages/*` 둘인지도 같은 파일에서 확인한다.
+
+> 실제 이미지를 끝까지 빌드해 보는 CI job 은 아직 없다. 이 테스트는 **목록만** 본다 —
+> 목록이 맞는데 이미지가 깨지는 종류는 여전히 배포가 최초 검증이다.
 
 ## H. (26차) 재배치 · dev 기동에서 밟은 것
 
