@@ -916,11 +916,14 @@ CatalogSection  category · onCategoryChange 를 받는다  홈 · /lab/* 넷이
 
 세 갈래로 처리했다.
 
-| 갈래                    | 어디                                         |
-| ----------------------- | -------------------------------------------- |
-| 코드가 SSOT 를 순회한다 | `deploy-targets.ts` · `serve-all-remotes.ts` |
-| 타입이 강제한다         | `contract-check.ts` 의 `RemoteKeys` 유니온   |
-| 검사가 대조한다         | `docker-context.test.ts` · ci 의 docker job  |
+| 갈래                    | 어디                                         | 이번에 만든 것 |
+| ----------------------- | -------------------------------------------- | -------------- |
+| 코드가 SSOT 를 순회한다 | `deploy-targets.ts` · `serve-all-remotes.ts` | 예             |
+| 검사가 대조한다         | `docker-context.test.ts` · ci 의 docker job  | 예             |
+| 타입이 강제한다         | `contract-check.ts` 의 `RemoteKeys` 유니온   | 아니오 (27차)  |
+
+세 번째는 이미 있던 것이다. 이번 처리의 결과로 적으면 기록이 실제보다 커진다 — 여기
+넣은 이유는 **세 갈래가 같이 있어야 이 원칙이 성립한다**는 것을 보이기 위해서다.
 
 변수 이름 규칙(`MF_<NAME>_URL` · `DOKPLOY_APP_<NAME>`)도 SSOT 에 둔다. 워크플로는
 `toJSON(vars)` 로 저장소 Variables 를 통째로 받아 그 이름으로 찾고, 없으면 `jq -e` 가
@@ -937,9 +940,11 @@ CatalogSection  category · onCategoryChange 를 받는다  홈 · /lab/* 넷이
 
 ### 결과
 
-- ⭕ remote 추가 시 손대야 하는 자리가 열 곳 넘음 → **`REMOTES` + 그 앱의 파일들** 로 줄었다.
-- ⭕ 남은 수동 자리(`turbo.json` · Dockerfile · tsconfig `paths`)는 전부 **잊으면 죽는다.**
-  `pnpm test` 나 `pnpm typecheck` 가 어느 파일에 무엇을 넣어야 하는지 말한다.
+- ⭕ 손대야 하는 자리가 **조용히 틀리는 것 셋을 포함해 열 곳 넘음** → 조용한 자리는 0 이 됐다.
+  남은 수동 자리는 일곱 곳 + 저장소 Variables 둘이고 전부 **잊으면 죽는다.** 목록은
+  `.claude/rules/remotes.md` 의 "remote 를 하나 더 추가할 때" 표가 SSOT 다 — 여기 다시
+  적으면 갈린다. `pnpm test` · `pnpm typecheck` 가 어느 파일에 무엇을 넣어야 하는지 말하고,
+  Variables 둘은 배포 job 이 `jq -e` 에서 죽으며 이름을 말한다.
 - ⭕ 배포 전에 이미지 빌드를 본다. 예전에는 배포가 최초 검증이었다.
 - ❌ Dockerfile 의 `COPY` 목록은 여전히 O(n²) 다. 없애는 쪽(`COPY packages ./packages`)은
   소스 한 줄만 바꿔도 설치 레이어를 무효화해서 매 배포마다 `pnpm install` 이 다시 돈다.

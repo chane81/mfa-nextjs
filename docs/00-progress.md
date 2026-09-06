@@ -23,7 +23,7 @@ Dockerfile 목록과 오프라인 대조 테스트만 담는다.
 | `deploy.yml` 의 URL 삼항       | 남의 remote 주소로 배포 검증이 통과한다          | matrix 객체 + `jq -e`   |
 | Dockerfile `COPY` 목록         | 이미지 빌드가 깨진다                             | 목록 유지 + 대조 테스트 |
 | `host` build · ci 의 정적 서버 | 그 remote 만 프리렌더에서 ECONNREFUSED           | `serve-all-remotes.ts`  |
-| `turbo.json` 의 dependsOn      | 같음                                             | 텍스트 대조 테스트      |
+| `turbo.json` 의 dependsOn      | 같음                                             | 그대로 — 이미 죽는다    |
 | `MfWarmup` 의 remote 분기      | warm 에서 조용히 빠진다                          | `MODULE_IDS` 에서 파생  |
 
 원칙은 ADR-021 에 남겼다 — **파생할 수 있으면 파생하고, 못 하면 어긋남을 죽는 검사로

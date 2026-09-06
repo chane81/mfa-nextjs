@@ -6,9 +6,8 @@ description: 바뀐 경로로 어떤 앱을 배포할지 정한다 (Dokploy Watc
 #
 # ## 판별 자체는 여기 없다
 #
-# 예전에는 이 파일의 bash 안에 remote 이름이 여섯 번 리터럴로 박혀 있었다. remote 를
-# 추가하고 그중 하나만 빠뜨리면 CI 는 초록인데 그 remote 의 배포 job 이 **안 생긴다** —
-# 로그에는 `대상 — remotes=[] host=false` 라고 정상처럼 찍힌다.
+# 예전에는 이 파일의 bash 안에 remote 이름이 여섯 번 리터럴로 박혀 있었다. 그때 무엇이
+# 조용히 틀렸는지는 known-issues I-11 에 있다.
 #
 # 지금은 `scripts/deploy-targets.ts` 가 `@mfa/remote-config` 를 읽어 판별하고, 그 규칙에는
 # 테스트가 붙어 있다(`scripts/deploy-targets.test.ts`). 여기 남은 일은 git 에게 바뀐 경로를

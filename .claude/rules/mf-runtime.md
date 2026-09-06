@@ -50,6 +50,15 @@ node builtin 을 넣을 수 없고, node 전용 코드는 전부 `node.ts`(`@mfa
 거치기 때문이다 — host 는 `transpilePackages` 로 `@mfa/ui`·`@mfa/contracts` 를 직접 번들하고,
 remote 는 Vite·Rsbuild 가 번들한다. 근거: known-issues D-1.
 
+**예외는 `scripts/` 다.** 거기서는 `.ts` 를 붙인다. 그 파일들은 번들러를 안 거치고
+`node scripts/x.ts` 로 직접 도는데, Node 의 ESM 해석기는 상대 경로의 확장자를 보정하지
+않는다. tsc 쪽 허용은 루트 `tsconfig.json` 의 `allowImportingTsExtensions` 가 맡는다
+(`noEmit` 이라 켤 수 있다 — dist 를 내보내는 프로젝트였으면 못 켠다).
+
+`scripts/deploy-targets.ts` 는 한 걸음 더 간다. 워크스페이스 별칭(`@mfa/remote-config`)
+대신 **상대 경로**로 SSOT 를 들이는데, 그 스크립트가 도는 배포 detect job 은 체크아웃만
+하고 `pnpm install` 을 안 해서 별칭을 풀 심링크가 없기 때문이다.
+
 `packages/remote-config` **안에서는 상대 import 를 쓰지 않는다.** 이건 Node 가 번들러 없이
 직접 읽는 유일한 패키지라, 확장자를 빼면 Node 가 못 찾고(`ERR_MODULE_NOT_FOUND`) 붙이면
 tsc 가 막는다(`TS5097`). 이 패키지는 빌드 산출물이 없어서 소비처의 tsc 가 소스를 직접
