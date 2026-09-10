@@ -185,6 +185,16 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
       **remote 수를 넘지 않는다.** nonce 는 요청마다 유일해서(`버전-Date.now()`) 키를 쌓으면
       warm 한 번마다 엔트리가 늘고 host 는 장수 프로세스라 영영 안 준다. 코드로는 회귀를
       알아채기 어렵고 증상이 한참 뒤 메모리로만 나와서 크기를 직접 본다(40차)
+- [x] 44. `scripts/remote-wiring.test.ts` — **remote 를 추가할 때 잊는 선언 파일 셋**을
+      `REMOTE_LIST` 와 대조한다(41차). `turbo.json` 의 `@mfa/host#build.dependsOn`,
+      `docker-compose.yml` 의 서비스 · 포트 · env · 볼륨 · `depends_on`, 각 remote
+      Dockerfile 의 포트와 **제외 필터**. 셋 다 JSON · YAML · 도커 빌드 컨텍스트라 SSOT 를
+      못 읽는다(ADR-021 의 "파생 못 하면 대조한다"). 특히 제외 필터는 remote 가 늘 때마다
+      **다른 모든 remote 의 Dockerfile 이 같이 늘어나는** 유일한 자리이고, 빠뜨려도 빌드는
+      성공하고 이미지만 커져서 아무도 못 본다.
+      ⚠️ `turbo.json` 은 JSONC 라 주석을 걷어내고 읽는데, **정규식으로 하면 안 된다** —
+      값에 있는 `".next/**"` 의 `/**` 부터 먹어서 그 아래 태스크가 통째로 사라진다(실측).
+      문자열 안팎을 구분하는 스캐너가 그래서 그 파일에 있다
 
 ## vitest 밖의 검사 — MF DTS 가 `pnpm typecheck` 안에서 돈다
 

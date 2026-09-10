@@ -1,5 +1,85 @@
 # 진행 상황
 
+## 2026-09-10 (41차) — 번들러가 몰라도 되는 것을 번들러 설정에서 걷어낸다
+
+저장소 전체를 "실무 프로젝트라면 remote 나 expose 를 추가할 때 어디를 고치게 되나" 로
+읽었다. 대부분은 이미 `packages/remote-config` 에서 파생되고 있었다(ADR-017 · ADR-021).
+남은 자리가 두 종류였다.
+
+| 종류                          | 어디                                             | 왜 남았나                   |
+| ----------------------------- | ------------------------------------------------ | --------------------------- |
+| SSOT 가 있는데 **안 읽던** 것 | 두 번들러 config, host 런타임, stamp 스크립트    | 아무도 안 옮겼다            |
+| SSOT 를 **못 읽는** 선언 파일 | `turbo.json` · `docker-compose.yml` · Dockerfile | JSON · YAML · 빌드 컨텍스트 |
+
+### MF 옵션이 두 config 에 복제돼 있었다 (ADR-024)
+
+두 번들러 플러그인이 같은 `ModuleFederationOptions` 를 받는데, 그 옵션이 Vite 설정과
+Rsbuild 설정에 글자 그대로 두 벌 있었다 — `filename`, `shared`, `dts` 다섯 항목, `dev`.
+**복제된 쪽이 어긋나도 빌드는 통과한다.** 증상은 배포 후에 한쪽 remote 에서만, 그것도
+에러가 아니라 동작 이상으로 나온다(`requiredVersion` 이 갈리면 그 remote 만 자기 React
+사본을 받아 훅이 깨진다).
+
+`@mfa/remote-config/node` 의 `remoteFederationConfig(name)` 하나로 모았다. 번들러 config 에는
+포트 · 자산 경로 · CSS 파이프라인 · dev 미들웨어 — **그 번들러 어휘로만 쓸 수 있는 것**만
+남는다. 370 → 264 줄, 159 → 111 줄.
+
+같이 올라간 상수들:
+
+| 값                 | 있던 곳             | 간 곳                                     |
+| ------------------ | ------------------- | ----------------------------------------- |
+| `'remoteEntry.js'` | config 2곳          | `MF_FILES.webEntry`                       |
+| `'^19.0.0'`        | config 2곳 + host 1 | `REACT_REQUIRED_VERSION` · `SHARED_REACT` |
+| `'.mf-version'`    | 스크립트 2곳        | `VERSION_FILE`                            |
+| `'unversioned'`    | host 2곳            | `mf/config` 의 `UNVERSIONED`              |
+
+### host 가 공표하던 React 버전이 손으로 적혀 있었다
+
+`REACT_VERSION = '19.2.8'` — MF `shared` 에 실려 나가는 값이다. React 를 올리고 이 줄을
+잊으면 **공표한 버전과 실제로 주입하는 모듈이 다른** 상태가 된다. MF 는 그 문자열로
+`requiredVersion` 을 판정한 뒤 다른 실체를 넘기므로, 에러 없이 remote 안에서만 훅이 깨진다.
+
+주입 대상에서 직접 읽게 했다(`MODULES.react.version`) — 정규화까지 끝난 그 모듈 자체다.
+
+### 선언 파일 셋은 SSOT 를 못 읽는다 — 그래서 대조한다
+
+`turbo.json` 의 `@mfa/host#build.dependsOn`, `docker-compose.yml` 의 remote 배선,
+각 Dockerfile 의 포트와 제외 필터. 셋 다 remote 를 추가할 때 손으로 고쳐야 하고
+**셋 다 빠뜨려도 조용하다.**
+
+- turbo 를 잊으면 host 프리렌더가 아직 안 빌드된 remote 를 받으러 가서 ECONNREFUSED 로 죽는다.
+  메시지만 보고는 원인이 `turbo.json` 이라는 게 안 보인다.
+- Dockerfile 의 `--filter '!@mfa/remote-<다른 remote>'` 는 remote 가 늘 때마다 **다른 모든
+  remote 의 Dockerfile 이 같이 늘어나는** 유일한 자리다. 빠뜨려도 빌드는 성공하고
+  이미지만 몇 백 MB 커진다 — 아무도 못 본다.
+
+`scripts/remote-wiring.test.ts` 가 `REMOTE_LIST` 와 대고 본다. 이미 있던
+`docker-context.test.ts` 와 같은 방식이고, 실패 메시지가 어느 파일에 무슨 줄을 넣으라고
+말한다. 확인: `turbo.json` 의 cart 항목을 한 글자 바꾸자 즉시 그 문장으로 실패했다.
+
+#### JSONC 를 정규식으로 벗기면 안 된다
+
+`turbo.json` 은 주석이 설계 근거를 들고 있어서 JSONC 다. 처음엔
+`/\*[\s\S]*?\*\//g` 로 걷어냈는데, **값에 있는 `".next/**"`의`/**` 부터 주석으로
+읽어서** 그 아래 태스크가 통째로 사라졌다. 파싱은 엉뚱한 자리에서 깨진다.
+
+```
+SyntaxError: Bad control character in string literal in JSON at position 362
+```
+
+문자열 안팎을 구분하며 한 글자씩 지나가는 스캐너로 바꿨다.
+
+### 테스트 헬퍼 하나
+
+jsdom 쿠키를 비우는 `clearCookies` 가 테스트 파일 **일곱 벌**에 복제돼 있었다.
+`tests/helpers/cookies.ts` 로 옮겼다.
+
+### 검증
+
+`pnpm build --force` 로 remote 둘을 실제로 다시 빌드하고 host 프리렌더까지 통과시켰다.
+산출물 목록과 `mf-version.json` 이 그대로다. `serve-all-remotes -- pnpm mf:types` 로
+DTS 를 다시 받았을 때 `packages/contracts/src/generated/` 에 **diff 가 없다** —
+`dts` 설정을 옮기면서 값이 안 바뀌었다는 뜻이다.
+
 ## 2026-09-06 (40차) — 교체하면서 조용히 빠진 성질들을 되돌린다
 
 38·39차(PR #8)가 머지된 뒤 그 범위를 다시 리뷰했다. 나온 6건 중 셋이 같은 모양이었다 —

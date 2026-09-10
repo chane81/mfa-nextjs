@@ -755,18 +755,17 @@ Vite dev 설정에는 없다 — **있어야 할 이유도 없다.** 테스트�
 
 ```ts
 // apps/remote-*/{vite,rsbuild}.config.ts
-const EXPOSED = readExposes('./src/exposes', {
-  ignore: [/\.test\.tsx$/],
-});
+const MF = remoteFederationConfig(NAME);
 ```
 
-`readExposes` 는 `@mfa/remote-config/node` 에 있다 — 번들러가 둘(Vite · Rsbuild)이라
-각자 구현하면 "무엇이 expose 인가"가 remote 마다 갈린다(`createMfDevMiddleware` 와 같은
-이유). 돌려주는 `files` 를 catalog 의 `server.warmup.clientFiles` 와
-`optimizeDeps.entries` 가 그대로 쓴다 — expose 와 **같은 목록**이라 워밍이 expose 를
-놓치는 경우가 성립하지 않는다.
+스캔과 제외 규칙은 `@mfa/remote-config/node` 가 쥔다(`readExposes` · `EXPOSE_SCAN`).
+번들러가 둘(Vite · Rsbuild)이라 각자 구현하면 "무엇이 expose 인가"가 remote 마다
+갈린다(`createMfDevMiddleware` 와 같은 이유). 돌려주는 `MF.files` 를 catalog 의
+`server.warmup.clientFiles` 와 `optimizeDeps.entries` 가 그대로 쓴다 — expose 와
+**같은 목록**이라 워밍이 expose 를 놓치는 경우가 성립하지 않는다.
 
-dev 가 볼 게 아닌 이웃 파일이 또 생기면(`*.stories.tsx` 등) `ignore` 에 줄을 하나 더 넣는다.
+dev 가 볼 게 아닌 이웃 파일이 또 생기면(`*.stories.tsx` 등) `EXPOSE_SCAN.ignore` 에
+줄을 하나 더 넣는다.
 
 alias 를 vite 설정에 추가하는 안은 기각했다 — 테스트를 dev 모듈 그래프에 들이는 것이
 문제의 원인이지 해결이 아니다.

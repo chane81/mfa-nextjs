@@ -1045,3 +1045,65 @@ PR 흐름으로 굳어지면 다시 연다. 그때는 job 을 되살리는 게 �
   그 커밋은 아무 데도 안 올라간 상태가 된다.
 - ❌ I-10 류가 다시 나면 **또 배포가 최초 검증**이다. 다만 그 함정의 구체적 형태(목록
   드리프트)는 오프라인 테스트가 막고 있어서, 남는 건 아직 본 적 없는 다른 형태다.
+
+## ADR-024 — 번들러가 달라도 MF 옵션은 한 함수가 만든다
+
+**날짜** 2026-09-10 (41차) · **상태** 채택 · **관련** ADR-017(배치 SSOT) · ADR-021(파생 못 하면 대조한다)
+
+### 맥락
+
+remote 두 벌은 일부러 다른 번들러다(Vite · Rsbuild). 그런데 **MF 플러그인이 받는 옵션은
+같은 타입이다** — 둘 다 `@module-federation/core` 의 `ModuleFederationOptions` 위에 있다
+(context7, `@module-federation/core` 문서: "All Module Federation plugin options are
+supported in Vite, except for the `dev` option").
+
+그래서 두 config 에는 **번들러와 무관한 덩이**가 글자 그대로 복제돼 있었다.
+
+| 덩이                                | 복제된 곳    | 어긋나면                                   |
+| ----------------------------------- | ------------ | ------------------------------------------ |
+| `filename: 'remoteEntry.js'`        | 2            | host 가 조립한 주소만 조용히 빗나간다      |
+| `shared` 의 `requiredVersion`       | 2 (+ host 1) | 그 remote 만 자기 React 사본 → 훅이 깨진다 |
+| `dts.generateTypes` 다섯 항목       | 2            | 한쪽만 다른 모양의 타입을 내보낸다         |
+| `dev.disableDynamicRemoteTypeHints` | 2            | 그 remote dev 에서만 `[object Event]`      |
+| `readExposes(EXPOSE_SCAN…)` 호출    | 2            | (인자는 이미 SSOT 였다)                    |
+
+셋의 공통 성질이 나쁘다. **복제된 쪽이 어긋나도 빌드는 통과한다.** 증상은 배포 후에
+한쪽 remote 에서만, 그것도 에러가 아니라 동작 이상으로 나온다.
+
+그리고 이건 remote 를 하나 더 추가할 때 **복사해야 하는 양**이기도 하다.
+
+### 결정
+
+`@mfa/remote-config/node` 에 `remoteFederationConfig(name)` 을 두고, 두 config 는
+`federation(MF.options)` / `pluginModuleFederation(MF.options)` 만 부른다.
+번들러 config 에는 **그 번들러 고유의 것만** 남는다 — 포트, 자산 경로, CSS 파이프라인,
+dev 미들웨어, warmup.
+
+공유 React 범위는 한 걸음 더 올렸다. `SHARED_REACT` · `REACT_REQUIRED_VERSION` 은
+`@mfa/remote-config` 에 있고 **host 의 런타임 `init({ shared })` 도 같은 상수를 읽는다** —
+세 곳이 구조적으로 못 갈린다.
+
+같이 고친 것: host 가 공표하던 React 버전이 손으로 적은 `'19.2.8'` 이었다. 주입하는
+모듈에서 읽도록 바꿨다(`MODULES.react.version`). React 를 올리고 그 줄을 잊는 상태가
+**공표한 버전과 넘기는 실체가 다른** 가장 안 보이는 형태였다.
+
+### 왜 `manifest: true` 를 넣나
+
+Vite 플러그인은 명시해야 `mf-manifest.json` 을 내고 Rsbuild 플러그인은 기본으로 낸다.
+기본값에 기대면 한쪽만 조용히 안 내는 상태가 성립한다 — host 는 그 매니페스트로 remote 를
+초기화하므로 그게 없으면 그 remote 만 안 뜬다. 옵션이 한 곳이 된 김에 명시로 굳혔다.
+
+### 기각한 대안 — config 를 통째로 합친다
+
+`defineConfig` 까지 공통 팩토리로 만들고 번들러 차이를 인자로 받는 안. 기각했다.
+포트 · 자산 경로 · CSS 출력 · dev 미들웨어는 번들러 어휘가 실제로 다르고, 합치면
+"이 옵션이 어느 번들러 것인가" 를 함수 안에서 다시 분기해야 한다. **복잡성이 줄지 않고
+자리만 옮긴다.** 경계는 "번들러가 모르는 것"(= MF 계약)에서 끊는다.
+
+### 결과
+
+- ⭕ remote 를 추가할 때 복사할 MF 설정이 없다. `remoteFederationConfig(NAME)` 한 줄이다.
+- ⭕ `vite.config.ts` 370 → 264 줄, `rsbuild.config.ts` 159 → 111 줄. 남은 건 전부 번들러 고유다.
+- ⭕ React 공유 계약이 remote 둘 + host 하나에서 같은 상수를 읽는다.
+- ❌ 번들러 하나가 옵션 이름을 갈아엎으면 이 함수가 **두 remote 를 동시에** 깬다.
+  지금은 둘 다 같은 core 위에 있어서 성립하는 전제고, 갈라지는 날 이 함수를 되나눈다.
