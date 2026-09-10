@@ -6,8 +6,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearCookies } from '@tests/helpers/cookies';
-import { clearGlobalRegistries } from '@tests/helpers/globals';
+import { clearCookies } from '@mfa/utils/test/cookies';
+import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
 import { ORIGIN } from '../origin';
 

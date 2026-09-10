@@ -4,8 +4,8 @@ import { PRODUCTS } from '@mfa/contracts';
 import { act, render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearCookies } from '@tests/helpers/cookies';
-import { clearGlobalRegistries } from '@tests/helpers/globals';
+import { clearCookies } from '@mfa/utils/test/cookies';
+import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
 /**
  * 탭 사이에서 장바구니가 갈라지는 걸 막는다.

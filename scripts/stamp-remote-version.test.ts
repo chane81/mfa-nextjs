@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { MF_FILES, versionedPath } from '@mfa/remote-config';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { generateSigningKeyPair } from '@tests/helpers/signing';
+import { generateSigningKeyPair } from '@mfa/utils/test/signing';
 
 import {
   buildPayload,

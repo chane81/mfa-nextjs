@@ -252,8 +252,8 @@ export function createMfDevMiddleware({
  *
  * 이 저장소는 **테스트를 대상 소스 옆에 둔다**. 그래서 `src/exposes/` 에는 expose 가
  * 아닌 이웃 파일이 같이 산다(`exposes.test.tsx`). 그런 파일이 expose 로 올라가면
- * remote 의 공개 계약이 조용히 늘어나고, dev 에서는 사전 transform 까지 시도해
- * `@tests/*` alias 를 못 찾고 터진다(known-issues H-2).
+ * remote 의 공개 계약이 조용히 늘어나고, dev 에서는 사전 transform 까지 시도하다
+ * 테스트 전용 import 에서 터진다(known-issues H-2).
  *
  * 그래서 **제외 규칙을 인자로 받는다.** 호출부에 눈에 보이게 두고, dev 가 볼 게 아닌
  * 이웃 파일이 또 생기면(`*.stories.tsx` 등) 거기에 한 줄 더 넣는다.
@@ -326,14 +326,16 @@ export const EXPOSE_SCAN = {
    * 이 저장소는 **테스트를 대상 소스 옆에 둔다**(`docs/06-testing/01-test-plan.md`).
    * 그래서 이 폴더에는 expose 가 아닌 이웃 파일이 같이 산다(`exposes.test.tsx`).
    * 거르지 않으면 remote 의 공개 계약이 조용히 늘어나고, dev 에서는 사전 transform 까지
-   * 시도하다 `@tests/*` alias 를 못 찾고 터진다.
+   * 시도하다 테스트 전용 import 에서 터진다. 당시 실측(헬퍼가 `@tests/*` alias 로
+   * 오던 시절이다 — 지금은 `@mfa/utils/test/*` 라 이 줄에서는 해석되고 대신
+   * `vitest` · `@testing-library/*` 에서 같은 모양으로 터진다):
    *
    *     Pre-transform error: Failed to resolve import "@tests/helpers/globals"
    *     from "src/exposes/exposes.test.tsx"
    *
-   * alias 를 번들러에 추가하는 건 답이 아니다 — 테스트는 애초에 dev 모듈 그래프에 들어갈
-   * 파일이 아니다. **dev 가 볼 게 아닌 이웃 파일이 또 생기면 아래 배열에 한 줄 더 넣는다**
-   * (`/\.stories\.tsx$/` 같은 것). 기록: known-issues H-2.
+   * 번들러에 그 해석 경로를 열어주는 건 답이 아니다 — 테스트는 애초에 dev 모듈
+   * 그래프에 들어갈 파일이 아니다. **dev 가 볼 게 아닌 이웃 파일이 또 생기면 아래
+   * 배열에 한 줄 더 넣는다**(`/\.stories\.tsx$/` 같은 것). 기록: known-issues H-2.
    */
   ignore: [/\.test\.tsx$/],
 } as const satisfies { dir: string } & ExposeScanOptions;

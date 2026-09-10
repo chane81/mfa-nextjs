@@ -11,7 +11,7 @@ import {
 } from './cookie-codec';
 import { CART_STORAGE_KEY, cartCookieStorage } from './cookie-storage';
 
-import { clearCookies } from '@tests/helpers/cookies';
+import { clearCookies } from '@mfa/utils/test/cookies';
 
 /**
  * 여기 있는 건 **설정**뿐이다 — 배관은 `utils/cookie-storage`, 값의 모양은 `cookie-codec`.

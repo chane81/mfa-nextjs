@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearCookies } from '@tests/helpers/cookies';
+import { clearCookies } from '@mfa/utils/test/cookies';
 
 /**
  * 쿠키 배관. jsdom 이 필요해서 `.test.tsx` 다(JSX 는 없다).
