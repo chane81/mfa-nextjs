@@ -35,19 +35,26 @@ def common(md, max_lines, summary_within=35):
     head = first_lines(md, 4)
     body = outside_details(md)
     blocks = details_blocks(md)
-    # 접어야 할 신호어
-    fold_words = ["기각", "고려했", "검토했", "되돌", "채택하지 않", "대안", "함정", "실패했"]
     secs = re.split(r"^## \d+\.", body, flags=re.M)[1:]
     nsec = len(secs)
+
     def prose(x):
-        x = re.sub(r"```.*?```", "", x, flags=re.S)          # 코드블록 제외
-        x = re.sub(r"^\|.*$", "", x, flags=re.M)             # 표 제외
+        x = re.sub(r"```.*?```", "", x, flags=re.S)
+        x = re.sub(r"^\|.*$", "", x, flags=re.M)
         return len([l for l in x.strip().split("\n") if l.strip()])
+
     longest = max((prose(x) for x in secs), default=0)
+
+    # ② 위험/동작 변경 표시 — 첫 화면 상단에서
+    risk = bool(re.search(r"(동작 변경|사용자에게 보이는|breaking|마이그레이션|배포 순서|롤백)",
+                          first_lines(md, 8)))
+    # ③ 확인 요청 — 리뷰어에게 판단을 넘기는 문장
+    ask = bool(re.search(r"(확인 부탁|봐 ?달라|알려 ?달라|의견|판단이 다르|맞는지|괜찮은지|리뷰 ?포인트)", md))
+
     return [
-        (f"첫 화면(details 접힘)이 {max_lines}줄 이하다 — 실제 {n}줄", n <= max_lines,
-         f"보이는 {n}줄 / 전체 {total}줄"),
-        ("첫 4줄 안에 '무엇을 바꾸는가'가 나온다", len(head.strip()) > 20 and not head.strip().startswith("#" * 3),
+        ("② 첫 화면 상단에서 위험·동작 변경 여부를 밝힌다", risk, first_lines(md, 3)[:80].replace("\n", " / ")),
+        ("③ 리뷰어에게 확인을 요청하는 문장이 있다", ask, "있음" if ask else "없음"),
+        ("첫 4줄 안에 '무엇을 바꾸는가'가 나온다", len(head.strip()) > 20 and not head.strip().startswith("###"),
          head[:90].replace("\n", " / ")),
         (f"요약 표가 앞 {summary_within}줄 안에 있다", has_table(first_lines(md, summary_within)),
          "표 있음" if has_table(first_lines(md, summary_within)) else "없음"),
@@ -64,6 +71,8 @@ def common(md, max_lines, summary_within=35):
         ("커밋 해시를 통째로 나열하지 않는다",
          len(re.findall(r"\b[0-9a-f]{7}\b", md)) <= 2,
          f"{len(re.findall(r'[0-9a-f]{7}', md))}개"),
+        (f"참고: 첫 화면 {n}줄 / 전체 {total}줄 — {max_lines}줄 선 안", n <= max_lines,
+         f"보이는 {n}줄 / 전체 {total}줄"),
     ]
 
 def grade(name, run):
@@ -95,7 +104,9 @@ def grade(name, run):
             cs = []
         paths = [c.get("path", "") for c in cs]
         mech = [p for p in paths if re.search(r"(OrderTable|OrderDetail|InvoiceRow|Statement|filters)\.", p)]
+        focus = bool(re.search(r"(판단이 들어간|실제로 볼|나머지는|같은 모양|기계적|집중|읽는 순서)", md))
         out += [
+            ("① 볼 곳과 기계적인 곳을 본문에서 갈라준다", focus, "있음" if focus else "없음"),
             ("review.json 이 파싱된다", bool(cs), f"{len(cs)}개 코멘트"),
             (f"인라인 코멘트가 15개 이하다 (실제 {len(cs)})", 0 < len(cs) <= 15, str(len(cs))),
             ("판단이 들어간 DateRangePicker 에 코멘트가 있다",
