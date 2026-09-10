@@ -108,3 +108,9 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 ### Domain docs
 
 단일 컨텍스트. ADR 은 `docs/02-architecture/01-decision.md`. `docs/agents/domain.md` 참고.
+
+### PR
+
+`/pr` — 브랜치를 PR 로 올리거나 열린 PR 의 본문·인라인 코멘트를 다시 쓴다.
+본문은 **리뷰어를 diff 로 데려가는 안내판**이지 설명문이 아니다 — 근거·기각한 대안·밟은
+함정은 `<details>` 로 접는다. `.claude/skills/pr/SKILL.md`.
