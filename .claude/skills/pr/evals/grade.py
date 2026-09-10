@@ -8,11 +8,15 @@ WS = Path(sys.argv[1])
 def read(p):
     return p.read_text(encoding="utf8") if p.exists() else ""
 
+# 줄 앞에 온 것만 실제 블록으로 본다 — 본문이 `<details>` 를 언급만 해도
+# 거기서부터 끝까지 잘려서 섹션이 통째로 사라졌다.
+DETAILS = re.compile(r"^<details>(.*?)^</details>", re.S | re.M)
+
 def details_blocks(md):
-    return re.findall(r"<details>(.*?)</details>", md, re.S)
+    return DETAILS.findall(md)
 
 def outside_details(md):
-    return re.sub(r"<details>.*?</details>", "", md, flags=re.S)
+    return DETAILS.sub("", md)
 
 def first_lines(md, n):
     return "\n".join(md.strip().split("\n")[:n])
@@ -72,9 +76,8 @@ def common(md, max_prose, summary_within=35):
 
     # 섹션마다 가장 위험한 문장을 인용·굵게로 뽑아냈나
     marked = [x for x in secs if re.search(r"^>", x, re.M) or "**" in x]
-    # 평행하게 열거되는 것이 표·불릿으로 갔나 (한눈에 표 말고, 본문 안쪽에)
-    below = "\n".join(body.strip().split("\n")[summary_within:])
-    enumerated = table_rows(below) >= 3 or bullet_items(body) >= 2
+    # 평행하게 열거되는 것이 표·불릿으로 갔나 — `한눈에` 말고 번호 섹션 안에서 본다
+    enumerated = any(table_rows(x) >= 3 or bullet_items(x) >= 2 for x in secs)
 
     # ② 위험/동작 변경 표시 — 첫 화면 상단에서
     risk = bool(re.search(r"(동작 변경|사용자에게 보이는|breaking|마이그레이션|배포 순서|롤백)",
@@ -107,8 +110,8 @@ def common(md, max_prose, summary_within=35):
          f"{[len(b.strip().split(chr(10))) for b in diffs] or '없음'}"),
         (f"섹션의 가장 위험한 문장이 인용(>)·굵게로 뽑혀 있다 ({len(marked)}/{nsec})",
          nsec > 0 and len(marked) >= (nsec + 1) // 2, f"{len(marked)}/{nsec} 섹션"),
-        ("평행하게 열거되는 결과가 표·불릿이다", enumerated,
-         f"본문 표 {table_rows(below)}행 · 불릿 {bullet_items(body)}개"),
+        ("평행하게 열거되는 결과가 섹션 안 표·불릿이다", enumerated,
+         f"섹션별 표 {[table_rows(x) for x in secs]} · 불릿 {[bullet_items(x) for x in secs]}"),
         (f"참고: 첫 화면 산문 {n_prose}줄 — {max_prose}줄 안팎 (표·인용·코드는 안 센다)",
          n_prose <= max_prose, f"산문 {n_prose}줄 / 보이는 {n}줄 / 전체 {total}줄"),
     ]
