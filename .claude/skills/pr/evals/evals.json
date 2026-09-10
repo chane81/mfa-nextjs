@@ -72,6 +72,6 @@
       ]
     }
   ],
-  "how_to_run": "python3 .claude/skills/pr/evals/grade.py <workspace-dir>  — 각 <eval>/<config>/outputs/pr-body.md 를 채점한다",
+  "how_to_run": "1) 각 케이스를 서브에이전트로 돌려 <workspace>/<eval>/<config>/outputs/pr-body.md 를 만든다\n2) python3 grade.py <workspace>            — assertion 채점, grading.json 생성\n3) python3 render_compare.py <workspace> <out.html> <새라벨> <옛라벨>  — 마크다운을 렌더해 나란히 비교\n   (기본 eval 뷰어는 .md 를 raw 텍스트로 넣어서 표·details·diff 가 안 보인다)",
   "measures": "길이가 아니라 '리뷰어가 볼 곳을 알게 됐나' 를 잰다 — ①볼 곳 ②위험 ③확인 요청"
 }

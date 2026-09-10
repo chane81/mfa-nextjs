@@ -44,6 +44,7 @@ def common(md, max_lines, summary_within=35):
         return len([l for l in x.strip().split("\n") if l.strip()])
 
     longest = max((prose(x) for x in secs), default=0)
+    diffs = re.findall(r"```diff\n(.*?)```", md, re.S)
 
     # ② 위험/동작 변경 표시 — 첫 화면 상단에서
     risk = bool(re.search(r"(동작 변경|사용자에게 보이는|breaking|마이그레이션|배포 순서|롤백)",
@@ -71,6 +72,9 @@ def common(md, max_lines, summary_within=35):
         ("커밋 해시를 통째로 나열하지 않는다",
          len(re.findall(r"\b[0-9a-f]{7}\b", md)) <= 2,
          f"{len(re.findall(r'[0-9a-f]{7}', md))}개"),
+        ("diff 블록이 있으면 6줄 이하다 (바뀐 줄만)",
+         all(len(b.strip().split("\n")) <= 6 for b in diffs) if diffs else True,
+         f"{[len(b.strip().split(chr(10))) for b in diffs] or '없음'}"),
         (f"참고: 첫 화면 {n}줄 / 전체 {total}줄 — {max_lines}줄 선 안", n <= max_lines,
          f"보이는 {n}줄 / 전체 {total}줄"),
     ]
@@ -105,7 +109,11 @@ def grade(name, run):
         paths = [c.get("path", "") for c in cs]
         mech = [p for p in paths if re.search(r"(OrderTable|OrderDetail|InvoiceRow|Statement|filters)\.", p)]
         focus = bool(re.search(r"(판단이 들어간|실제로 볼|나머지는|같은 모양|기계적|집중|읽는 순서)", md))
+        shape = [b for b in re.findall(r"```diff\n(.*?)```", md, re.S)
+                 if len(b.strip().split("\n")) <= 6]
         out += [
+            ("① 치환의 모양을 짧은 before/after diff 로 보여준다", bool(shape),
+             f"{len(shape)}개" if shape else "없음"),
             ("① 볼 곳과 기계적인 곳을 본문에서 갈라준다", focus, "있음" if focus else "없음"),
             ("review.json 이 파싱된다", bool(cs), f"{len(cs)}개 코멘트"),
             (f"인라인 코멘트가 15개 이하다 (실제 {len(cs)})", 0 < len(cs) <= 15, str(len(cs))),
