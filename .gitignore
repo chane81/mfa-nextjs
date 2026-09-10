@@ -40,3 +40,7 @@ next-env.d.ts
 # MF 빌드 버전 (빌드 중에만 존재)
 .mf-version
 .gstack/
+
+# Python 캐시 (스킬 evals 채점기)
+__pycache__/
+*.pyc
