@@ -4,6 +4,7 @@ import { PRODUCTS } from '@mfa/contracts';
 import { act, render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { clearCookies } from '@tests/helpers/cookies';
 import { clearGlobalRegistries } from '@tests/helpers/globals';
 
 /**
@@ -14,13 +15,6 @@ import { clearGlobalRegistries } from '@tests/helpers/globals';
  */
 const A = PRODUCTS[0]!;
 const B = PRODUCTS[1]!;
-
-const clearCookies = () => {
-  for (const part of document.cookie.split(/;\s*/)) {
-    const name = part.split('=')[0];
-    if (name) document.cookie = `${name}=; path=/; max-age=0`;
-  }
-};
 
 const setVisibility = (state: DocumentVisibilityState) => {
   Object.defineProperty(document, 'visibilityState', {

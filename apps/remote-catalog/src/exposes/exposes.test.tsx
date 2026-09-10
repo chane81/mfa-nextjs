@@ -6,6 +6,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { clearCookies } from '@tests/helpers/cookies';
 import { clearGlobalRegistries } from '@tests/helpers/globals';
 
 import { ORIGIN } from '../origin';
@@ -19,13 +20,6 @@ import { ORIGIN } from '../origin';
  */
 const A = PRODUCTS[0]!;
 const SOLD_OUT = { ...A, id: 'so-001', name: '품절된 상품', stock: 0 };
-
-const clearCookies = () => {
-  for (const part of document.cookie.split(/;\s*/)) {
-    const name = part.split('=')[0];
-    if (name) document.cookie = `${name}=; path=/; max-age=0`;
-  }
-};
 
 beforeEach(() => {
   clearGlobalRegistries();

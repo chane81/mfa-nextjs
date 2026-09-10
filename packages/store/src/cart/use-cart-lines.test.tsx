@@ -5,6 +5,7 @@ import { act, render, screen } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { clearCookies } from '@tests/helpers/cookies';
 import { clearGlobalRegistries } from '@tests/helpers/globals';
 
 import { type CartLine } from './create-store';
@@ -15,13 +16,6 @@ import { type CartLine } from './create-store';
  */
 const A = PRODUCTS[0]!;
 const B = PRODUCTS[1]!;
-
-const clearCookies = () => {
-  for (const part of document.cookie.split(/;\s*/)) {
-    const name = part.split('=')[0];
-    if (name) document.cookie = `${name}=; path=/; max-age=0`;
-  }
-};
 
 beforeEach(() => {
   clearGlobalRegistries();

@@ -2,6 +2,8 @@ import '@testing-library/jest-dom/vitest';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { clearCookies } from '@tests/helpers/cookies';
+
 /**
  * 쿠키 배관. jsdom 이 필요해서 `.test.tsx` 다(JSX 는 없다).
  *
@@ -11,13 +13,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const load = () => import('./cookie-storage');
 
 /** jsdom 의 document.cookie 를 비운다 (max-age=0 으로 덮어쓰는 게 유일한 방법) */
-const clearCookies = () => {
-  for (const part of document.cookie.split(/;\s*/)) {
-    const name = part.split('=')[0];
-    if (name) document.cookie = `${name}=; path=/; max-age=0`;
-  }
-};
-
 let warn: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
