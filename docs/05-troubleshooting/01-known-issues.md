@@ -747,6 +747,10 @@ optimizeDeps: {
 Vite dev 설정에는 없다 — **있어야 할 이유도 없다.** 테스트는 애초에 dev 모듈 그래프에
 들어갈 파일이 아니다.
 
+> 41차에 헬퍼가 `@mfa/utils/test/*` 로 옮겨가면서 **이 줄은 해석된다.** 대신 같은
+> 파일의 `vitest` · `@testing-library/*` import 가 같은 자리에서 같은 모양으로 터진다.
+> 고침(파일을 dev 그래프에 안 들인다)은 그대로다.
+
 이 저장소는 테스트를 대상 소스 옆에 두므로(`docs/06-testing/01-test-plan.md`)
 소스 디렉터리를 `*` 로 훑는 설정은 전부 이 함정을 갖는다.
 
@@ -965,13 +969,17 @@ x expected `,` but instead found `"//#typecheck:tests"`
 ### F-3. turbo inputs 가 tsc 프로그램과 어긋나면 stale PASS 를 재생한다
 
 `//#typecheck:scripts` 의 inputs 는 `["scripts/**/*.ts", "tsconfig.json"]` 이었다. 그런데
-`scripts/*.test.ts` 가 `@tests/helpers/*` 를 import 하므로 그 헬퍼가 프로그램 안에 들어온다.
+`scripts/*.test.ts` 가 테스트 헬퍼를 import 하므로 그 헬퍼가 프로그램 안에 들어온다.
 
 ```
 $ tsc -p tsconfig.json --noEmit --listFiles | grep mfa-nextjs/tests/
 .../tests/helpers/http.ts
 .../tests/helpers/signing.ts
 ```
+
+> 41차에 헬퍼가 `packages/utils` 로 옮겨갔다. **성질은 그대로다** — 그 패키지는 빌드가
+> 없어서 `exports` 가 소스를 직접 가리키고, `^build` 는 빌드 태스크가 없으니 건너뛴다.
+> 그래서 inputs 에 `packages/utils/src/**` 를 적어야 하는 것도 그대로다.
 
 inputs 에 없으니 헬퍼를 깨도 turbo 가 캐시된 PASS 를 재생한다. 실측 — 헬퍼에 한 줄 넣고 재실행:
 

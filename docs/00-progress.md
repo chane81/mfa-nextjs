@@ -68,10 +68,37 @@ SyntaxError: Bad control character in string literal in JSON at position 362
 
 문자열 안팎을 구분하며 한 글자씩 지나가는 스캐너로 바꿨다.
 
-### 테스트 헬퍼 하나
+### 테스트 헬퍼를 패키지로 올렸다 (ADR-025)
 
-jsdom 쿠키를 비우는 `clearCookies` 가 테스트 파일 **일곱 벌**에 복제돼 있었다.
-`tests/helpers/cookies.ts` 로 옮겼다.
+먼저 jsdom 쿠키를 비우는 `clearCookies` 가 테스트 파일 **일곱 벌**에 복제돼 있어서
+헬퍼로 합쳤다. 합치고 나니 헬퍼가 사는 자리 자체가 눈에 들어왔다.
+
+루트 `tests/helpers/` + `@tests/*` alias 였는데, 그 alias 를 쓰려면 **같은 매핑을
+tsconfig 10곳에 복제**해야 했다. 하나라도 빠지면 그 패키지에서만 편집기가 `ts(2307)` 로
+빨개진다 — 러너는 멀쩡히 돈다. 그리고 "`packages/store` 의 테스트가 루트 `tests/` 를
+읽는다" 는 사실이 `package.json` 어디에도 없었다.
+
+`packages/utils`(`@mfa/utils`) 로 옮기고 쓰는 쪽이 `devDependencies` 에 적게 했다.
+paths 10개는 지웠다 — pnpm 심링크가 해석을 맡는다.
+
+**빌드는 안 둔다.** `build` 스크립트가 있으면 turbo 의 `^build` 그래프에 들어가서
+프로덕션 이미지 빌드가 테스트 헬퍼를 먼저 컴파일하게 된다. `exports` 가 소스 `.ts` 를
+직접 가리키는 방식(`@mfa/remote-config` 과 같다)이면 그 일이 아예 안 생긴다.
+`pnpm build` 태스크 수는 6개 그대로다.
+
+**배럴도 안 둔다.** 서브패스마다 필요한 환경이 다르다 — `test/cookies` 는 DOM,
+`test/http` · `test/signing` 은 node. 배럴을 두면 DOM 없는 패키지가 `test/globals`
+하나를 쓰려다 `document` 를 만난다.
+
+#### 대가 — `packages/` 는 "바뀌면 전부 배포" 였다
+
+`SHARED_DEPLOY_PATHS` 에 `packages/` 가 통짜로 들어 있다. 그대로 두면 **테스트 헬퍼
+한 줄에 remote 둘과 host 가 전부 재배포된다.** 구멍을 하나 팠다 —
+`DEPLOY_IGNORED_PATHS`. 기준은 "이미지 안에서 실행되는가" 하나다.
+
+구멍을 판 만큼 정반대 사고가 생긴다. 앱이 런타임에 쓰는 패키지를 거기 넣으면 배포가
+그 변경을 안 물고 나가고, 증상은 "고쳤는데 반영이 안 된다" 뿐이다. `deploy-targets.test.ts`
+가 그 목록의 패키지가 어느 앱의 `dependencies` 에도 없는지 본다.
 
 ### 검증
 

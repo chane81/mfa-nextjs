@@ -1107,3 +1107,65 @@ Vite 플러그인은 명시해야 `mf-manifest.json` 을 내고 Rsbuild 플러�
 - ⭕ React 공유 계약이 remote 둘 + host 하나에서 같은 상수를 읽는다.
 - ❌ 번들러 하나가 옵션 이름을 갈아엎으면 이 함수가 **두 remote 를 동시에** 깬다.
   지금은 둘 다 같은 core 위에 있어서 성립하는 전제고, 갈라지는 날 이 함수를 되나눈다.
+
+## ADR-025 — 테스트 헬퍼는 워크스페이스 패키지로 두되, 배포 경로에서 뺀다
+
+**날짜** 2026-09-10 (41차) · **상태** 채택 · **대체** "공유 자산은 루트 `tests/` 에 둔다"(초기 규약)
+
+### 맥락
+
+테스트 헬퍼 넷(`globals` · `cookies` · `http` · `signing`)이 루트 `tests/helpers/` 에 있고
+`@tests/*` alias 로 불렸다. 그 alias 를 쓰려면 **같은 매핑을 tsconfig 10곳에 복제**해야
+했다 — 앱 셋, 패키지 넷(remote-config 은 둘), 루트 둘. 하나라도 빠지면 그 패키지에서만
+편집기가 `ts(2307)` 로 빨개진다. 러너는 멀쩡히 돈다.
+
+그리고 그 의존은 **어디에도 적혀 있지 않았다.** `packages/store` 의 테스트가 루트
+`tests/` 를 읽는다는 사실이 `package.json` 어디에도 없다.
+
+### 결정
+
+`packages/utils`(`@mfa/utils`) 를 만들고 헬퍼를 `src/test/` 아래로 옮긴다.
+쓰는 패키지가 `devDependencies` 에 적는다. tsconfig `paths` 10곳은 지운다 —
+pnpm 심링크가 해석을 맡는다.
+
+**빌드는 두지 않는다.** `exports` 가 소스 `.ts` 를 직접 가리킨다(`@mfa/remote-config` 와 같다).
+`build` 스크립트가 있으면 이 패키지가 turbo 의 `^build` 그래프에 들어가고, **프로덕션 이미지
+빌드가 테스트 헬퍼를 먼저 컴파일하게 된다.** 그건 이 이동에서 가장 피하고 싶었던 것이다.
+
+**배럴을 두지 않는다.** 서브패스마다 필요한 환경이 다르다 — `test/cookies` 는 DOM,
+`test/http` · `test/signing` 은 node 다. 배럴을 두면 DOM 없는 패키지가 `test/globals`
+하나를 쓰려다 `document` 를 만난다. 서브패스가 그 비대칭을 구조적으로 막는다.
+
+### 대가 — `packages/` 는 "바뀌면 전부 배포" 였다
+
+`SHARED_DEPLOY_PATHS` 에 `packages/` 가 통짜로 들어 있다(ADR-021). 그대로 두면
+**테스트 헬퍼 한 줄에 remote 둘과 host 가 전부 재배포된다.**
+
+그래서 구멍을 하나 팠다 — `DEPLOY_IGNORED_PATHS`. 기준은 하나다: **이미지 안에서
+실행되는가.** `@mfa/utils` 는 devDependency 이고 빌드 태스크도 없으니 아니다.
+
+구멍을 판 만큼 정반대 사고가 가능해진다. 앱이 런타임에 쓰는 패키지를 거기 넣으면
+배포가 그 변경을 안 물고 나가고, 증상은 "고쳤는데 반영이 안 된다" 뿐이다.
+그래서 `scripts/deploy-targets.test.ts` 가 그 목록의 패키지가 어느 앱의
+`dependencies` 에도 없는지 본다.
+
+### 기각한 대안 — 루트 `tests/` 를 그대로 둔다
+
+배포 트리거와 Docker 컨텍스트를 안 건드린다는 게 장점이었다. 기각한 이유는
+**alias 복제가 자라는 방향**이다. 패키지가 하나 늘 때마다 tsconfig 한 곳이 늘고,
+빠뜨리면 러너는 통과하고 편집기만 깨져서 잡히는 데 오래 걸린다. 그 비용은 이 저장소가
+계속 커진다는 전제에서 복리로 붙는다.
+
+### 결과
+
+- ⭕ tsconfig `paths` 에서 `@tests/*` 매핑 10개가 사라졌다. 새 패키지가 헬퍼를 쓸 때
+  적을 곳이 `package.json` 한 줄이다.
+- ⭕ 의존이 `devDependencies` 에 적힌다 — 누가 헬퍼를 쓰는지 도구가 안다.
+- ⭕ 빌드 태스크가 없어서 `pnpm build` 의 태스크 수가 그대로다(6개). 이미지 빌드도 그대로다.
+- ❌ 세 Dockerfile 의 `COPY … package.json` 목록이 한 줄씩 늘었다
+  (`docker-context.test.ts` 가 강제하므로 잊을 수는 없다).
+- ❌ `DEPLOY_IGNORED_PATHS` 라는 **예외 목록이 생겼다.** 목록은 자라기 쉽고, 자랄수록
+  "배포가 안 물리는" 경로가 는다. 늘릴 때는 "이미지 안에서 실행되는가" 만 본다.
+- ❌ 이름이 `@mfa/utils` 라 **테스트 전용이라는 게 이름에 없다.** 프로덕션 유틸이 생기면
+  `src/` 아래 다른 폴더로 들어올 텐데, 그 순간 이 패키지는 `DEPLOY_IGNORED_PATHS` 에서
+  빠져야 한다 — 위 테스트가 그때 알려준다.
