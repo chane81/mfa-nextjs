@@ -16,7 +16,13 @@ import { resolve } from 'node:path';
  * 자기 이름을 부르는 걸 지원하고(v12.16+), tsc 는 소비처와 똑같은 경로로 해석한다.
  * 확장자 문제 자체가 사라진다.
  */
-import { MF_FILES } from '@mfa/remote-config';
+import {
+  MF_FILES,
+  MF_TYPES_FOLDER,
+  SHARED_REACT,
+  VERSION_FILE,
+  type RemoteName,
+} from '@mfa/remote-config';
 
 /**
  * `@mfa/remote-config` 의 **node 전용 표면.**
@@ -62,7 +68,7 @@ import { MF_FILES } from '@mfa/remote-config';
  * @param cwd 기본값은 `process.cwd()`. 번들러 config 는 그 앱 디렉터리에서 평가된다.
  */
 export function readBuildVersion(cwd: string = process.cwd()): string | null {
-  const file = resolve(cwd, '.mf-version');
+  const file = resolve(cwd, VERSION_FILE);
   if (!existsSync(file)) return null;
   return readFileSync(file, 'utf8').trim() || null;
 }
@@ -317,8 +323,125 @@ export const EXPOSE_SCAN = {
   /** 각 remote 의 앱 루트 기준 */
   dir: './src/exposes',
   /**
-   * 이 저장소는 테스트를 대상 소스 옆에 둔다. 거르지 않으면 remote 의 공개 계약이
-   * 조용히 늘고, dev 에서는 사전 transform 까지 시도하다 터진다(known-issues H-2).
+   * 이 저장소는 **테스트를 대상 소스 옆에 둔다**(`docs/06-testing/01-test-plan.md`).
+   * 그래서 이 폴더에는 expose 가 아닌 이웃 파일이 같이 산다(`exposes.test.tsx`).
+   * 거르지 않으면 remote 의 공개 계약이 조용히 늘어나고, dev 에서는 사전 transform 까지
+   * 시도하다 `@tests/*` alias 를 못 찾고 터진다.
+   *
+   *     Pre-transform error: Failed to resolve import "@tests/helpers/globals"
+   *     from "src/exposes/exposes.test.tsx"
+   *
+   * alias 를 번들러에 추가하는 건 답이 아니다 — 테스트는 애초에 dev 모듈 그래프에 들어갈
+   * 파일이 아니다. **dev 가 볼 게 아닌 이웃 파일이 또 생기면 아래 배열에 한 줄 더 넣는다**
+   * (`/\.stories\.tsx$/` 같은 것). 기록: known-issues H-2.
    */
   ignore: [/\.test\.tsx$/],
 } as const satisfies { dir: string } & ExposeScanOptions;
+
+/**
+ * remote 번들러 플러그인에 그대로 넘기는 MF 설정.
+ *
+ * `@module-federation/vite` 와 `@module-federation/rsbuild-plugin` 은 같은
+ * `ModuleFederationOptions` 를 받는다(둘 다 `@module-federation/core` 위에 있다).
+ * 그래서 이 저장소에서 "remote 가 MF 를 쓰는 방식" 은 번들러가 달라도 하나다 —
+ * 노출 목록 스캔, 엔트리 파일명, 매니페스트, 공유 React, DTS 규칙, dev 힌트 억제.
+ *
+ * 예전에는 그 여섯이 두 config 에 **글자 그대로 복제**돼 있었다. 복제된 쪽이 어긋나도
+ * 빌드는 통과한다 — 증상은 배포 후에 한쪽 remote 에서만 나온다(예: `requiredVersion`
+ * 이 갈리면 그 remote 만 자기 React 사본을 받아 훅이 깨진다). remote 를 하나 더
+ * 추가할 때 복사해야 하는 양이기도 했다.
+ *
+ * 번들러마다 다른 것(포트 · 자산 경로 · CSS 파이프라인 · dev 미들웨어)은 여기 없다.
+ * 그건 각 config 가 자기 번들러 어휘로 적는 게 맞고, 합치면 오히려 읽기 어려워진다.
+ *
+ * ## DTS 를 켜는 이유
+ *
+ * remote 는 타입의 **생산자**다 — 자기 `exposes` 의 시그니처를 컴파일해
+ * `@mf-types.zip` · `@mf-types.d.ts` 로 내보내고, host 가 `mf dts --fetch` 로 받아간다.
+ * 산출물은 웹 번들과 같은 버전 디렉터리(`dist/v<version>/`)로 나간다 — 번들러의
+ * 출력 디렉터리를 그대로 쓰기 때문이다.
+ *
+ * 그래도 `@mfa/contracts` 가 SSOT 다. 여기서 나온 타입이 host 의 모듈 타입을 **그대로
+ * 만들고**(`packages/contracts/src/remote-contract.ts`), remote 가 props 를 바꾸면
+ * host 호출부가 컴파일 에러가 된다. 계약 패키지에 남는 건 어휘(`Product` 등)와 런타임
+ * 이름 목록(`MODULE_IDS`)뿐이다 — props 를 그쪽으로 올리면 host 와 remote 가 같은
+ * 선언을 가리키게 되어 DTS 가 전달할 정보가 0 이 된다(known-issues I-2).
+ *
+ * ## `dev` 를 함께 끄는 이유
+ *
+ * `[ dynamic-remote-type-hints-plugin ] err: [object Event]` 는 dts 가 아니라 **dev 옵션**
+ * 소관이다(`DevPlugin` 이 `isDev()` 에서 WS 런타임 플러그인을 주입한다). DTS 는 켜되
+ * 그 WS 만 끈다. 검토 전문: docs/01-research/03-dts-plugin-review.md
+ *
+ * @param name remote 이름. MF 스코프 이름이자 host 가 `loadRemote('<name>/…')` 로 부르는 이름.
+ * @param cwd 스캔 기준 디렉터리. 기본값은 `process.cwd()` — 번들러 config 는 그 앱에서 평가된다.
+ */
+export function remoteFederationConfig(
+  name: RemoteName,
+  cwd: string = process.cwd(),
+) {
+  const scanned = readExposes(EXPOSE_SCAN.dir, {
+    ignore: EXPOSE_SCAN.ignore,
+    cwd,
+  });
+
+  return {
+    /** 노출 파일 경로. Vite 의 dev warmup · `optimizeDeps.entries` 가 쓴다. */
+    files: scanned.files,
+    /** 번들러 MF 플러그인에 그대로 넘긴다. */
+    options: {
+      name,
+      filename: MF_FILES.webEntry,
+      exposes: scanned.exposes,
+      shared: SHARED_REACT,
+      /**
+       * host 런타임이 포맷 · 공유 정보를 자동 판별하는 근거다. Vite 플러그인은 명시해야
+       * 내고 Rsbuild 플러그인은 기본으로 내지만, 기본값에 기대면 한쪽만 조용히 안 낼 수 있다.
+       */
+      manifest: true,
+      dts: {
+        generateTypes: {
+          /**
+           * 그 remote 의 tsconfig 로 컴파일한다. `noEmit: true` 라도 상관없다 —
+           * dts-plugin 이 임시 tsconfig 를 만들어 `declaration` 을 켜고 돌린다.
+           */
+          tsConfigPath: './tsconfig.json',
+          /**
+           * 폴더 이름은 계약이다. host 가 받을 zip · API 파일명(`MF_FILES.typesApi` ·
+           * `typesArchive`)이 같은 상수에서 파생되므로 여기만 바꿔서 어긋날 수 없다.
+           */
+          typesFolder: MF_TYPES_FOLDER,
+          /** `RemoteKeys` · `PackageType` — host 의 `loadRemote()` 모듈 확장이 이걸 쓴다 */
+          generateAPITypes: true,
+          /**
+           * 타입 생성이 실패하면 빌드를 세운다. 조용히 넘어가면 host 는 타입이 없는 게
+           * 아니라 **옛 타입**을 계속 쓰게 되고, 그 상태가 CI 를 통과한다.
+           */
+          abortOnError: true,
+          /**
+           * `@mfa/contracts` 를 타입 아카이브에 인라인하지 않는다.
+           *
+           * host 도 같은 워크스페이스라 그 패키지를 직접 해석할 수 있고, 인라인하면
+           * 계약의 원본이 두 벌이 된다.
+           *
+           * ⚠️ **이 저장소에서는 켜도 동작하지 않는다.**(실측) `third-party-dts-extractor`
+           * 가 `require.resolve(pkg, …)` 로 패키지를 찾는데, `@mfa/contracts` 는
+           * `type: module` 에 `exports` 에 `require` 조건이 없는 ESM 전용 워크스페이스
+           * 패키지라 그 해석이 실패한다.
+           *
+           * 지금은 필요 없다 — props 가 `src/exposes` 안에 있으므로 DTS 가 이미 실제
+           * 시그니처를 인라인해서 보낸다. 이 값이 필요해지는 건 remote 가 **다른 저장소로
+           * 나가서** 계약 패키지의 어휘까지 실어 보내야 하는 날이다.
+           */
+          extractThirdParty: false,
+        },
+        /** remote 는 다른 remote 를 소비하지 않는다 — 받을 타입이 없다. */
+        consumeTypes: false,
+      },
+      dev: {
+        /** WS 기반 동적 타입 힌트만 끈다 (위 `[object Event]`). */
+        disableDynamicRemoteTypeHints: true,
+      },
+    },
+  };
+}
