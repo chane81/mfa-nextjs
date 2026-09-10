@@ -36,6 +36,7 @@
   "devDependencies": {
     "@mfa/eslint-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
+    "@mfa/utils": "workspace:*",
     "@types/react": "^19.2.2",
     "eslint": "^10.8.1",
     "react": "^19.2.8",

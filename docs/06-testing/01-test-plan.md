@@ -43,17 +43,26 @@ packages/store/src/cart/cookie-codec.test.ts   ← 바로 옆
 대상이 `.ts` 여도 DOM 이 필요하면 테스트는 `.test.tsx` 다(`renderHook` 은 JSX 가 없어도 된다).
 규칙이 하나뿐이라 파일을 열지 않고도 어느 환경에서 도는지 안다.
 
-공유 자산만 루트 `tests/` 에 둔다.
+공유 자산은 성격에 따라 두 곳이다.
 
 ```
 tests/
-  setup/dom.ts          jest-dom 매처 + RTL cleanup (dom 프로젝트 전용)
-  helpers/globals.ts    globalThis 싱글턴 레지스트리 정리
-  helpers/…             서명 키쌍, 가짜 req/res 등
+  setup/dom.ts                  jest-dom 매처 + RTL cleanup (러너 설정이다 — vitest.config.ts 가 가리킨다)
+
+packages/utils/                 @mfa/utils — 테스트 헬퍼 패키지 (빌드 없음)
+  src/test/globals.ts           globalThis 싱글턴 레지스트리 정리
+  src/test/cookies.ts           jsdom document.cookie 비우기
+  src/test/http.ts              가짜 req/res
+  src/test/signing.ts           Ed25519 서명 키쌍 픽스처
 ```
 
-테스트 파일에서는 `@tests/helpers/…` 로 부른다. 상대 경로로 쓰면
-`../../../../tests/…` 가 되고 깊이가 파일마다 달라져서 파일을 옮길 때마다 깨진다.
+**헬퍼는 워크스페이스 패키지이고 셋업은 아니다.** 셋업은 러너가 부트할 때 부르는
+설정 파일이라 `vitest.config.ts` 옆에 있는 게 맞고, 헬퍼는 여러 패키지의 테스트가
+import 하는 **라이브러리**라 의존성이 `package.json` 에 적히는 게 맞다(ADR-025).
+
+테스트 파일에서는 `@mfa/utils/test/…` 로 부른다. 배럴이 없다 — 서브패스마다 필요한
+환경이 다르기 때문이다(`test/cookies` 는 DOM, `test/http` · `test/signing` 은 node).
+배럴을 두면 DOM 없는 패키지가 `test/globals` 하나를 쓰려다 `document` 를 만난다.
 
 ### 두 가지 함정을 설정으로 막아뒀다
 
@@ -66,14 +75,16 @@ tests/
 | `tsconfig.build.json` | `build` · `dev` 스크립트          | **제외** | `outDir` · `rootDir` · `declaration` |
 
 **테스트를 `tsconfig.json` 에서 빼면 안 된다.** 편집기의 TS 서버는 그 파일을 어느 프로젝트에도
-넣지 못해 `@tests/*` 와 `@mfa/*` 를 통째로 못 찾는다(`ts(2307)`) — 러너는 멀쩡히 도는데
+넣지 못해 `@mfa/*` 를 통째로 못 찾는다(`ts(2307)`) — 러너는 멀쩡히 도는데
 에디터만 빨갛게 되는 상태다. 한 번 그렇게 만들었다가 되돌렸다.
 
-`rootDir` 도 `tsconfig.build.json` 쪽이다. 검사 프로그램에 두면 테스트가 루트 `tests/` 의
+`rootDir` 도 `tsconfig.build.json` 쪽이다. 검사 프로그램에 두면 테스트가 `@mfa/utils` 의
 헬퍼를 import 하는 순간 `TS6059: not under rootDir` 로 죽는다.
 
-emit 하지 않는 나머지(host · remote 둘 · remote-config)는 파일 하나로 충분하다 —
-`@tests/*` paths 만 있으면 된다.
+emit 하지 않는 나머지(host · remote 둘 · remote-config)는 파일 하나로 충분하다.
+**tsconfig `paths` 는 하나도 필요 없다** — 헬퍼가 워크스페이스 패키지가 되면서
+pnpm 심링크가 해석을 맡는다. 예전에는 같은 `@tests/*` 매핑이 tsconfig 10곳에 복제돼
+있었고, 하나라도 빠지면 그 패키지에서만 에디터가 빨개졌다.
 
 **② 빌드 없이 못 도는 것.** 워크스페이스 패키지의 `exports` 는 `./dist/*.js` 를 가리킨다.
 `vitest.config.ts` 의 alias 가 `src` 를 직접 가리키므로 `pnpm build` 없이 돈다 —
@@ -185,6 +196,21 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
       **remote 수를 넘지 않는다.** nonce 는 요청마다 유일해서(`버전-Date.now()`) 키를 쌓으면
       warm 한 번마다 엔트리가 늘고 host 는 장수 프로세스라 영영 안 준다. 코드로는 회귀를
       알아채기 어렵고 증상이 한참 뒤 메모리로만 나와서 크기를 직접 본다(40차)
+- [x] 44. `scripts/remote-wiring.test.ts` — **remote 를 추가할 때 잊는 선언 파일 셋**을
+      `REMOTE_LIST` 와 대조한다(41차). `turbo.json` 의 `@mfa/host#build.dependsOn`,
+      `docker-compose.yml` 의 서비스 · 포트 · env · 볼륨 · `depends_on`, 각 remote
+      Dockerfile 의 포트와 **제외 필터**. 셋 다 JSON · YAML · 도커 빌드 컨텍스트라 SSOT 를
+      못 읽는다(ADR-021 의 "파생 못 하면 대조한다"). 특히 제외 필터는 remote 가 늘 때마다
+      **다른 모든 remote 의 Dockerfile 이 같이 늘어나는** 유일한 자리이고, 빠뜨려도 빌드는
+      성공하고 이미지만 커져서 아무도 못 본다.
+      ⚠️ `turbo.json` 은 JSONC 라 주석을 걷어내고 읽는데, **정규식으로 하면 안 된다** —
+      값에 있는 `".next/**"` 의 `/**` 부터 먹어서 그 아래 태스크가 통째로 사라진다(실측).
+      문자열 안팎을 구분하는 스캐너가 그래서 그 파일에 있다
+- [x] 45. `scripts/deploy-targets.test.ts` 의 "공유 코드는 전부 배포한다" 에
+      `packages/utils/` 를 넣었다(41차) — 그 패키지는 **테스트 헬퍼뿐이라** 배포에서
+      빼고 싶어지는 자리다. 빼면 정반대 사고가 열린다: 거기 프로덕션 유틸이 하나
+      들어오는 순간 배포가 그 변경을 **안 물고 나가고**, 증상은 "고쳤는데 반영이
+      안 된다" 뿐이다. 통짜 규칙을 지키는 쪽이 틀려도 무해하다(ADR-025)
 
 ## vitest 밖의 검사 — MF DTS 가 `pnpm typecheck` 안에서 돈다
 
@@ -215,7 +241,7 @@ remote 이름인지. 그 파일은 **아무것도 export 하지 않는다** — 
 | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/host/src/mf/components/RemoteVersionSync.tsx` | `'use cache'` 는 Next 컴파일러가 변환하는 디렉티브다. 변환 없이 실행하면 `cacheLife`/`cacheTag` 가 캐시 스코프 밖 호출로 throw. **e2e 영역** |
 | 실제 MF 런타임 로딩 · host 프리렌더                 | `pnpm build` 가 이미 계약 테스트로 커버한다 (CI `build` job)                                                                                 |
-| `scripts/gen-signing-key.ts`                        | 로직이 없다. 키 형식만 `tests/helpers/signing.ts` 로 옮겨 픽스처 생성에 쓴다                                                                 |
+| `scripts/gen-signing-key.ts`                        | 로직이 없다. 키 형식만 `@mfa/utils/test/signing` 으로 옮겨 픽스처 생성에 쓴다                                                                |
 | `scripts/mf-build-version.ts`                       | `t${Date.now().toString(36)}` 한 줄                                                                                                          |
 | 브라우저 실제 동작                                  | e2e 범위                                                                                                                                     |
 
@@ -229,7 +255,7 @@ remote 이름인지. 그 파일은 **아무것도 export 하지 않는다** — 
    이 모듈은 `versions/server` · `loader/server` · `loader` · `RemoteComponent` 가 전부 전이 의존한다.
 
 2. **globalThis 오염** — `globalCell`(host) 과 `globalSingleton`(store) 은 `Symbol.for` 레지스트리라
-   `vi.resetModules()` 로 안 지워진다. `tests/helpers/globals.ts` 의 `clearGlobalRegistries()` 를
+   `vi.resetModules()` 로 안 지워진다. `@mfa/utils/test/globals` 의 `clearGlobalRegistries()` 를
    `beforeEach` 에서 부른다.
 
 3. **모듈 스코프 가변 상태** — `loader/server.ts` 의 `bundleCache`, `loader/index.ts` 의 `clientCache` ·

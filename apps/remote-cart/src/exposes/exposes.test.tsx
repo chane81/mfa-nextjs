@@ -6,7 +6,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@tests/helpers/globals';
+import { clearCookies } from '@mfa/utils/test/cookies';
+import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
 import { ORIGIN } from '../origin';
 
@@ -26,13 +27,6 @@ const line = (product: (typeof PRODUCTS)[number], quantity: number) => ({
   unitPrice: product.price,
   quantity,
 });
-
-const clearCookies = () => {
-  for (const part of document.cookie.split(/;\s*/)) {
-    const name = part.split('=')[0];
-    if (name) document.cookie = `${name}=; path=/; max-age=0`;
-  }
-};
 
 beforeEach(() => {
   clearGlobalRegistries();

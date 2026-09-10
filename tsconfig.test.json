@@ -21,7 +21,6 @@
      * 통과하는데 런타임에서 다른 파일이 로드되거나 그 반대가 된다.
      */
     "paths": {
-      "@tests/*": ["./tests/*"],
       "@mfa/store/server": ["./packages/store/src/server.ts"],
       "@mfa/store": ["./packages/store/src/index.ts"],
       "@mfa/contracts": ["./packages/contracts/src/index.ts"],

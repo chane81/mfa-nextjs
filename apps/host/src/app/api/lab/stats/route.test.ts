@@ -1,7 +1,7 @@
 import { MF_FILES, versionedPath } from '@mfa/remote-config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@tests/helpers/globals';
+import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
 /**
  * 실험 절차: `DELETE` 로 0 으로 리셋 → 대상 페이지를 N 번 요청 → `GET` 으로 확인.

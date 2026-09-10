@@ -65,9 +65,15 @@ export default defineConfig({
       },
       // host 의 tsconfig `paths` 와 같은 규칙
       { find: /^@\//, replacement: `${at('./apps/host/src')}/` },
-      // 테스트가 공유하는 셋업·헬퍼. 테스트 파일은 소스 옆에 있으므로 상대 경로로는
-      // `../../../../tests/...` 가 된다 — 깊이가 파일마다 달라져서 옮길 때마다 깨진다.
-      { find: /^@tests\//, replacement: `${at('./tests')}/` },
+      /**
+       * 테스트 헬퍼. `exports` 가 이미 소스 `.ts` 를 가리키므로 alias 없이도 해석되지만,
+       * 위 항목들과 같은 이유로 명시한다 — 해석이 `node_modules` 심링크를 타면 이 파일이
+       * 정한 것과 **다른 경로로 로드될 수 있는 자리**가 하나 생긴다.
+       */
+      {
+        find: /^@mfa\/utils\/(.*)$/,
+        replacement: `${at('./packages/utils/src')}/$1.ts`,
+      },
     ],
     /**
      * 루트(테스트·RTL)와 각 패키지가 각자 `react` 를 해석한다. pnpm 이 같은 버전을

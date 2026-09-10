@@ -4,7 +4,8 @@ import { PRODUCTS } from '@mfa/contracts';
 import { act, render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@tests/helpers/globals';
+import { clearCookies } from '@mfa/utils/test/cookies';
+import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
 /**
  * 탭 사이에서 장바구니가 갈라지는 걸 막는다.
@@ -14,13 +15,6 @@ import { clearGlobalRegistries } from '@tests/helpers/globals';
  */
 const A = PRODUCTS[0]!;
 const B = PRODUCTS[1]!;
-
-const clearCookies = () => {
-  for (const part of document.cookie.split(/;\s*/)) {
-    const name = part.split('=')[0];
-    if (name) document.cookie = `${name}=; path=/; max-age=0`;
-  }
-};
 
 const setVisibility = (state: DocumentVisibilityState) => {
   Object.defineProperty(document, 'visibilityState', {

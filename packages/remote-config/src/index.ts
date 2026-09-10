@@ -88,6 +88,13 @@ export const MF_TYPES_FOLDER = '@mf-types';
 export const MF_FILES = {
   /** 브라우저 MF 런타임이 읽는 매니페스트 */
   webManifest: 'mf-manifest.json',
+  /**
+   * 브라우저 MF 런타임이 매니페스트를 따라 받아가는 remote 엔트리.
+   *
+   * 두 번들러 플러그인의 `filename` 기본값과 같지만 **기본값에 기대지 않고 명시한다** —
+   * 한쪽 플러그인이 기본값을 바꾸면 host 가 조립한 주소만 조용히 어긋나기 때문이다.
+   */
+  webEntry: 'remoteEntry.js',
   /** host **서버**가 받아 실행하는 node 타깃 CJS 번들 */
   ssrBundle: `${MF_SSR_BUNDLE.name}${MF_SSR_BUNDLE.extension}`,
   /** remote 가 "지금 버전이 뭔지"를 공표하는 파일 (버전 경로 아래가 아니라 루트에 있다) */
@@ -413,6 +420,37 @@ export const SSR_EXTERNALS = [
  * 빠진 채로 배포되면 `예상 밖 모듈을 require 했습니다` 로 remote 가 통째로 안 뜬다.
  */
 export type SsrExternal = (typeof SSR_EXTERNALS)[number];
+
+/**
+ * 브라우저 MF `shared` 가 요구하는 React 범위.
+ *
+ * 이 문자열은 **세 곳에서 같아야 한다** — remote 두 벌의 번들러 설정과 host 런타임
+ * `init({ shared })`. 어긋나면 MF 가 공유 스코프에서 host 의 React 를 거절하고
+ * remote 가 자기 사본을 받아 쓴다. 그러면 에러 없이 훅만 깨진다
+ * (`Invalid hook call` 이 remote 안에서만 난다) — 원인이 가장 안 보이는 형태다.
+ *
+ * 정확한 버전이 아니라 범위인 이유: host 가 심는 실제 버전은 런타임의 `React.version`
+ * 이고, remote 는 그게 이 범위 안이기만 하면 된다.
+ */
+export const REACT_REQUIRED_VERSION = '^19.0.0';
+
+/**
+ * remote 번들러가 그대로 넘기는 브라우저 `shared` 설정.
+ *
+ * **루트만** 공유한다. 서브엔트리(`react/jsx-runtime` 등)까지 공유하면 네임스페이스
+ * 모양이 갈려 `_jsxDEV is not a function` 이 난다 — 그쪽은 위 `SSR_EXTERNALS` 가
+ * 맡는 서버 경로 전용이다.
+ */
+export const SHARED_REACT = {
+  react: { singleton: true, requiredVersion: REACT_REQUIRED_VERSION },
+  'react-dom': { singleton: true, requiredVersion: REACT_REQUIRED_VERSION },
+} as const;
+
+/**
+ * 빌드 버전이 적히는 파일 이름. `scripts/mf-build-version.ts` 가 쓰고
+ * `readBuildVersion`(node 진입점)이 읽는다. 두 remote 의 `clean` 스크립트도 이 이름을 지운다.
+ */
+export const VERSION_FILE = '.mf-version';
 
 /**
  * 버전 디렉터리 아래의 경로. `/v<version>/<파일>` — **오리진은 붙이지 않는다.**

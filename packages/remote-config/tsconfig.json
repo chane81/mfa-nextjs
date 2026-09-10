@@ -18,11 +18,7 @@
      * 필요한 `process` 한 조각은 `src/index.ts` 에서 좁게 선언한다.
      */
     "types": [],
-    "tsBuildInfoFile": "./.turbo/tsconfig.tsbuildinfo",
-    // 테스트가 공유하는 셋업·헬퍼 (`vitest.config.ts` 의 alias 와 같은 대상)
-    "paths": {
-      "@tests/*": ["../../tests/*"]
-    }
+    "tsBuildInfoFile": "./.turbo/tsconfig.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
   /**

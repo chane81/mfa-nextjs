@@ -33,7 +33,6 @@
      * `vitest.config.ts` 의 alias 와 같은 대상을 가리킨다.
      */
     "paths": {
-      "@tests/*": ["./tests/*"],
       "@/*": ["./apps/host/src/*"]
     }
   },

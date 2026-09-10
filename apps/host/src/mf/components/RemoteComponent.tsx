@@ -10,7 +10,7 @@ import type {
 import { stylesPath } from '@mfa/remote-config';
 import { Skeleton } from '@mfa/ui';
 
-import { WEB_ENTRIES, WEB_ORIGINS } from '../config';
+import { UNVERSIONED, WEB_ENTRIES, WEB_ORIGINS } from '../config';
 import { loadRemoteModule } from '../loader';
 import { remoteVersion } from '../versions';
 import { RemoteBoundary } from './RemoteBoundary';
@@ -39,7 +39,7 @@ const lazyCache = new Map<string, ComponentType<Record<string, unknown>>>();
 export function remoteCacheKey(id: RemoteModuleId, reloadKey?: string): string {
   const remote = id.split('/')[0] as RemoteName;
   // 브라우저에는 서버가 심어준 버전이 있고(RemoteVersionSync), 없으면 unversioned 로 고정된다
-  const version = remoteVersion(remote) ?? 'unversioned';
+  const version = remoteVersion(remote) ?? UNVERSIONED;
   return `${id}@${version}${reloadKey ? `#${reloadKey}` : ''}`;
 }
 

@@ -4,7 +4,7 @@ import { MF_FILES } from '@mfa/remote-config';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@tests/helpers/globals';
+import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
 import { formatKst } from '@/lib/format-time';
 
