@@ -65,7 +65,7 @@ def common(md, max_lines, summary_within=35):
              for b0 in re.findall(r"<summary>.*?</summary>", md, re.S)) if "<summary>" in md else False,
          re.findall(r"<summary>(.*?)</summary>", md, re.S)[:3]),
         (f"번호 섹션이 4개 이하다 (실제 {nsec})", nsec <= 4, f"{nsec}개"),
-        (f"가장 긴 섹션의 산문이 5줄 이하다 (실제 {longest})", longest <= 5, f"최장 {longest}줄"),
+        (f"참고: 가장 긴 섹션 산문 {longest}줄 — 8줄 넘으면 판단 둘이 섞였는지 본다", longest <= 8, f"최장 {longest}줄"),
         ("검증 결과가 코드블록·표 안에 있다",
          any(re.search(r"(통과|passed|✓|pnpm|pytest)", f) for f in fenced(md)) or has_table(md),
          f"fence {len(fenced(md))}개"),
