@@ -56,9 +56,13 @@ def table_rows(md):
 
 # ── 공통 assertion ────────────────────────────────────────────────
 def visible(md):
-    """<details> 가 접힌 상태에서 리뷰어가 실제로 보는 것. summary 줄만 남긴다."""
-    return re.sub(r"<details>.*?<summary>(.*?)</summary>.*?</details>",
-                  r"\1", md, flags=re.S)
+    """<details> 가 접힌 상태에서 리뷰어가 실제로 보는 것. summary 줄만 남긴다.
+
+    여기도 줄 앞에 온 `<details>` 만 블록으로 본다 — 본문이 그 태그를 글로 언급하면
+    거기서부터 실제 블록의 `</summary>` 까지가 통째로 사라졌다.
+    """
+    return re.sub(r"^<details>.*?<summary>(.*?)</summary>.*?^</details>",
+                  r"\1", md, flags=re.S | re.M)
 
 def common(md, max_prose, summary_within=35):
     seen = visible(md)
