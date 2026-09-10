@@ -26,7 +26,6 @@ import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 import {
-  DEPLOY_IGNORED_PATHS,
   HOST_WORKSPACE_DIR,
   REMOTES,
   REMOTE_NAMES,
@@ -87,19 +86,8 @@ export function plan({
 
   if (changed === null) return ALL;
 
-  /**
-   * 이미지 안에서 실행되지 않는 경로를 먼저 걷어낸다(`DEPLOY_IGNORED_PATHS`).
-   *
-   * 걷어내지 않으면 `packages/` 통짜 규칙에 걸려 **테스트 헬퍼 한 줄에 세 앱이 전부
-   * 재배포된다.** 여기서 지우면 그 파일만 바뀐 push 는 아래 어느 갈래에도 안 걸려
-   * "배포 없음" 으로 끝난다 — 의도한 결과다.
-   */
-  const relevant = changed.filter(
-    (file) => !DEPLOY_IGNORED_PATHS.some((prefix) => file.startsWith(prefix)),
-  );
-
   const touches = (prefix: string): boolean =>
-    relevant.some((file) => file === prefix || file.startsWith(prefix));
+    changed.some((file) => file === prefix || file.startsWith(prefix));
 
   // 공유 코드는 세 이미지가 전부 다시 빌드해야 한다.
   if (SHARED_DEPLOY_PATHS.some(touches)) return ALL;

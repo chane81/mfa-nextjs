@@ -1,14 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-import {
-  DEPLOY_IGNORED_PATHS,
-  HOST_WORKSPACE_DIR,
-  REMOTES,
-  REMOTE_LIST,
-  REMOTE_NAMES,
-} from '@mfa/remote-config';
+import { REMOTE_NAMES } from '@mfa/remote-config';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -24,8 +14,6 @@ const push = (changed: readonly string[] | null) =>
 const names = (p: { remotes: { name: string }[] }) =>
   p.remotes.map((r) => r.name);
 
-const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
-
 describe('배포 대상 판별', () => {
   it('바뀐 디렉터리로 대상을 고른다', () => {
     expect(names(push(['apps/remote-catalog/src/x.tsx']))).toEqual(['catalog']);
@@ -37,9 +25,16 @@ describe('배포 대상 판별', () => {
   });
 
   it('공유 코드는 전부 배포한다', () => {
-    // 셋 다 세 이미지에 들어간다. `.dockerignore` 는 빌드 컨텍스트를 바꾼다(I-7).
+    // 넷 다 세 이미지에 들어간다. `.dockerignore` 는 빌드 컨텍스트를 바꾼다(I-7).
+    //
+    // `packages/utils` 는 지금 테스트 헬퍼뿐이라 "굳이?" 로 보인다. 그래도 여기 둔다 —
+    // `packages/` 를 통짜로 보는 것이 이 판별의 성질이고, 예외를 파는 순간 **반대 방향
+    // 사고**가 열리기 때문이다. 그 패키지에 프로덕션 유틸이 하나 들어오면 배포가 그
+    // 변경을 안 물고 나가고, 증상은 "고쳤는데 반영이 안 된다" 뿐이다(ADR-025).
+    // 대가는 헬퍼 한 줄에 세 앱이 다시 나가는 것이고, 그쪽이 훨씬 싸다.
     for (const f of [
       'packages/store/src/x.ts',
+      'packages/utils/src/test/cookies.ts',
       'scripts/x.ts',
       '.dockerignore',
     ])
@@ -62,54 +57,6 @@ describe('배포 대상 판별', () => {
     expect(names(d('all'))).toEqual([...REMOTE_NAMES]);
     expect(d('remotes').host).toBe(false);
     expect(d('host').remotes).toEqual([]);
-  });
-
-  /**
-   * `packages/` 는 통짜로 "바뀌면 전부 배포" 다. 그 구멍이 `DEPLOY_IGNORED_PATHS` 이고,
-   * 구멍이 뚫린 만큼 **정반대 사고**가 가능해진다 — 앱이 런타임에 쓰는 패키지를
-   * 거기 넣으면 배포가 그 변경을 안 물고 나가고, 증상은 "고쳤는데 반영이 안 된다" 다.
-   */
-  describe('이미지에 안 들어가는 경로는 배포를 안 부른다', () => {
-    it('그 경로만 바뀌면 아무것도 배포하지 않는다', () => {
-      expect(push(['packages/utils/src/test/cookies.ts'])).toEqual({
-        remotes: [],
-        host: false,
-      });
-    });
-
-    it('같이 바뀐 진짜 변경은 그대로 잡는다', () => {
-      expect(
-        push([
-          'packages/utils/src/test/cookies.ts',
-          'apps/host/src/app/page.tsx',
-        ]),
-      ).toEqual({ remotes: [], host: true });
-    });
-
-    it.each(DEPLOY_IGNORED_PATHS)(
-      '%s 는 어느 앱의 런타임 의존성도 아니다',
-      (prefix) => {
-        const manifest = JSON.parse(
-          readFileSync(resolve(REPO_ROOT, prefix, 'package.json'), 'utf8'),
-        ) as { name: string };
-
-        for (const dir of [
-          HOST_WORKSPACE_DIR,
-          ...REMOTE_LIST.map(({ name }) => REMOTES[name].workspaceDir),
-        ]) {
-          const app = JSON.parse(
-            readFileSync(resolve(REPO_ROOT, dir, 'package.json'), 'utf8'),
-          ) as { dependencies?: Record<string, string> };
-
-          expect(
-            Object.keys(app.dependencies ?? {}),
-            `${dir} 가 ${manifest.name} 을 런타임 의존성으로 쓴다. ` +
-              'DEPLOY_IGNORED_PATHS 에서 빼거나 그 import 를 없애세요 — ' +
-              '지금은 그 패키지를 고쳐도 배포가 안 나간다.',
-          ).not.toContain(manifest.name);
-        }
-      },
-    );
   });
 
   it('모르는 대상은 경계에서 죽는다', () => {

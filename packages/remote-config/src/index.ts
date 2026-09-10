@@ -317,23 +317,6 @@ export const SHARED_DEPLOY_PATHS: readonly string[] = [
   '.dockerignore',
 ];
 
-/**
- * 위 목록의 **구멍**. 여기 걸린 경로는 바뀌어도 배포를 부르지 않는다.
- *
- * `packages/` 는 통짜로 "바뀌면 전부 배포" 다. 그 안에 **이미지 산출물에 못 들어가는**
- * 패키지가 생기면 그 규칙이 과하게 잡는다 — `@mfa/utils` 는 테스트 헬퍼뿐이고 어느
- * 앱도 런타임에 import 하지 않는다(devDependency 이고 빌드 태스크도 없다). 헬퍼 한 줄
- * 고쳤다고 remote 둘과 host 를 다시 배포할 이유가 없다.
- *
- * ⚠️ **여기 넣는 순간 그 패키지는 프로덕션 코드에서 못 쓴다.** 누가 앱 런타임에서
- * import 하면 배포가 그 변경을 안 물고 나가고, 증상은 "고쳤는데 반영이 안 된다" 로만
- * 보인다. 그래서 `scripts/remote-wiring.test.ts` 가 이 목록의 패키지가 정말
- * devDependency 로만 쓰이는지 본다.
- *
- * 목록을 늘릴 때 기준은 하나다 — **이미지 안에서 실행되는가.**
- */
-export const DEPLOY_IGNORED_PATHS: readonly string[] = ['packages/utils/'];
-
 export function deployTarget(remote: RemoteName): RemoteDeployTarget {
   return {
     name: remote,
