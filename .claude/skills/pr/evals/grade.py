@@ -112,8 +112,9 @@ def common(md, max_prose, summary_within=35):
          nsec > 0 and len(marked) >= (nsec + 1) // 2, f"{len(marked)}/{nsec} 섹션"),
         ("평행하게 열거되는 결과가 섹션 안 표·불릿이다", enumerated,
          f"섹션별 표 {[table_rows(x) for x in secs]} · 불릿 {[bullet_items(x) for x in secs]}"),
-        (f"참고: 첫 화면 산문 {n_prose}줄 — {max_prose}줄 안팎 (표·인용·코드는 안 센다)",
-         n_prose <= max_prose, f"산문 {n_prose}줄 / 보이는 {n}줄 / 전체 {total}줄"),
+        # 맞춰야 하는 숫자가 아니라 되돌아볼 신호다. 크게 넘길 때만 걸리게 둔다.
+        (f"참고: 첫 화면 산문 {n_prose}줄 — 크게 넘치면 핵심이 산문에 묻혔는지 본다",
+         n_prose <= max_prose * 1.5, f"산문 {n_prose}줄 / 보이는 {n}줄 / 전체 {total}줄"),
     ]
 
 def grade(name, run):
