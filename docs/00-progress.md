@@ -1,5 +1,61 @@
 # 진행 상황
 
+## 2026-09-06 (41차) — catalog 를 Vite 에서 Rsbuild 로 옮긴다
+
+두 remote 를 **일부러 다른 번들러**로 둔 것이 이 저장소의 주장 중 하나였다. 그 주장은
+[04-bundler-comparison.md](./01-research/04-bundler-comparison.md) 에서 검증을 마쳤고
+(둘 다 host 가 똑같이 소비한다), 결론은 "MF remote 전용이라면 Rsbuild" 였다.
+그 결론을 실행했다 — 판단과 대가는
+[ADR-024](./02-architecture/01-decision.md#adr-024--catalog-를-vite-에서-rsbuild-로-옮긴다-번들러-다양성을-코드에서-뺀다).
+
+### 무엇이 줄었나
+
+catalog 의 설정 **423줄 → 237줄(−44%)**. 저장소 전체로는 `+308 / −536`.
+
+| 사라진 것              | 무엇을 메꾸던 코드였나                                                    |
+| ---------------------- | ------------------------------------------------------------------------- |
+| `server.warmup`        | expose 소스를 기동 시점에 미리 transform (0-4c 의 레이스)                 |
+| `optimizeDeps`         | 의존성 사전 번들링. host 안에서는 Vite 의 자동 새로고침이 오지 않는다     |
+| `serveDevStylesheet()` | dev 의 CSS 를 `?direct` 로 뽑아 `text/css` 로 되돌려주기                  |
+| 훅 2개                 | `configureServer` + `configurePreviewServer` → `server.setup` 의 `action` |
+| `index.html`           | Rsbuild 가 생성한다. 진입점도 `src/index.tsx` 로 cart 와 같아졌다         |
+
+셋 다 **dev 전용**이었다. 배포 산출물에서 하는 일이 없는 코드가 설정의 절반을 차지하고
+있었다는 뜻이다.
+
+### 파생으로 죽은 SSOT 갈래
+
+- `assetBase()` 의 `trailingSlash` — Vite `base` 만 뒤 슬래시를 요구했다. 호출부 0 → 삭제
+- `@mfa/typescript-config/vite.json` — 소비처 0 → 삭제
+- `@tailwindcss/vite` 경로 — 세 앱이 `@tailwindcss/postcss` 하나로 모였다
+- `.env*` 비대칭 — Vite 는 config 평가 시점에 `.env` 를 안 읽었다. 이제 두 remote 가 같다
+  (여전히 파일은 쓰지 않는다 — [03-environment.md](./03-setup/03-environment.md))
+
+### 계약은 하나도 안 바꿨다
+
+`MF_FILES` · `EXPOSE_SCAN` · `SSR_EXTERNALS` · `createMfDevMiddleware` 는 그대로다.
+번들러를 아는 지식이 계약에 새지 않게 막아 둔 것이 이번에 값을 했다 — 한쪽 remote 의
+번들러를 통째로 갈았는데 host 쪽 코드는 **주석만** 바뀌었다.
+
+### 남긴 것
+
+host 의 `SHARED_PROBES` 5개 중 서브엔트리 셋(`react-dom/client` · `react/jsx-runtime` ·
+`react/jsx-dev-runtime`)은 이제 **아무도 요구하지 않는다.** `@module-federation/vite` 가
+매니페스트에 자동으로 올리던 것이었고, 지금 두 remote 는 `react` · `react-dom` 둘만
+올린다(실측). 그래도 지우지 않았다 — 8차에 같은 목록을 오진으로 줄였다가 `#RUNTIME-015`
+를 만난 기록이 있고(0-4d), 그때 세운 검증 절차(0-4e)를 치르지 않고 지우면 같은 실수다.
+
+### 밟은 것
+
+- **J-1** — 블록 주석 안에 `apps/remote-*/rsbuild.config.ts` 라고 적었더니 `*/` 가 주석을
+  끝내버려서 TS 파일이 통째로 깨졌다. 에러는 전부 주석 **아래** 줄에서 났다
+- **J-2** — 0-4c · 0-4d 는 원인이 사라져 더는 재현되지 않는다. 항목은 남기고 표시만 달았다
+
+### 검증
+
+`pnpm build` · `typecheck` · `lint` · `test`(46파일 656개) 전부 통과.
+`pnpm mf:types` 재생성 결과도 커밋에 포함(origin 라벨이 `remote: catalog · rsbuild` 로 바뀐다).
+
 ## 2026-09-06 (40차) — 교체하면서 조용히 빠진 성질들을 되돌린다
 
 38·39차(PR #8)가 머지된 뒤 그 범위를 다시 리뷰했다. 나온 6건 중 셋이 같은 모양이었다 —

@@ -10,7 +10,7 @@ paths:
 
 토큰 원본은 `packages/tailwind-config/theme.css` 의 `@theme` 한 곳뿐이다.
 **공유 패키지는 CSS 를 빌드하지 않는다** — 소스만 배포하고 세 앱이 자기 파이프라인에서 컴파일한다
-(host · cart 는 `@tailwindcss/postcss`, catalog 는 `@tailwindcss/vite`).
+(세 앱 모두 `@tailwindcss/postcss`).
 공유 CSS 산출물을 만들면 배포 그래프가 다시 하나로 묶여 독립 배포 주장이 깨진다.
 
 세 앱과 `@mfa/tailwind-config` 의 Tailwind 버전은 **같아야 한다**(현재 `^4.3.3`).

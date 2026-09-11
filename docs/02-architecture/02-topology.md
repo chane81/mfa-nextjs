@@ -17,7 +17,7 @@
           └────────────────────────┘                └────────────────────────┘
                        ▲                                          ▲
                        └──────────── 같은 소스 ────────────────────┘
-                          catalog :3001 (Vite) / cart :3002 (Rsbuild)
+                       catalog :3001 / cart :3002 (둘 다 Rsbuild)
 
 
   host :3000  ─ Next.js 16 / Turbopack / App Router ─ 라우터는 여기 하나뿐
@@ -51,7 +51,7 @@
 | 앱                    | 포트 | 번들러                 | 역할                                     | 산출물                                                                   |
 | --------------------- | ---- | ---------------------- | ---------------------------------------- | ------------------------------------------------------------------------ |
 | `apps/host`           | 3000 | Next.js 16 / Turbopack | 셸 · 라우팅 · remote 소비(브라우저+서버) | `.next` (standalone)                                                     |
-| `apps/remote-catalog` | 3001 | Vite 8                 | 상품 목록 / 상세                         | `/v<version>/` 아래 웹·노드 번들 + `style.css`, 루트에 `mf-version.json` |
+| `apps/remote-catalog` | 3001 | Rsbuild 2 (Rspack)     | 상품 목록 / 상세                         | `/v<version>/` 아래 웹·노드 번들 + `style.css`, 루트에 `mf-version.json` |
 | `apps/remote-cart`    | 3002 | Rsbuild 2 (Rspack)     | 장바구니 / 배지 / **결제**               | 위와 동일                                                                |
 
 remote 자산은 **버전 디렉터리 아래 불변 경로**에 올라가고, 루트의 `mf-version.json` 하나가
@@ -71,16 +71,16 @@ remote 자산은 **버전 디렉터리 아래 불변 경로**에 올라가고, �
 | `@mfa/tailwind-config`   | **디자인 토큰 SSOT** — Tailwind v4 `@theme` + PostCSS 설정 원본             |
 | `@mfa/ui`                | 공용 컴포넌트 — Tailwind 클래스만 내보내고 CSS 는 만들지 않는다             |
 | `@mfa/eslint-config`     | ESLint 10 flat config (base / react / next)                                 |
-| `@mfa/typescript-config` | tsconfig 프리셋 (base / nextjs / react-library / vite)                      |
+| `@mfa/typescript-config` | tsconfig 프리셋 (base / nextjs / react-library)                             |
 
 `@mfa/remote-config` 만 **빌드 산출물이 없다**. `exports` 가 소스 `.ts` 를 직접 가리킨다.
-번들러 config(`vite.config.ts` · `rsbuild.config.ts`)가 프로세스 시작 즉시 이 모듈을 읽는데,
+번들러 config(각 remote 의 `rsbuild.config.ts`)가 프로세스 시작 즉시 이 모듈을 읽는데,
 그 시점엔 watch 빌드가 `dist/` 를 만들 틈이 없기 때문이다. Node 24 의 타입 스트리핑이
 `.ts` 를 그대로 실행해주는 덕에 성립한다 — `engines.node` 가 `>=24.19.0` 인 이유다.
 
 `@mfa/tailwind-config` 도 빌드하지 않는다. `theme.css` 를 **소스 그대로** 내보내고
-세 앱이 각자 자기 파이프라인에서 컴파일한다(host·cart 는 `@tailwindcss/postcss`,
-catalog 는 `@tailwindcss/vite`). 공유 CSS 를 한 번 빌드해 배포하면 remote 가 새 클래스를
+세 앱이 각자 자기 파이프라인에서 컴파일한다(전부 `@tailwindcss/postcss`).
+공유 CSS 를 한 번 빌드해 배포하면 remote 가 새 클래스를
 쓸 때마다 그 공유 산출물을 다시 배포해야 하고, 그러면 배포 단위가 다시 하나로 묶인다.
 같은 유틸리티가 여러 CSS 에 중복되지만 값이 같고, 캐스케이드 레이어는 이름이 같으면
 병합되므로 나중에 로드된 remote CSS 가 host 유틸리티를 덮지 않는다.
@@ -206,13 +206,12 @@ SSR HTML 에도 들어가고 소프트 내비게이션에서도 동작하며, �
 청크)이 선행된다. `<link>` 는 HTML 에 처음부터 있는 게 가장 빠른데 정반대다. 실측으로도
 지금 구조는 `/cart` 가 cart CSS 만 받는다.
 
-| 제약                                     | 이유                                                                                                                                            |
-| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| 파일명 고정 `style.css` (해시 X)         | host 가 주소를 **계산으로** 알아야 한다. 해시가 붙으면 매니페스트를 파싱해 캐내야 하고 그 순간 remote 의 빌드 산출물 구조에 묶인다              |
-| 오리진은 `WEB_ENTRIES` 에서 파생         | `publicOrigin` 은 동적 env 접근이라 **브라우저 번들에서 치환되지 않는다.** 그대로 쓰면 배포에서 `localhost` 를 가리키고 하이드레이션도 어긋난다 |
-| CSS 를 한 파일로 (`cssCodeSplit: false`) | expose 마다 쪼개지면 가리킬 주소가 여러 개가 되고 그 목록이 다시 계약이 된다                                                                    |
-| `<link>` 는 `Suspense` 밖                | 안에 두면 remote 번들을 기다리는 동안 스타일시트 요청이 시작되지 않는다                                                                         |
-| dev 전용 미들웨어 (catalog)              | dev 의 Vite 는 CSS 를 `<style>` 주입 **JS 모듈**로 서빙한다. `<link>` 로 받으면 브라우저가 조용히 무시하므로 `?direct` 로 순수 CSS 를 돌려준다  |
+| 제약                              | 이유                                                                                                                                            |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| 파일명 고정 `style.css` (해시 X)  | host 가 주소를 **계산으로** 알아야 한다. 해시가 붙으면 매니페스트를 파싱해 캐내야 하고 그 순간 remote 의 빌드 산출물 구조에 묶인다              |
+| 오리진은 `WEB_ENTRIES` 에서 파생  | `publicOrigin` 은 동적 env 접근이라 **브라우저 번들에서 치환되지 않는다.** 그대로 쓰면 배포에서 `localhost` 를 가리키고 하이드레이션도 어긋난다 |
+| CSS 를 한 파일로 · 해시 없는 이름 | expose 마다 쪼개지면 가리킬 주소가 여러 개가 되고 그 목록이 다시 계약이 된다                                                                    |
+| `<link>` 는 `Suspense` 밖         | 안에 두면 remote 번들을 기다리는 동안 스타일시트 요청이 시작되지 않는다                                                                         |
 
 ## host 의 MF 계층 (`apps/host/src/mf/`)
 
@@ -256,8 +255,11 @@ loadRemoteModule("cart/CheckoutFlow")
 
 ## 공유 모듈 목록
 
-host 는 브라우저 쪽에 5개를 공유한다. 루트만으로 충분해 보이지만
-`@module-federation/vite` 가 서브엔트리를 shared 목록에 자동으로 올리므로 전부 제공해야 한다.
+host 는 브라우저 쪽에 5개를 공유한다. 루트만으로 충분해 보이지만, catalog 가 Vite 였을 때
+`@module-federation/vite` 가 서브엔트리를 shared 목록에 자동으로 올렸다. 41차에 두 remote 가
+Rsbuild 로 통일되면서 **매니페스트에는 `react` · `react-dom` 둘만 오른다**(실측) — 지금
+서브엔트리 셋은 남겨 둔 것이지 요구받는 것이 아니다. 지우려면 dev 콜드 로드까지 확인해야
+한다(known-issues 0-4d).
 
 | 모듈                    | 프로브         | 비고                                             |
 | ----------------------- | -------------- | ------------------------------------------------ |

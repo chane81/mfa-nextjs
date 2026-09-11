@@ -13,17 +13,16 @@
 
 ## `.env` 파일이 실제로 로드되는 자리는 한 곳뿐
 
-앱마다 번들러가 다르다(host=Next/Turbopack, catalog=Vite, cart=Rsbuild). **env 파일 로딩은
+앱마다 번들러가 다르다(host=Next/Turbopack, catalog·cart=Rsbuild). **env 파일 로딩은
 번들러가 하는 일이라 앱마다 다르게 동작한다.** 파일을 만들어 두고 값이 안 먹어서 헤매기 쉬운
 지점이라 먼저 적는다.
 
-| 위치                          | 로더                 | 로드됨?            | 근거                                  |
-| ----------------------------- | -------------------- | ------------------ | ------------------------------------- |
-| `apps/host/.env.local`        | Next.js              | ✅                 | `next.config.ts` 평가 시점에도 보인다 |
-| `apps/remote-cart/.env.local` | Rsbuild CLI (dotenv) | ✅ (권장하지 않음) | 실측 확인 — 아래                      |
-| `apps/remote-catalog/.env*`   | Vite 8               | ❌                 | 설계상 `process.env` 에 안 넣는다     |
-| 루트 `.env`                   | turbo 2              | ❌                 | 캐시 키로만 쓴다                      |
-| `scripts/*.ts`                | 없음                 | ❌                 | 별도 node 프로세스                    |
+| 위치                       | 로더                 | 로드됨?            | 근거                                  |
+| -------------------------- | -------------------- | ------------------ | ------------------------------------- |
+| `apps/host/.env.local`     | Next.js              | ✅                 | `next.config.ts` 평가 시점에도 보인다 |
+| `apps/remote-*/.env.local` | Rsbuild CLI (dotenv) | ✅ (권장하지 않음) | 실측 확인 — 아래                      |
+| 루트 `.env`                | turbo 2              | ❌                 | 캐시 키로만 쓴다                      |
+| `scripts/*.ts`             | 없음                 | ❌                 | 별도 node 프로세스                    |
 
 실질적으로 **`apps/host/.env.local` 하나만 쓴다.** 나머지는 셸 환경변수로 준다.
 
@@ -32,45 +31,35 @@
 Next.js 가 `.env.local` 을 자동 로드하고, `next.config.ts` 평가 전에 로드하므로
 `NEXT_PUBLIC_*` 치환까지 파일에서 먹는다.
 
-### catalog(Vite 8) — 동작하지 않는다
-
-`vite.config.ts` 는 `publicOrigin()` 을 통해 config 평가 시점에
-`process.env.REMOTE_CATALOG_PUBLIC_URL` 을 읽는다. 그런데 Vite 는 그 시점에 `.env*` 를
-로드하지 않았다.
-
-> Vite deliberately defers loading `.env*` files until after the user config has been resolved,
-> as the set of files to load depends on config options like `root` and `envDir`, and also on the
-> final `mode`. This means variables defined in `.env` files are not automatically injected into
-> `process.env` while `vite.config.*` is running.
-> — Vite 8.0.10, `docs/config/index.md`
-
-읽을 파일 목록 자체가 config 에 달려 있으니 config 보다 먼저 읽을 수 없다는, 피할 수 없는
-순서 문제다. 최종적으로도 `VITE_` 접두사 값만 `import.meta.env` 로 노출되고 `process.env` 는
-끝까지 채워지지 않는다.
-
-그래서 catalog 의 자산 오리진은 **셸 환경변수로만** 바뀐다.
-
-```bash
-REMOTE_CATALOG_PUBLIC_URL=https://cdn.example.com pnpm --filter @mfa/remote-catalog build
-```
-
-파일로 받고 싶으면 `vite.config.ts` 에서 `loadEnv(mode, process.cwd(), '')` 를 직접 호출해
-결과를 써야 한다. **하지 않았다** — 아래 "왜 remote 는 파일을 안 쓰나" 참고.
-
-### cart(Rsbuild 2) — 동작하지만 쓰지 않는다
+### 두 remote(Rsbuild 2) — 동작하지만 쓰지 않는다
 
 Rsbuild CLI 는 dotenv 로 `.env*` 를 읽어 `process.env` 에 넣고, 그 뒤에 config 를 로드한다.
-`rsbuild.config.ts` 의 `publicOrigin()` 이 값을 그대로 받는다. 실측:
+`rsbuild.config.ts` 의 `publicOrigin()` 이 값을 그대로 받는다. 두 remote 모두 실측:
 
 ```bash
 # apps/remote-cart/.env.local 에 REMOTE_CART_PUBLIC_URL=http://envtest.local:9999
 $ npx rsbuild inspect
 dist/.rsbuild/rsbuild.config.mjs:80:  assetPrefix: 'http://envtest.local:9999',
 dist/.rsbuild/rspack.config.web.mjs:29: publicPath: 'http://envtest.local:9999/',
+
+# apps/remote-catalog/.env.local 에 REMOTE_CATALOG_PUBLIC_URL=http://envtest.local:9999 (41차)
+$ npx rsbuild inspect
+dist/.rsbuild/rsbuild.config.mjs:80:  assetPrefix: 'http://envtest.local:9999',
+dist/.rsbuild/rspack.config.web.mjs:29: publicPath: 'http://envtest.local:9999/',
 ```
 
-**동작하지만 파일을 두지 않는다.** catalog 는 같은 파일이 안 먹으므로, cart 만 파일로 설정하면
-두 remote 의 설정 방법이 갈린다. 양쪽 다 셸 env 로 통일하는 편이 헷갈릴 여지가 없다.
+**동작하지만 파일을 두지 않는다.** 자산 오리진은 배포 파이프라인이 빌드 인자로 넘기는 값이라
+(docs/03-setup/04-dokploy.md), 파일이 또 하나의 출처가 되면 "어느 쪽이 이겼나"를 매번 따져야
+한다. 셸 env 하나로 통일한다.
+
+```bash
+REMOTE_CATALOG_PUBLIC_URL=https://cdn.example.com pnpm --filter @mfa/remote-catalog build
+```
+
+> catalog 가 Vite 였을 때는 **아예 동작하지 않았다.** Vite 는 `.env*` 로딩을 user config
+> 해석 이후로 미루므로(읽을 파일 목록이 `root`·`envDir`·`mode` 에 달려 있다) `vite.config.ts`
+> 평가 시점의 `process.env` 는 비어 있었고, 최종적으로도 `VITE_` 접두사 값만
+> `import.meta.env` 로 노출됐다. 41차에 Rsbuild 로 옮기면서 이 비대칭이 사라졌다.
 
 ### 루트 `.env` — 로드되지 않는다
 
@@ -114,11 +103,11 @@ remote 가 env 로 받는 값은 `REMOTE_*_PUBLIC_URL` 하나뿐이고, 그건 *
 `*_PUBLIC_URL` 하나에서 **세 가지가 파생된다.** 조립은 `@mfa/remote-config` 가 하고,
 파일명은 `MF_FILES` 에서 온다 — env 로 오지 않는다.
 
-| 파생값                  | 조립                          | 읽는 곳                                |
-| ----------------------- | ----------------------------- | -------------------------------------- |
-| 브라우저 매니페스트 URL | `${오리진}/mf-manifest.json`  | `apps/host/next.config.ts`             |
-| host 서버 SSR 번들 URL  | `${오리진}/mf-server.cjs`     | `host/src/mf/config/index.ts`          |
-| remote 자산 접두사      | `${오리진}` (+ `/v<version>`) | `vite.config.ts` / `rsbuild.config.ts` |
+| 파생값                  | 조립                          | 읽는 곳                          |
+| ----------------------- | ----------------------------- | -------------------------------- |
+| 브라우저 매니페스트 URL | `${오리진}/mf-manifest.json`  | `apps/host/next.config.ts`       |
+| host 서버 SSR 번들 URL  | `${오리진}/mf-server.cjs`     | `host/src/mf/config/index.ts`    |
+| remote 자산 접두사      | `${오리진}` (+ `/v<version>`) | 각 remote 의 `rsbuild.config.ts` |
 
 > 예전에는 이 셋이 각각 환경변수였다(`NEXT_PUBLIC_REMOTE_*_ENTRY`, `REMOTE_*_SSR_ENTRY`,
 > `REMOTE_*_PUBLIC_URL`). 실제 값은 하나인데 슬롯마다 파일명 접미사만 달라서, 복붙하다

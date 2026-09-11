@@ -29,7 +29,7 @@ import { MF_FILES } from '@mfa/remote-config';
  *
  * 그래서 파일을 나눈다. 이 파일을 부르는 쪽은 셋뿐이고 전부 node 다.
  *
- *   번들러 config   apps/remote-catalog/vite*.ts, apps/remote-cart/rsbuild*.ts
+ *   번들러 config   각 remote 의 rsbuild.config.ts · rsbuild.server.config.ts
  *   빌드 스크립트   scripts/stamp-remote-version.ts
  *
  * 타입 검사도 갈라져 있다 — `tsconfig.json` 은 `types: []` 로 브라우저 안전성을
@@ -79,21 +79,13 @@ export function versionedDist(version?: string | null): string {
 }
 
 /**
- * 이 remote 의 자산 URL 접두사. Vite 의 `base` 와 Rsbuild 의 `output.assetPrefix` 가
- * 같은 값을 받는다.
+ * 이 remote 의 자산 URL 접두사. 두 remote 의 Rsbuild `output.assetPrefix` 가 이 값을 받는다.
  *
- * ⚠️ 두 번들러의 요구가 미묘하게 다르다. Vite `base` 는 **뒤에 슬래시가 있어야** 하고
- * (없으면 마지막 세그먼트를 디렉터리가 아니라 파일로 붙인다), Rsbuild `assetPrefix` 는
- * 붙이지 않는 쪽을 기대한다. 그래서 `trailingSlash` 를 인자로 받는다 — 이 차이를
- * 호출부가 문자열로 다시 조립하게 두면 SSOT 를 뽑은 의미가 없다.
+ * 호출부가 문자열로 다시 조립하게 두면 SSOT 를 뽑은 의미가 없다 — 버전 세그먼트가
+ * 붙는 규칙은 여기 한 곳에만 있다.
  */
-export function assetBase(
-  publicUrl: string,
-  version: string | null,
-  { trailingSlash = false }: { trailingSlash?: boolean } = {},
-): string {
-  const base = version ? `${publicUrl}/v${version}` : publicUrl;
-  return trailingSlash ? `${base}/` : base;
+export function assetBase(publicUrl: string, version: string | null): string {
+  return version ? `${publicUrl}/v${version}` : publicUrl;
 }
 
 /**
@@ -132,18 +124,17 @@ const NOT_IN_DEV: readonly string[] = [`/${MF_FILES.versionManifest}`];
  * 이 미들웨어가 어느 서버에 붙었는지.
  *
  * env 로 판별하지 않는다. `pnpm dev` 는 dev 서버와 `build --watch` 를 **동시에** 돌리므로
- * `NODE_ENV` 로는 갈리지 않고, Vite 의 `command` 는 dev 와 preview 가 둘 다 `serve` 다.
- * 호출부가 훅으로 아는 사실(`configureServer` vs `configurePreviewServer`,
- * Rsbuild 의 `action`)을 그대로 넘겨받는다.
+ * `NODE_ENV` 로는 갈리지 않는다. 호출부가 훅으로 아는 사실(Rsbuild `server.setup` 의
+ * `action`)을 그대로 넘겨받는다.
  */
 export type ServerKind = 'dev' | 'preview';
 
 /**
  * node `http` 미들웨어의 최소 표면.
  *
- * Vite 의 `Connect.NextHandleFunction` 과 Rspack dev 서버의 미들웨어가 같은 모양이라
- * 양쪽이 이 시그니처를 그대로 받는다. 번들러 타입을 import 하지 않는 이유는 이 패키지가
- * 어느 번들러에도 의존하지 않기 위해서다 — 그러면 remote 하나가 번들러를 갈아타도
+ * Rspack dev 서버의 미들웨어와 Connect 계열(Vite 등)이 같은 모양이라 어느 쪽이든 이
+ * 시그니처를 그대로 받는다. 번들러 타입을 import 하지 않는 이유는 이 패키지가 어느
+ * 번들러에도 의존하지 않기 위해서다 — 그러면 remote 하나가 번들러를 갈아타도
  * 이 파일은 안 바뀐다.
  */
 interface ServerRequest {
@@ -167,7 +158,7 @@ export type MfDevMiddleware = (
  *
  * ## 왜 공용인가
  *
- * catalog(Vite)와 cart(Rsbuild)가 **글자 그대로 같은 60줄**을 각자 갖고 있었다 —
+ * 두 remote 가 **글자 그대로 같은 60줄**을 각자 갖고 있었다 —
  * 서빙 대상 목록, 404 JSON 본문, MIME 분기, CORS 헤더, `no-store`. 번들러가 다르다는
  * 게 이 저장소의 전제지만, 이 미들웨어가 하는 일에는 번들러가 전혀 안 나온다.
  * host 가 dev 에서 remote 를 어떻게 받아가는지는 **remote 전체의 계약**이라 한 곳에 있어야 한다.

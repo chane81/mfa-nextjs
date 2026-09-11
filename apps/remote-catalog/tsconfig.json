@@ -1,12 +1,15 @@
 {
-  "extends": "@mfa/typescript-config/vite.json",
+  "extends": "@mfa/typescript-config/react-library.json",
   "compilerOptions": {
-    "types": ["vite/client", "node"],
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node"],
     // 테스트가 공유하는 셋업·헬퍼 (`vitest.config.ts` 의 alias 와 같은 대상)
     "paths": {
       "@tests/*": ["../../tests/*"]
     }
   },
-  "include": ["src/**/*", "vite.config.ts", "vite.config.server.ts"],
+  "include": ["src/**/*", "rsbuild.config.ts", "rsbuild.server.config.ts"],
   "exclude": ["dist", "node_modules"]
 }

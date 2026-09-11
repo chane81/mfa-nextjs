@@ -686,7 +686,8 @@
             <span class="port">:3000</span></span
           >
           <span class="chip cat"
-            ><b>remote-catalog</b> Vite 8 <span class="port">:3001</span></span
+            ><b>remote-catalog</b> Rsbuild 2 · Rspack
+            <span class="port">:3001</span></span
           >
           <span class="chip crt"
             ><b>remote-cart</b> Rsbuild 2 · Rspack
@@ -893,7 +894,7 @@
                 rx="3"
                 class="box"
               />
-              <text x="56" y="180" class="ttl">이미지 빌드 — Vite 8</text>
+              <text x="56" y="180" class="ttl">이미지 빌드 — Rsbuild 2</text>
               <text x="56" y="200" class="xs mut">
                 ARG
                 <tspan class="mono">REMOTE_CATALOG_PUBLIC_URL</tspan>
@@ -3488,10 +3489,16 @@
         </div>
 
         <p class="claim">
-          catalog 는 Vite 8, cart 는 Rsbuild 2 — 취향이 아니라
-          <b>검증 대상</b>이다. “번들러가 달라도 런타임 계약만 맞으면 host 가
-          똑같이 소비한다”는 통과했다. 이 파트의 질문은 그다음이다:
+          catalog 는 Vite 8, cart 는 Rsbuild 2 였다 — 취향이 아니라
+          <b>검증 대상</b>이었다. “번들러가 달라도 런타임 계약만 맞으면 host 가
+          똑같이 소비한다”는 통과했고, 이 파트의 질문은 그다음이었다:
           <b>새로 remote 를 만든다면 어느 쪽인가.</b>
+        </p>
+
+        <p class="claim">
+          <b>41차에 그 답을 실행했다 — catalog 도 Rsbuild 로 옮겼다.</b> 아래는
+          둘을 나란히 돌리며 실측한 <b>기록</b>이고, 그 결정의 근거다. 지금
+          저장소의 두 remote 는 같은 번들러다(ADR-024).
         </p>
 
         <h3>3-1. 갈리는 지점은 하나다 — 배리어가 런타임 안이냐 밖이냐</h3>

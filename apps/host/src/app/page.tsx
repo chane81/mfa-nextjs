@@ -33,8 +33,8 @@ export default function HomePage() {
           SSR 하고, 점선으로 감싸인 영역은 브라우저에서 별도 배포된 remote
           번들을 받아 그린다.
           <br />
-          보라색 = <code>catalog</code> (Vite), 초록색 = <code>cart</code>{' '}
-          (Rsbuild).
+          보라색 = <code>catalog</code>, 초록색 = <code>cart</code> (둘 다
+          Rsbuild).
         </p>
       </section>
 

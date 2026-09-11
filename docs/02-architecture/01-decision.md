@@ -1045,3 +1045,53 @@ PR 흐름으로 굳어지면 다시 연다. 그때는 job 을 되살리는 게 �
   그 커밋은 아무 데도 안 올라간 상태가 된다.
 - ❌ I-10 류가 다시 나면 **또 배포가 최초 검증**이다. 다만 그 함정의 구체적 형태(목록
   드리프트)는 오프라인 테스트가 막고 있어서, 남는 건 아직 본 적 없는 다른 형태다.
+
+## ADR-024 — catalog 를 Vite 에서 Rsbuild 로 옮긴다 (번들러 다양성을 코드에서 뺀다)
+
+### 맥락
+
+두 remote 를 **일부러 다른 번들러**로 두었다(ADR-001 이후 줄곧). catalog = Vite 8 +
+`@module-federation/vite`, cart = Rsbuild 2 + `@module-federation/rsbuild-plugin`.
+"MF 는 번들러가 달라도 런타임 계약만 맞으면 된다"를 저장소가 직접 증명하기 위해서였고,
+그 주장은 실제로 참이었다 — 두 remote 는 한 번도 다른 계약을 요구한 적이 없다.
+
+증명이 끝난 뒤에 남은 것은 **비용**이다. Vite dev 서버가 이 저장소의 요구(host 안에서
+교차 출처로 로드되는 remote)와 맞지 않아 우회가 셋 쌓였다.
+
+| 우회                   | 무엇을 메꿨나                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| `server.warmup`        | expose 로더가 shared 배리어를 `import()` 뒤에 둬서 나는 `_jsxDEV is not a function` |
+| `optimizeDeps`         | 요청 이후 사전 번들링. host 안에서는 Vite 의 자동 새로고침이 오지 않는다            |
+| `serveDevStylesheet()` | dev 의 CSS 를 `?direct` 로 뽑아 `text/css` 로 되돌려주기                            |
+
+셋 다 **dev 전용**이고, 셋 다 배포에서는 아무 일도 하지 않는다. 즉 저장소의 주장을
+지탱하는 코드가 아니라 한 번들러의 dev 성질을 메꾸는 코드다.
+
+### 결정
+
+catalog 를 Rsbuild 2 로 옮긴다. **번들러 다양성은 코드가 아니라 기록으로 남긴다** —
+근거와 실측은 [01-research/04-bundler-comparison.md](../01-research/04-bundler-comparison.md),
+그때 밟은 함정은 known-issues 0-4c · 0-4d 에 그대로 있다.
+
+계약은 **하나도 바꾸지 않는다.** `MF_FILES` · `EXPOSE_SCAN` · `SSR_EXTERNALS` ·
+`createMfDevMiddleware` 는 번들러를 모르는 채로 남는다. 그래야 한쪽을 다시 갈아탈 때
+그 자리가 갈라지지 않는다.
+
+### 결과
+
+- ⭕ catalog 설정이 **423줄 → 237줄**(−44%). 사라진 것은 전부 위 표의 우회다.
+- ⭕ `index.html` 이 없어진다(Rsbuild 가 생성). 단독 실행 셸의 진입점이 `src/index.tsx` 로
+  cart 와 같아진다.
+- ⭕ 파생 SSOT 갈래가 죽는다 — `assetBase()` 의 `trailingSlash`(Vite `base` 만 뒤 슬래시를
+  요구했다), `@mfa/typescript-config/vite.json`, `@tailwindcss/vite` 경로.
+- ⭕ 세 앱의 Tailwind 연동이 `@tailwindcss/postcss` 하나로 모인다.
+- ⭕ `.env*` 비대칭이 사라진다. Vite 는 config 평가 시점에 `.env` 를 안 읽었고 Rsbuild 는
+  읽는다 — 여전히 파일을 쓰지 않지만, 이제 "왜 catalog 만 안 되나"를 설명할 필요가 없다.
+- ❌ **저장소의 주장 하나를 코드에서 잃는다.** "번들러 자유도"는 이제 문서로만 남는다.
+  되찾으려면 remote 를 하나 더 만들어 다른 번들러로 붙이는 편이 낫다 — 되돌리는 것보다
+  주장이 강해지고, 계약이 번들러를 모른다는 사실도 같이 검증된다.
+- ❌ host 의 `SHARED_PROBES` 5개 중 서브엔트리 셋(`react-dom/client` ·
+  `react/jsx-runtime` · `react/jsx-dev-runtime`)이 **아무도 요구하지 않는 상태로 남는다.**
+  `@module-federation/vite` 가 매니페스트에 자동으로 올리던 것이었고, 지금 두 remote 의
+  매니페스트에는 `react` · `react-dom` 둘뿐이다(실측). 지우려면 dev 콜드 로드까지
+  확인해야 해서(0-4d) 이번에는 손대지 않았다.

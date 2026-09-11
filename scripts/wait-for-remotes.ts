@@ -7,17 +7,11 @@
  * 연결 거부를, host 서버 로더는 404 를 만난다. 그 창을 없앤다.
  *
  * ## 이 스크립트가 막지 **못하는** 것
- * 한때 여기 아래 에러를 이 게이트의 존재 이유로 적어 두었다. 그건 오진이었다.
- *
- *   TypeError: _jsxDEV is not a function
- *     at ProductGrid (http://localhost:3001/src/exposes/ProductGrid.tsx)
- *
- * 이 게이트는 **HTTP 200 여부**만 본다. 저 에러는 HTTP 가 아니라 **브라우저 안의 모듈 평가
- * 순서**에서 나므로 게이트를 통과한 뒤에 터진다. 게다가 catalog 의 매니페스트는 dev 모듈
- * URL 을 싣지 않아서(`assets.js.sync` 가 `remoteEntry.js` 뿐) 이 스크립트가 그 파일들을 알
- * 방법도 없다. 그래서 그쪽은 remote 자기 설정으로 푼다 —
- * `apps/remote-catalog/vite.config.ts` 의 `server.warmup`,
- * 근거는 docs/05-troubleshooting/01-known-issues.md 의 0-4c.
+ * 이 게이트는 **HTTP 200 여부**만 본다. 브라우저 안의 모듈 평가 순서에서 나는 문제는
+ * 게이트를 통과한 뒤에 터진다 — 한때 `_jsxDEV is not a function`(0-4c)을 이 게이트의
+ * 존재 이유로 적어 두었던 것이 오진이었다. 그건 Vite dev 의 expose 로더가 shared 배리어를
+ * `import()` 뒤에 두는 문제였고, 두 remote 가 Rsbuild 로 통일된 38차부터는 재현되지 않는다.
+ * 근거: docs/05-troubleshooting/01-known-issues.md 의 0-4c.
  *
  * ## 무엇을 기다리나
  * 포트가 열렸는지가 아니라 **host 가 실제로 가져갈 것**이 200 을 주는지를 본다.
@@ -26,7 +20,7 @@
  * remote 하나가 host 에게 주는 것은 **두 가지**이고, 서로 다른 프로세스가 만든다
  * (각 remote 의 `dev` 스크립트가 concurrently 로 둘을 같이 띄운다).
  *
- *   web — 브라우저가 받는 번들.  `vite dev` / `rsbuild dev` 가 메모리에서 서빙
+ *   web — 브라우저가 받는 번들.  `rsbuild dev` 가 메모리에서 서빙
  *   ssr — host 서버가 받아 실행하는 CJS 번들.  `--watch` 빌드가 dist 에 쓴 것을
  *         dev 서버 미들웨어가 `/mf-server.cjs` 로 내려준다
  *
@@ -126,17 +120,12 @@ export function remoteEntryUrl(
  * 모듈 파이프라인이 아직 못 답하는 상태에서도 200 을 줄 수 있기 때문이다. remoteEntry 는
  * 그 파이프라인을 통과해야 나오므로 "코드를 줄 수 있다"의 증거가 된다.
  *
- * ⚠️ 이 저장소 기준으로는 지금 둘의 시차가 없다 — catalog 를 콜드 캐시로 격리 기동해
- * 실측한 결과 매니페스트 302ms / remoteEntry 325ms / 프리번들 완료 마커
- * (`node_modules/.vite/deps/_metadata.json`) 301ms 로 사실상 동시였다.
- * `vite.config.ts` 의 `optimizeDeps.entries` + `include` 가 기동 시점에 프리번들을
- * 끝내주기 때문이다. ②는 그 설정이 사라지거나 remote 가 늘었을 때를 위한 보험이다.
+ * ⚠️ 이 저장소 기준으로는 지금 둘의 시차가 없다. Rsbuild 는 dev 에서도 번들을 만들어
+ * 메모리에서 서빙하므로, 매니페스트가 나온 시점이면 remoteEntry 도 같이 나와 있다.
+ * ②는 그 성질이 바뀌거나 remote 가 늘었을 때를 위한 보험이다.
  *
- * ⚠️ **여기에 exposes 를 추가하지 않는다.** remoteEntry 가 200 이어도 exposes 소스의
- * transform 은 아직 안 끝나 있고, 그 창에서 `_jsxDEV is not a function` 이 난다.
- * 하지만 그 대기를 여기서 하려면 이 파일이 expose 목록을 알아야 하는데(매니페스트는
- * dev 모듈 URL 을 안 싣는다) 그건 위 `REMOTES` 주석이 피하려는 결합 그 자체다.
- * remote 자기 설정(`server.warmup`)이 맡는다. 0-4c 참고.
+ * ⚠️ **여기에 exposes 를 추가하지 않는다.** 그러려면 이 파일이 expose 목록을 알아야 하는데
+ * (매니페스트는 그걸 안 싣는다) 그건 위 `REMOTES` 주석이 피하려는 결합 그 자체다.
  */
 async function webReady(manifestUrl: string): Promise<boolean> {
   const res = await fetchOk(manifestUrl);

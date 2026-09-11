@@ -7,9 +7,15 @@ paths:
 
 # remote 앱(catalog · cart) 규칙
 
-두 remote 는 **일부러 다른 번들러**다(catalog = Vite 8 + `@module-federation/vite`,
-cart = Rsbuild 2 + `@module-federation/rsbuild-plugin`). 번들러 자유도가 이 저장소의 주장 중 하나라
-한쪽으로 통일하지 않는다. 대신 **산출물 계약을 같게 맞춘다.**
+두 remote 는 **Rsbuild 2 + `@module-federation/rsbuild-plugin`** 이다. 41차 전에는 catalog 가
+Vite 8 이었고 그게 "번들러 자유도" 주장의 증거였다 — 그 증거는
+[ADR-024](../../docs/02-architecture/01-decision.md) 과
+[번들러 비교](../../docs/01-research/04-bundler-comparison.md) 에 기록으로 남기고,
+**코드에서는 계약만 지킨다.**
+
+그래서 규칙은 그대로다. **번들러를 아는 지식이 계약에 새면 안 된다** — 지금 둘이 같은
+번들러라고 해서 출력 경로·파일명을 번들러 기본값에 맡기면, 한쪽을 다시 갈아탈 때 그 자리가
+전부 갈라진다. 아래 계약은 번들러를 모른다.
 
 ## 산출물 계약
 
@@ -29,21 +35,22 @@ cart = Rsbuild 2 + `@module-federation/rsbuild-plugin`). 번들러 자유도가 
 
 host 는 dev 든 배포든 같은 모양의 URL 을 만든다. 그래서 dev 서버가 부족한 응답을 메꾼다.
 
-- catalog: `/style.css` 를 `?direct` 로 변환해 `text/css` 로 응답(`serveDevStylesheet`).
-  안 하면 Vite 가 CSS 를 JS 모듈로 주고 브라우저가 **에러 없이** 무시한다.
-- catalog: `/mf-server.cjs` 는 디스크에서 읽어 내려주고, `mf-version.json` 은 **일부러 404** 다.
-  dev 에서 버전을 공표하면 하지도 않은 배포를 알리게 되고 무결성 검사에서 죽는다.
+- `/mf-server.cjs` 는 디스크에서 읽어 내려준다. 웹 번들과 달리 이 파일은 `--watch` 빌드가
+  디스크에 쓰므로 dev 서버가 직접 읽어야 한다.
+- `mf-version.json` 은 dev 에서 **일부러 404** 다. 버전을 공표하면 하지도 않은 배포를
+  알리게 되고 무결성 검사에서 죽는다. preview 는 빌드 산출물이라 내려준다.
 
-dev 전용 미들웨어를 늘릴 때는 `configureServer`(dev)와 `configurePreviewServer`(preview) 훅
-자체를 판별자로 쓴다. `NODE_ENV` · `command` 로는 구분이 안 된다.
+응답 규칙은 두 remote 가 `createMfDevMiddleware`(`@mfa/remote-config/node`) 하나를 공유한다.
+dev 와 preview 는 `server.setup` 이 넘겨주는 `action` 으로 가른다 — `NODE_ENV` 로는 구분이
+안 된다(`pnpm dev` 가 dev 서버와 `build --watch` 를 동시에 돌린다).
 
 ## `exposes` 는 손으로 적지 않는다
 
 `src/exposes/` 를 읽어서 만든다 — `readExposes(EXPOSE_SCAN.dir, { ignore: EXPOSE_SCAN.ignore })`
-(`@mfa/remote-config/node`). 번들러가 둘이라 스캔을 각자 구현하면 "무엇이 expose 인가"가
-remote 마다 갈린다. **인자도 `EXPOSE_SCAN` 한 곳에 있다** — 그 값을 대는 자리가 셋이라
-(Vite 설정 · Rsbuild 설정 · `scripts/gen-module-ids.test.ts`) 갈리면 검사가 실제 빌드와
-다른 것을 보게 된다. dev 가 볼 게 아닌 이웃 파일이 생기면 거기 `ignore` 에 줄을 하나 넣는다.
+(`@mfa/remote-config/node`). 스캔을 remote 마다 구현하면 "무엇이 expose 인가"가 갈린다.
+**인자도 `EXPOSE_SCAN` 한 곳에 있다** — 그 값을 대는 자리가 셋이라
+(두 remote 의 `rsbuild.config.ts` · `scripts/gen-module-ids.test.ts`) 갈리면 검사가 실제
+빌드와 다른 것을 보게 된다. dev 가 볼 게 아닌 이웃 파일이 생기면 거기 `ignore` 에 줄을 하나 넣는다.
 
 **`server-entry.ts` 의 SSR 진입점 맵은 손으로 적는다** — 정적 import 여야 번들이 갈리지
 않는다. 그 맵이 스캔 결과와 같은지는 `src/server-entry.test.tsx` 가 본다. 빠뜨리면
@@ -94,7 +101,7 @@ export default function ProductGrid({ … }: ProductGridProps) { … }
 
 ### DTS 설정은 두 remote 가 같아야 한다
 
-번들러가 달라도 host 는 같은 방식으로 소비한다.
+host 는 두 remote 를 같은 방식으로 소비한다.
 
 ```ts
 dts: {

@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
 #
-# remote-catalog — Vite 8 + @module-federation/vite
+# remote-catalog — Rsbuild 2 + @module-federation/rsbuild-plugin
 #
 # 빌드 컨텍스트는 **저장소 루트**다.
 #   docker build -f apps/remote-catalog/Dockerfile .
 #
 # 산출물은 웹 번들 + SSR(node) 번들 두 벌이고 전부 `dist/v<version>/` 아래로 나간다.
-# 런타임은 Next 도 Vite 도 아니다 — scripts/serve-remote-dist.ts 가 CDN 을 흉내내 서빙한다.
+# 런타임은 Next 도 Rsbuild 도 아니다 — scripts/serve-remote-dist.ts 가 CDN 을 흉내내 서빙한다.
 #
 # ## 빌드 시점에 굳는 값 (런타임 env 로 못 바꾼다)
 #   REMOTE_CATALOG_PUBLIC_URL — 자산 URL 접두사. host 가 다른 오리진에서 청크를 받으므로 절대 URL.
@@ -47,9 +47,9 @@ COPY packages/store/package.json packages/store/
 COPY packages/tailwind-config/package.json packages/tailwind-config/
 COPY packages/typescript-config/package.json packages/typescript-config/
 COPY packages/ui/package.json packages/ui/
-# catalog 만 빌드하므로 host(next)와 cart(rspack)의 툴체인은 받지 않는다.
+# catalog 만 빌드하므로 host(next)의 툴체인은 받지 않는다.
 # 제외 필터라 루트 패키지는 남는다 — 루트 devDependency 인 turbo 가 필요하다.
-# 여기서 빠지는 것: next(198M) + @next/swc(85M) + @rspack/binding(40M) — 설치 기준
+# 여기서 빠지는 것: next(198M) + @next/swc(85M) — 설치 기준
 # 네트워크/공급망 설정은 base 스테이지의 pnpm_config_* 참고.
 RUN --mount=type=cache,target=/pnpm/store,sharing=locked \
     pnpm install --frozen-lockfile \

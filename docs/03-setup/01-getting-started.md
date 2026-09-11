@@ -72,10 +72,10 @@ remote 는 앱마다 **프로세스가 둘**이다(`concurrently`).
 
    remote 마크업이 서버에서 이미 그려져 나온다.
 
-2. http://localhost:3000 → 보라색 점선(catalog · Vite), 초록색 점선(cart · Rsbuild)
+2. http://localhost:3000 → 보라색 점선(catalog), 초록색 점선(cart)
 
 3. 상품 카드의 **담기** → 헤더 배지 숫자/금액 즉시 증가
-   → 서로 다른 번들러로 빌드된 두 remote 가 상태를 공유하는 지점
+   → 따로 배포된 두 remote 가 상태를 공유하는 지점
 
 4. **소프트 내비게이션 확인** — DevTools Network 를 `Doc` 필터로 켜둔다
    - 헤더 `결제` 클릭 → **document 요청이 늘지 않는다** (remote, 소프트)
@@ -151,8 +151,8 @@ remote 의 `build` 는 **네 단계**다. 버전을 빌드 전에 정해야 자�
 
 ```jsonc
 // apps/remote-catalog/package.json
-"build":     "node ../../scripts/mf-build-version.ts && vite build && pnpm build:ssr && pnpm stamp",
-"build:ssr": "vite build --config vite.config.server.ts",
+"build":     "node ../../scripts/mf-build-version.ts && rsbuild build && pnpm build:ssr && pnpm stamp",
+"build:ssr": "rsbuild build --config rsbuild.server.config.ts",
 "stamp":     "node ../../scripts/stamp-remote-version.ts catalog"
 ```
 
@@ -183,8 +183,8 @@ pnpm start
 ```
 
 remote 는 번들러 preview 가 아니라 **공용 정적 서버**로 뜬다
-(`scripts/serve-remote-dist.ts`). 두 번들러의 preview 가 버전 경로를 서빙하는 방식이 달라서
-배포 표면을 하나로 통일했고, 실제 배포에서 그 자리는 CDN 이다.
+(`scripts/serve-remote-dist.ts`). preview 서버는 `/v<ver>/` 버전 접두사를 그대로 서빙해 주지
+않아서 배포 표면을 하나로 통일했고, 실제 배포에서 그 자리는 CDN 이다.
 
 ```
 /v<version>/…      Cache-Control: public, max-age=31536000, immutable
@@ -245,7 +245,7 @@ host **서버**가 받아 실행하는 SSR 번들 URL(`…/mf-server.cjs`), remo
 > 이 패키지만 **빌드 산출물이 없다.** `exports` 가 `src/index.ts` 를 직접 가리키고
 > Node 24 의 타입 스트리핑이 실행 시점에 타입을 지운다. 번들러 config 의 import 는
 > 프로세스 시작 즉시 일어나서 watch 빌드가 `dist/` 를 만들 틈이 없기 때문이다
-> (tsc 빌드형으로 두면 `failed to load config from vite.config.ts` 로 죽는다 — 실측).
+> (tsc 빌드형으로 두면 번들러 config 로드 자체가 죽는다 — 실측).
 > 그래서 `engines.node` 가 `>=24.19.0` 이고, `erasableSyntaxOnly` 로 타입 스트리핑이
 > 처리 못 하는 문법(enum·namespace 등)을 컴파일 타임에 막는다.
 

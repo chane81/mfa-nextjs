@@ -34,28 +34,26 @@ export const REACT_VERSION = '19.2.8';
  * ```
  *
  * 즉 **루트만 싱글턴이면 동작 자체는 성립한다.** 그런데 그건 이 목록을 정하는 근거가
- * 아니다. 근거는 remote 쪽 플러그인이 무엇을 요구하느냐고, 두 remote 가 서로 다르다.
+ * 아니다. 근거는 remote 쪽 플러그인이 매니페스트에 무엇을 올리느냐다.
  *
- *     catalog (Vite)   선언은 react·react-dom 둘인데 매니페스트에는 **넷**이 오른다
- *                      → react, react-dom, react/jsx-runtime, react-dom/client
- *                      `@module-federation/vite` 가 서브엔트리를 자동으로 올린다
- *     cart (Rsbuild)   선언한 둘 그대로. 자동 추가가 없다
- *
- * host 가 catalog 이 올린 것을 제공하지 않으면 **bridge 단계에서 죽는다.**
+ * 이 목록이 넷이 된 건 catalog 가 Vite(`@module-federation/vite`)였을 때다. 그 플러그인은
+ * 선언이 react·react-dom 둘이어도 매니페스트에 서브엔트리를 자동으로 올렸고
+ * (react/jsx-runtime · react-dom/client), host 가 그걸 제공하지 않으면 **bridge 단계에서
+ * 죽었다.**
  *
  *     [Module Federation] Failed to bridge external shared module "react-dom/client"
  *     [ Federation Runtime ]: Remote container initialization failed. #RUNTIME-015
  *
- * `react/jsx-dev-runtime` 은 프로덕션 매니페스트에는 없고 **dev 그래프에만** 나타난다.
- * dev 의 catalog 는 `jsxDEV` 를 loadShare 가상 모듈로 가져간다.
+ * 41차에 catalog 를 Rsbuild 로 옮기면서 **두 remote 의 매니페스트가 둘 다 react·react-dom
+ * 둘만 올린다**(실측). 그래서 서브엔트리 셋은 지금은 아무도 요구하지 않는다 — 남겨 둔
+ * 것이지 필요해서 있는 게 아니다. 지우려면 프로덕션 빌드만으로 부족하고 **dev 콜드
+ * 로드까지** 확인해야 한다(0-4d 교훈).
  *
  * ## ⚠️ 이 목록을 줄이려는 시도는 이미 한 번 실패했다
  *
  * 8차에 `_jsxDEV is not a function`(0-4c)을 **오진해서** 서브엔트리를 여기서 뺐다가
- * 위 `#RUNTIME-015` 를 만났다. 진짜 원인은 공유 목록이 아니라 dev 의 모듈 평가 순서였고,
- * 그쪽은 catalog 의 `server.warmup` 이 맡는다. 근거: known-issues 0-4c · 0-4d.
- *
- * **shared 를 건드렸으면 프로덕션 빌드만으로 부족하다. dev 콜드 로드까지 돌린다**(0-4d 교훈).
+ * 위 `#RUNTIME-015` 를 만났다. 그때 진짜 원인은 공유 목록이 아니라 Vite dev 의 모듈
+ * 평가 순서였다. 근거: known-issues 0-4c · 0-4d.
  */
 export const SHARED_PROBES = {
   react: 'useState',
