@@ -1,7 +1,6 @@
-import type { CSSProperties } from 'react';
-
 import type { CartLine } from '@mfa/contracts';
 import { cartTotals, useCartLines } from '@mfa/store';
+import { hueVar } from '@mfa/ui';
 
 import { ORIGIN_HUE } from '../origin';
 
@@ -26,7 +25,7 @@ export default function CartBadge({
   return (
     <span
       // cart 의 경계 색. 값은 Panel 이 쓰는 것과 같은 통로로 내려간다.
-      style={{ '--hue': ORIGIN_HUE } as CSSProperties}
+      style={hueVar(ORIGIN_HUE)}
       className="remote-boundary inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-mono text-xs text-text"
     >
       🛒 {label}

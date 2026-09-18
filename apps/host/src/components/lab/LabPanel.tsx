@@ -1,4 +1,6 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
+
+import { hueVar } from '@mfa/ui';
 
 import { CatalogSection } from '@/components/CatalogSection';
 import { formatKst } from '@/lib/format-time';
@@ -26,7 +28,7 @@ export function LabPanel({ mode, renderedAt, children }: LabPanelProps) {
     <>
       <section
         // 모드 색(hue)은 `modes.ts` 가 정하는 런타임 값이라 클래스로 굳힐 수 없다
-        style={{ '--hue': spec.hue } as CSSProperties}
+        style={hueVar(spec.hue)}
         className="flex flex-col gap-3 rounded-lg border border-[hsl(var(--hue)_60%_45%/0.5)] bg-[hsl(var(--hue)_60%_45%/0.08)] p-6"
       >
         <div className="flex items-baseline gap-3">

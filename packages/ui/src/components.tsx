@@ -17,8 +17,17 @@ import type { CSSProperties, ReactNode } from 'react';
  * `originHue` 는 런타임 값이라 클래스로 굳힐 수 없다. CSS 변수로 내려보내고
  * `remote-boundary` / `text-origin` 같은 유틸리티가 그 변수를 읽는다
  * (정의: `packages/tailwind-config/theme.css`).
+ *
+ * ## 왜 export 하나
+ *
+ * 감추는 건 4줄짜리 함수가 아니라 **`--hue` 라는 변수 이름이 계약이라는 사실**이다.
+ * 이걸 비공개로 두자 `Panel`·`Badge` 로 감쌀 수 없는 자리들(pill 모양 배지, lab 카드)이
+ * `style={{ '--hue': x } as CSSProperties}` 를 그대로 베껴 갔다. 변수 이름을 바꾸면
+ * 이 패키지의 컴포넌트는 따라오고 **베껴 간 쪽만 색을 잃는다** — 타입 오류도 테스트
+ * 실패도 없이 화면에서만 나타나는데, 이 저장소에서 hue 는 "어느 remote 가 그렸나" 를
+ * 판별하는 관측 수단이라 관측 장치가 조용히 거짓말을 하게 된다.
  */
-function hueVar(hue: number): CSSProperties {
+export function hueVar(hue: number): CSSProperties {
   return { '--hue': hue } as CSSProperties;
 }
 
