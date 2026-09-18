@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./style/hue": "./src/style/hue.ts",
     "./test/cookies": "./src/test/cookies.ts",
     "./test/globals": "./src/test/globals.ts",
     "./test/http": "./src/test/http.ts",
@@ -21,6 +22,7 @@
     "@mfa/eslint-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
     "@types/node": "^24.10.1",
+    "@types/react": "^19.2.2",
     "eslint": "^10.8.1",
     "typescript": "6.0.3"
   }

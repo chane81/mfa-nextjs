@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { hueVar } from '@mfa/ui';
+import { hueVar } from '@mfa/utils/style/hue';
 
 import { CatalogSection } from '@/components/CatalogSection';
 import { formatKst } from '@/lib/format-time';

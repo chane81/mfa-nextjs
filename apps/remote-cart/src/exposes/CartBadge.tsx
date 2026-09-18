@@ -1,6 +1,6 @@
 import type { CartLine } from '@mfa/contracts';
 import { cartTotals, useCartLines } from '@mfa/store';
-import { hueVar } from '@mfa/ui';
+import { hueVar } from '@mfa/utils/style/hue';
 
 import { ORIGIN_HUE } from '../origin';
 
