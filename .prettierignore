@@ -14,3 +14,11 @@ pnpm-lock.yaml
 # `src/generated/module-ids.ts` 는 제외하지 않는다 — 생성 코드가 prettier 출력과 같은
 # 모양으로 쓰므로 포맷해도 안 바뀐다(그건 확인해 뒀다).
 packages/contracts/src/generated/@mf-types
+
+# graft 설치기가 넣은 파일. **커밋하지만 포맷하지 않는다.**
+# prettier 가 손대면 graft 를 다시 설치할 때마다 원본과 어긋나서
+# `format:check` 가 변경하지도 않은 파일에서 실패한다.
+.mcp.json
+.claude/settings.json
+.claude/helpers/
+.claude/skills/graft/
