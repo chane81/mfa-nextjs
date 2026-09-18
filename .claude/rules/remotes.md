@@ -137,7 +137,7 @@ export default function ProductGrid({ … }: ProductGridProps) { … }
 배치의 원본은 `packages/remote-config` 하나다(ADR-017). 거기에 항목을 넣으면 **런타임 ·
 스크립트 · 번들러 설정 · CI 배포 판별 · turbo env** 는 저절로 따라온다 — 손댈 곳이 없다.
 
-손으로 해야 하는 건 아래 여덟 곳이고, **새 앱 디렉터리를 뺀 전부가 빠뜨리면 죽는다** —
+손으로 해야 하는 건 아래 아홉 곳이고, **새 앱 디렉터리를 뺀 전부가 빠뜨리면 죽는다** —
 `pnpm test` 나 `pnpm typecheck` 이 어디를 고치라고 말해준다.
 
 | 무엇                                       | 안 하면                                                |
@@ -147,6 +147,7 @@ export default function ProductGrid({ … }: ProductGridProps) { … }
 | `turbo.json` 의 `@mfa/host#build`          | `remote-wiring.test.ts` 가 줄까지 알려준다             |
 | 세 Dockerfile 의 `COPY … package.json`     | `docker-context.test.ts` 가 줄까지 알려준다            |
 | 새 Dockerfile 의 포트 · 제외 필터          | `remote-wiring.test.ts` 가 줄까지 알려준다             |
+| `docker-compose.yml` 의 서비스 한 벌       | `remote-wiring.test.ts` 가 죽는다                      |
 | `contract-check.ts` 의 `RemoteKeys` 유니온 | `pnpm typecheck` 이 죽는다                             |
 | `apps/host/tsconfig.json` 의 `<name>/*`    | host 컴파일이 즉시 죽는다 (I-4 때문에 와일드카드 불가) |
 | `packages/contracts/tsconfig.json` 도 같이 | 같음                                                   |
@@ -168,6 +169,9 @@ DOKPLOY_APP_<NAME>     Dokploy 애플리케이션 id
 `docker-compose.yml` 과 `scripts/docker-host-local.sh` 는 로컬 검증 전용이라 손으로 맞춘다
 (정적 YAML · 셸이라 SSOT 를 못 읽는다). 안 고쳐도 배포에는 영향이 없지만, compose 쪽은
 `remote-wiring.test.ts` 가 서비스 · 포트 · env · 볼륨 · `depends_on` 을 대조한다.
+
+`scripts/docker/remote-entrypoint.sh` 는 두 remote 가 같이 쓴다. **포트에 기본값을 두지 않는다** —
+기본값은 곧 어느 한쪽의 포트라, 새 remote 가 `ENV PORT` 를 빠뜨리면 남의 포트로 조용히 뜬다(J-2).
 
 ## 컴포넌트를 하나 더 추가할 때
 
