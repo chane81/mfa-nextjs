@@ -1,4 +1,6 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { ReactNode } from 'react';
+
+import { hueVar } from '@mfa/utils/style/hue';
 
 /**
  * host / remote 가 공유하는 프리미티브.
@@ -10,17 +12,6 @@ import type { CSSProperties, ReactNode } from 'react';
  * 공유 패키지가 CSS 까지 빌드해 배포하면 그 산출물이 새 배포 단위가 되고, 앱이 새 클래스를
  * 쓸 때마다 그걸 먼저 배포해야 한다. MFA 의 독립 배포와 정면으로 어긋난다.
  */
-
-/**
- * remote 마다 다른 경계 색을 넘기는 통로.
- *
- * `originHue` 는 런타임 값이라 클래스로 굳힐 수 없다. CSS 변수로 내려보내고
- * `remote-boundary` / `text-origin` 같은 유틸리티가 그 변수를 읽는다
- * (정의: `packages/tailwind-config/theme.css`).
- */
-function hueVar(hue: number): CSSProperties {
-  return { '--hue': hue } as CSSProperties;
-}
 
 export interface PanelProps {
   /** 어느 앱(remote)이 렌더링했는지 시각적으로 표시 */

@@ -38,12 +38,19 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  CONTRACTS_TYPES_DIR,
+  CONTRACTS_WORKSPACE_DIR,
+} from '@mfa/remote-config';
+
 /** `scripts/` 는 리포 루트 바로 아래라 이 파일 위치가 곧 기준점이다 */
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
+/** 쓰는 쪽(`module-federation.config.ts` 의 `typesFolder`)과 같은 상수를 본다 */
 const TYPES_DIR = resolve(
   REPO_ROOT,
-  'packages/contracts/src/generated/@mf-types',
+  CONTRACTS_WORKSPACE_DIR,
+  CONTRACTS_TYPES_DIR,
 );
 const OUT_FILE = resolve(
   REPO_ROOT,

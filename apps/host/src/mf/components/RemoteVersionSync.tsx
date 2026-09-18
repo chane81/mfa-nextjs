@@ -3,7 +3,7 @@ import { cacheLife, cacheTag } from 'next/cache';
 import { REMOTE_NAMES } from '@mfa/contracts';
 
 import { ssrOrigin } from '../config';
-import { REMOTE_VERSIONS_GLOBAL } from '../versions/browser';
+import { injectionScript, type InjectedEntry } from '../versions/browser';
 import { fetchRemoteVersion, remoteVersionTag } from '../versions/server';
 
 /**
@@ -45,10 +45,10 @@ export async function RemoteVersionSync() {
       return [
         remote,
         info
-          ? {
+          ? ({
               version: info.version,
               entry: `${ssrOrigin(remote)}${info.webEntry}`,
-            }
+            } satisfies InjectedEntry)
           : null,
       ] as const;
     }),
@@ -59,10 +59,9 @@ export async function RemoteVersionSync() {
   return (
     <script
       id="mfa-remote-versions"
-      // 값은 remote 가 공표한 hex 해시라 문자열 이스케이프만으로 충분하다
-      dangerouslySetInnerHTML={{
-        __html: `window.${REMOTE_VERSIONS_GLOBAL}=${JSON.stringify(versions)}`,
-      }}
+      // 전역 이름 · 값 모양 · 이스케이프는 전부 `versions/browser` 가 쥔다.
+      // 읽는 쪽과 같은 파일이라 한쪽만 바뀌는 일이 구조적으로 안 생긴다.
+      dangerouslySetInnerHTML={{ __html: injectionScript(versions) }}
     />
   );
 }

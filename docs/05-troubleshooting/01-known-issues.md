@@ -56,6 +56,8 @@
 | 배포 job 이 **메시지 없이** 종료코드 1 로 죽는다                                        | `$(…)` 로 값을 받는 셸 함수가 에러를 stdout 에 썼다 — [I-11 의 `>&2` 절](#그-메시지가-안-나오던-자리--2-하나)                                     |
 | `ERR_UNKNOWN_FILE_EXTENSION: Unknown file extension ".ts"` (GHA)                        | 그 job 이 러너 이미지의 Node 를 그냥 쓰고 있다 — [I-12](#i-12-ts-를-러너의-주변-node-로-돌리면-이미지가-바뀔-때-조용히-깨진다)                    |
 | 로컬 `pnpm test` 는 초록인데 **CI 의 test job 만** `Failed to resolve import` 로 죽는다 | `vitest.config.ts` 의 alias 에 그 진입점이 없다 — [I-13](#i-13-vitest-alias-에-빠진-진입점은-로컬에서만-통과한다)                                 |
+| remote 장애 상자의 `entry:` 가 **배포에 없는 주소**다 (루트 `/mf-manifest.json`)        | 경계가 폴백 주소를 받고 있었다 — [J-1](#j-1-에러-경계가-배포에-없는-주소를-찍고-있었다)                                                           |
+| 새로 붙인 remote 컨테이너가 **남의 포트로** 뜬다 / host 만 그 remote 를 못 찾는다       | Dockerfile 의 `ENV PORT` 누락 + 엔트리포인트 폴백 — [J-2](#j-2-두-remote-가-같이-쓰는-엔트리포인트에-어느-한쪽의-포트가-기본값으로-있었다)        |
 
 ### SSR · hydration
 
@@ -114,6 +116,55 @@
 | 증상                                                           | 항목                                                                    |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련) | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다) |
+
+## J. (41차) 진단과 배치가 조용히 거짓말하던 자리
+
+둘 다 **증상이 실패가 아니라 오작동**이다. 화면도 빌드도 멀쩡하고, 틀린 값이 사람에게만
+보인다 — 그래서 테스트가 아니라 리뷰로만 잡히던 종류다.
+
+### J-1. 에러 경계가 **배포에 없는 주소**를 찍고 있었다
+
+remote 가 죽었을 때 `RemoteBoundary` 가 보여주는 상자에 이런 줄이 있었다.
+
+```
+entry: https://catalog.example.com/mf-manifest.json
+        ← 루트. 배포에서 이 주소는 404 다
+```
+
+런타임이 실제로 부르는 주소는 `/v<version>/mf-manifest.json` 이다. 경계가 그걸 모른 채
+`entry` 를 **prop 으로 받고 있었고**, 두 호출부(`RemoteComponent` · `MfWarmup`)가 똑같이
+`WEB_ENTRIES[remote]` — dev 에만 실재하는 폴백 — 를 넘겼다.
+
+같은 함정을 진단 화면이 먼저 밟았다. `MfDiagnostics` 는 폴백 주소를 찌르다가 배포에서
+두 remote 가 멀쩡한데도 `Failed to fetch` 로 빨갛게 떠서 `pinnedEntry` 로 고쳤는데,
+**에러 경계는 같이 안 고쳤다.** 고치고 나서 보니 테스트가 그 틀린 값을 고정하고 있었다 —
+`RemoteComponent.test.tsx` 안에서 경계 테스트는 버전 없는 주소를, 바로 아래 lazy 캐시
+테스트는 `/vt9zzz/…` 를 각각 옳다고 단언했다. 경계 쪽만 `stubInjectedVersions` 를 안
+불러서 그 어긋남이 드러나지 않았다.
+
+**고친 방법: 주소를 인터페이스에서 뺐다.** 경계는 `remoteName` 만 받고 에러 분기에서
+`pinnedEntry(remoteName)` 를 스스로 부른다. `loader/index.ts` 가 적어 둔 "remote 를 부르는
+쪽은 전부 이 함수를 거쳐야 한다. 진단 화면도 마찬가지다" 가 그제야 코드로 참이 된다.
+
+> 교훈은 "호출자에게 값을 고르게 시키면 틀릴 자리가 생긴다" 다. 호출부가 둘뿐이었는데
+> **둘 다 틀렸다.**
+
+### J-2. 두 remote 가 같이 쓰는 엔트리포인트에 **어느 한쪽의 포트**가 기본값으로 있었다
+
+```sh
+# scripts/docker/remote-entrypoint.sh
+PORT="${PORT:-3001}"   # ← 3001 은 catalog 의 포트다
+```
+
+두 remote 의 Dockerfile 이 `ENV PORT` 를 주고 있어 지금은 안 터진다. 하지만 새 remote 의
+Dockerfile 이 그 줄을 빠뜨리면 **컨테이너는 정상 기동하고 catalog 의 포트로 뜬다.**
+증상은 부팅 실패가 아니라 "host 만 그 remote 를 못 찾음" 이라 원인까지 가는 길이 멀다.
+
+폴백을 없애고(`${PORT:?…}`) 미설정이면 죽게 했다. 그리고 그 계층 전체를 대조로 묶었다 —
+`scripts/docker-ssot.test.ts` 가 `REMOTE_LIST` 를 순회하며 compose 의 포트 · 헬스체크
+파일명 · 오리진 env 이름과 각 Dockerfile 의 `ENV PORT`/`EXPOSE` 를 SSOT 와 맞춘다.
+YAML 과 셸은 `@mfa/remote-config` 를 import 할 수 없으니 **참조 대신 대조**다
+(같은 계층의 I-10 을 `docker-context.test.ts` 가 이미 그 방식으로 막고 있다).
 
 ## I. (27차) MF DTS 를 켜면서 밟은 것
 

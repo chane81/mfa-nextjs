@@ -152,8 +152,12 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 25. `packages/store/src/hooks/use-revalidate-on-focus.ts` — visibility 가드 / **ref latest** / cleanup
 - [x] 26. `use-hydrated.ts` · `use-cart-lines.ts` — `renderToString` SSR 경로 / 클라이언트 전환
 - [x] 27. `packages/store/src/cart/use-cart-sync.ts` — 기준선 3-상태 / 동일 원문 스킵 / **정규화 후 reseed**
-- [x] 28. `packages/ui/src/components.tsx` — `--hue` 변수 / 조건부 렌더 / variant 클래스 매핑
-- [x] 29. `apps/host/src/mf/components/RemoteBoundary.tsx` — 자식 throw → `ErrorBox` 내용
+- [x] 28. `packages/ui/src/components.tsx` — `--hue` 변수(통로는 `@mfa/utils/style/hue` 의
+      `hueVar` 다 — 감추는 건 함수가 아니라 **변수 이름이 계약이라는 사실**이다) /
+      조건부 렌더 / variant 클래스 매핑
+- [x] 29. `apps/host/src/mf/components/RemoteBoundary.tsx` — 자식 throw → `ErrorBox` 내용.
+      **주소는 받지 않고 `pinnedEntry` 로 스스로 고른다**(41차, J-1) — 정상 렌더에서는
+      묻지도 않는다
 - [x] 30. `apps/host/src/mf/components/RemoteComponent.tsx` — Skeleton → 마크업 전이 / `<link href>` 조립 / **브라우저는 심어준 버전을 본다**(24차, `globalCell` 없이 불변 경로) / 실패 시 Boundary
 - [x] 31. remote exposes — cart 3종 · catalog 5종(`RelatedProducts` 포함). props 계약 + 콜백. **remote 는 host 라우터를 모른다**(ADR-013). **저장 상한(`MAX_CART_QUANTITY`)에서 담기·`+` 가 잠긴다**(33차)
 - [x] 32. host 컴포넌트 — `SiteHeader` · `MfDiagnostics` · `lab/*` · `CatalogSlot`(주소 → 카테고리 검증 / `replace` / `all` 은 주소에서 뺀다 / 다른 쿼리 보존)
@@ -205,12 +209,24 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
       성공하고 이미지만 커져서 아무도 못 본다.
       ⚠️ `turbo.json` 은 JSONC 라 주석을 걷어내고 읽는데, **정규식으로 하면 안 된다** —
       값에 있는 `".next/**"` 의 `/**` 부터 먹어서 그 아래 태스크가 통째로 사라진다(실측).
-      문자열 안팎을 구분하는 스캐너가 그래서 그 파일에 있다
+      문자열 안팎을 구분하는 스캐너가 그래서 그 파일에 있다.
+      42차에 둘을 더했다 — compose 헬스체크가 **`MF_FILES.versionManifest` 를 찌르는지**
+      (파일명이 어긋나도 정적 서버 폴백이 200 이라 헬스체크가 통과해 버린다), 그리고
+      공유 엔트리포인트에 **포트 폴백이 없는지**(기본값은 곧 어느 한쪽의 포트다 — J-2)
 - [x] 45. `scripts/deploy-targets.test.ts` 의 "공유 코드는 전부 배포한다" 에
       `packages/utils/` 를 넣었다(41차) — 그 패키지는 **테스트 헬퍼뿐이라** 배포에서
       빼고 싶어지는 자리다. 빼면 정반대 사고가 열린다: 거기 프로덕션 유틸이 하나
       들어오는 순간 배포가 그 변경을 **안 물고 나가고**, 증상은 "고쳤는데 반영이
       안 된다" 뿐이다. 통짜 규칙을 지키는 쪽이 틀려도 무해하다(ADR-025)
+- [x] 46. `apps/host/src/mf/loader/index.test.tsx` — **MF 초기화가 `init()` 에 실제로 넘긴
+      인자.** shared 5키가 전부 같은 싱글턴 설정인지(`react-dom/client` 포함 — 빼면
+      #RUNTIME-015), `remotes` 가 `pinnedEntry` 를 쓰는지(심어준 값 우선 · remote 별 독립),
+      초기화가 한 번인지, `typeof window` 두 갈래. 순수 함수(`react-modules`)에는 테스트가
+      있었지만 **규칙이 다섯 개 전부에 입혀졌는가** 는 아무도 안 보던 자리다(42차)
+- [x] 47. `apps/host/src/mf/versions/browser.test.ts` 의 왕복 — `injectionScript` 가 뱉은
+      인라인 스크립트를 실행해 `injectedEntry` 로 되읽는다. 이 seam 의 계약은 "직렬화 →
+      스크립트 → 역직렬화" 라 **한쪽만 시험하면 필드 이름이 어긋나도 양쪽이 초록**이고,
+      증상은 에러가 아니라 버전 없는 폴백으로 조용히 붙는 것이다(G-1 그 모양, 41차)
 
 ## vitest 밖의 검사 — MF DTS 가 `pnpm typecheck` 안에서 돈다
 

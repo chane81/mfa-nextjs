@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
+
+import { hueVar } from '@mfa/utils/style/hue';
 
 import { LAB_MODES, LAB_ORDER } from '@/components/lab/modes';
 
@@ -39,7 +40,7 @@ export default function LabIndexPage() {
               key={mode}
               href={`/lab/${mode}`}
               // 모드 색(hue)은 `modes.ts` 가 정하는 런타임 값이라 클래스로 굳힐 수 없다
-              style={{ '--hue': spec.hue } as CSSProperties}
+              style={hueVar(spec.hue)}
               className="flex flex-col gap-2 rounded-lg border border-[hsl(var(--hue)_60%_45%/0.5)] bg-[hsl(var(--hue)_60%_45%/0.08)] p-5 text-inherit no-underline"
             >
               <strong className="text-base">{spec.label}</strong>

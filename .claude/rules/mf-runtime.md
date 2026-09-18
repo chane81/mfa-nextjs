@@ -34,6 +34,7 @@ host 는 번들러 플러그인 없이 `@module-federation/runtime` 만 쓴다. 
 | remote 이름 · 포트 · env  | `packages/remote-config`                                                  |
 | 산출물 파일명 · URL 조립  | 같은 패키지의 `MF_FILES` · `*Url()` · `versionedPath()`                   |
 | MF DTS 산출물 이름        | 같은 패키지의 `MF_TYPES_FOLDER` (remote 설정 · host 소비가 같이 본다)     |
+| MF DTS 가 풀리는 경로     | 같은 패키지의 `CONTRACTS_TYPES_DIR` (`mf dts` 가 쓰고 생성기가 읽는다)    |
 | React external 목록       | 같은 패키지의 `SSR_EXTERNALS` (remote 빌드 · host 셰임이 같이 본다)       |
 | 매니페스트 서명 페이로드  | 같은 패키지의 `signedPayload()` (stamp 와 host 검증이 같이 본다)          |
 | 빌드 버전 · dist 경로     | `@mfa/remote-config/node` — `readBuildVersion()` · `versionedDist()`      |

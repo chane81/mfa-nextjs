@@ -35,13 +35,18 @@ vi.mock('next/link', () => ({
  * 오리진은 env 스텁과 web 엔트리가 **같은 값이어야** 의미가 있다.
  * `vi.mock` 팩토리는 호이스팅되어 바깥 `const` 를 못 보므로 `vi.hoisted` 에 둔다.
  */
-const { CATALOG_ORIGIN, CART_ORIGIN, loadRemoteModule } = vi.hoisted(() => ({
-  CATALOG_ORIGIN: 'https://catalog.example.com',
-  CART_ORIGIN: 'https://cart.example.com',
-  loadRemoteModule: vi.fn(),
-}));
+const { CATALOG_ORIGIN, CART_ORIGIN, loadRemoteModule, pinnedEntry } =
+  vi.hoisted(() => ({
+    CATALOG_ORIGIN: 'https://catalog.example.com',
+    CART_ORIGIN: 'https://cart.example.com',
+    loadRemoteModule: vi.fn(),
+    // 에러 경계가 "런타임이 지금 쓰는 주소" 를 이 함수로 묻는다.
+    pinnedEntry: vi.fn(
+      () => 'https://cart.example.com/vpinned/mf-manifest.json',
+    ),
+  }));
 
-vi.mock('@/mf/loader', () => ({ loadRemoteModule }));
+vi.mock('@/mf/loader', () => ({ loadRemoteModule, pinnedEntry }));
 
 beforeEach(() => {
   clearGlobalRegistries();

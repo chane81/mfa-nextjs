@@ -50,3 +50,27 @@ export function injectedEntry(remote: RemoteName): InjectedEntry | undefined {
     globalThis as { __MFA_REMOTE_VERSIONS__?: Record<string, InjectedEntry> }
   )[REMOTE_VERSIONS_GLOBAL]?.[remote];
 }
+
+/**
+ * 심는 쪽. `RemoteVersionSync` 가 이 문자열을 인라인 `<script>` 에 넣는다.
+ *
+ * ## 왜 읽는 쪽과 같은 파일인가
+ *
+ * 전역 **이름**은 원래부터 한 곳이었는데(`REMOTE_VERSIONS_GLOBAL`) **모양**은 아니었다 —
+ * `{ version, entry }` 객체를 조립하는 코드가 `RemoteVersionSync` 안에 리터럴로 있었고
+ * `InjectedEntry` 와 타입으로 묶여 있지 않았다. 필드 이름이 하나 어긋나면 컴파일은
+ * 통과하고 `injectedEntry(...)?.entry` 만 `undefined` 가 된다 — 증상은 에러가 아니라
+ * **버전 없는 폴백 엔트리로 조용히 붙는 것**이다(known-issues G-1 이 기록한 그 모양).
+ *
+ * 이제 이 파일 하나가 이름 · 모양 · 직렬화를 다 갖는다. 왕복 테스트가 이 seam 을 덮는다.
+ *
+ * `JSON.stringify` 는 `</script>` 를 이스케이프하지 않는다. 값이 remote 가 공표한 hex
+ * 해시와 우리가 조립한 URL 이라 지금은 닿을 수 없는 경로지만, 이 함수가 "문자열을
+ * 만드는 유일한 자리" 인 이상 방어는 여기 있어야 한다.
+ */
+export function injectionScript(
+  entries: Partial<Record<RemoteName, InjectedEntry>>,
+): string {
+  const json = JSON.stringify(entries).replace(/</g, '\\u003c');
+  return `window.${REMOTE_VERSIONS_GLOBAL}=${json}`;
+}

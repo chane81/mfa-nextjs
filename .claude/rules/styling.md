@@ -36,4 +36,9 @@ remote 쪽 expose 마다 선언하지 않는다 — expose 를 추가할 때 잊
 내려보내고, `remote-boundary` · `text-origin` 같은 `@utility` 가 그 변수를 읽는다.
 `hsl(...)` 조립식을 컴포넌트에 복제하지 않는다.
 
+**변수를 내려보내는 통로는 `hueVar`(`@mfa/utils/style/hue`) 하나다.** 직접
+`style={{ '--hue': x } as CSSProperties}` 를 적지 않는다 — 그러면 변수 이름을 바꿀 때
+그 자리만 색을 잃고, 타입 오류도 테스트 실패도 없이 화면에서만 나타난다.
+`@mfa/ui` 의 `Panel`·`Badge` 도 같은 함수를 쓴다.
+
 배경과 실측은 `docs/02-architecture/05-styling.md`.

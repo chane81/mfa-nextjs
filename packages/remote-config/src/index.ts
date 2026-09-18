@@ -79,6 +79,24 @@ export const MF_SSR_BUNDLE = {
 export const MF_TYPES_FOLDER = '@mf-types';
 
 /**
+ * MF DTS 가 풀리는 자리. **`@mfa/contracts` 패키지 루트 기준 상대 경로**다.
+ *
+ * 이 경로는 쓰는 쪽과 읽는 쪽이 따로 있다 —
+ * `packages/contracts/module-federation.config.ts` 의 `typesFolder` 가 여기에 풀고,
+ * `scripts/gen-module-ids.ts` 가 여기서 읽어 `module-ids.ts` 를 만든다.
+ * 두 곳이 각자 문자열을 들고 있었는데, 한쪽만 바꾸면 실패 메시지가
+ * "`pnpm mf:types` 를 먼저 돌리세요" 로 나온다 — 원인이 경로 불일치라는 힌트가 전혀
+ * 없어서 remote 를 띄워 몇 번을 다시 돌려도 같은 말만 반복된다.
+ *
+ * ⚠️ `packages/contracts/tsconfig.json` 과 `contract-check.ts` 에도 같은 경로가 있지만
+ * 그쪽은 **정적 해석이 필요해** 리터럴로 남는다(tsc 는 상수를 못 읽는다).
+ */
+export const CONTRACTS_TYPES_DIR = `src/generated/${MF_TYPES_FOLDER}`;
+
+/** `@mfa/contracts` 의 워크스페이스 디렉터리 — 위 상대 경로의 기준점 */
+export const CONTRACTS_WORKSPACE_DIR = 'packages/contracts';
+
+/**
  * MF 산출물 파일명.
  *
  * remote 가 내보내고 host 가 받아가는 계약이라 양쪽이 같은 이름을 알아야 한다.
