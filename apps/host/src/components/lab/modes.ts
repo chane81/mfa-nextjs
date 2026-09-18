@@ -1,6 +1,17 @@
 /** 실험 모드 메타데이터. 인덱스 페이지가 remote 트리를 끌고 오지 않도록 별도 모듈로 분리했다. */
+import type { RemoteName } from '@mfa/contracts';
 
 export type LabMode = 'ssr' | 'isr' | 'cache';
+
+/**
+ * 실험이 의존하는 remote. **세 페이지가 같은 remote 를 봐야 비교가 성립한다** —
+ * `/lab/isr` 과 `/lab/cache` 는 수명 정책만 다르고 나머지가 같다는 게 실험의 전제다.
+ *
+ * 각 페이지가 `'catalog'` 를 따로 적고 있었다. 타입이 `RemoteName` 유니온이라 리네임은
+ * 막히지만, **실험 대상을 다른 remote 로 옮길 때 한쪽만 고치면** 두 페이지가 다른 태그를
+ * 달고도 초록이다. 그러면 비교 결과가 조용히 무의미해진다.
+ */
+export const LAB_REMOTE: RemoteName = 'catalog';
 
 export interface LabModeSpec {
   label: string;

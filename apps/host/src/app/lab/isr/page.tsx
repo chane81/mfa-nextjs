@@ -1,6 +1,7 @@
 import { cacheLife, cacheTag } from 'next/cache';
 
 import { LabPanel } from '@/components/lab/LabPanel';
+import { LAB_REMOTE } from '@/components/lab/modes';
 import { remoteCacheTag } from '@/mf/loader/server';
 
 /**
@@ -17,7 +18,7 @@ async function IsrEquivalent() {
   cacheLife({ stale: 60, revalidate: 60, expire: 3600 });
   // 이 캐시 스코프가 어떤 remote 에 의존하는지 스스로 선언한다.
   // remote 재배포 웹훅은 이 태그만 만료시키면 되고, 라우트 목록을 알 필요가 없다.
-  cacheTag(remoteCacheTag('catalog'));
+  cacheTag(remoteCacheTag(LAB_REMOTE));
 
   return <LabPanel mode="isr" renderedAt={new Date().toISOString()} />;
 }

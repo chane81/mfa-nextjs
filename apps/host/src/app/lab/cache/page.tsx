@@ -1,6 +1,7 @@
 import { cacheLife, cacheTag } from 'next/cache';
 
 import { LabPanel } from '@/components/lab/LabPanel';
+import { LAB_REMOTE } from '@/components/lab/modes';
 import { remoteCacheTag } from '@/mf/loader/server';
 
 /**
@@ -17,7 +18,7 @@ import { remoteCacheTag } from '@/mf/loader/server';
 async function CachedShell() {
   'use cache';
   cacheLife('minutes');
-  cacheTag(remoteCacheTag('catalog'));
+  cacheTag(remoteCacheTag(LAB_REMOTE));
 
   return <LabPanel mode="cache" renderedAt={new Date().toISOString()} />;
 }
