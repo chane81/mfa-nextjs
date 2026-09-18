@@ -10,7 +10,7 @@ import type {
 import { stylesPath } from '@mfa/remote-config';
 import { Skeleton } from '@mfa/ui';
 
-import { UNVERSIONED, WEB_ENTRIES, WEB_ORIGINS } from '../config';
+import { UNVERSIONED, WEB_ORIGINS } from '../config';
 import { loadRemoteModule } from '../loader';
 import { remoteVersion } from '../versions';
 import { RemoteBoundary } from './RemoteBoundary';
@@ -133,7 +133,7 @@ export function RemoteComponent<K extends RemoteModuleId>({
   const Remote = getLazyRemote(moduleId, reloadKey);
 
   return (
-    <RemoteBoundary remoteName={remoteName} entry={WEB_ENTRIES[remoteName]}>
+    <RemoteBoundary remoteName={remoteName}>
       {/*
         버전은 서버가 심어준 값을 그대로 쓴다(`RemoteVersionSync` → `remoteVersion`).
         없으면 버전 없는 경로로 떨어지는데, 그건 dev 서버가 자산을 서빙하는 주소라

@@ -8,7 +8,6 @@ import {
   type RemoteName,
 } from '@mfa/contracts/remote';
 
-import { WEB_ENTRIES } from '@/mf/config';
 import { RemoteBoundary } from '@/mf/components/RemoteBoundary';
 import { remoteCacheKey } from '@/mf/components/RemoteComponent';
 import { loadRemoteModule } from '@/mf/loader';
@@ -109,11 +108,7 @@ export function MfWarmup({
       {remotes.map((remote) => {
         const Loader = warmLoader(remote, nonce);
         return (
-          <RemoteBoundary
-            key={remote}
-            remoteName={remote}
-            entry={WEB_ENTRIES[remote]}
-          >
+          <RemoteBoundary key={remote} remoteName={remote}>
             <Suspense fallback={null}>
               <Loader />
             </Suspense>

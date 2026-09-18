@@ -25,18 +25,25 @@ import { REMOTE_VERSIONS_GLOBAL } from '../versions/browser';
  * 엔트리 주소는 목이 아니라 `config` 가 env 에서 실제로 조립한 값을 쓴다.
  * 로더 목도 같이 둬서 `(id) => loadRemoteModule(id)` 래퍼를 없앴다.
  */
-const { CATALOG_ORIGIN, CART_ORIGIN, loadRemoteModule } = vi.hoisted(() => ({
-  CATALOG_ORIGIN: 'https://catalog.example.com',
-  CART_ORIGIN: 'https://cart.example.com',
-  loadRemoteModule: vi.fn(),
-}));
+const { CATALOG_ORIGIN, CART_ORIGIN, loadRemoteModule, pinnedEntry } =
+  vi.hoisted(() => ({
+    CATALOG_ORIGIN: 'https://catalog.example.com',
+    CART_ORIGIN: 'https://cart.example.com',
+    loadRemoteModule: vi.fn(),
+    pinnedEntry: vi.fn(),
+  }));
 
-vi.mock('../loader', () => ({ loadRemoteModule }));
+vi.mock('../loader', () => ({ loadRemoteModule, pinnedEntry }));
 
 beforeEach(() => {
   clearGlobalRegistries();
   vi.resetModules();
   loadRemoteModule.mockReset();
+  // 경계가 에러 상자에 찍는 주소는 **런타임이 실제로 부르는 주소**여야 한다.
+  pinnedEntry.mockImplementation(
+    (remote: string) =>
+      `https://${remote}.example.com/vpinned/mf-manifest.json`,
+  );
   vi.stubEnv('REMOTE_CATALOG_PUBLIC_URL', CATALOG_ORIGIN);
   vi.stubEnv('REMOTE_CART_PUBLIC_URL', CART_ORIGIN);
   vi.stubEnv(
@@ -247,15 +254,21 @@ describe('실패', () => {
     error.mockRestore();
   });
 
-  it('경계에 remote 의 web 엔트리를 알려준다', async () => {
+  it('경계에 런타임이 실제로 쓰는 엔트리가 찍힌다', async () => {
+    // 폴백(`WEB_ENTRIES`)은 dev 에만 실재하는 주소다. 그걸 찍으면 배포 장애에서
+    // 진단이 거짓말을 한다 — 실패한 URL 이 화면 어디에도 안 나온다.
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     loadRemoteModule.mockRejectedValue(new Error('실패'));
     const { RemoteComponent } = await load();
 
     render(<RemoteComponent module="catalog/ProductGrid" />);
 
-    expect(await screen.findByText(/entry:/)).toHaveTextContent(
-      `${CATALOG_ORIGIN}/${MF_FILES.webManifest}`,
+    const detail = await screen.findByText(/entry:/);
+    expect(detail).toHaveTextContent(
+      'https://catalog.example.com/vpinned/mf-manifest.json',
+    );
+    expect(detail).not.toHaveTextContent(
+      `${CATALOG_ORIGIN}/${MF_FILES.webManifest}\n`,
     );
     error.mockRestore();
   });
