@@ -2,7 +2,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { REMOTE_LIST, REMOTES, type RemoteName } from '@mfa/remote-config';
+import {
+  MF_FILES,
+  REMOTE_LIST,
+  REMOTES,
+  type RemoteName,
+} from '@mfa/remote-config';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -151,6 +156,22 @@ describe('docker-compose.yml — 로컬 도커에 remote 가 다 있다', () => 
   );
 
   it.each(REMOTE_LIST)(
+    '$name 헬스체크가 버전 매니페스트를 찌른다',
+    ({ name, devPort }) => {
+      /**
+       * ⚠️ 파일명이 어긋나도 **404 가 아니다.** 정적 서버의 폴백이 200 을 주므로
+       * 헬스체크가 통과하고, 그 상태로 `up --wait` 이 초록이 된다 — 즉 이 값이 틀리면
+       * 검사 자체가 사라지는데 아무 신호가 없다.
+       */
+      expect(
+        compose,
+        `docker-compose.yml 의 remote-${name} 헬스체크를 ` +
+          `\`http://127.0.0.1:${devPort}/${MF_FILES.versionManifest}\` 로 맞추세요.`,
+      ).toContain(`http://127.0.0.1:${devPort}/${MF_FILES.versionManifest}`);
+    },
+  );
+
+  it.each(REMOTE_LIST)(
     'host 가 $name 이 healthy 해질 때까지 기다린다',
     ({ name }) => {
       /**
@@ -208,4 +229,28 @@ describe('Dockerfile — remote 이미지가 자기 것만 설치한다', () => 
       expect(dockerfile(name)).toContain(`--filter=${packageName}`);
     },
   );
+});
+
+/**
+ * 두 remote 가 **같이 쓰는** 엔트리포인트. 그래서 여기 있는 기본값은 곧 어느 한쪽의
+ * 포트가 된다 — 새 remote 의 Dockerfile 이 `ENV PORT` 를 빠뜨리면 컨테이너는 정상
+ * 기동하고 남의 포트로 뜬다. 증상이 부팅 실패가 아니라 "host 만 그 remote 를 못 찾음"
+ * 이라 원인까지 가는 길이 멀다(known-issues J-2).
+ */
+describe('remote-entrypoint.sh — 공유 엔트리포인트', () => {
+  const ENTRYPOINT = 'scripts/docker/remote-entrypoint.sh';
+
+  it('포트에 폴백을 두지 않는다', () => {
+    expect(
+      read(ENTRYPOINT),
+      `${ENTRYPOINT} 의 PORT 는 \`\${PORT:?…}\` 여야 합니다 — ` +
+        '폴백을 두면 설정 누락이 부팅 실패가 아니라 오작동으로 나타납니다.',
+    ).not.toMatch(/\$\{PORT:-/);
+  });
+
+  it('버전 매니페스트 이름을 SSOT 와 같이 쓴다', () => {
+    // 이 스크립트가 이미지의 dist 에서 볼륨으로 옮기는 파일이다. 이름이 갈리면
+    // 배포는 성공하고 host 만 옛 버전을 계속 본다.
+    expect(read(ENTRYPOINT)).toContain(MF_FILES.versionManifest);
+  });
 });

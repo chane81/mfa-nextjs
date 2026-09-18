@@ -20,7 +20,12 @@ set -eu
 
 BUILD_DIST=/app/dist
 DATA_DIR="${REMOTE_DIST_DIR:-/data}"
-PORT="${PORT:-3001}"
+# ⚠️ 폴백을 두지 않는다. 이 스크립트는 **두 remote 가 같이 쓰는** 엔트리포인트라,
+# 기본값이 있으면 그건 어느 한쪽의 포트다. 새 remote 의 Dockerfile 이 `ENV PORT` 를
+# 빠뜨리면 컨테이너는 정상 기동하고 **남의 포트로 뜬다** — 증상은 부팅 실패가 아니라
+# "host 만 그 remote 를 못 찾음" 이라 원인까지 가는 길이 멀다. 값의 원본은
+# `packages/remote-config` 의 `devPort` 고, Dockerfile 이 그걸 옮겨 적는다.
+PORT="${PORT:?ENV PORT 가 없습니다 — remote 의 Dockerfile 에 ENV PORT 를 넣으세요}"
 # 볼륨에 남길 버전 개수. 한때 env(`REMOTE_KEEP_VERSIONS`)였는데 값을 넣는 경로가
 # 없었다 — Actions 는 컨테이너 env 에 닿지 못하고(배포 트리거만 한다), Dokploy
 # Application env 에도 넣은 적이 없어 항상 폴백만 돌았다. 바꾸려면 이 줄을 고친다.
