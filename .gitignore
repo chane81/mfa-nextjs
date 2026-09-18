@@ -44,3 +44,6 @@ next-env.d.ts
 # Python 캐시 (스킬 evals 채점기)
 __pycache__/
 *.pyc
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
