@@ -1,0 +1,2281 @@
+<!doctype html>
+<!--
+  쉬운 판 해부도 — 처음 보는 사람에게 "이 저장소가 뭘 증명하려는 건지"를 그림과 비유로 설명한다.
+
+  ## `anatomy.html` 과 무엇이 다른가
+
+  같은 구조를 설명하지만 독자가 다르다.
+
+    anatomy.html          이미 MF 를 아는 사람이 "이 저장소는 어떻게 했나"를 확인하는 문서.
+                          레인·분기·되돌아오는 화살표까지 정확히 그린다.
+    anatomy-simple.html   MF 를 모르는 사람이 "왜 이런 걸 하나"를 잡는 문서.
+                          하나의 비유(푸드코트)로 끝까지 밀고, 정확한 이름은 각 절 끝에 붙인다.
+
+  그래서 이 파일은 **정확도보다 순서를 우선**한다. 세부가 궁금해지는 지점마다
+  `anatomy.html` 의 해당 절로 보낸다. 둘을 나란히 두고 비교하라고 색(host 파랑 ·
+  catalog 보라 · cart 초록)은 일부러 해부도와 같은 값을 쓴다 — 종이 색만 다르다.
+
+  ## 이 파일도 SSOT 가 아니다
+
+  근거와 실측은 `docs/**.md` 에 있다. 설계가 바뀌면 마크다운 → anatomy.html →
+  이 파일 순으로 고친다. 비유가 먼저 바뀌는 일은 없어야 한다.
+
+  ## 보는 법
+
+  의존성이 없다. 폰트(Google Fonts) 말고는 전부 이 파일 안에 있고 스크립트는 둘 뿐이다 —
+  테마 토글과, Pages 에서 `.md` 링크를 GitHub blob 으로 돌리는 보정.
+-->
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>쉬운 판 해부도 — mfa-nextjs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap"
+    />
+
+    <style>
+      :root {
+        /* 종이 색만 해부도와 다르다 — 같은 구조의 다른 판본이라는 표시 */
+        --bg: #f4efe6;
+        --surface: #fffdf9;
+        --surface-2: #efe8db;
+        --ink: #221f1a;
+        --ink-2: #6b6255;
+        --line: #ded3c1;
+        --line-2: #b7a892;
+
+        /* 역할 색은 해부도와 같은 값이다. 두 문서를 오갈 때 같은 색이 같은 앱이어야 한다 */
+        --hostc: #1b4f8f;
+        --cat: #6a45c8;
+        --cart: #0f7454;
+        --alert: #a83a22;
+
+        --sans:
+          'IBM Plex Sans KR', system-ui, -apple-system, 'Apple SD Gothic Neo',
+          sans-serif;
+        --mono:
+          'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --bg: #14110d;
+          --surface: #1d1913;
+          --surface-2: #26211a;
+          --ink: #ece5da;
+          --ink-2: #a2978a;
+          --line: #352e25;
+          --line-2: #574c3e;
+
+          --hostc: #6fa8e8;
+          --cat: #af90ff;
+          --cart: #3fd09b;
+          --alert: #f08a6c;
+        }
+      }
+
+      :root[data-theme='dark'] {
+        --bg: #14110d;
+        --surface: #1d1913;
+        --surface-2: #26211a;
+        --ink: #ece5da;
+        --ink-2: #a2978a;
+        --line: #352e25;
+        --line-2: #574c3e;
+
+        --hostc: #6fa8e8;
+        --cat: #af90ff;
+        --cart: #3fd09b;
+        --alert: #f08a6c;
+      }
+
+      /* 최소 리셋 — 이 파일은 단독으로 열린다 */
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      img,
+      svg {
+        max-width: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 16.5px;
+        line-height: 1.8;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .wrap {
+        max-width: 1060px;
+        margin: 0 auto;
+        padding: 0 24px 110px;
+      }
+
+      /* ------------------------------------------------------------ 헤더 */
+      header.masthead {
+        padding: 64px 0 36px;
+      }
+
+      .eyebrow {
+        display: inline-block;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        color: var(--ink-2);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 3px 14px;
+        margin-bottom: 20px;
+      }
+
+      h1 {
+        font-size: clamp(30px, 5.2vw, 46px);
+        line-height: 1.3;
+        margin: 0 0 18px;
+        letter-spacing: -0.02em;
+      }
+
+      .lede {
+        font-size: clamp(17px, 2.2vw, 19px);
+        margin: 0 0 26px;
+        color: var(--ink-2);
+        max-width: 42em;
+      }
+      .lede b {
+        color: var(--ink);
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .chip {
+        font-size: 13.5px;
+        padding: 5px 13px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--ink-2);
+      }
+      .chip b {
+        color: var(--ink);
+      }
+      .chip.hst b {
+        color: var(--hostc);
+      }
+      .chip.cat b {
+        color: var(--cat);
+      }
+      .chip.crt b {
+        color: var(--cart);
+      }
+
+      /* ------------------------------------------------- 문서 사이 안내 */
+      .crosslink {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 16px;
+        margin: 26px 0 0;
+        padding: 16px 20px;
+        border: 1px dashed var(--line-2);
+        border-radius: 14px;
+        background: var(--surface);
+        font-size: 15px;
+        color: var(--ink-2);
+      }
+      .crosslink b {
+        color: var(--ink);
+      }
+
+      a {
+        color: var(--hostc);
+        text-underline-offset: 3px;
+      }
+
+      /* ------------------------------------------------------------ 절 */
+      section {
+        margin-top: 76px;
+      }
+
+      .step-head {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        border-top: 2px solid var(--ink);
+        padding-top: 14px;
+        margin-bottom: 8px;
+      }
+      .step-num {
+        font-family: var(--mono);
+        font-size: 13px;
+        color: var(--ink-2);
+        white-space: nowrap;
+      }
+      h2 {
+        font-size: clamp(21px, 3.4vw, 27px);
+        line-height: 1.4;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+
+      h3 {
+        font-size: 18px;
+        margin: 42px 0 10px;
+      }
+
+      p {
+        margin: 0 0 16px;
+        max-width: 44em;
+      }
+
+      /* 비유 카드 */
+      .metaphor {
+        border-left: 4px solid var(--line-2);
+        background: var(--surface);
+        border-radius: 0 14px 14px 0;
+        padding: 18px 22px;
+        margin: 18px 0 26px;
+      }
+      .metaphor .m-h {
+        display: block;
+        font-size: 12.5px;
+        letter-spacing: 0.08em;
+        color: var(--ink-2);
+        margin-bottom: 6px;
+      }
+      .metaphor p {
+        margin: 0;
+        font-size: 17.5px;
+      }
+      .metaphor p + p {
+        margin-top: 10px;
+      }
+
+      /* 진짜 이름 */
+      .realname {
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px 20px;
+        margin: 26px 0 0;
+        font-size: 15.5px;
+      }
+      .realname .r-h {
+        display: block;
+        font-size: 12.5px;
+        letter-spacing: 0.08em;
+        color: var(--ink-2);
+        margin-bottom: 6px;
+      }
+      .realname p {
+        margin: 0;
+        max-width: none;
+      }
+      .realname p + p {
+        margin-top: 8px;
+      }
+
+      code {
+        font-family: var(--mono);
+        font-size: 0.88em;
+        background: var(--surface-2);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 1px 5px;
+      }
+      .realname code {
+        background: var(--surface);
+      }
+
+      /* 그림 */
+      .scroller {
+        overflow-x: auto;
+        margin: 26px 0;
+        padding-bottom: 4px;
+      }
+      figure {
+        margin: 0;
+        min-width: 620px;
+      }
+      figcaption {
+        font-size: 14px;
+        color: var(--ink-2);
+        margin-top: 10px;
+        line-height: 1.65;
+      }
+
+      /* 그림 안에서 반복되는 글자 스타일 */
+      svg text {
+        font-family: var(--sans);
+        fill: var(--ink);
+      }
+      svg .t-title {
+        font-size: 17px;
+        font-weight: 600;
+      }
+      svg .t-body {
+        font-size: 14.5px;
+      }
+      svg .t-small {
+        font-size: 13px;
+        fill: var(--ink-2);
+      }
+      svg .t-mono {
+        font-family: var(--mono);
+        font-size: 13px;
+        fill: var(--ink-2);
+      }
+      svg .t-num {
+        font-family: var(--mono);
+        font-size: 15px;
+        font-weight: 500;
+      }
+      svg .box {
+        fill: var(--surface);
+        stroke: var(--line-2);
+        stroke-width: 1.5;
+      }
+      svg .box-2 {
+        fill: var(--surface-2);
+        stroke: var(--line);
+        stroke-width: 1.5;
+      }
+      svg .ln {
+        stroke: var(--line-2);
+        stroke-width: 2;
+        fill: none;
+      }
+
+      /* 대조표 */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 22px 0;
+        font-size: 15.5px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 11px 14px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        font-size: 13px;
+        letter-spacing: 0.06em;
+        color: var(--ink-2);
+        font-weight: 500;
+        border-bottom: 1.5px solid var(--line-2);
+      }
+      td:first-child {
+        white-space: nowrap;
+        font-weight: 600;
+      }
+      .tablewrap {
+        overflow-x: auto;
+      }
+      .tablewrap table {
+        min-width: 640px;
+      }
+
+      /* 더 읽을 것 */
+      .more {
+        margin-top: 76px;
+        border-top: 2px solid var(--ink);
+        padding-top: 22px;
+      }
+      .more ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--ink-2);
+      }
+      .more li {
+        margin-bottom: 8px;
+      }
+
+      footer {
+        margin-top: 64px;
+        padding-top: 22px;
+        border-top: 1px solid var(--line);
+        font-size: 14px;
+        color: var(--ink-2);
+      }
+
+      /* 테마 토글 */
+      .theme-toggle {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        z-index: 10;
+        font-family: var(--sans);
+        font-size: 13px;
+        color: var(--ink-2);
+        background: var(--surface);
+        border: 1px solid var(--line-2);
+        border-radius: 999px;
+        padding: 6px 15px;
+        cursor: pointer;
+      }
+      .theme-toggle:hover {
+        color: var(--ink);
+      }
+
+      @media (max-width: 640px) {
+        .wrap {
+          padding: 0 18px 80px;
+        }
+        header.masthead {
+          padding-top: 52px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <button
+      type="button"
+      class="theme-toggle"
+      id="theme-toggle"
+      aria-label="라이트 · 다크 전환"
+    >
+      테마
+    </button>
+
+    <!-- 화살촉 정의 — 색깔별로 하나씩. 인라인 SVG 라 아래 그림 전부가 이걸 쓴다 -->
+    <svg width="0" height="0" aria-hidden="true" style="position: absolute">
+      <defs>
+        <marker
+          id="ah"
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="7"
+          markerHeight="7"
+          orient="auto-start-reverse"
+        >
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--line-2)" />
+        </marker>
+        <marker
+          id="ah-host"
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="7"
+          markerHeight="7"
+          orient="auto-start-reverse"
+        >
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--hostc)" />
+        </marker>
+        <marker
+          id="ah-cat"
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="7"
+          markerHeight="7"
+          orient="auto-start-reverse"
+        >
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--cat)" />
+        </marker>
+        <marker
+          id="ah-cart"
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="7"
+          markerHeight="7"
+          orient="auto-start-reverse"
+        >
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--cart)" />
+        </marker>
+        <marker
+          id="ah-alert"
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="7"
+          markerHeight="7"
+          orient="auto-start-reverse"
+        >
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--alert)" />
+        </marker>
+      </defs>
+    </svg>
+
+    <div class="wrap">
+      <header class="masthead">
+        <span class="eyebrow">mfa-nextjs · 쉬운 판</span>
+        <h1>웹사이트 하나를<br />세 팀이 따로 배포하는 법</h1>
+        <p class="lede">
+          <b
+            >손님에게는 사이트 하나로 보이는데, 만드는 쪽에서는 앱 셋이 각자
+            배포된다.</b
+          >
+          이 저장소는 그게 Next.js 16 에서 되는지를 확인한 실험 기록이다. 이
+          문서는 코드를 모르는 사람도 순서를 따라갈 수 있게
+          <b>푸드코트</b> 하나로 끝까지 설명한다.
+        </p>
+        <div class="chips">
+          <span class="chip hst"
+            ><b>host</b> 건물 전체 · Next.js 16 · :3000</span
+          >
+          <span class="chip cat"
+            ><b>catalog</b> 입점 가게 ① · Vite 8 · :3001</span
+          >
+          <span class="chip crt"
+            ><b>cart</b> 입점 가게 ② · Rsbuild 2 · :3002</span
+          >
+        </div>
+
+        <div class="crosslink">
+          <b>정확한 판은 따로 있다.</b>
+          <span
+            >용어를 이미 아는 사람은
+            <a href="./anatomy.html">Next 16 페더레이션 해부도</a> 를 보면 된다.
+            같은 구조를 레인·분기까지 그린 문서다. 색(파랑 host · 보라 catalog ·
+            초록 cart)은 두 문서가 같다.</span
+          >
+        </div>
+      </header>
+
+      <!-- ====================================================== 1 -->
+      <section>
+        <div class="step-head">
+          <span class="step-num">01</span>
+          <h2>먼저 그림 한 장 — 이게 전부다</h2>
+        </div>
+
+        <div class="metaphor">
+          <span class="m-h">비유</span>
+          <p>
+            <b>푸드코트</b>를 떠올리면 된다. 건물은 하나다. 출입구도 하나,
+            복도도 하나, 안내판도 하나. 그런데 안에 들어가 있는
+            <b>가게는 각자 다른 회사</b>다. 손님은 그걸 눈치채지 못한다 — 쟁반
+            하나 들고 돌아다니면 음식이 담길 뿐이다.
+          </p>
+        </div>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 1000 470"
+              role="img"
+              aria-label="브라우저에서 들어온 손님이 host 라는 건물 하나로 들어가고, 그 건물 안에 catalog 가게와 cart 가게가 입점해 있다. 출입구와 복도(라우터)와 공용 식기(React)는 건물이 소유한다"
+            >
+              <!-- 손님 -->
+              <rect
+                class="box"
+                x="24"
+                y="150"
+                width="200"
+                height="110"
+                rx="14"
+              />
+              <text class="t-title" x="124" y="192" text-anchor="middle">
+                손님
+              </text>
+              <text class="t-body" x="124" y="218" text-anchor="middle">
+                = 브라우저
+              </text>
+              <text class="t-small" x="124" y="242" text-anchor="middle">
+                주소창에 주소 하나만 친다
+              </text>
+              <path class="ln" d="M232 205 H 296" marker-end="url(#ah)" />
+
+              <!-- 건물(host) -->
+              <rect
+                x="304"
+                y="20"
+                width="672"
+                height="430"
+                rx="18"
+                fill="var(--surface-2)"
+                stroke="var(--hostc)"
+                stroke-width="2.5"
+              />
+              <text class="t-title" x="330" y="58" fill="var(--hostc)">
+                host — 건물 전체
+              </text>
+              <text class="t-mono" x="330" y="82">
+                Next.js 16 · Turbopack · :3000
+              </text>
+
+              <!-- 건물이 소유하는 것 둘 -->
+              <rect
+                class="box"
+                x="330"
+                y="102"
+                width="300"
+                height="86"
+                rx="12"
+              />
+              <text class="t-body" x="350" y="132">출입구 · 복도 · 안내판</text>
+              <text class="t-small" x="350" y="158">
+                주소를 해석하는 곳이 한 군데뿐이다
+              </text>
+              <text class="t-mono" x="350" y="178">라우터 = host 하나</text>
+
+              <rect
+                class="box"
+                x="650"
+                y="102"
+                width="300"
+                height="86"
+                rx="12"
+              />
+              <text class="t-body" x="670" y="132">공용 식기 한 벌</text>
+              <text class="t-small" x="670" y="158">
+                가게가 자기 그릇을 들고 오면 안 된다
+              </text>
+              <text class="t-mono" x="670" y="178">React = host 것 하나</text>
+
+              <!-- 입점 가게 둘 -->
+              <rect
+                x="330"
+                y="212"
+                width="300"
+                height="208"
+                rx="14"
+                fill="var(--surface)"
+                stroke="var(--cat)"
+                stroke-width="2.5"
+              />
+              <text class="t-title" x="352" y="250" fill="var(--cat)">
+                catalog 가게
+              </text>
+              <text class="t-small" x="352" y="276">상품을 보여주는 코너</text>
+              <text class="t-mono" x="352" y="312">Vite 8 · :3001</text>
+              <text class="t-mono" x="352" y="340">내놓는 메뉴 ―</text>
+              <text class="t-mono" x="352" y="364">
+                ProductGrid · ProductDetail
+              </text>
+              <text class="t-mono" x="352" y="388">RelatedProducts</text>
+
+              <rect
+                x="650"
+                y="212"
+                width="300"
+                height="208"
+                rx="14"
+                fill="var(--surface)"
+                stroke="var(--cart)"
+                stroke-width="2.5"
+              />
+              <text class="t-title" x="672" y="250" fill="var(--cart)">
+                cart 가게
+              </text>
+              <text class="t-small" x="672" y="276">담고 결제하는 코너</text>
+              <text class="t-mono" x="672" y="312">Rsbuild 2 · :3002</text>
+              <text class="t-mono" x="672" y="340">내놓는 메뉴 ―</text>
+              <text class="t-mono" x="672" y="364">CartPanel · CartBadge</text>
+              <text class="t-mono" x="672" y="388">CheckoutFlow</text>
+            </svg>
+            <figcaption>
+              가게는 <b>화면 조각</b>을 내놓고, 건물은 그 조각을 받아 한
+              페이지로 합친다. 손님은 건물 주소 하나만 안다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="realname">
+          <span class="r-h">진짜 이름</span>
+          <p>
+            건물 = <b>host</b>. 가게 = <b>remote</b>. 가게가 내놓는 메뉴 =
+            <b>expose 한 모듈</b>. 이 구조 전체를
+            <b>마이크로 프론트엔드(Micro Frontend)</b> 라고 부르고, 가게 코드를
+            건물이 실행 시점에 받아오는 방식을 <b>Module Federation</b> 이라고
+            한다.
+          </p>
+        </div>
+      </section>
+
+      <!-- ====================================================== 2 -->
+      <section>
+        <div class="step-head">
+          <span class="step-num">02</span>
+          <h2>왜 굳이 나누나 — 한 덩어리일 때 생기는 일</h2>
+        </div>
+
+        <div class="metaphor">
+          <span class="m-h">비유</span>
+          <p>
+            식당 한 곳이 메뉴 전부를 만든다고 해보자. 김밥 단무지를 바꾸려고
+            해도
+            <b>가게 문을 닫았다가 다시 열어야</b> 한다. 그동안 파스타도 못 판다.
+          </p>
+          <p>
+            푸드코트면 단무지 바꾸는 가게만 셔터를 내린다. 옆 가게도 건물도 그냥
+            영업한다.
+          </p>
+        </div>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 1000 400"
+              role="img"
+              aria-label="왼쪽은 한 덩어리 앱이라 상품 목록만 고쳐도 전체를 다시 배포해야 한다. 오른쪽은 앱이 셋으로 나뉘어 catalog 만 다시 배포되고 host 와 cart 는 계속 떠 있다"
+            >
+              <!-- 왼쪽: 한 덩어리 -->
+              <text class="t-title" x="40" y="36">한 덩어리로 만들면</text>
+              <rect
+                x="40"
+                y="56"
+                width="400"
+                height="180"
+                rx="14"
+                fill="var(--surface)"
+                stroke="var(--alert)"
+                stroke-width="2.5"
+              />
+              <text class="t-body" x="62" y="92">앱 하나 안에 전부</text>
+              <rect
+                class="box-2"
+                x="62"
+                y="112"
+                width="110"
+                height="46"
+                rx="9"
+              />
+              <text class="t-small" x="117" y="141" text-anchor="middle">
+                상품 목록
+              </text>
+              <rect
+                class="box-2"
+                x="184"
+                y="112"
+                width="110"
+                height="46"
+                rx="9"
+              />
+              <text class="t-small" x="239" y="141" text-anchor="middle">
+                장바구니
+              </text>
+              <rect
+                class="box-2"
+                x="306"
+                y="112"
+                width="110"
+                height="46"
+                rx="9"
+              />
+              <text class="t-small" x="361" y="141" text-anchor="middle">
+                결제
+              </text>
+              <text class="t-small" x="62" y="192">
+                상품 목록 글자 하나만 고쳤다
+              </text>
+              <text class="t-small" x="62" y="216" fill="var(--alert)">
+                → 그래도 전부 다시 빌드 · 다시 배포
+              </text>
+
+              <path
+                class="ln"
+                d="M240 246 V 292"
+                stroke="var(--alert)"
+                marker-end="url(#ah-alert)"
+              />
+              <rect
+                x="40"
+                y="300"
+                width="400"
+                height="66"
+                rx="12"
+                fill="var(--surface-2)"
+                stroke="var(--alert)"
+                stroke-width="1.5"
+              />
+              <text
+                class="t-body"
+                x="240"
+                y="330"
+                text-anchor="middle"
+                fill="var(--alert)"
+              >
+                건물 전체가 잠깐 멈춘다
+              </text>
+              <text class="t-small" x="240" y="352" text-anchor="middle">
+                고친 사람과 상관없는 팀까지 기다린다
+              </text>
+
+              <!-- 오른쪽: 셋으로 -->
+              <text class="t-title" x="560" y="36">셋으로 나누면</text>
+              <rect
+                x="560"
+                y="56"
+                width="400"
+                height="180"
+                rx="14"
+                fill="var(--surface)"
+                stroke="var(--line-2)"
+                stroke-width="1.5"
+              />
+              <rect
+                class="box-2"
+                x="582"
+                y="82"
+                width="110"
+                height="56"
+                rx="9"
+                stroke="var(--hostc)"
+              />
+              <text
+                class="t-small"
+                x="637"
+                y="108"
+                text-anchor="middle"
+                fill="var(--hostc)"
+              >
+                host
+              </text>
+              <text class="t-small" x="637" y="128" text-anchor="middle">
+                그대로
+              </text>
+              <rect
+                class="box-2"
+                x="704"
+                y="82"
+                width="110"
+                height="56"
+                rx="9"
+                stroke="var(--cat)"
+                stroke-width="2.5"
+              />
+              <text
+                class="t-small"
+                x="759"
+                y="108"
+                text-anchor="middle"
+                fill="var(--cat)"
+              >
+                catalog
+              </text>
+              <text class="t-small" x="759" y="128" text-anchor="middle">
+                여기만 교체
+              </text>
+              <rect
+                class="box-2"
+                x="826"
+                y="82"
+                width="110"
+                height="56"
+                rx="9"
+                stroke="var(--cart)"
+              />
+              <text
+                class="t-small"
+                x="881"
+                y="108"
+                text-anchor="middle"
+                fill="var(--cart)"
+              >
+                cart
+              </text>
+              <text class="t-small" x="881" y="128" text-anchor="middle">
+                그대로
+              </text>
+              <text class="t-small" x="582" y="176">
+                상품 목록 글자 하나만 고쳤다
+              </text>
+              <text class="t-small" x="582" y="200" fill="var(--cart)">
+                → catalog 이미지 하나만 새로 올린다
+              </text>
+
+              <path
+                class="ln"
+                d="M760 246 V 292"
+                stroke="var(--cart)"
+                marker-end="url(#ah-cart)"
+              />
+              <rect
+                x="560"
+                y="300"
+                width="400"
+                height="66"
+                rx="12"
+                fill="var(--surface-2)"
+                stroke="var(--cart)"
+                stroke-width="1.5"
+              />
+              <text
+                class="t-body"
+                x="760"
+                y="330"
+                text-anchor="middle"
+                fill="var(--cart)"
+              >
+                건물은 안 멈춘다
+              </text>
+              <text class="t-small" x="760" y="352" text-anchor="middle">
+                손님은 바뀐 줄도 모른다
+              </text>
+            </svg>
+            <figcaption>
+              이 저장소가 증명하려는 한 문장 —
+              <b>catalog 만 고쳐 배포해도 host 는 무중단</b>.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="realname">
+          <span class="r-h">진짜 이름</span>
+          <p>
+            가게마다 셔터를 따로 내리는 것 = <b>독립 배포</b>. 이 저장소는 앱
+            셋을 각자 컨테이너 이미지로 올린다(<code>ADR-009</code>). 배포
+            순서는 사람이 아니라 CI 가 쥐고,
+            <b>가게(remote) 를 먼저 열고 건물(host) 을 나중에</b> 연다 — 이유는
+            다음 절에 나온다.
+          </p>
+        </div>
+      </section>
+
+      <!-- ====================================================== 3 -->
+      <section>
+        <div class="step-head">
+          <span class="step-num">03</span>
+          <h2>어려운 부분은 여기다 — 손님이 오기 전에 접시를 채워야 한다</h2>
+        </div>
+
+        <div class="metaphor">
+          <span class="m-h">비유</span>
+          <p>
+            보통의 푸드코트라면 손님이 가게 앞에 가서 주문하면 된다. 그런데 이
+            건물의 규칙은 다르다 —
+            <b>손님이 문을 열고 들어오는 순간 이미 쟁반에 음식이 담겨 있어야</b>
+            한다. 빈 접시를 들려주고 "곧 나옵니다" 하면 안 된다.
+          </p>
+          <p>
+            그래서 건물이 손님보다 먼저 움직인다. 가게에 전화해서
+            <b>조리법을 통째로 받아와</b>, 건물 주방에서,
+            <b>건물 식기로</b> 직접 만든다.
+          </p>
+        </div>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 1000 572"
+              role="img"
+              aria-label="host 서버가 요청을 받아 remote 의 버전 파일을 확인하고, 버전 경로의 서버용 번들을 내려받아 검문을 통과시킨 뒤 host 의 React 를 주입해 실행하고, 완성된 HTML 을 브라우저에 보낸다. 브라우저에서는 별도의 브라우저용 번들이 그 HTML 위에 붙는다"
+            >
+              <!-- 1 -->
+              <rect class="box" x="60" y="24" width="880" height="62" rx="12" />
+              <text class="t-num" x="86" y="62" fill="var(--hostc)">1</text>
+              <text class="t-body" x="118" y="52">
+                손님이 주소를 친다 →
+                <tspan class="t-mono">host 서버</tspan>
+                가 요청을 받는다
+              </text>
+              <text class="t-small" x="118" y="74">
+                아직 브라우저에서는 아무 일도 일어나지 않았다
+              </text>
+              <path class="ln" d="M500 90 V 108" marker-end="url(#ah)" />
+
+              <!-- 2 -->
+              <rect
+                class="box"
+                x="60"
+                y="112"
+                width="880"
+                height="62"
+                rx="12"
+              />
+              <text class="t-num" x="86" y="150" fill="var(--hostc)">2</text>
+              <text class="t-body" x="118" y="140">
+                가게 정문의 메뉴판을 본다 —
+                <tspan class="t-mono">mf-version.json</tspan>
+              </text>
+              <text class="t-small" x="118" y="162">
+                "지금 영업 중인 건 v7" · 해시와 서명도 여기 적혀 있다
+              </text>
+              <path class="ln" d="M500 178 V 196" marker-end="url(#ah)" />
+
+              <!-- 3 -->
+              <rect
+                class="box"
+                x="60"
+                y="200"
+                width="880"
+                height="62"
+                rx="12"
+                stroke="var(--cat)"
+              />
+              <text class="t-num" x="86" y="238" fill="var(--cat)">3</text>
+              <text class="t-body" x="118" y="228">
+                조리법을 받아온다 —
+                <tspan class="t-mono">/v7/mf-server.cjs</tspan>
+                한 덩어리
+              </text>
+              <text class="t-small" x="118" y="250">
+                브라우저용이 아니라
+                <tspan font-weight="600">서버에서 돌아가는 판</tspan>
+                이다 · 그냥 HTTP 로 받는다
+              </text>
+              <path class="ln" d="M500 266 V 284" marker-end="url(#ah)" />
+
+              <!-- 4 -->
+              <rect
+                class="box"
+                x="60"
+                y="288"
+                width="880"
+                height="62"
+                rx="12"
+                stroke="var(--alert)"
+              />
+              <text class="t-num" x="86" y="326" fill="var(--alert)">4</text>
+              <text class="t-body" x="118" y="316">
+                검문 네 겹을 통과시킨다 (06 절에서 자세히)
+              </text>
+              <text class="t-small" x="118" y="338">
+                남이 만든 코드를
+                <tspan font-weight="600">우리 서버에서</tspan>
+                실행하는 참이라, 여기서 막지 못하면 뒤가 없다
+              </text>
+              <path class="ln" d="M500 354 V 372" marker-end="url(#ah)" />
+
+              <!-- 5 -->
+              <rect
+                class="box"
+                x="60"
+                y="376"
+                width="880"
+                height="78"
+                rx="12"
+                stroke="var(--hostc)"
+                stroke-width="2.5"
+              />
+              <text class="t-num" x="86" y="414" fill="var(--hostc)">5</text>
+              <text class="t-body" x="118" y="404">
+                건물 식기를 쥐여주고 조리한다 —
+                <tspan font-weight="600">host 의 React 를 주입</tspan>
+              </text>
+              <text class="t-small" x="118" y="426">
+                가게 코드가
+                <tspan class="t-mono">require('react')</tspan>
+                하면 host 것이 건네진다
+              </text>
+              <text class="t-small" x="118" y="444">
+                식기가 두 벌이면(React 가 둘이면) 그 자리에서 깨진다 — 이 규칙이
+                전부의 핵심이다
+              </text>
+              <path class="ln" d="M500 452 V 470" marker-end="url(#ah)" />
+
+              <!-- 6 -->
+              <rect
+                class="box"
+                x="60"
+                y="474"
+                width="880"
+                height="86"
+                rx="12"
+                stroke="var(--cart)"
+                stroke-width="2.5"
+              />
+              <text class="t-num" x="86" y="512" fill="var(--cart)">6</text>
+              <text class="t-body" x="118" y="502">
+                다 담긴 쟁반이 손님에게 나간다 —
+                <tspan font-weight="600">완성된 HTML 한 장</tspan>
+              </text>
+              <text class="t-small" x="118" y="524">
+                가게가 만든 화면이 host 의 HTML 안에
+                <tspan font-weight="600">글자로 들어 있다</tspan>
+              </text>
+              <text class="t-small" x="118" y="542">
+                브라우저는 그 위에 브라우저용 번들을 덧붙여 손을 쓸 수 있게
+                만든다(hydrate)
+              </text>
+            </svg>
+            <figcaption>
+              5번이 이 저장소에서 가장 많이 밟은 지뢰다. 식기(React)를 host 것
+              하나로 고정하지 않으면 훅이 깨진다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <p>
+          같은 화면인데 <b>손님이 이미 들어온 뒤</b>에 필요해질 수도 있다.
+          그때는 건물이 아니라 브라우저가 직접 가게에 전화한다. 받아오는 파일이
+          다를 뿐(서버용 <code>mf-server.cjs</code> ↔ 브라우저용
+          <code>remoteEntry.js</code>) 규칙은 같다 —
+          <b>식기는 언제나 건물 것</b>이다.
+        </p>
+
+        <div class="realname">
+          <span class="r-h">진짜 이름</span>
+          <p>
+            손님 오기 전에 접시를 채우는 것 = <b>SSR(서버 사이드 렌더링)</b>.
+            그래서 remote 는 <b>같은 소스에서 두 벌</b>로 빌드된다 — 브라우저용
+            <code>remoteEntry.js</code> + <code>mf-manifest.json</code>, 서버용
+            <code>mf-server.cjs</code>.
+          </p>
+          <p>
+            건물 식기를 쥐여주는 것 = <b>React 인스턴스 주입</b>. 서버 쪽은
+            <code>new Function</code> 으로 평가하면서 <code>require</code> 를
+            가로채고, 브라우저 쪽은 Module Federation 의 <b>shared</b> 선언이
+            같은 일을 한다(<code>ADR-005</code>).
+          </p>
+          <p>
+            <b>음식은 오는데 그릇 색은 안 온다.</b> 가게의 CSS 는 이 두 경로
+            어디로도 따라오지 않는다. 그래서 host 가 가게를 꽂는 자리에서 그
+            가게의 스타일 주소를 <code>&lt;link&gt;</code> 로 같이 건다 — 같은
+            주소는 React 가 알아서 하나로 합친다(<code>ADR-011</code>).
+          </p>
+          <p>
+            그리고 이게 <b>가게를 먼저 배포하는 이유</b>다 — host 는 빌드할 때도
+            가게 코드를 실제로 받아 실행해 본다. 가게가 안 떠 있으면 host 빌드가
+            거기서 멈춘다. 즉
+            <b>빌드가 통과했다는 사실 자체가 이 저장소의 주장에 대한 증거</b>다.
+          </p>
+        </div>
+      </section>
+
+      <!-- ====================================================== 4 -->
+      <section>
+        <div class="step-head">
+          <span class="step-num">04</span>
+          <h2>가게를 옮겨 다녀도 건물 밖으로 나가지 않는다</h2>
+        </div>
+
+        <div class="metaphor">
+          <span class="m-h">비유</span>
+          <p>
+            상품을 보다가 결제하러 갈 때, 손님이
+            <b>건물 밖으로 나갔다가 옆 건물로 다시 들어가야</b> 한다면? 들고
+            있던 쟁반을 입구에 두고 나가는 셈이다. 화면은 하얗게 한 번 번쩍이고,
+            스크롤 위치도 장바구니도 다시 그려진다.
+          </p>
+          <p>
+            이 저장소는 결제 코너까지 <b>같은 건물 안</b>에 넣었다. 손님은
+            복도를 걸어갈 뿐이다.
+          </p>
+        </div>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 1000 360"
+              role="img"
+              aria-label="위쪽은 같은 건물 안에서 이동하는 소프트 내비게이션으로 문서 요청이 0건이고 상태가 유지된다. 아래쪽은 건물을 나갔다 다른 건물로 들어가는 하드 내비게이션으로 문서 요청이 1건 생기고 화면이 처음부터 다시 그려진다"
+            >
+              <!-- 소프트 -->
+              <text class="t-title" x="40" y="40" fill="var(--cart)">
+                채택 — 건물 안에서 걸어간다
+              </text>
+              <rect
+                x="40"
+                y="58"
+                width="620"
+                height="96"
+                rx="14"
+                fill="var(--surface-2)"
+                stroke="var(--hostc)"
+                stroke-width="2.5"
+              />
+              <text class="t-mono" x="58" y="82">host 건물 하나</text>
+              <rect
+                class="box"
+                x="76"
+                y="92"
+                width="200"
+                height="46"
+                rx="10"
+                stroke="var(--cat)"
+              />
+              <text class="t-small" x="176" y="121" text-anchor="middle">
+                / 상품 코너
+              </text>
+              <path
+                class="ln"
+                d="M288 115 H 400"
+                stroke="var(--cart)"
+                marker-end="url(#ah-cart)"
+              />
+              <text class="t-small" x="344" y="104" text-anchor="middle">
+                복도
+              </text>
+              <rect
+                class="box"
+                x="412"
+                y="92"
+                width="212"
+                height="46"
+                rx="10"
+                stroke="var(--cart)"
+              />
+              <text class="t-small" x="518" y="121" text-anchor="middle">
+                /checkout 결제 코너
+              </text>
+              <text class="t-body" x="692" y="100" fill="var(--cart)">
+                document 요청 0건
+              </text>
+              <text class="t-small" x="692" y="124">장바구니 그대로</text>
+              <text class="t-small" x="692" y="146">스크롤·전환 그대로</text>
+
+              <!-- 하드 -->
+              <text class="t-title" x="40" y="222" fill="var(--alert)">
+                기각 — 나갔다가 옆 건물로 들어간다
+              </text>
+              <rect
+                class="box"
+                x="40"
+                y="240"
+                width="240"
+                height="80"
+                rx="14"
+                stroke="var(--hostc)"
+              />
+              <text class="t-small" x="160" y="278" text-anchor="middle">
+                건물 A
+              </text>
+              <text class="t-small" x="160" y="300" text-anchor="middle">
+                / 상품 코너
+              </text>
+              <path
+                class="ln"
+                d="M292 280 H 408"
+                stroke="var(--alert)"
+                stroke-dasharray="7 5"
+                marker-end="url(#ah-alert)"
+              />
+              <text class="t-small" x="350" y="268" text-anchor="middle">
+                길 건너기
+              </text>
+              <rect
+                class="box"
+                x="420"
+                y="240"
+                width="240"
+                height="80"
+                rx="14"
+                stroke="var(--line-2)"
+              />
+              <text class="t-small" x="540" y="278" text-anchor="middle">
+                건물 B
+              </text>
+              <text class="t-small" x="540" y="300" text-anchor="middle">
+                /legacy-checkout
+              </text>
+              <text class="t-body" x="692" y="266" fill="var(--alert)">
+                document 요청 1건
+              </text>
+              <text class="t-small" x="692" y="290">화면이 한 번 하얘진다</text>
+              <text class="t-small" x="692" y="312">
+                들고 있던 상태를 다시 만든다
+              </text>
+            </svg>
+            <figcaption>
+              실측값이다(<code>ADR-003</code>). 이 한 가지 때문에 Next 의
+              Multi-Zones 방식을 버리고, 결제 화면을 cart 가게 안으로 옮겼다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="realname">
+          <span class="r-h">진짜 이름</span>
+          <p>
+            복도를 걸어가는 것 = <b>소프트 내비게이션</b>. 길을 건너는 것 =
+            <b>하드 내비게이션</b>(문서를 새로 받는다). Multi-Zones 는
+            <b>건물마다 라우터가 따로</b>라 경계를 넘을 때 하드 내비게이션이
+            강제된다 — 그래서 <b>라우터는 host 하나</b>만 두는 쪽을 택했다.
+          </p>
+          <p>
+            가게는 복도 구조를 아예 모른다. "다 됐으니 홈으로 보내 달라"를
+            <b>건물에 부탁</b>할 뿐이다 — remote 는 라우터를 모르고, 이동은 host
+            가 넘겨준 콜백으로 위임한다 (<code
+              >onDone: () =&gt; router.push('/')</code
+            >).
+          </p>
+        </div>
+      </section>
+
+      <!-- ====================================================== 5 -->
+      <section>
+        <div class="step-head">
+          <span class="step-num">05</span>
+          <h2>가게가 새 단장을 하면 건물은 어떻게 아나</h2>
+        </div>
+
+        <div class="metaphor">
+          <span class="m-h">비유</span>
+          <p>
+            가게가 메뉴를 바꾸면 정문에 걸린 <b>메뉴판 한 장</b>을 갈아 끼운다.
+            건물은 <b>30초에 한 번</b> 그 메뉴판만 흘깃 본다. 가게가 건물에
+            전화를 걸어 알리기도 하지만, 그건 <b>빨리</b> 알리려는 것일 뿐이다 —
+            전화가 끊겨도 30초 뒤면 어차피 맞춰진다.
+          </p>
+          <p>
+            지난 메뉴는 창고에 <b>최근 다섯 개까지</b> 남긴다. 이미 인쇄되어
+            나간 전단(캐시된 화면)이 옛 번호를 가리키고 있기 때문이다 — 창고를
+            비우면 그 손님 화면이 깨진다.
+          </p>
+        </div>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 1000 400"
+              role="img"
+              aria-label="remote 는 버전별 불변 경로에 산출물을 쌓아두고 mf-version.json 이 현재 버전을 가리킨다. host 인스턴스 여럿이 각자 그 파일만 확인하므로 브로드캐스트가 필요 없고, 롤백은 그 파일을 이전 버전으로 되돌리는 것뿐이다"
+            >
+              <!-- 창고 -->
+              <text class="t-title" x="40" y="38">
+                가게 창고 — 지우지 않는다
+              </text>
+              <rect
+                class="box"
+                x="40"
+                y="56"
+                width="300"
+                height="230"
+                rx="14"
+                stroke="var(--cat)"
+              />
+              <rect
+                class="box-2"
+                x="64"
+                y="82"
+                width="252"
+                height="44"
+                rx="9"
+              />
+              <text class="t-mono" x="84" y="110">/v5/ …</text>
+              <text class="t-small" x="290" y="110" text-anchor="end">
+                캐시된 화면이 아직 본다
+              </text>
+              <rect
+                class="box-2"
+                x="64"
+                y="136"
+                width="252"
+                height="44"
+                rx="9"
+              />
+              <text class="t-mono" x="84" y="164">/v6/ …</text>
+              <text class="t-small" x="290" y="164" text-anchor="end">
+                최근 5개까지 남긴다
+              </text>
+              <rect
+                x="64"
+                y="190"
+                width="252"
+                height="44"
+                rx="9"
+                fill="var(--surface-2)"
+                stroke="var(--cat)"
+                stroke-width="2.5"
+              />
+              <text class="t-mono" x="84" y="218" fill="var(--cat)">
+                /v7/ …
+              </text>
+              <text
+                class="t-small"
+                x="290"
+                y="218"
+                text-anchor="end"
+                fill="var(--cat)"
+              >
+                지금 것
+              </text>
+              <text class="t-small" x="64" y="262">
+                같은 주소는 내용이 절대 안 바뀐다
+              </text>
+              <text class="t-small" x="64" y="280">
+                → 캐시를 영원히 둬도 안전하다
+              </text>
+
+              <!-- 메뉴판 -->
+              <path
+                class="ln"
+                d="M348 172 H 404"
+                stroke="var(--cat)"
+                marker-end="url(#ah-cat)"
+              />
+              <rect
+                x="412"
+                y="92"
+                width="200"
+                height="160"
+                rx="14"
+                fill="var(--surface)"
+                stroke="var(--alert)"
+                stroke-width="2.5"
+              />
+              <text class="t-body" x="512" y="126" text-anchor="middle">
+                정문 메뉴판
+              </text>
+              <text
+                class="t-mono"
+                x="512"
+                y="150"
+                text-anchor="middle"
+                fill="var(--alert)"
+              >
+                mf-version.json
+              </text>
+              <text class="t-small" x="512" y="180" text-anchor="middle">
+                지금 버전: v7
+              </text>
+              <text class="t-small" x="512" y="202" text-anchor="middle">
+                파일별 해시
+              </text>
+              <text class="t-small" x="512" y="224" text-anchor="middle">
+                가게 서명
+              </text>
+
+              <!-- host 들 -->
+              <path
+                class="ln"
+                d="M620 172 H 676"
+                marker-end="url(#ah-host)"
+                stroke="var(--hostc)"
+              />
+              <text class="t-title" x="684" y="38">
+                건물은 여러 채일 수 있다
+              </text>
+              <rect
+                class="box"
+                x="684"
+                y="92"
+                width="276"
+                height="46"
+                rx="10"
+                stroke="var(--hostc)"
+              />
+              <text class="t-small" x="704" y="121">host 인스턴스 ①</text>
+              <rect
+                class="box"
+                x="684"
+                y="150"
+                width="276"
+                height="46"
+                rx="10"
+                stroke="var(--hostc)"
+              />
+              <text class="t-small" x="704" y="179">host 인스턴스 ②</text>
+              <rect
+                class="box"
+                x="684"
+                y="208"
+                width="276"
+                height="46"
+                rx="10"
+                stroke="var(--hostc)"
+              />
+              <text class="t-small" x="704" y="237">host 인스턴스 ③</text>
+              <text class="t-small" x="684" y="278">
+                각자 30초마다 메뉴판만 본다 — 서로 연락할 필요가 없다
+              </text>
+
+              <!-- 롤백 -->
+              <path
+                class="ln"
+                d="M512 260 V 312"
+                stroke="var(--alert)"
+                marker-end="url(#ah-alert)"
+              />
+              <rect
+                x="212"
+                y="318"
+                width="600"
+                height="58"
+                rx="12"
+                fill="var(--surface-2)"
+                stroke="var(--alert)"
+                stroke-width="1.5"
+              />
+              <text
+                class="t-body"
+                x="512"
+                y="346"
+                text-anchor="middle"
+                fill="var(--alert)"
+              >
+                새 메뉴가 수상하면 — 건물이 받기를 거부하고, 마지막 정상 가게를
+                그대로 쓴다
+              </text>
+              <text class="t-small" x="512" y="366" text-anchor="middle">
+                손님 화면은 그동안에도 계속 뜬다(검증 실패 시 502, 페이지 캐시는
+                건드리지 않는다)
+              </text>
+            </svg>
+            <figcaption>
+              그림의 <code>v5·v6·v7</code> 은 읽기 쉬우라고 붙인 번호다. 실제
+              버전 문자열은 빌드 ID(git SHA 기반)다. 건물이 이미 그려둔 화면을
+              캐시해 뒀다면? <b>새 코드를 먼저 데워서 제대로 도는지 본 다음</b>
+              그 캐시를 버린다 — 순서를 거꾸로 하면 로딩 중인 뼈대 화면이 캐시에
+              굳는다(실측 4/4).
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="realname">
+          <span class="r-h">진짜 이름</span>
+          <p>
+            메뉴판 = <code>mf-version.json</code>(버전 <b>공표</b>, TTL 30초).
+            창고 선반 = <b>불변 경로</b> <code>/v&lt;version&gt;/</code>. 전화 =
+            <code>POST /api/mf-revalidate</code> <b>웹훅</b> — 유실돼도 TTL 로
+            수렴하므로 정합성 문제가 아니다. 데운 뒤 버리는 순서 =
+            <b>warm-then-revalidate</b>. 캐시는 네 층이고 무효화 태그도 층마다
+            따로다(<code>ADR-007</code>) — 전부
+            <a href="./02-architecture/04-remote-lifecycle.md"
+              >04-remote-lifecycle.md</a
+            >.
+          </p>
+        </div>
+      </section>
+
+      <!-- ====================================================== 6 -->
+      <section>
+        <div class="step-head">
+          <span class="step-num">06</span>
+          <h2>남이 만든 코드를 우리 서버에서 돌린다 — 검문 네 겹</h2>
+        </div>
+
+        <div class="metaphor">
+          <span class="m-h">비유</span>
+          <p>
+            03 절을 다시 보자. 건물 주방에서
+            <b>가게가 보낸 조리법을 그대로 실행</b>한다. 조리법이 바꿔치기당하면
+            건물 주방이 통째로 넘어간다.
+          </p>
+          <p>
+            그래서 배달을 받을 때 네 번 확인한다. 뒤로 갈수록 강하고,
+            <b>앞의 것이 없으면 뒤의 것도 의미가 없다</b>.
+          </p>
+        </div>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 1000 320"
+              role="img"
+              aria-label="네 개의 검문 단계. 오리진 허용 목록, 경로 형태 검증, SRI 해시 대조, Ed25519 서명 검증을 차례로 통과한 코드만 실행한다"
+            >
+              <!-- 게이트 4개 -->
+              <rect
+                class="box"
+                x="28"
+                y="60"
+                width="214"
+                height="120"
+                rx="14"
+                stroke="var(--alert)"
+              />
+              <text class="t-num" x="50" y="92" fill="var(--alert)">①</text>
+              <text class="t-body" x="82" y="92">받는 곳</text>
+              <text class="t-small" x="50" y="122">아는 주소에서만 받는다</text>
+              <text class="t-small" x="50" y="144">
+                메뉴판이 "저기서 받아라"
+              </text>
+              <text class="t-small" x="50" y="164">해도 따르지 않는다</text>
+
+              <path class="ln" d="M250 120 H 282" marker-end="url(#ah)" />
+
+              <rect
+                class="box"
+                x="290"
+                y="60"
+                width="214"
+                height="120"
+                rx="14"
+                stroke="var(--alert)"
+              />
+              <text class="t-num" x="312" y="92" fill="var(--alert)">②</text>
+              <text class="t-body" x="344" y="92">받는 파일</text>
+              <text class="t-small" x="312" y="122">
+                버전 폴더 안의 아는 이름만
+              </text>
+              <text class="t-small" x="312" y="144">
+                상위 폴더로 빠져나가거나
+              </text>
+              <text class="t-small" x="312" y="164">엉뚱한 주소면 거절</text>
+
+              <path class="ln" d="M512 120 H 544" marker-end="url(#ah)" />
+
+              <rect
+                class="box"
+                x="552"
+                y="60"
+                width="200"
+                height="120"
+                rx="14"
+                stroke="var(--alert)"
+              />
+              <text class="t-num" x="574" y="92" fill="var(--alert)">③</text>
+              <text class="t-body" x="606" y="92">내용 대조</text>
+              <text class="t-small" x="574" y="122">받은 바이트의 지문이</text>
+              <text class="t-small" x="574" y="144">메뉴판에 적힌 지문과</text>
+              <text class="t-small" x="574" y="164">같은지 본다</text>
+
+              <path class="ln" d="M760 120 H 792" marker-end="url(#ah)" />
+
+              <rect
+                class="box"
+                x="800"
+                y="60"
+                width="172"
+                height="120"
+                rx="14"
+                stroke="var(--alert)"
+                stroke-width="2.5"
+              />
+              <text class="t-num" x="822" y="92" fill="var(--alert)">④</text>
+              <text class="t-body" x="854" y="92">서명 확인</text>
+              <text class="t-small" x="822" y="122">메뉴판 자체가</text>
+              <text class="t-small" x="822" y="144">우리가 아는 도장으로</text>
+              <text class="t-small" x="822" y="164">찍혔는지 본다</text>
+
+              <!-- 왜 4가 필요한가 -->
+              <path
+                class="ln"
+                d="M652 188 V 214"
+                stroke="var(--alert)"
+                marker-end="url(#ah-alert)"
+              />
+              <rect
+                x="290"
+                y="220"
+                width="682"
+                height="76"
+                rx="12"
+                fill="var(--surface-2)"
+                stroke="var(--line)"
+                stroke-width="1.5"
+              />
+              <text class="t-body" x="314" y="250">③ 만으로는 왜 부족한가</text>
+              <text class="t-small" x="314" y="274">
+                지문은
+                <tspan font-weight="600">메뉴판에 적힌 값</tspan>
+                과 비교하는 것이다. 가게 서버가 통째로 넘어가면 코드와 지문을
+                같이 바꾸면 그만이다.
+              </text>
+              <text class="t-small" x="314" y="292" fill="var(--alert)">
+                도장(④)은 가게 서버가 아니라
+                <tspan font-weight="600">빌드 파이프라인이 쥔 열쇠</tspan>
+                로 찍는다 — 서버를 뺏겨도 도장은 못 찍는다.
+              </text>
+            </svg>
+            <figcaption>
+              ①②는 <b>받기 전</b>에, ③④는 <b>받은 뒤 실행 전</b>에 본다. 그리고
+              <b>넷을 다 통과해야 비로소 실행한다</b> — 하나라도 걸리면 그
+              가게는 이번 판에서 빠지고, 건물은 마지막 정상 가게로 계속
+              영업한다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="realname">
+          <span class="r-h">진짜 이름</span>
+          <p>
+            ① <b>오리진 허용 목록</b> — 기본값이 이미 닫혀 있고
+            <code>REMOTE_ALLOWED_ORIGINS</code> 로만 넓힌다. ②
+            <b>경로 형태 검증</b>. ③ <b>SRI 해시 대조</b>(SHA-384). ④
+            <b>Ed25519 서명 검증</b> — 개인키는 remote 의 빌드 파이프라인이,
+            공개키는 host 가 가진다. 구현은
+            <code>apps/host/src/mf/trust/</code>, 브라우저 번들에도 섞이므로
+            <code>node:crypto</code> 가 아니라 WebCrypto 를 쓴다.
+          </p>
+          <p>
+            실제로 변조해 보고 확인했다 — 번들 바이트 변조 · 매니페스트가 외부
+            오리진 지정 · 경로 탈출 · 서명 없이 매니페스트 교체 · 서명은 둔 채
+            해시만 교체,
+            <b>다섯 가지 모두 502 로 거부하면서 서비스는 계속 떴다</b>(<a
+              href="./02-architecture/04-remote-lifecycle.md"
+              >04-remote-lifecycle.md</a
+            >).
+          </p>
+        </div>
+      </section>
+
+      <!-- ====================================================== 7 -->
+      <section>
+        <div class="step-head">
+          <span class="step-num">07</span>
+          <h2>가게 둘을 일부러 다른 장비로 지었다</h2>
+        </div>
+
+        <div class="metaphor">
+          <span class="m-h">비유</span>
+          <p>
+            한 가게는 A 사 주방 설비로, 다른 가게는 B 사 설비로 지었다. 일부러
+            그랬다 — <b>"이 건물은 특정 설비 회사에 묶이지 않는다"</b> 를 보여야
+            하니까. 건물이 요구하는 건 설비가 아니라 <b>콘센트 규격</b>뿐이다.
+          </p>
+        </div>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 1000 300"
+              role="img"
+              aria-label="catalog 는 Vite, cart 는 Rsbuild 로 지었지만 둘 다 같은 Module Federation 규격으로 host 에 꽂힌다. 차이는 공유 의존성 협상이 번들러 안에서 일어나느냐 밖에서 일어나느냐 하나다"
+            >
+              <rect
+                class="box"
+                x="40"
+                y="40"
+                width="280"
+                height="110"
+                rx="14"
+                stroke="var(--cat)"
+              />
+              <text class="t-title" x="64" y="78" fill="var(--cat)">
+                catalog
+              </text>
+              <text class="t-small" x="64" y="104">Vite 8 로 지었다</text>
+              <text class="t-small" x="64" y="128">
+                규격을
+                <tspan font-weight="600">플러그인이 밖에서</tspan>
+                맞춘다
+              </text>
+
+              <rect
+                class="box"
+                x="40"
+                y="170"
+                width="280"
+                height="110"
+                rx="14"
+                stroke="var(--cart)"
+              />
+              <text class="t-title" x="64" y="208" fill="var(--cart)">
+                cart
+              </text>
+              <text class="t-small" x="64" y="234">Rsbuild 2 로 지었다</text>
+              <text class="t-small" x="64" y="258">
+                규격이
+                <tspan font-weight="600">도구 안에 내장</tspan>
+                돼 있다
+              </text>
+
+              <path
+                class="ln"
+                d="M328 95 H 420"
+                stroke="var(--cat)"
+                marker-end="url(#ah-cat)"
+              />
+              <path
+                class="ln"
+                d="M328 225 H 420"
+                stroke="var(--cart)"
+                marker-end="url(#ah-cart)"
+              />
+
+              <rect
+                x="428"
+                y="70"
+                width="200"
+                height="180"
+                rx="14"
+                fill="var(--surface-2)"
+                stroke="var(--line-2)"
+                stroke-width="2"
+              />
+              <text class="t-body" x="528" y="124" text-anchor="middle">
+                같은 콘센트
+              </text>
+              <text class="t-mono" x="528" y="152" text-anchor="middle">
+                Module
+              </text>
+              <text class="t-mono" x="528" y="172" text-anchor="middle">
+                Federation
+              </text>
+              <text class="t-small" x="528" y="204" text-anchor="middle">
+                건물은 이것만 본다
+              </text>
+
+              <path
+                class="ln"
+                d="M636 160 H 700"
+                stroke="var(--hostc)"
+                marker-end="url(#ah-host)"
+              />
+              <rect
+                class="box"
+                x="708"
+                y="100"
+                width="252"
+                height="120"
+                rx="14"
+                stroke="var(--hostc)"
+                stroke-width="2.5"
+              />
+              <text
+                class="t-title"
+                x="834"
+                y="148"
+                text-anchor="middle"
+                fill="var(--hostc)"
+              >
+                host
+              </text>
+              <text class="t-small" x="834" y="176" text-anchor="middle">
+                둘을 구별하지 않는다
+              </text>
+              <text class="t-small" x="834" y="198" text-anchor="middle">
+                받는 파일 이름도 같다
+              </text>
+            </svg>
+            <figcaption>
+              차이는 딱 하나다 —
+              <b>공유 의존성을 맞추는 경계가 번들러 안에 있느냐 밖에 있느냐</b>.
+              엔트리 모양, 공유 선언이 먹는 시점, SSR 번들을 만드는 방법 등
+              나머지 차이는 전부 여기서 파생된다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div class="realname">
+          <span class="r-h">진짜 이름</span>
+          <p>
+            콘센트 규격 = <b>Module Federation</b>. catalog 는
+            <code>@module-federation/vite</code>, cart 는
+            <code>@module-federation/rsbuild-plugin</code>. 그리고 host 는
+            <b>번들러 플러그인을 아예 쓰지 않는다</b> —
+            <code>@module-federation/runtime</code> 만 쓴다. Next 16 의
+            Turbopack 은 Module Federation 을 몰라도 된다는 뜻이고, 이 저장소가
+            성립하는 이유이기도 하다.
+          </p>
+          <p>
+            <b>둘 다 되지만 편하기는 다르다.</b> 규격이 도구 밖에 있는 Vite 쪽은
+            개발 서버가 차가울 때 순서가 어긋나는 문제가 있어 따로 손을 봐야
+            했고, 서버용 번들을 만드는 설정도 더 길다. 한 줄 결론 —
+            <b>MF remote 전용으로 새로 짓는다면 Rsbuild</b>. 그래도 catalog 를
+            옮기지 않는 건 <b>두 번들러가 공존하는 것 자체가 이 실험</b>이기
+            때문이다 (<a href="./01-research/04-bundler-comparison.md"
+              >04-bundler-comparison.md</a
+            >).
+          </p>
+        </div>
+      </section>
+
+      <!-- ====================================================== 8 -->
+      <section>
+        <div class="step-head">
+          <span class="step-num">08</span>
+          <h2>가게끼리는 말을 걸지 않는다 — 그럼 장바구니는?</h2>
+        </div>
+
+        <div class="metaphor">
+          <span class="m-h">비유</span>
+          <p>
+            상품 코너에서 "담기"를 누르면 장바구니 숫자가 올라간다. 두 코너는
+            <b>다른 가게</b>인데 어떻게 아나? 가게끼리 전화하는 게 아니다 —
+            <b>쟁반은 가게 것이 아니라 손님 것</b>이고, 그 쟁반을 건물이
+            관리한다.
+          </p>
+          <p>
+            가게끼리 직접 연결하면 <b>한 가게가 옆 가게 영업시간에 묶인다</b>.
+            그래서 규칙이 하나다 — <b>가게는 건물하고만 대화한다</b>.
+          </p>
+        </div>
+
+        <div class="scroller">
+          <figure>
+            <svg
+              viewBox="0 0 1000 380"
+              role="img"
+              aria-label="catalog 와 cart 는 서로 직접 연결되지 않는다. 둘 다 host 가 관리하는 하나의 장바구니 상태를 본다. 그 상태는 쿠키에 담겨 요청과 함께 서버로 가므로 서버가 그린 첫 화면부터 개수가 맞는다"
+            >
+              <rect
+                class="box"
+                x="60"
+                y="40"
+                width="260"
+                height="96"
+                rx="14"
+                stroke="var(--cat)"
+              />
+              <text
+                class="t-title"
+                x="190"
+                y="80"
+                text-anchor="middle"
+                fill="var(--cat)"
+              >
+                catalog 가게
+              </text>
+              <text class="t-small" x="190" y="108" text-anchor="middle">
+                "담기" 버튼이 여기 있다
+              </text>
+
+              <rect
+                class="box"
+                x="680"
+                y="40"
+                width="260"
+                height="96"
+                rx="14"
+                stroke="var(--cart)"
+              />
+              <text
+                class="t-title"
+                x="810"
+                y="80"
+                text-anchor="middle"
+                fill="var(--cart)"
+              >
+                cart 가게
+              </text>
+              <text class="t-small" x="810" y="108" text-anchor="middle">
+                숫자 배지가 여기 있다
+              </text>
+
+              <!-- 금지된 직통 -->
+              <path
+                class="ln"
+                d="M330 88 H 670"
+                stroke="var(--alert)"
+                stroke-dasharray="7 6"
+              />
+              <line
+                x1="482"
+                y1="70"
+                x2="518"
+                y2="106"
+                stroke="var(--alert)"
+                stroke-width="3"
+              />
+              <line
+                x1="518"
+                y1="70"
+                x2="482"
+                y2="106"
+                stroke="var(--alert)"
+                stroke-width="3"
+              />
+              <text
+                class="t-small"
+                x="500"
+                y="140"
+                text-anchor="middle"
+                fill="var(--alert)"
+              >
+                직통은 없다
+              </text>
+
+              <!-- 보관함 -->
+              <path
+                class="ln"
+                d="M190 144 L 330 214"
+                stroke="var(--cat)"
+                marker-end="url(#ah-cat)"
+              />
+              <path
+                class="ln"
+                d="M810 144 L 670 214"
+                stroke="var(--cart)"
+                marker-end="url(#ah-cart)"
+              />
+              <rect
+                x="290"
+                y="218"
+                width="420"
+                height="120"
+                rx="14"
+                fill="var(--surface-2)"
+                stroke="var(--hostc)"
+                stroke-width="2.5"
+              />
+              <text
+                class="t-title"
+                x="500"
+                y="256"
+                text-anchor="middle"
+                fill="var(--hostc)"
+              >
+                건물 로비의 보관함 하나
+              </text>
+              <text class="t-body" x="500" y="284" text-anchor="middle">
+                장바구니는 여기 딱 한 벌만 있다
+              </text>
+              <text class="t-small" x="500" y="312" text-anchor="middle">
+                쿠키에 담겨 요청에 실려 가므로
+                <tspan font-weight="600">서버도 읽는다</tspan>
+              </text>
+              <text class="t-small" x="500" y="330" text-anchor="middle">
+                → 첫 화면부터 개수가 맞는다
+              </text>
+            </svg>
+            <figcaption>
+              <b>코드를 나눠 쓰는 게 아니라 상태를 나눠 쓴다.</b> 같은 부품
+              코드는 가게마다 조금씩 중복되지만(가게당 몇 KB), 그 대신 한 가게의
+              배포가 다른 가게의 동작을 바꾸지 못한다.
+            </figcaption>
+          </figure>
+        </div>
+
+        <h3>그리고 한 가게에 불이 나면</h3>
+
+        <p>
+          건물을 닫지 않는다. <b>그 코너만 에러 상자로 바뀌고</b> 나머지 화면은
+          그대로 뜬다. 응답 자체는 정상(200)이라 손님은 상품도 보고 결제도 할 수
+          있다 — 못 쓰는 건 고장 난 코너 하나뿐이다.
+        </p>
+
+        <div class="realname">
+          <span class="r-h">진짜 이름</span>
+          <p>
+            보관함 = <code>@mfa/store</code>. 어느 쪽이 먼저 로드되든 같은 것을
+            보도록 <code>globalThis</code> 에 싱글턴으로 잡고(<code
+              >ADR-004</code
+            >
+            · <code>ADR-012</code>), 저장소는 쿠키다 —
+            <b>서버가 읽을 수 있어야</b>
+            첫 HTML 부터 개수가 맞기 때문이다(<code>ADR-014</code>).
+          </p>
+          <p>
+            <b>공유하는 것은 상태이지 코드가 아니다.</b> 그래서
+            <code>@mfa/store</code> 와 <code>@mfa/ui</code> 는 Module Federation
+            의 <code>shared</code> 에 <b>올리지 않는다</b> — 올리면 버전 협상이
+            붙어 한 remote 의 배포가 다른 remote 의 런타임을 바꾼다
+            (<code>ADR-022</code>). 대가는 remote 수에 비례하는 중복(현재 remote
+            당 gzip 수 KB)이고, 그걸 받아들인 것이다.
+          </p>
+          <p>
+            에러 상자 = <code>RemoteBoundary</code>
+            (<code>apps/host/src/mf/components/</code>). 그리고 remote → remote
+            의존을 금지하는 이 규칙이
+            <a href="./02-architecture/02-topology.md">02-topology.md</a> 의
+            "remote 는 host 하고만 대화한다"다.
+          </p>
+        </div>
+      </section>
+
+      <!-- ====================================================== 9 -->
+      <section>
+        <div class="step-head">
+          <span class="step-num">09</span>
+          <h2>비유를 걷어내면 — 용어 대조표</h2>
+        </div>
+
+        <p>
+          여기까지 읽었으면 이제 <a href="./anatomy.html">해부도</a> 를 볼 수
+          있다. 왼쪽 칸이 이 문서의 말이고, 가운데가 그쪽 문서의 말이다.
+        </p>
+
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>이 문서의 말</th>
+                <th>진짜 이름</th>
+                <th>어디에 있나</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>건물</td>
+                <td>host — Next.js 16 · Turbopack · :3000</td>
+                <td><code>apps/host</code></td>
+              </tr>
+              <tr>
+                <td>입점 가게</td>
+                <td>remote — catalog(:3001) · cart(:3002)</td>
+                <td><code>apps/remote-*</code></td>
+              </tr>
+              <tr>
+                <td>가게가 내놓는 메뉴</td>
+                <td>expose 한 모듈 (ProductGrid · CheckoutFlow …)</td>
+                <td><code>apps/remote-*/src/exposes/</code></td>
+              </tr>
+              <tr>
+                <td>출입구 · 복도 · 안내판</td>
+                <td>라우터 (host 가 하나만 가진다)</td>
+                <td><code>apps/host/src/app</code></td>
+              </tr>
+              <tr>
+                <td>공용 식기</td>
+                <td>React 인스턴스 — host 것을 주입 · 공유한다</td>
+                <td><code>apps/host/src/mf/loader/</code></td>
+              </tr>
+              <tr>
+                <td>손님 오기 전에 접시를 채운다</td>
+                <td>SSR — remote 를 서버에서 실행해 HTML 에 담는다</td>
+                <td><code>mf/loader/server.ts</code></td>
+              </tr>
+              <tr>
+                <td>복도를 걸어간다</td>
+                <td>소프트 내비게이션 (document 요청 0건)</td>
+                <td>
+                  <a href="./02-architecture/03-ssr-and-soft-nav.md"
+                    >03-ssr-and-soft-nav.md</a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>정문 메뉴판</td>
+                <td>버전 공표 — <code>mf-version.json</code></td>
+                <td>
+                  <a href="./02-architecture/04-remote-lifecycle.md"
+                    >04-remote-lifecycle.md</a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td>창고 선반</td>
+                <td>불변 경로 <code>/v&lt;version&gt;/</code></td>
+                <td>같은 문서</td>
+              </tr>
+              <tr>
+                <td>검문 네 겹</td>
+                <td>오리진 허용 목록 · 경로 검증 · SRI · Ed25519 서명</td>
+                <td><code>apps/host/src/mf/trust/</code></td>
+              </tr>
+              <tr>
+                <td>로비의 보관함</td>
+                <td>공유 상태 — <code>globalThis</code> 싱글턴 + 쿠키 저장</td>
+                <td><code>packages/store</code></td>
+              </tr>
+              <tr>
+                <td>코너만 에러 상자</td>
+                <td>remote 장애 격리 — 페이지는 200 으로 산다</td>
+                <td><code>mf/components/RemoteBoundary.tsx</code></td>
+              </tr>
+              <tr>
+                <td>콘센트 규격</td>
+                <td>Module Federation</td>
+                <td>
+                  <a href="./02-architecture/02-topology.md">02-topology.md</a>
+                </td>
+              </tr>
+              <tr>
+                <td>건물 관리 규약집</td>
+                <td>
+                  공용 패키지 — 데이터 모양(contracts) · 가게
+                  배치(remote-config) · 장바구니 상태(store) · 색과
+                  여백(tailwind-config)
+                </td>
+                <td><code>packages/*</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ====================================================== 10 -->
+      <section>
+        <div class="step-head">
+          <span class="step-num">10</span>
+          <h2>그래서 이 저장소가 증명한 것</h2>
+        </div>
+
+        <div class="metaphor">
+          <span class="m-h">한 문단 요약</span>
+          <p>
+            Next.js 16 에서 <b>공식 플러그인이 죽은 뒤에도</b> 런타임 Module
+            Federation 이 된다. 가게 코드는 host 서버에서 실행되어
+            <b>SSR 된 HTML</b> 로 나가고, 손님은 경계를 넘어도
+            <b>화면이 끊기지 않는다</b>. 가게는 <b>혼자 배포</b>되고, 되돌리기는
+            <b>파일 한 장</b>이며, 그 코드를 실행하기 전에
+            <b>네 번 검문</b>한다.
+          </p>
+          <p>
+            증거는 문장이 아니라 빌드다 — <code>pnpm build</code> 가 통과하면
+            host 프리렌더가 실제로 remote 의 서버 번들을 받아 실행했다는 뜻이다.
+            그래서 이 저장소는 빌드 실패를 우회하지 않는다.
+          </p>
+        </div>
+      </section>
+
+      <div class="more">
+        <h3 style="margin-top: 0">다음에 볼 것</h3>
+        <ul>
+          <li>
+            <a href="./anatomy.html">Next 16 페더레이션 해부도</a> — 같은 구조의
+            정확한 판. 배포 파이프라인 · 런타임 · 번들러 비교를 레인까지 그린다
+          </li>
+          <li>
+            <a href="./README.md">docs/README.md</a> — 문서 전체 지도와 6줄 요약
+          </li>
+          <li>
+            <a href="./02-architecture/01-decision.md">아키텍처 결정(ADR)</a> —
+            무엇을 골랐고 <b>무엇을 왜 버렸는지</b>
+          </li>
+          <li>
+            <a href="./05-troubleshooting/01-known-issues.md">밟은 지뢰 목록</a>
+            — 증상으로 원인을 찾는 표가 앞에 있다
+          </li>
+        </ul>
+      </div>
+
+      <footer>
+        mfa-nextjs · 쉬운 판 해부도. 이 문서는 지도이지 원본이 아니다 — 근거와
+        실측은 <code>docs/**.md</code> 에 있고, 설계가 바뀌면 그쪽을 먼저
+        고친다.
+        <br />
+        여기 인용한 수치(문서 요청 0건 · 1건, 버전 TTL 30초, 스켈레톤 캐시 4/4,
+        변조 거부 5건)는 전부 그 문서들의 실측값을 옮긴 것이다. 검증일:
+        2026-09-04.
+      </footer>
+    </div>
+
+    <script>
+      // 테마 토글 — OS 설정이 기본이고, 누르면 그걸 덮는다.
+      // 저장 키는 해부도와 따로 둔다(두 문서를 다른 테마로 볼 수 있게).
+      (function () {
+        var KEY = 'mfa-anatomy-simple-theme';
+        var root = document.documentElement;
+        var saved = null;
+
+        try {
+          saved = localStorage.getItem(KEY);
+        } catch (e) {
+          // 프라이빗 모드 등에서 막히면 저장 없이 이번 세션만 동작한다
+        }
+
+        if (saved === 'dark' || saved === 'light')
+          root.setAttribute('data-theme', saved);
+
+        document
+          .getElementById('theme-toggle')
+          .addEventListener('click', function () {
+            var systemDark = window.matchMedia(
+              '(prefers-color-scheme: dark)',
+            ).matches;
+            var current =
+              root.getAttribute('data-theme') ||
+              (systemDark ? 'dark' : 'light');
+            var next = current === 'dark' ? 'light' : 'dark';
+
+            root.setAttribute('data-theme', next);
+            try {
+              localStorage.setItem(KEY, next);
+            } catch (e) {
+              /* 저장 실패는 무시한다 — 화면은 이미 바뀌었다 */
+            }
+          });
+      })();
+
+      // GitHub Pages 는 마크다운을 렌더링하지 않는다. Pages 로 서빙될 때만
+      // `.md` 상대 링크를 GitHub blob 주소로 돌린다 — 로컬(file://)에서는 옆
+      // 파일을 그대로 가리켜야 하므로 건드리지 않는다. (해부도와 같은 처리)
+      (function () {
+        if (location.hostname.indexOf('github.io') === -1) return;
+
+        var BLOB = 'https://github.com/chane81/mfa-nextjs/blob/main/docs/';
+
+        document.querySelectorAll('a[href$=".md"]').forEach(function (a) {
+          var href = a.getAttribute('href');
+          if (href.slice(0, 2) !== './') return;
+
+          a.href = BLOB + href.slice(2);
+          a.target = '_blank';
+          a.rel = 'noopener';
+        });
+      })();
+    </script>
+  </body>
+</html>
