@@ -1,4 +1,5 @@
 import {
+  CONTRACTS_TYPES_DIR,
   MF_FILES,
   REMOTE_NAMES,
   publicOrigin,
@@ -148,7 +149,7 @@ export default {
        * **손으로 고치면 안 되는 파일이 한 자리에 모인다.**
        * `context`(= 이 패키지 루트) 기준 상대 경로다.
        */
-      typesFolder: 'src/generated/@mf-types',
+      typesFolder: CONTRACTS_TYPES_DIR,
     },
   },
 };
