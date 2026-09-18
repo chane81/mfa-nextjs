@@ -15,6 +15,7 @@ import {
   REMOTE_FETCH_TIMEOUT_MS,
   SSR_ENTRIES,
   ssrOrigin,
+  UNVERSIONED,
 } from '../config';
 import { recordEval, recordFetch, recordLoad } from '../state/loader-stats';
 import { markBundleReady, warmEpoch } from '../state/warm';
@@ -76,9 +77,6 @@ interface CacheEntry {
 }
 
 const bundleCache = new Map<RemoteName, CacheEntry>();
-
-/** 버전을 모를 때 쓰는 캐시 키 (dev, 또는 stamp 안 한 remote) */
-const UNVERSIONED = 'unversioned';
 
 /**
  * remote 하나에 태그가 **두 개**인 이유.

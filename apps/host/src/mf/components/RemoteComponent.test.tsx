@@ -4,7 +4,7 @@ import { MF_FILES, stylesPath } from '@mfa/remote-config';
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@tests/helpers/globals';
+import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
 import { REMOTE_VERSIONS_GLOBAL } from '../versions/browser';
 

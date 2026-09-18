@@ -10,14 +10,11 @@ import * as ReactDOMClient from 'react-dom/client';
 
 import type { RemoteModule, RemoteModuleId } from '@mfa/contracts/remote';
 import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts/remote';
+import { REACT_REQUIRED_VERSION } from '@mfa/remote-config';
 
 import { WEB_ENTRIES } from '../config';
 import { injectedEntry } from '../versions/browser';
-import {
-  normalizeShared,
-  REACT_VERSION,
-  type SharedModuleId,
-} from './react-modules';
+import { normalizeShared, type SharedModuleId } from './react-modules';
 import { loadRemoteModuleOnServer } from './server';
 
 /**
@@ -51,6 +48,19 @@ const MODULES = normalizeShared({
 } satisfies Record<SharedModuleId, unknown>);
 
 /**
+ * host 가 공유 스코프에 **공표하는** React 버전.
+ *
+ * 상수로 적지 않는다. 여기서 적은 값과 실제로 주입하는 모듈이 어긋나면 MF 가 remote 의
+ * `requiredVersion` 을 이 문자열로 판정한 뒤 **다른 실체**를 넘겨준다 — React 를 올릴 때
+ * package.json 만 고치고 이 줄을 잊는 게 정확히 그 상태다. 증상은 에러가 아니라
+ * remote 안에서만 훅이 깨지는 것이라 원인이 안 보인다.
+ *
+ * 위 `MODULES.react` 는 정규화까지 끝난 **주입 대상 그 자체**다. 거기서 읽으면 공표한
+ * 버전과 넘기는 실체가 구조적으로 같아진다.
+ */
+const REACT_VERSION = (MODULES.react as { version: string }).version;
+
+/**
  * 브라우저 MF `shared` 목록. **모듈 하나에 다른 건 없다** — 여기는 위 표에 공통 설정을
  * 입히는 자리다.
  *
@@ -65,7 +75,7 @@ const SHARED = Object.fromEntries(
       version: REACT_VERSION,
       scope: 'default',
       lib: () => mod,
-      shareConfig: { singleton: true, requiredVersion: '^19.0.0' },
+      shareConfig: { singleton: true, requiredVersion: REACT_REQUIRED_VERSION },
     },
   ]),
 );

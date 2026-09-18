@@ -3,8 +3,6 @@
   "compilerOptions": {
     "paths": {
       "@/*": ["./src/*"],
-      // 테스트가 공유하는 셋업·헬퍼 (`vitest.config.ts` 의 alias 와 같은 대상)
-      "@tests/*": ["../../tests/*"],
 
       // MF DTS 가 받아온 remote 타입. 생성물은 `packages/contracts` 가 소유하지만,
       // 그 `.d.ts` 안의 `typeof import('catalog/ProductGrid')` 는 **읽는 쪽 프로그램**의

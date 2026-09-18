@@ -118,6 +118,9 @@ importers:
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:packages/typescript-config
+      '@mfa/utils':
+        specifier: workspace:*
+        version: link:packages/utils
       '@testing-library/dom':
         specifier: ^10.4.1
         version: 10.4.1
@@ -147,7 +150,7 @@ importers:
         version: 4.1.11(vitest@4.1.11)
       eslint:
         specifier: ^10.8.1
-        version: 10.8.1(jiti@2.4.2)(supports-color@8.1.1)
+        version: 10.8.1(jiti@2.7.0)(supports-color@8.1.1)
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1
@@ -206,6 +209,9 @@ importers:
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@mfa/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       '@tailwindcss/postcss':
         specifier: ^4.3.3
         version: 4.3.3
@@ -258,6 +264,9 @@ importers:
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@mfa/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       '@module-federation/rsbuild-plugin':
         specifier: ^2.8.2
         version: 2.8.2(@rsbuild/core@2.1.13(@module-federation/runtime-tools@2.8.2))(@rspack/core@2.1.10(@module-federation/runtime-tools@2.8.2)(@swc/helpers@0.5.23))(typescript@6.0.3)
@@ -325,6 +334,9 @@ importers:
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
+      '@mfa/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       '@module-federation/vite':
         specifier: ^1.20.7
         version: 1.20.7(typescript@6.0.3)(vite@8.2.1(@types/node@24.13.3)(jiti@2.4.2))
@@ -429,6 +441,9 @@ importers:
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@mfa/utils':
+        specifier: workspace:*
+        version: link:../utils
       '@types/node':
         specifier: ^24.10.1
         version: 24.13.3
@@ -457,6 +472,9 @@ importers:
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      '@mfa/utils':
+        specifier: workspace:*
+        version: link:../utils
       '@types/react':
         specifier: ^19.2.2
         version: 19.2.18
@@ -498,6 +516,24 @@ importers:
       react:
         specifier: ^19.2.8
         version: 19.2.8
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+
+  packages/utils:
+    devDependencies:
+      '@mfa/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@mfa/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.13.3
+      eslint:
+        specifier: ^10.8.1
+        version: 10.8.1(jiti@2.7.0)(supports-color@8.1.1)
       typescript:
         specifier: 6.0.3
         version: 6.0.3

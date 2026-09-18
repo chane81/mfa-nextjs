@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@tests/helpers/globals';
+import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
 /**
  * Next 는 RSC 레이어와 SSR 레이어의 모듈 그래프를 분리한다 — 같은 파일이 두 번 평가되고

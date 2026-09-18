@@ -25,6 +25,7 @@
     "@mfa/eslint-config": "workspace:*",
     "@mfa/remote-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
+    "@mfa/utils": "workspace:*",
     "@module-federation/vite": "^1.20.7",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.10.1",

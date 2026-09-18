@@ -47,6 +47,7 @@ COPY packages/store/package.json packages/store/
 COPY packages/tailwind-config/package.json packages/tailwind-config/
 COPY packages/typescript-config/package.json packages/typescript-config/
 COPY packages/ui/package.json packages/ui/
+COPY packages/utils/package.json packages/utils/
 # catalog 만 빌드하므로 host(next)와 cart(rspack)의 툴체인은 받지 않는다.
 # 제외 필터라 루트 패키지는 남는다 — 루트 devDependency 인 turbo 가 필요하다.
 # 여기서 빠지는 것: next(198M) + @next/swc(85M) + @rspack/binding(40M) — 설치 기준

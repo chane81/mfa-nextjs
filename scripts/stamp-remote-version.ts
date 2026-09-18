@@ -30,6 +30,7 @@ import { pathToFileURL } from 'node:url';
 
 import {
   MF_FILES,
+  VERSION_FILE,
   type RemoteName,
   type SignedManifestFields,
   assertRemoteName,
@@ -145,13 +146,13 @@ function main(): void {
    * 어떻게 볼 것인가" 같은 판단이 갈라지고, 그러면 stamp 가 찾는 디렉터리와 빌드가
    * 만든 디렉터리가 어긋난다.
    */
-  const versionFile = resolve(cwd, '.mf-version');
+  const versionFile = resolve(cwd, VERSION_FILE);
   const version = readBuildVersion(cwd);
   if (!version) {
     console.error(
       existsSync(versionFile)
-        ? '[stamp] .mf-version 이 비어 있습니다. mf-build-version.ts 가 버전을 못 정했습니다.'
-        : '[stamp] .mf-version 이 없습니다. 빌드 전에 mf-build-version.ts 가 돌아야 합니다.',
+        ? `[stamp] ${VERSION_FILE} 이 비어 있습니다. mf-build-version.ts 가 버전을 못 정했습니다.`
+        : `[stamp] ${VERSION_FILE} 이 없습니다. 빌드 전에 mf-build-version.ts 가 돌아야 합니다.`,
     );
     process.exit(1);
   }

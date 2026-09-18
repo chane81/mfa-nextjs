@@ -3,7 +3,8 @@ import '@testing-library/jest-dom/vitest';
 import { PRODUCTS } from '@mfa/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@tests/helpers/globals';
+import { clearCookies } from '@mfa/utils/test/cookies';
+import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
 import { MAX_CART_QUANTITY, serializeCartCookie } from './cookie-codec';
 
@@ -16,13 +17,6 @@ import { MAX_CART_QUANTITY, serializeCartCookie } from './cookie-codec';
  */
 const A = PRODUCTS[0]!;
 const B = PRODUCTS[1]!;
-
-const clearCookies = () => {
-  for (const part of document.cookie.split(/;\s*/)) {
-    const name = part.split('=')[0];
-    if (name) document.cookie = `${name}=; path=/; max-age=0`;
-  }
-};
 
 beforeEach(() => {
   clearGlobalRegistries();

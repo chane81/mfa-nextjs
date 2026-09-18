@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@tests/helpers/globals';
+import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
 /**
  * `Symbol.for` 레지스트리는 realm 전역이라 `vi.resetModules()` 로 안 지워진다.

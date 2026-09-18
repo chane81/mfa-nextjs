@@ -46,8 +46,10 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { VERSION_FILE } from '@mfa/remote-config';
+
 /** base36 이라 짧고, 자산 경로에 그대로 쓸 수 있는 문자만 나온다 */
 const version = `t${Date.now().toString(36)}`;
 
-writeFileSync(resolve(process.cwd(), '.mf-version'), `${version}\n`);
+writeFileSync(resolve(process.cwd(), VERSION_FILE), `${version}\n`);
 console.log(`[version] ${version}`);

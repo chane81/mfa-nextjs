@@ -1,5 +1,122 @@
 # 진행 상황
 
+## 2026-09-10 (41차) — 번들러가 몰라도 되는 것을 번들러 설정에서 걷어낸다
+
+저장소 전체를 "실무 프로젝트라면 remote 나 expose 를 추가할 때 어디를 고치게 되나" 로
+읽었다. 대부분은 이미 `packages/remote-config` 에서 파생되고 있었다(ADR-017 · ADR-021).
+남은 자리가 두 종류였다.
+
+| 종류                          | 어디                                             | 왜 남았나                   |
+| ----------------------------- | ------------------------------------------------ | --------------------------- |
+| SSOT 가 있는데 **안 읽던** 것 | 두 번들러 config, host 런타임, stamp 스크립트    | 아무도 안 옮겼다            |
+| SSOT 를 **못 읽는** 선언 파일 | `turbo.json` · `docker-compose.yml` · Dockerfile | JSON · YAML · 빌드 컨텍스트 |
+
+### MF 옵션이 두 config 에 복제돼 있었다 (ADR-024)
+
+두 번들러 플러그인이 같은 `ModuleFederationOptions` 를 받는데, 그 옵션이 Vite 설정과
+Rsbuild 설정에 글자 그대로 두 벌 있었다 — `filename`, `shared`, `dts` 다섯 항목, `dev`.
+**복제된 쪽이 어긋나도 빌드는 통과한다.** 증상은 배포 후에 한쪽 remote 에서만, 그것도
+에러가 아니라 동작 이상으로 나온다(`requiredVersion` 이 갈리면 그 remote 만 자기 React
+사본을 받아 훅이 깨진다).
+
+`@mfa/remote-config/node` 의 `remoteFederationConfig(name)` 하나로 모았다. 번들러 config 에는
+포트 · 자산 경로 · CSS 파이프라인 · dev 미들웨어 — **그 번들러 어휘로만 쓸 수 있는 것**만
+남는다. 370 → 264 줄, 159 → 111 줄.
+
+같이 올라간 상수들:
+
+| 값                 | 있던 곳             | 간 곳                                     |
+| ------------------ | ------------------- | ----------------------------------------- |
+| `'remoteEntry.js'` | config 2곳          | `MF_FILES.webEntry`                       |
+| `'^19.0.0'`        | config 2곳 + host 1 | `REACT_REQUIRED_VERSION` · `SHARED_REACT` |
+| `'.mf-version'`    | 스크립트 2곳        | `VERSION_FILE`                            |
+| `'unversioned'`    | host 2곳            | `mf/config` 의 `UNVERSIONED`              |
+
+### host 가 공표하던 React 버전이 손으로 적혀 있었다
+
+`REACT_VERSION = '19.2.8'` — MF `shared` 에 실려 나가는 값이다. React 를 올리고 이 줄을
+잊으면 **공표한 버전과 실제로 주입하는 모듈이 다른** 상태가 된다. MF 는 그 문자열로
+`requiredVersion` 을 판정한 뒤 다른 실체를 넘기므로, 에러 없이 remote 안에서만 훅이 깨진다.
+
+주입 대상에서 직접 읽게 했다(`MODULES.react.version`) — 정규화까지 끝난 그 모듈 자체다.
+
+### 선언 파일 셋은 SSOT 를 못 읽는다 — 그래서 대조한다
+
+`turbo.json` 의 `@mfa/host#build.dependsOn`, `docker-compose.yml` 의 remote 배선,
+각 Dockerfile 의 포트와 제외 필터. 셋 다 remote 를 추가할 때 손으로 고쳐야 하고
+**셋 다 빠뜨려도 조용하다.**
+
+- turbo 를 잊으면 host 프리렌더가 아직 안 빌드된 remote 를 받으러 가서 ECONNREFUSED 로 죽는다.
+  메시지만 보고는 원인이 `turbo.json` 이라는 게 안 보인다.
+- Dockerfile 의 `--filter '!@mfa/remote-<다른 remote>'` 는 remote 가 늘 때마다 **다른 모든
+  remote 의 Dockerfile 이 같이 늘어나는** 유일한 자리다. 빠뜨려도 빌드는 성공하고
+  이미지만 몇 백 MB 커진다 — 아무도 못 본다.
+
+`scripts/remote-wiring.test.ts` 가 `REMOTE_LIST` 와 대고 본다. 이미 있던
+`docker-context.test.ts` 와 같은 방식이고, 실패 메시지가 어느 파일에 무슨 줄을 넣으라고
+말한다. 확인: `turbo.json` 의 cart 항목을 한 글자 바꾸자 즉시 그 문장으로 실패했다.
+
+#### JSONC 를 정규식으로 벗기면 안 된다
+
+`turbo.json` 은 주석이 설계 근거를 들고 있어서 JSONC 다. 처음엔
+`/\*[\s\S]*?\*\//g` 로 걷어냈는데, **값에 있는 `".next/**"`의`/**` 부터 주석으로
+읽어서** 그 아래 태스크가 통째로 사라졌다. 파싱은 엉뚱한 자리에서 깨진다.
+
+```
+SyntaxError: Bad control character in string literal in JSON at position 362
+```
+
+문자열 안팎을 구분하며 한 글자씩 지나가는 스캐너로 바꿨다.
+
+### 테스트 헬퍼를 패키지로 올렸다 (ADR-025)
+
+먼저 jsdom 쿠키를 비우는 `clearCookies` 가 테스트 파일 **일곱 벌**에 복제돼 있어서
+헬퍼로 합쳤다. 합치고 나니 헬퍼가 사는 자리 자체가 눈에 들어왔다.
+
+루트 `tests/helpers/` + `@tests/*` alias 였는데, 그 alias 를 쓰려면 **같은 매핑을
+tsconfig 10곳에 복제**해야 했다. 하나라도 빠지면 그 패키지에서만 편집기가 `ts(2307)` 로
+빨개진다 — 러너는 멀쩡히 돈다. 그리고 "`packages/store` 의 테스트가 루트 `tests/` 를
+읽는다" 는 사실이 `package.json` 어디에도 없었다.
+
+`packages/utils`(`@mfa/utils`) 로 옮기고 쓰는 쪽이 `devDependencies` 에 적게 했다.
+paths 10개는 지웠다 — pnpm 심링크가 해석을 맡는다.
+
+**빌드는 안 둔다.** `build` 스크립트가 있으면 turbo 의 `^build` 그래프에 들어가서
+프로덕션 이미지 빌드가 테스트 헬퍼를 먼저 컴파일하게 된다. `exports` 가 소스 `.ts` 를
+직접 가리키는 방식(`@mfa/remote-config` 과 같다)이면 그 일이 아예 안 생긴다.
+`pnpm build` 태스크 수는 6개 그대로다.
+
+**배럴도 안 둔다.** 서브패스마다 필요한 환경이 다르다 — `test/cookies` 는 DOM,
+`test/http` · `test/signing` 은 node. 배럴을 두면 DOM 없는 패키지가 `test/globals`
+하나를 쓰려다 `document` 를 만난다.
+
+#### 대가 — `packages/` 는 "바뀌면 전부 배포" 다
+
+`SHARED_DEPLOY_PATHS` 에 `packages/` 가 통짜로 들어 있다. 그래서 **테스트 헬퍼 한 줄에
+remote 둘과 host 가 전부 재배포된다.**
+
+구멍을 하나 파봤다(`DEPLOY_IGNORED_PATHS` — "이미지 안에서 실행되지 않는 경로는 배포를
+안 부른다"). 만들어 놓고 되돌렸다. 두 선택의 **사고가 대칭이 아니기** 때문이다.
+
+| 선택        | 틀렸을 때                        | 언제 알게 되나            |
+| ----------- | -------------------------------- | ------------------------- |
+| 통짜로 둔다 | 안 바뀐 이미지를 다시 올린다     | 즉시, 그리고 무해하다     |
+| 구멍을 판다 | **바뀐 코드가 배포에 안 실린다** | "고쳤는데 반영이 안 된다" |
+
+결정적인 건 이름이다. 이 패키지는 `@mfa/utils` 이고, **범용 이름은 범용으로 쓰이게 된다.**
+프로덕션 유틸이 하나 들어오는 순간 구멍은 조용한 사고가 된다 — 그때 구멍을 메우는 걸
+기억해야 성립하는 안전은 안전이 아니다. 재배포 비용은 여기서 시간뿐이다.
+
+`deploy-targets.test.ts` 가 `packages/utils/` 변경도 전체 배포를 부르는지 본다.
+누가 다시 구멍을 파면 거기서 걸린다.
+
+### 검증
+
+`pnpm build --force` 로 remote 둘을 실제로 다시 빌드하고 host 프리렌더까지 통과시켰다.
+산출물 목록과 `mf-version.json` 이 그대로다. `serve-all-remotes -- pnpm mf:types` 로
+DTS 를 다시 받았을 때 `packages/contracts/src/generated/` 에 **diff 가 없다** —
+`dts` 설정을 옮기면서 값이 안 바뀌었다는 뜻이다.
+
 ## 2026-09-06 (40차) — 교체하면서 조용히 빠진 성질들을 되돌린다
 
 38·39차(PR #8)가 머지된 뒤 그 범위를 다시 리뷰했다. 나온 6건 중 셋이 같은 모양이었다 —

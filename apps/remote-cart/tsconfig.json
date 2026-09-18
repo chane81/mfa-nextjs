@@ -4,11 +4,7 @@
     "noEmit": true,
     "declaration": false,
     "declarationMap": false,
-    "types": ["node"],
-    // 테스트가 공유하는 셋업·헬퍼 (`vitest.config.ts` 의 alias 와 같은 대상)
-    "paths": {
-      "@tests/*": ["../../tests/*"]
-    }
+    "types": ["node"]
   },
   "include": ["src/**/*", "rsbuild.config.ts", "rsbuild.server.config.ts"],
   "exclude": ["dist", "node_modules"]

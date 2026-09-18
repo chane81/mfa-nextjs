@@ -1,7 +1,7 @@
 import { MF_FILES, SSR_EXTERNALS, versionedPath } from '@mfa/remote-config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@tests/helpers/globals';
+import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
 /**
  * host **서버**가 remote 의 CJS 번들을 받아 `new Function` 으로 평가하는 자리.

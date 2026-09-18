@@ -11,6 +11,8 @@ import {
 } from './cookie-codec';
 import { CART_STORAGE_KEY, cartCookieStorage } from './cookie-storage';
 
+import { clearCookies } from '@mfa/utils/test/cookies';
+
 /**
  * 여기 있는 건 **설정**뿐이다 — 배관은 `utils/cookie-storage`, 값의 모양은 `cookie-codec`.
  * 그래서 보는 것도 "그 둘에 제대로 위임하는가" 다.
@@ -20,13 +22,6 @@ const lines = fromStoredLines([
   { id: A.id, q: 2 },
 ] as readonly StoredCartLine[]);
 const envelope = JSON.stringify({ state: { lines } });
-
-const clearCookies = () => {
-  for (const part of document.cookie.split(/;\s*/)) {
-    const name = part.split('=')[0];
-    if (name) document.cookie = `${name}=; path=/; max-age=0`;
-  }
-};
 
 beforeEach(clearCookies);
 

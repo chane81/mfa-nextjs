@@ -1,26 +1,25 @@
 {
-  "name": "@mfa/remote-config",
+  "name": "@mfa/utils",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./node": "./src/node.ts"
+    "./test/cookies": "./src/test/cookies.ts",
+    "./test/globals": "./src/test/globals.ts",
+    "./test/http": "./src/test/http.ts",
+    "./test/signing": "./src/test/signing.ts"
   },
   "files": [
     "src"
   ],
   "scripts": {
     "lint": "eslint .",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf .turbo"
   },
   "devDependencies": {
     "@mfa/eslint-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
-    "@mfa/utils": "workspace:*",
     "@types/node": "^24.10.1",
     "eslint": "^10.8.1",
     "typescript": "6.0.3"

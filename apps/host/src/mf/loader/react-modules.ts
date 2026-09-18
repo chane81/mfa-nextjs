@@ -17,9 +17,6 @@
  * `satisfies` 가 컴파일 타임에 확인한다.
  */
 
-/** host 가 remote 에 내려주는 공유 모듈 버전. React 가 두 번 로드되면 훅이 깨진다. */
-export const REACT_VERSION = '19.2.8';
-
 /**
  * 모듈 이름 → **그 모듈이 진짜인지 판별하는 export 이름**.
  *

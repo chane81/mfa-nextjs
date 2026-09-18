@@ -4,7 +4,7 @@ import { MF_FILES } from '@mfa/remote-config';
 import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@tests/helpers/globals';
+import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
 /**
  * host 헤더. **배지 자체가 cart remote 에서 온다** — 헤더 하나가 host 라우팅과

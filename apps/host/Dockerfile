@@ -62,6 +62,7 @@ COPY packages/store/package.json packages/store/
 COPY packages/tailwind-config/package.json packages/tailwind-config/
 COPY packages/typescript-config/package.json packages/typescript-config/
 COPY packages/ui/package.json packages/ui/
+COPY packages/utils/package.json packages/utils/
 # 이 이미지는 host 만 빌드하므로 remote 의 툴체인을 받을 이유가 없다.
 # 제외 필터를 쓰면 **루트 패키지가 남는다** — 루트 devDependency 인 turbo 가 필요하기 때문이다.
 # (`--filter '@mfa/host...'` 는 루트를 빼버려서 `pnpm turbo` 가 없어진다. 실측으로 확인)

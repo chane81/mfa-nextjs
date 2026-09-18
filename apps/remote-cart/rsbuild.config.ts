@@ -1,18 +1,12 @@
 import { resolve } from 'node:path';
 
 import { pluginModuleFederation } from '@module-federation/rsbuild-plugin';
-import {
-  MF_FILES,
-  MF_TYPES_FOLDER,
-  REMOTES,
-  publicOrigin,
-} from '@mfa/remote-config';
+import { MF_FILES, REMOTES, publicOrigin } from '@mfa/remote-config';
 import {
   assetBase,
-  EXPOSE_SCAN,
   createMfDevMiddleware,
   readBuildVersion,
-  readExposes,
+  remoteFederationConfig,
   versionedDist,
 } from '@mfa/remote-config/node';
 import { defineConfig } from '@rsbuild/core';
@@ -25,20 +19,14 @@ const PORT = REMOTE.devPort;
 const DIST = resolve(process.cwd(), 'dist');
 
 /**
- * 이 remote 가 노출하는 것 — **`src/exposes/` 를 읽어서 정한다.**
+ * 이 remote 의 MF 설정.
  *
- * 손으로 적으면 파일을 추가할 때마다 여기도 같이 고쳐야 하고, 빠뜨리면 "파일은 있는데
- * host 가 못 찾는" 상태가 된다. 스캔은 `@mfa/remote-config/node` 가 쥔다 —
- * catalog(Vite)와 **같은 판단**이어야 하기 때문이다. 번들러가 달라도 "무엇이 expose 인가"
- * 는 갈리면 안 된다.
- *
- * 제외 규칙도 그 패키지의 `EXPOSE_SCAN` 이 쥔다. 이 저장소는 테스트를 대상 소스 옆에
- * 두므로 거르지 않으면 `exposes.test.tsx` 가 remote 의 공개 계약에 올라간다
- * (known-issues H-2). 같은 값을 catalog 의 Vite 설정과 `gen-module-ids.test.ts` 도
- * 봐야 해서 한 곳에 뒀다 — 갈리면 검사가 실제 빌드와 다른 것을 보게 된다.
- * 스캔 결과가 커밋된 `MODULE_IDS` 와 어긋나면 그 테스트가 잡는다.
+ * 노출 목록은 **`src/exposes/` 를 읽어서 정하고**, 엔트리 파일명 · 공유 React · DTS 규칙도
+ * 같이 온다. 전부 `@mfa/remote-config/node` 가 쥔다 — catalog(Vite)와 **같은 판단**이어야
+ * 하기 때문이다. 번들러가 달라도 "무엇이 expose 인가", "React 를 어떤 범위로 공유하는가",
+ * "어떤 타입을 내보내는가" 는 갈리면 안 된다. 이 파일에는 Rsbuild 고유의 것만 남는다.
  */
-const EXPOSED = readExposes(EXPOSE_SCAN.dir, { ignore: EXPOSE_SCAN.ignore });
+const MF = remoteFederationConfig(NAME);
 /**
  * 이 remote 가 배포된 **공개 오리진**. assetPrefix 가 여기서 나온다.
  *
@@ -69,43 +57,7 @@ const DIST_ROOT = versionedDist(VERSION);
  * MF 는 "번들러가 달라도 런타임 계약만 맞으면 된다"는 걸 이 저장소에서 직접 검증하기 위함.
  */
 export default defineConfig({
-  plugins: [
-    pluginReact(),
-    pluginModuleFederation({
-      name: NAME,
-      filename: 'remoteEntry.js',
-      exposes: EXPOSED.exposes,
-      shared: {
-        react: { singleton: true, requiredVersion: '^19.0.0' },
-        'react-dom': { singleton: true, requiredVersion: '^19.0.0' },
-      },
-      /**
-       * MF 자동 타입 생성(DTS)을 **켠다.** 배경과 판단은 catalog 쪽 vite.config.ts 주석 참고.
-       * 요약: 생산자로서 `exposes` 시그니처를 `@mf-types.zip` 으로 내보내고,
-       * host 가 `mf dts --fetch` 로 받아 `@mfa/contracts` 와 대조한다.
-       * 계약의 SSOT 는 여전히 `@mfa/contracts` 다 — DTS 는 검증 장치다.
-       *
-       * ⚠️ 번들러가 달라도 **옵션 값은 catalog 와 같아야 한다.** 갈라지면 한쪽 remote 만
-       * 다른 모양의 타입을 내보내고, host 는 그걸 같은 방식으로 소비하려다 실패한다.
-       */
-      dts: {
-        generateTypes: {
-          tsConfigPath: './tsconfig.json',
-          // 폴더 이름은 계약이다 — catalog 쪽 주석 참고
-          typesFolder: MF_TYPES_FOLDER,
-          generateAPITypes: true,
-          abortOnError: true,
-          extractThirdParty: false,
-        },
-        // 이 remote 는 다른 remote 를 소비하지 않는다 — 받을 타입이 없다
-        consumeTypes: false,
-      },
-      dev: {
-        // WS 기반 동적 타입 힌트만 끈다 (`[ dynamic-remote-type-hints-plugin ] err: [object Event]`)
-        disableDynamicRemoteTypeHints: true,
-      },
-    }),
-  ],
+  plugins: [pluginReact(), pluginModuleFederation(MF.options)],
   server: {
     port: PORT,
     strictPort: true,

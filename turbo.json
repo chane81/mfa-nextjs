@@ -176,14 +176,15 @@
      * 워크스페이스 그래프가 서 있어야 한다.
      */
     /**
-     * `tests/**` 가 inputs 에 있는 이유: `scripts/*.test.ts` 가 `@tests/helpers/*` 를
-     * import 하므로 그 헬퍼들이 **이 프로그램 안에** 들어온다
+     * `packages/utils` 가 inputs 에 있는 이유: `scripts/*.test.ts` 가
+     * `@mfa/utils/test/*` 를 import 하는데 그 패키지는 **빌드가 없어서**
+     * `exports` 가 소스를 그대로 가리킨다 — 헬퍼 소스가 **이 프로그램 안에** 들어온다
      * (`tsc -p tsconfig.json --listFiles` 로 확인). 빼두면 헬퍼를 깨도 turbo 가
-     * 캐시된 PASS 를 재생한다.
+     * 캐시된 PASS 를 재생한다. `^build` 로는 안 잡힌다(빌드 태스크가 없으니 건너뛴다).
      */
     "//#typecheck:scripts": {
       "dependsOn": ["^build"],
-      "inputs": ["scripts/**/*.ts", "tests/**", "tsconfig.json"]
+      "inputs": ["scripts/**/*.ts", "packages/utils/src/**", "tsconfig.json"]
     },
     "//#lint:scripts": {
       "dependsOn": ["^build"],

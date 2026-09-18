@@ -37,13 +37,31 @@ host 는 dev 든 배포든 같은 모양의 URL 을 만든다. 그래서 dev 서
 dev 전용 미들웨어를 늘릴 때는 `configureServer`(dev)와 `configurePreviewServer`(preview) 훅
 자체를 판별자로 쓴다. `NODE_ENV` · `command` 로는 구분이 안 된다.
 
-## `exposes` 는 손으로 적지 않는다
+## MF 설정은 한 함수에서 온다
 
-`src/exposes/` 를 읽어서 만든다 — `readExposes(EXPOSE_SCAN.dir, { ignore: EXPOSE_SCAN.ignore })`
-(`@mfa/remote-config/node`). 번들러가 둘이라 스캔을 각자 구현하면 "무엇이 expose 인가"가
-remote 마다 갈린다. **인자도 `EXPOSE_SCAN` 한 곳에 있다** — 그 값을 대는 자리가 셋이라
-(Vite 설정 · Rsbuild 설정 · `scripts/gen-module-ids.test.ts`) 갈리면 검사가 실제 빌드와
-다른 것을 보게 된다. dev 가 볼 게 아닌 이웃 파일이 생기면 거기 `ignore` 에 줄을 하나 넣는다.
+두 번들러 플러그인은 같은 `ModuleFederationOptions` 를 받는다. 그래서 **remote 가 MF 를
+쓰는 방식**(노출 목록 · 엔트리 파일명 · 매니페스트 · 공유 React · DTS 규칙 · dev 힌트)은
+`remoteFederationConfig(NAME)` 하나가 만든다(`@mfa/remote-config/node`).
+
+```ts
+// apps/remote-*/{vite,rsbuild}.config.ts
+const MF = remoteFederationConfig(NAME);
+…
+federation(MF.options); // 또는 pluginModuleFederation(MF.options)
+```
+
+번들러 config 에는 **그 번들러 고유의 것만** 남긴다 — 포트, 자산 경로, CSS 파이프라인,
+dev 미들웨어. 공통 옵션을 config 에 되적지 않는다. 복제된 쪽이 어긋나도 빌드는 통과하고,
+증상은 배포 후 한쪽 remote 에서만 나온다(`requiredVersion` 이 갈리면 그 remote 만 자기
+React 사본을 받아 훅이 깨진다).
+
+`exposes` 는 그 안에서 `src/exposes/` 를 읽어 만든다(`readExposes` · `EXPOSE_SCAN`).
+같은 값을 `scripts/gen-module-ids.test.ts` 도 봐야 해서 스캔 인자까지 한 곳에 있다 —
+갈리면 검사가 실제 빌드와 다른 것을 보게 된다. dev 가 볼 게 아닌 이웃 파일이 생기면
+`EXPOSE_SCAN.ignore` 에 줄을 하나 넣는다.
+
+React 공유 범위(`SHARED_REACT` · `REACT_REQUIRED_VERSION`)도 같은 패키지에 있다.
+host 의 런타임 `init({ shared })` 가 같은 상수를 읽는다 — 세 곳이 구조적으로 못 갈린다.
 
 **`server-entry.ts` 의 SSR 진입점 맵은 손으로 적는다** — 정적 import 여야 번들이 갈리지
 않는다. 그 맵이 스캔 결과와 같은지는 `src/server-entry.test.tsx` 가 본다. 빠뜨리면
@@ -92,20 +110,12 @@ export default function ProductGrid({ … }: ProductGridProps) { … }
 그 목록도 생성물이다(`scripts/gen-module-ids.ts` 가 DTS 에서 뽑는다).
 **모듈을 추가할 때 등록하는 자리가 없다** — 파일을 놓고 `pnpm mf:types` 만 돌린다.
 
-### DTS 설정은 두 remote 가 같아야 한다
+### DTS 설정은 두 remote 가 같다 — 적을 자리가 없다
 
-번들러가 달라도 host 는 같은 방식으로 소비한다.
-
-```ts
-dts: {
-  generateTypes: { tsConfigPath: './tsconfig.json', typesFolder: MF_TYPES_FOLDER, … },
-  consumeTypes: false,       // remote 는 다른 remote 를 소비하지 않는다
-},
-dev: { disableDynamicRemoteTypeHints: true },   // WS 플러그인만 끈다
-```
-
-산출물 이름은 `MF_TYPES_FOLDER` 와 `MF_FILES.typesApi` · `typesArchive` 가 정한다 —
-host 가 받을 주소가 거기서 파생되므로 설정에 문자열을 다시 적지 않는다.
+번들러가 달라도 host 는 같은 방식으로 소비한다. 그래서 `dts` · `dev` 는 위
+`remoteFederationConfig` 안에만 있고 번들러 config 에는 없다. 산출물 이름은
+`MF_TYPES_FOLDER` 와 `MF_FILES.typesApi` · `typesArchive` 가 정한다 — host 가 받을
+주소가 거기서 파생되므로 설정에 문자열을 다시 적지 않는다.
 
 ### props 를 고쳤으면 `pnpm mf:types` 를 돌린다
 
@@ -127,17 +137,23 @@ host 가 받을 주소가 거기서 파생되므로 설정에 문자열을 다�
 배치의 원본은 `packages/remote-config` 하나다(ADR-017). 거기에 항목을 넣으면 **런타임 ·
 스크립트 · 번들러 설정 · CI 배포 판별 · turbo env** 는 저절로 따라온다 — 손댈 곳이 없다.
 
-손으로 해야 하는 건 아래 일곱 곳이고, **새 앱 디렉터리를 뺀 전부가 빠뜨리면 죽는다.**
+손으로 해야 하는 건 아래 여덟 곳이고, **새 앱 디렉터리를 뺀 전부가 빠뜨리면 죽는다** —
+`pnpm test` 나 `pnpm typecheck` 이 어디를 고치라고 말해준다.
 
 | 무엇                                       | 안 하면                                                |
 | ------------------------------------------ | ------------------------------------------------------ |
 | `REMOTES` 에 항목 추가                     | `assertRemoteName` 이 거부한다                         |
 | `apps/remote-<name>/` (번들러 설정 포함)   | —                                                      |
-| `turbo.json` 의 `@mfa/host#build`          | `serve-all-remotes` 가 dist 없다고 죽는다              |
+| `turbo.json` 의 `@mfa/host#build`          | `remote-wiring.test.ts` 가 줄까지 알려준다             |
 | 세 Dockerfile 의 `COPY … package.json`     | `docker-context.test.ts` 가 줄까지 알려준다            |
+| 새 Dockerfile 의 포트 · 제외 필터          | `remote-wiring.test.ts` 가 줄까지 알려준다             |
 | `contract-check.ts` 의 `RemoteKeys` 유니온 | `pnpm typecheck` 이 죽는다                             |
 | `apps/host/tsconfig.json` 의 `<name>/*`    | host 컴파일이 즉시 죽는다 (I-4 때문에 와일드카드 불가) |
 | `packages/contracts/tsconfig.json` 도 같이 | 같음                                                   |
+
+⚠️ Dockerfile 의 **제외 필터**(`--filter '!@mfa/remote-<다른 remote>'`)는 remote 가
+늘 때마다 **다른 모든 remote 의 Dockerfile 이 같이 늘어나는** 유일한 자리다. 빠뜨려도
+빌드는 성공하고 이미지만 몇 백 MB 커진다 — 그래서 테스트가 본다.
 
 저장소 Variables 두 개도 필요하다 — 이름은 `ciUrlVar` · `ciDokployAppVar` 가 정한다.
 
@@ -150,7 +166,8 @@ DOKPLOY_APP_<NAME>     Dokploy 애플리케이션 id
 주소를 읽던 예전 방식이 조용히 틀리던 자리다**(I-11).
 
 `docker-compose.yml` 과 `scripts/docker-host-local.sh` 는 로컬 검증 전용이라 손으로 맞춘다
-(정적 YAML · 셸이라 SSOT 를 못 읽는다). 안 고쳐도 배포에는 영향이 없다.
+(정적 YAML · 셸이라 SSOT 를 못 읽는다). 안 고쳐도 배포에는 영향이 없지만, compose 쪽은
+`remote-wiring.test.ts` 가 서비스 · 포트 · env · 볼륨 · `depends_on` 을 대조한다.
 
 ## 컴포넌트를 하나 더 추가할 때
 

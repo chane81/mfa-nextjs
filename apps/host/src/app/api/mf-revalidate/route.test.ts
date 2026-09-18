@@ -1,7 +1,7 @@
 import { MF_FILES, versionedPath } from '@mfa/remote-config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@tests/helpers/globals';
+import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
 /**
  * remote 배포 파이프라인이 host 캐시를 깨우는 엔드포인트.

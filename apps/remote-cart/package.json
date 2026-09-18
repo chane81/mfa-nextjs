@@ -25,6 +25,7 @@
     "@mfa/eslint-config": "workspace:*",
     "@mfa/remote-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
+    "@mfa/utils": "workspace:*",
     "@module-federation/rsbuild-plugin": "^2.8.2",
     "@rsbuild/core": "^2.1.13",
     "@rsbuild/plugin-react": "^2.1.0",
