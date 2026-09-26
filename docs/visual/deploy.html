@@ -1,0 +1,942 @@
+<!doctype html>
+<!--
+  배포 시네마 — `git push` 이후에 실제로 무엇이 어떤 순서로 일어나는지를 움직여서 보여준다.
+
+  ## anatomy.html 과 무엇이 다른가
+
+  `anatomy.html` 은 **구조**의 지도다(무엇이 어디에 있나). 이 파일은 **시간**의 지도다
+  (무엇이 무엇보다 먼저인가). 배포는 순서가 곧 정확성이라 정지 그림으로는 핵심이 안 보인다 —
+  remote 가 host 보다 먼저여야 하는 이유도, warm 이 무효화보다 먼저여야 하는 이유도
+  "그 반대로 하면 무엇이 깨지는가" 이고, 그건 움직여야 보인다.
+
+  ## 이 파일이 SSOT 가 아니다
+
+  근거와 실측은 전부 `docs/**.md` 와 `.github/workflows/deploy.yml` 에 있고 여기는 그 재생기다.
+  각 장면의 "근거" 링크가 원본을 가리킨다. 파이프라인을 바꾸면 워크플로를 먼저 고치고
+  이 파일의 `SCENARIOS` 를 따라 고친다.
+
+  ## 구현 메모
+
+  - 의존성 없음. 폰트(Google Fonts) 말고는 전부 이 파일 안에 있다.
+  - 노드는 평범한 DOM 박스고, 연결선은 그 박스들의 실제 좌표를 읽어 SVG 로 다시 그린다
+    (`layout()`). 그래서 레인이 세로로 접히는 좁은 화면에서도 선이 따라온다.
+  - 이동하는 점은 `path.getPointAtLength()` 로 직접 옮긴다. CSS `offset-path` 는
+    브라우저별 좌표계 차이가 있어서 쓰지 않는다.
+  - `prefers-reduced-motion` 이면 자동 재생을 끄고 점도 움직이지 않는다 — 장면 전환만 남는다.
+-->
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>배포 시네마 — mfa-nextjs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@600;700&display=swap"
+    />
+
+    <link rel="stylesheet" href="./cinema/engine.css" />
+  </head>
+
+  <body>
+    <div class="wrap">
+      <header class="masthead">
+        <p class="eyebrow">mfa-nextjs · 배포 시네마</p>
+        <h1>배포 버튼을 누른 뒤,<br />무슨 일이 어떤 순서로 일어나는가</h1>
+        <p class="lede">
+          host(Next 16) 하나와 remote(Vite · Rsbuild) 둘이
+          <strong>따로 빌드되고 따로 배포된다.</strong> 따로 배포되는 순간 "누가
+          먼저인가"가 곧 정확성이 된다 — 순서를 뒤집으면 타입 검사가 잡지 못하는
+          조합이 런타임에 생기고, 캐시 무효화를 먼저 하면 빈 스켈레톤이 캐시에
+          굳는다. 아래 세 시나리오는 그 순서를 실제 파이프라인 그대로 재생한다.
+        </p>
+        <div class="top-links">
+          <a class="chip" href="./anatomy.html">← 구조 해부도</a>
+          <a class="chip" href="./runtime.html">요청 시네마</a>
+          <a class="chip" href="./bundlers.html">번들러 시네마</a>
+          <a class="chip" href="../02-architecture/04-remote-lifecycle.md"
+            >remote 수명주기 문서</a
+          >
+          <a
+            class="chip"
+            href="https://github.com/chane81/mfa-nextjs/blob/main/.github/workflows/deploy.yml"
+            target="_blank"
+            rel="noopener"
+            >deploy.yml</a
+          >
+          <button class="chip" id="theme" type="button">테마</button>
+        </div>
+      </header>
+
+      <div class="scenarios" id="scenarios"></div>
+
+      <div class="transport">
+        <button class="btn primary" id="play" type="button">재생</button>
+        <button class="btn" id="prev" type="button">◀ 이전</button>
+        <button class="btn" id="next" type="button">다음 ▶</button>
+        <button class="btn" id="restart" type="button">처음으로</button>
+        <div class="speed" role="group" aria-label="재생 속도">
+          <button type="button" data-rate="0.5">0.5×</button>
+          <button type="button" data-rate="1" aria-pressed="true">1×</button>
+          <button type="button" data-rate="2">2×</button>
+        </div>
+        <span class="clock" id="clock">00 / 00</span>
+        <div class="track" id="track"></div>
+      </div>
+
+      <div class="stage-shell" id="stage">
+        <svg id="wires" aria-hidden="true"></svg>
+        <div id="lanes"></div>
+        <div id="tip" role="tooltip" hidden></div>
+      </div>
+
+      <div class="readout">
+        <section class="panel" id="detail">
+          <span class="step-no" id="d-no">장면</span>
+          <h2 id="d-title">시나리오를 고르고 재생을 누른다</h2>
+          <p id="d-body"></p>
+          <p class="why" id="d-why"></p>
+          <div class="facts" id="d-facts"></div>
+          <div class="src" id="d-src"></div>
+        </section>
+
+        <aside class="panel chapters" aria-label="장면 목록">
+          <div id="chapters"></div>
+        </aside>
+      </div>
+
+      <section class="closing">
+        <h3>이 그림이 주장하는 것</h3>
+        <ul>
+          <li>
+            <b>순서는 CI 가 만든다.</b> Dokploy 에는 앱 사이의 순서 개념이 없다
+            — 경로가 바뀌면 각자 뜰 뿐이다. 그래서 세 앱의 Autodeploy 를 끄고
+            GitHub Actions 가 API 로 트리거하며 완료까지 기다린다.
+          </li>
+          <li>
+            <b>웹훅은 최적화지 정합성 장치가 아니다.</b> 웹훅이 유실돼도 모든
+            host 인스턴스는 버전 매니페스트 TTL 30초 안에 새 remote 로 수렴한다.
+            웹훅은 그 수렴을 즉시로 당길 뿐이다.
+          </li>
+          <li>
+            <b>나쁜 배포를 거부해도 서비스는 계속 뜬다.</b> 서명·무결성 검증에
+            실패하면 502 로 중단하고 페이지 캐시를 건드리지 않는다 — 사용자는
+            마지막 정상 화면을 계속 본다.
+          </li>
+        </ul>
+        <p>
+          조작: <span class="kbd">Space</span> 재생/정지 ·
+          <span class="kbd">←</span> <span class="kbd">→</span> 장면 이동 ·
+          눈금을 눌러 그 장면으로 건너뛴다. <b>상자에 마우스를 올리면</b> 그게
+          무엇이고 실제 설정값이 얼마인지가 뜬다(읽는 동안 재생은 멈춘다 ·
+          <span class="kbd">Tab</span> 으로도 넘어간다 ·
+          <span class="kbd">Esc</span> 로 닫는다).
+        </p>
+      </section>
+    </div>
+
+    <script src="./cinema/engine.js"></script>
+    <script>
+      (function () {
+        'use strict';
+
+        /* ================================================================
+           레인 — 무대의 가로줄. 순서가 곧 화면 순서다.
+           ================================================================ */
+        var LANES = [
+          {
+            id: 'ci',
+            name: 'GitHub Actions',
+            sub: 'deploy.yml',
+            color: 'var(--ci)',
+          },
+          {
+            id: 'dokploy',
+            name: 'Dokploy',
+            sub: '컨테이너 빌드 · 배포',
+            color: 'var(--hostc)',
+          },
+          {
+            id: 'remote',
+            name: 'remote',
+            sub: 'catalog · cart',
+            color: 'var(--cat)',
+          },
+          {
+            id: 'host',
+            name: 'host 런타임',
+            sub: 'Next 16 · 캐시 4층',
+            color: 'var(--cart)',
+          },
+          {
+            id: 'user',
+            name: '사용자',
+            sub: '브라우저',
+            color: 'var(--ink-2)',
+          },
+        ];
+
+        /* ================================================================
+           노드 — 레인 위의 상자. 모든 시나리오가 이 집합을 공유하고,
+           시나리오마다 켜지는 것만 다르다.
+
+           `info` 는 호버·포커스 때 뜨는 설명이다. 장면 해설(오른쪽 패널)이
+           "지금 무슨 일이 일어나는가" 라면, 여기는 "이 상자가 원래 무엇인가" 다 —
+           재생을 멈추고 아무 상자나 짚어봐도 읽히도록 장면과 독립시켰다.
+             d : 한 줄 정의
+             k : [항목, 값] 쌍 — 실제 설정값 · 실측치만 적는다
+             f : 근거 파일
+           ================================================================ */
+        var NODES = [
+          // ------------------------------------------------------------ CI
+          {
+            id: 'push',
+            lane: 'ci',
+            t: 'push → main',
+            s: 'concurrency: 취소 없음',
+            info: {
+              d: 'main 브랜치 push 가 배포 워크플로를 깨운다. 경로 필터를 걸지 않고, 무엇을 배포할지는 다음 단계(detect)가 정한다.',
+              k: [
+                ['트리거', 'push(main) · workflow_dispatch'],
+                ['수동 대상', 'auto · all · remotes · host'],
+                ['동시 실행', '큐에 쌓는다 (cancel-in-progress: false)'],
+              ],
+              f: '.github/workflows/deploy.yml',
+            },
+          },
+          {
+            id: 'detect',
+            lane: 'ci',
+            t: 'detect',
+            s: 'git diff → 배포 대상',
+            info: {
+              d: 'Dokploy 의 Watch Paths 를 CI 로 옮겨온 자리. 바뀐 경로를 보고 배포할 remote 배열과 host 여부를 낸다.',
+              k: [
+                ['입력', 'git diff --name-only <before> <after>'],
+                ['기준 커밋 없으면', '전부 배포'],
+                ['출력', 'remotes[] · host(boolean)'],
+              ],
+              f: 'scripts/deploy-targets.ts',
+            },
+          },
+          {
+            id: 'job-remote',
+            lane: 'ci',
+            t: 'remotes job',
+            s: 'matrix · fail-fast: false',
+            info: {
+              d: 'remote 를 병렬로 배포한다. matrix 항목이 문자열이 아니라 자기 변수 이름을 들고 오는 객체라, remote 가 늘어도 워크플로 본문은 안 바뀐다.',
+              k: [
+                ['matrix 항목', '{ name, urlVar, appVar, workspaceDir }'],
+                ['한쪽 실패', '다른 remote 는 끝까지 간다'],
+                ['변수 누락', 'jq -e 로 그 자리에서 실패 (I-11)'],
+              ],
+              f: '.github/workflows/deploy.yml',
+            },
+          },
+          {
+            id: 'job-host',
+            lane: 'ci',
+            t: 'host job',
+            s: 'needs: remotes',
+            info: {
+              d: 'remote 배포가 끝난 뒤에만 돈다. 이 한 줄이 "새 host + 옛 remote" 조합을 없앤다.',
+              k: [
+                ['needs', 'detect, remotes'],
+                ['건너뛴 job 대비', 'always() 로 감싼다'],
+                ['막는 조건', 'remotes 가 failure · cancelled'],
+              ],
+              f: '.github/workflows/deploy.yml',
+            },
+          },
+          {
+            id: 'job-reval',
+            lane: 'ci',
+            t: 'revalidate job',
+            s: 'host 재배포 없을 때만',
+            info: {
+              d: 'host 는 그대로인데 remote 만 바뀐 경우에만 host 캐시를 깨러 간다. host 를 새로 띄웠으면 캐시가 이미 비어 있어 할 일이 없다.',
+              k: [
+                ['요청', 'POST /api/mf-revalidate'],
+                ['인증', 'x-mf-secret 헤더'],
+                ['재시도', '최대 5회 · 10 → 20 → 30초'],
+              ],
+              f: '.github/actions/mf-revalidate',
+            },
+          },
+
+          // ------------------------------------------------------- Dokploy
+          {
+            id: 'trigger',
+            lane: 'dokploy',
+            t: 'application.deploy',
+            s: 'POST · x-api-key',
+            info: {
+              d: 'Dokploy 에는 앱 사이의 순서 개념이 없다. 그래서 세 앱의 Autodeploy 를 끄고 CI 가 API 로 하나씩 트리거한다.',
+              k: [
+                ['엔드포인트', 'POST /api/application.deploy'],
+                ['본문', '{ "applicationId": "<id>" }'],
+                ['전제', 'Autodeploy OFF (안 끄면 이중 배포)'],
+              ],
+              f: '.github/actions/dokploy-deploy',
+            },
+          },
+          {
+            id: 'image',
+            lane: 'dokploy',
+            t: '이미지 빌드',
+            s: 'Docker · 대부분 CACHED',
+            info: {
+              d: '컨테이너 이미지를 굽는다. 소요의 거의 전부를 앱 빌드 레이어 하나가 쓰고 나머지는 캐시 히트다.',
+              k: [
+                ['앱 빌드 레이어', 'catalog 15.4초 · host 21.8초'],
+                ['나머지 레이어', '전부 CACHED'],
+                ['소스가 그대로면', '이미지 재사용 → 버전도 그대로'],
+              ],
+              f: 'docs/02-architecture/04-remote-lifecycle.md',
+            },
+          },
+          {
+            id: 'poll',
+            lane: 'dokploy',
+            t: '완료 대기',
+            s: 'deployment.all · 5초 폴링',
+            info: {
+              d: '배포 목록의 최신 항목 status 가 done 이 될 때까지 기다린다. 이 대기가 remote → host 순서를 실제로 만든다.',
+              k: [
+                ['판정', 'status: done / error'],
+                ['간격 · 한도', '5초 · 최대 1800초'],
+                ['실측', 'p50 25초 (catalog 21 · cart 19 · host 27)'],
+                ['버전 변화로 판정하면', '재사용 배포에서 영영 안 온다 (I-8)'],
+              ],
+              f: '.github/actions/dokploy-deploy',
+            },
+          },
+          {
+            id: 'host-img',
+            lane: 'dokploy',
+            t: 'host 이미지',
+            s: '프리렌더가 remote 를 실행',
+            info: {
+              d: 'host 빌드의 프리렌더 단계가 배포된 remote 의 SSR 번들을 실제로 받아 실행한다. 그래서 remote 가 떠 있지 않으면 host 빌드가 실패한다.',
+              k: [
+                ['받는 것', 'mf-server.cjs (CJS · new Function)'],
+                [
+                  '원인',
+                  'Cache Components 에서 generateStaticParams 가 빈 배열 불가',
+                ],
+                ['뜻', '빌드 통과 = 런타임 MF + SSR 이 아직 된다'],
+              ],
+              f: 'docs/02-architecture/03-ssr-and-soft-nav.md',
+            },
+          },
+
+          // -------------------------------------------------------- remote
+          {
+            id: 'stamp',
+            lane: 'remote',
+            t: 'stamp · 서명',
+            s: '/v{version}/ · SRI · Ed25519',
+            info: {
+              d: '빌드 산출물에 버전을 찍고 무결성 값과 서명을 붙인다. 개인키는 remote CI 에만 있고 공개키는 host 에만 있다.',
+              k: [
+                ['버전', '빌드 ID (git SHA + 접미사)'],
+                ['무결성', '파일별 SHA-384'],
+                ['서명', 'Ed25519 (MF_SIGNING_KEY)'],
+                ['왜 내용 해시가 아닌가', 'URL 접두사가 빌드 전에 필요 — 순환'],
+              ],
+              f: 'scripts/stamp-remote-version.ts',
+            },
+          },
+          {
+            id: 'boot',
+            lane: 'remote',
+            t: '컨테이너 부팅',
+            s: 'entrypoint → 볼륨',
+            info: {
+              d: '이미지의 dist 를 그대로 서빙하지 않고 영속 볼륨에 덧붙인다. 컨테이너는 휘발이라 그대로 서빙하면 재배포 순간 옛 버전이 사라진다.',
+              k: [
+                ['버전 디렉터리', 'no-clobber — 기존 것은 안 덮는다'],
+                ['mf-version.json', '항상 최신으로 교체'],
+                ['보존', 'KEEP=5 (mtime 순)'],
+                ['PORT', '폴백 없음 — 없으면 부팅 거부'],
+              ],
+              f: 'scripts/docker/remote-entrypoint.sh',
+            },
+          },
+          {
+            id: 'manifest',
+            lane: 'remote',
+            t: 'mf-version.json',
+            s: '공표 · no-store',
+            info: {
+              d: 'remote 가 "지금 내 버전은 이거다" 라고 공표하는 유일한 파일. host 는 이걸 읽어 어느 번들을 받을지 정한다.',
+              k: [
+                ['필드', 'version · ssrEntry · webEntry'],
+                ['검증용', 'ssrIntegrity · webIntegrity · signature'],
+                ['캐시', 'no-store (host 쪽에서 TTL 30초)'],
+                ['롤백', '이 파일만 옛 버전으로 되돌린다'],
+              ],
+              f: 'docs/02-architecture/04-remote-lifecycle.md',
+            },
+          },
+          {
+            id: 'assets',
+            lane: 'remote',
+            t: '/v{version}/ 빌드 산출물',
+            s: 'immutable · KEEP=5',
+            info: {
+              d: '한 번 배포되면 내용이 바뀌지 않는 디렉터리. 브라우저용과 host 서버용 번들이 같이 들어 있다.',
+              k: [
+                ['브라우저', 'mf-manifest.json · remoteEntry.js · assets/'],
+                ['host 서버', 'mf-server.cjs'],
+                ['캐시', 'immutable'],
+                [
+                  '옛 버전을 남기는 이유',
+                  '캐시된 HTML 이 옛 청크를 가리킨다 → 404',
+                ],
+              ],
+              f: 'docs/02-architecture/04-remote-lifecycle.md',
+            },
+          },
+
+          // ---------------------------------------------------- host 런타임
+          {
+            id: 'host-boot',
+            lane: 'host',
+            t: 'host 컨테이너',
+            s: '새로 뜨면 캐시가 빈다',
+            info: {
+              d: 'Next 16 서버. remote 를 번들러 플러그인 없이 @module-federation/runtime 으로만 불러온다.',
+              k: [
+                [
+                  '새로 뜨면',
+                  '캐시 4층 전부 콜드 — 첫 요청이 새 remote 로 굽는다',
+                ],
+                ['오리진 목록', 'REMOTE_*_PUBLIC_URL 에서 나온다'],
+                ['무효화 인증', 'MF_REVALIDATE_SECRET (미설정 = 전부 거부)'],
+              ],
+              f: 'docs/02-architecture/06-host-mf-layout.md',
+            },
+          },
+          {
+            id: 'c-ver',
+            lane: 'host',
+            t: '① 버전 캐시',
+            s: 'TTL 30초',
+            info: {
+              d: 'mf-version.json 응답을 담는 Data Cache. 웹훅이 없어도 모든 인스턴스가 이 TTL 안에 새 버전으로 수렴한다 — 정확성을 떠받치는 층이다.',
+              k: [
+                ['태그', 'mf-remote-version:<remote>'],
+                ['수명', 'TTL 30초'],
+                ['무효화', 'revalidateTag(..., { expire: 0 })'],
+              ],
+              f: 'docs/02-architecture/04-remote-lifecycle.md',
+            },
+          },
+          {
+            id: 'c-bundle',
+            lane: 'host',
+            t: '② 번들 캐시',
+            s: 'mf-server.cjs 바이트',
+            info: {
+              d: 'remote SSR 번들의 바이트를 담는 Data Cache. 여기서만큼은 옛 값을 돌려주면 안 된다.',
+              k: [
+                ['태그', 'mf-remote-bundle:<remote>'],
+                ['무효화', '{ expire: 0 } — SWR 금지'],
+                [
+                  '"max" 로 하면',
+                  'remote 가 죽어도 옛 바이트로 warm 이 성공해버린다',
+                ],
+              ],
+              f: 'docs/02-architecture/04-remote-lifecycle.md',
+            },
+          },
+          {
+            id: 'c-eval',
+            lane: 'host',
+            t: '③ 평가된 모듈',
+            s: 'new Function · 검증',
+            info: {
+              d: '받은 번들을 실행해 만든 모듈. Next 가 존재를 모르는 층이라 revalidateTag 로는 안 깨진다.',
+              k: [
+                ['검증 순서', '오리진 → 경로 → SHA-384 → Ed25519'],
+                ['무효화', '버전 문자열 · warm 세대'],
+                [
+                  '레이어 분리',
+                  'RSC · SSR 이 캐시를 공유하면 useState 가 깨진다',
+                ],
+                ['신호 공유', '문자열만 globalThis 로'],
+              ],
+              f: 'docs/02-architecture/04-remote-lifecycle.md',
+            },
+          },
+          {
+            id: 'c-page',
+            lane: 'host',
+            t: '④ 페이지 캐시',
+            s: '"use cache" · 태그',
+            info: {
+              d: 'remote 마크업이 들어간 HTML/RSC. 사용자가 실제로 보는 것이라, 검증에 실패하면 이 층은 손대지 않는다.',
+              k: [
+                ['태그', 'mf-remote:<remote>'],
+                ['무효화', '"max" (stale-while-revalidate)'],
+                ['여기만 SWR 인 이유', '잠깐 옛 화면이 느린 응답보다 낫다'],
+                ['warm 실패시', '건드리지 않는다 — 502 로 중단'],
+              ],
+              f: 'docs/04-experiments/03-cache-modes.md',
+            },
+          },
+
+          // -------------------------------------------------------- 사용자
+          {
+            id: 'visitor',
+            lane: 'user',
+            t: '방문자',
+            s: 'HTML + hydration',
+            info: {
+              d: 'host 가 구운 HTML 을 받고, 브라우저에서 remote 청크를 받아 hydration 한다. remote 가 죽어도 페이지 전체는 살아남는다.',
+              k: [
+                ['받는 청크', '/v{version}/remoteEntry.js · assets/'],
+                ['remote 장애시', 'RemoteBoundary 가 그 패널만 에러 상자로'],
+                ['응답', '200 유지'],
+              ],
+              f: 'docs/02-architecture/03-ssr-and-soft-nav.md',
+            },
+          },
+        ];
+
+        /* ================================================================
+           시나리오 — 장면 배열. 각 장면은
+             on    : 켤 노드
+             flow  : 이동하는 점 [from, to] (실패면 3번째 인자에 'bad')
+             badge : 노드에 붙일 짧은 라벨
+             fail / hold : 빨강 / 초록 상태
+           ================================================================ */
+        var SCENARIOS = [
+          {
+            id: 'full',
+            n: '시나리오 A',
+            t: 'remote 와 host 를 같이 배포',
+            d: '가장 흔한 경우. 순서 하나가 버전 스큐를 없앤다.',
+            accent: 'var(--hostc)',
+            steps: [
+              {
+                g: '판별',
+                title: 'main 에 push 한다',
+                no: '00:00',
+                body: '경로 필터 없이 워크플로가 한 번 돈다. 무엇을 배포할지는 다음 단계가 정한다. 동시 실행은 큐에 쌓을 뿐 <b>앞 실행을 취소하지 않는다</b>.',
+                why: '<b>왜 취소하지 않나.</b> 뒤 실행이 앞 실행을 끊으면 그 커밋은 어디에도 올라가지 않는다. 배포는 건너뛰면 안 되는 작업이라 최신만 남기는 전략이 맞지 않는다.',
+                facts: [
+                  'concurrency: deploy-main',
+                  'cancel-in-progress: false',
+                ],
+                src: '.github/workflows/deploy.yml',
+                on: ['push'],
+              },
+              {
+                g: '판별',
+                title: 'detect — 무엇을 배포할지 CI 가 정한다',
+                no: '00:03',
+                body: '직전 커밋과의 <code>git diff</code> 로 바뀐 경로를 모으고, <code>scripts/deploy-targets.ts</code> 가 배포할 remote 배열과 host 여부를 낸다. 여기서는 둘 다 <code>true</code>.',
+                why: '<b>왜 Dokploy 의 Watch Paths 를 쓰지 않나.</b> Dokploy 에는 앱 사이의 순서 개념이 없다. 한 push 가 세 앱을 동시에 물면 누가 먼저 끝날지 모른다 — 그 판단을 CI 로 가져와야 순서를 만들 수 있다.',
+                facts: [
+                  'outputs.remotes = [catalog, cart]',
+                  'outputs.host = true',
+                ],
+                src: '.github/actions/detect-targets',
+                on: ['push', 'detect'],
+                flow: [['push', 'detect']],
+              },
+              {
+                g: 'remote 배포',
+                title: 'remote 를 먼저 띄운다 — 두 개는 병렬로',
+                no: '00:10',
+                body: 'catalog · cart 가 matrix 로 동시에 돈다. <code>fail-fast: false</code> 라 한쪽이 실패해도 다른 쪽은 끝까지 간다. 배포 직전 현재 <code>mf-version.json</code> 의 버전을 기록해 둔다.',
+                why: '<b>왜 remote 가 먼저인가.</b> host 는 커밋된 MF DTS 로 컴파일되지만 런타임에는 <b>배포된</b> remote 를 받는다. host 가 먼저 뜨면 "새 host 코드 + 옛 remote 번들" 조합이 생기고, 양쪽이 같은 커밋의 타입을 쓰기 때문에 타입 검사가 이걸 못 잡는다.',
+                facts: ['matrix: catalog · cart', 'baseline 버전 기록'],
+                src: 'docs/02-architecture/04-remote-lifecycle.md',
+                on: ['detect', 'job-remote'],
+                flow: [['detect', 'job-remote']],
+              },
+              {
+                g: 'remote 배포',
+                title: 'Dokploy API 로 트리거하고 상태를 폴링한다',
+                no: '00:14',
+                body: '<code>POST /api/application.deploy</code> 로 배포를 걸고, <code>deployment.all</code> 의 최신 항목 status 가 <code>done</code> 이 될 때까지 5초 간격으로 확인한다. 실측 p50 25초(catalog 21 · cart 19 · host 27).',
+                why: '<b>왜 버전 변화로 완료를 판정하지 않나.</b> 소스가 그대로면 Docker 레이어가 전부 캐시 히트해 이미지가 재사용되고, 그때는 버전이 영영 안 바뀐다. 그 배포는 정상인데 CI 는 영원히 기다리게 된다(known-issues I-8).',
+                facts: ['폴링 5초', 'p50 25초', '타임아웃 1800초'],
+                src: '.github/actions/dokploy-deploy',
+                on: ['job-remote', 'trigger', 'poll'],
+                flow: [
+                  ['job-remote', 'trigger'],
+                  ['trigger', 'poll'],
+                ],
+              },
+              {
+                g: 'remote 배포',
+                title: '이미지 안에서 버전이 결정되고 서명된다',
+                no: '00:26',
+                body: '빌드 ID(git SHA)로 버전을 잡고 산출물을 <code>/v{version}/</code> 아래에 넣는다. 파일마다 SHA-384 무결성 값을 계산하고, 매니페스트 전체에 Ed25519 서명을 붙인다.',
+                why: '<b>왜 버전이 내용 해시가 아닌가.</b> 자산 URL 접두사는 빌드 <b>전에</b> 정해져야 하는데 내용 해시는 빌드가 끝나야 나온다 — 순환이다. 부수 효과는 의도한 것이다: 소스가 같아도 재배포하면 새 버전이 되므로, 인스턴스를 갈아엎는 운영성 배포에서 host 가 확실히 갈아탄다.',
+                facts: [
+                  'version = 21418fe2d1-mst2drrz',
+                  'SHA-384 SRI',
+                  'Ed25519 개인키는 CI 에만',
+                ],
+                src: 'scripts/stamp-remote-version.ts',
+                on: ['image', 'stamp'],
+                flow: [
+                  ['poll', 'image'],
+                  ['image', 'stamp'],
+                ],
+                badge: { stamp: '서명됨' },
+              },
+              {
+                g: 'remote 배포',
+                title: '컨테이너가 뜨면서 자산을 볼륨에 덧붙인다',
+                no: '00:32',
+                body: 'entrypoint 가 새 <code>/v{version}/</code> 만 볼륨에 복사한다 — 기존 버전 디렉터리는 <b>덮지 않는다</b>. <code>mf-version.json</code> 만 항상 최신으로 교체하고, 오래된 버전은 최근 5개까지 남기고 지운다.',
+                why: '<b>왜 옛 버전을 남기나.</b> 캐시된 HTML 은 자기가 만들어진 시점의 버전을 가리킨다. 그 자산이 사라지면 브라우저가 hydration 단계에서 404 를 맞는다(dist 를 통째로 지웠다가 실제로 재현했다). 덤으로 롤백이 <code>mf-version.json</code> 한 파일 교체로 끝난다.',
+                facts: ['cp no-clobber', 'KEEP=5', '롤백 = 매니페스트 교체'],
+                src: 'scripts/docker/remote-entrypoint.sh',
+                on: ['boot', 'assets', 'manifest'],
+                flow: [
+                  ['stamp', 'boot'],
+                  ['boot', 'assets'],
+                  ['boot', 'manifest'],
+                ],
+                badge: { assets: 'immutable', manifest: 'no-store' },
+              },
+              {
+                g: 'remote 배포',
+                title: '새 버전이 공표됐는지 본다 — 게이트는 아니다',
+                no: '00:38',
+                body: '배포 전에 기록해 둔 버전과 지금 값을 비교한다. 바뀌었으면 로그에 남기고, 30초 안에 안 바뀌면 "이미지 재사용"으로 보고 <b>통과시킨다</b>.',
+                why: '<b>왜 실패시키지 않나.</b> 앞 단계와 같은 이유다 — 이미지 재사용은 정상적인 결과다. 여기서 막으면 "아무것도 안 바뀐 재배포"가 전부 빨간불이 된다. 관측은 하되 판정은 배포 상태에 맡긴다.',
+                facts: ['대기 30초', '공표 실측 0.5초', '실패시키지 않음'],
+                src: '.github/actions/mf-version-check',
+                on: ['job-remote', 'manifest'],
+                flow: [['manifest', 'job-remote']],
+              },
+              {
+                g: 'host 배포',
+                title: 'remote 가 끝난 뒤에야 host 가 뜬다',
+                no: '00:45',
+                body: 'host job 은 <code>needs: [detect, remotes]</code> 다. remote job 이 실패하거나 취소되면 host 는 뜨지 않는다. 남는 조합은 "옛 host + 새 remote" 뿐이다.',
+                why: '<b>그 조합은 규칙 하나로 덮인다.</b> "remote 는 한 배포 주기만큼 하위호환을 유지한다". 그걸 못 지키는 변경(필수 prop 추가 등)은 expand/contract 로 나눈다 — ① remote 가 옵셔널로 받게 배포 → ② host 가 쓰기 시작 → ③ remote 에서 옛 것 제거.',
+                facts: [
+                  'needs: remotes',
+                  '옵셔널 prop 추가가 더 위험 (조용히 무시)',
+                ],
+                src: 'docs/02-architecture/04-remote-lifecycle.md',
+                on: ['job-host', 'host-img'],
+                flow: [
+                  ['job-remote', 'job-host'],
+                  ['job-host', 'host-img'],
+                ],
+              },
+              {
+                g: 'host 배포',
+                title: 'host 빌드는 remote SSR 번들을 실제로 실행한다',
+                no: '00:52',
+                body: '프리렌더 단계에서 host 가 배포된 remote 의 <code>mf-server.cjs</code> 를 받아 평가한다. 그래서 remote 가 떠 있지 않으면 host 빌드가 실패한다.',
+                why: '<b>이게 이 저장소의 주장이다.</b> 빌드가 통과했다는 건 "Next 16 에서 번들러 플러그인 없이 런타임 Module Federation + remote SSR 이 된다"가 아직 참이라는 뜻이다. 그래서 빌드 실패를 우회하지 않고 원인을 고친다.',
+                facts: ['호스트 빌드 ⟵ remote 기동 의존', 'nextjs-mf 미사용'],
+                src: 'docs/02-architecture/03-ssr-and-soft-nav.md',
+                on: ['host-img', 'manifest', 'assets'],
+                flow: [
+                  ['manifest', 'host-img'],
+                  ['assets', 'host-img'],
+                ],
+              },
+              {
+                g: '전환',
+                title: '새 host 컨테이너는 빈 캐시로 뜬다',
+                no: '01:05',
+                body: '캐시 네 층이 전부 비어 있으므로 첫 요청이 곧바로 새 <code>mf-version.json</code> 을 읽고 새 번들을 받아 굽는다. 그래서 이 시나리오에서는 무효화 job 이 <b>돌지 않는다</b>.',
+                why: '<b>무효화는 "host 는 그대로인데 remote 만 바뀐" 경우의 것이다.</b> 재배포로 프로세스가 갈렸는데 굳이 웹훅을 때리면, 있지도 않은 캐시를 깨고 방금 뜬 인스턴스를 한 번 더 덥히는 헛일이 된다.',
+                facts: ['revalidate job: skipped', '캐시 4층 전부 콜드'],
+                src: '.github/workflows/deploy.yml',
+                on: ['host-boot', 'c-ver', 'c-bundle', 'c-eval', 'c-page'],
+                flow: [['host-img', 'host-boot']],
+                badge: { 'c-page': '비어 있음' },
+              },
+              {
+                g: '전환',
+                title: '첫 방문자가 새 조합을 받는다',
+                no: '01:12',
+                body: 'host 서버가 매니페스트를 읽고(①) 번들 바이트를 받아(②) 오리진·경로·SRI·서명을 검증한 뒤 <code>new Function</code> 으로 평가하고(③), 렌더 결과를 페이지 캐시에 굳힌다(④). 브라우저는 <code>/v{version}/</code> 청크로 hydration 한다.',
+                why: '<b>캐시가 왜 네 층인가.</b> 무효화 수단이 층마다 다르기 때문이다. ③은 Next 가 아예 모르는 계층이라 <code>revalidateTag</code> 로 안 깨진다 — 버전 문자열과 warm 세대로 관리한다.',
+                facts: ['① 30초 TTL', '②③ 태그 만료', '④ "use cache"'],
+                src: 'docs/02-architecture/04-remote-lifecycle.md',
+                on: [
+                  'c-ver',
+                  'c-bundle',
+                  'c-eval',
+                  'c-page',
+                  'visitor',
+                  'assets',
+                ],
+                flow: [
+                  ['manifest', 'c-ver'],
+                  ['assets', 'c-bundle'],
+                  ['c-bundle', 'c-eval'],
+                  ['c-eval', 'c-page'],
+                  ['c-page', 'visitor'],
+                ],
+                badge: { visitor: '새 remote' },
+              },
+            ],
+          },
+
+          {
+            id: 'remote-only',
+            n: '시나리오 B',
+            t: 'remote 만 바뀐 push',
+            d: 'host 는 그대로. 여기서 warm-then-revalidate 가 등장한다.',
+            accent: 'var(--cat)',
+            steps: [
+              {
+                g: '판별',
+                title: 'detect 가 host 를 대상에서 뺀다',
+                no: '00:00',
+                body: '<code>apps/remote-catalog/**</code> 만 바뀐 push. <code>outputs.host</code> 가 <code>false</code> 라 host job 은 건너뛴다.',
+                why: '<b>그래서 host 프로세스가 살아 있다.</b> 이미 구워둔 페이지 캐시도, 이미 평가해둔 옛 remote 모듈도 그대로 남아 있다. 시나리오 A 와 다른 문제가 여기서 시작된다 — <b>누군가 그 캐시를 깨줘야 한다.</b>',
+                facts: ['outputs.host = false', 'host 프로세스 유지'],
+                src: '.github/actions/detect-targets',
+                on: ['push', 'detect', 'host-boot', 'c-page'],
+                flow: [['push', 'detect']],
+                badge: { 'c-page': '옛 버전 보유' },
+              },
+              {
+                g: 'remote 배포',
+                title: 'catalog 만 배포된다',
+                no: '00:08',
+                body: '트리거 → 폴링 → 새 버전 스탬프·서명 → 볼륨에 덧붙이기 → 공표. 시나리오 A 와 같은 경로다.',
+                why: '<b>remote 는 캐시를 모른다.</b> 순수 렌더 함수로 두고 캐시 정책은 100% host 가 쥔다. 그 계약이 유지되는 한 remote 를 몇 개로 늘려도 캐시 설계는 그대로다.',
+                facts: ['matrix: catalog', 'version 새로 발급'],
+                src: 'scripts/stamp-remote-version.ts',
+                on: [
+                  'job-remote',
+                  'trigger',
+                  'image',
+                  'stamp',
+                  'boot',
+                  'manifest',
+                  'assets',
+                ],
+                flow: [
+                  ['detect', 'job-remote'],
+                  ['job-remote', 'trigger'],
+                  ['trigger', 'image'],
+                  ['image', 'stamp'],
+                  ['stamp', 'boot'],
+                  ['boot', 'manifest'],
+                ],
+                badge: { manifest: '새 버전' },
+              },
+              {
+                g: '무효화',
+                title: '아무것도 안 해도 30초 안에 수렴한다',
+                no: '00:40',
+                body: '버전 매니페스트는 TTL 30초짜리 캐시다. 웹훅이 없어도 모든 host 인스턴스가 그 안에 새 버전을 읽고 갈아탄다.',
+                why: '<b>이걸 먼저 보여주는 이유.</b> 다음에 나오는 웹훅은 <b>최적화</b>지 정합성 장치가 아니다. 웹훅이 유실돼도 결과가 틀리지 않는다 — 단지 30초 늦을 뿐이다. 그래서 웹훅 실패를 장애로 취급하지 않아도 된다.',
+                facts: ['TTL 30초', '웹훅 유실 ≠ 정합성 문제'],
+                src: 'docs/02-architecture/04-remote-lifecycle.md',
+                on: ['c-ver', 'manifest'],
+                flow: [['manifest', 'c-ver']],
+                badge: { 'c-ver': 'TTL 30초' },
+              },
+              {
+                g: '무효화',
+                title: 'revalidate job 이 host 웹훅을 때린다',
+                no: '00:44',
+                body: '<code>POST /api/mf-revalidate</code> 에 <code>x-mf-secret</code> 를 실어 보낸다. 실패하면 10초 · 20초 · 30초… 로 늘리며 최대 5회 재시도한다.',
+                why: '<b>시크릿이 없으면 전부 거부한다.</b> "미설정 = 인증 없음"이 아니라 "미설정 = 아무도 못 부름"이다. host 서버가 남의 코드를 <code>new Function</code> 으로 실행하는 구조라, 이 엔드포인트를 여는 기본값을 둘 수 없다.',
+                facts: ['x-mf-secret', '최대 5회', '401 = 시크릿 불일치'],
+                src: '.github/actions/mf-revalidate',
+                on: ['job-reval', 'host-boot'],
+                flow: [['job-reval', 'host-boot']],
+              },
+              {
+                g: '무효화',
+                title: '① 버전·번들 태그를 즉시 만료시킨다',
+                no: '00:46',
+                body: "<code>revalidateTag('mf-remote-version:catalog', {expire:0})</code> 와 번들 태그를 깬다. <b>페이지 태그는 아직 건드리지 않는다.</b>",
+                why: '<b>왜 태그가 세 개인가.</b> 하나로 묶으면 순서를 만들 수 없다. 번들을 깨는 순간 페이지도 같이 깨져서 재생성이 warm 보다 먼저 일어난다. 그리고 <code>{expire:0}</code> 인 이유는 <code>"max"</code>(stale-while-revalidate)로 하면 다음 읽기가 <b>옛 바이트</b>를 그대로 돌려줘, remote 가 죽어 있어도 warm 이 "성공"해버리기 때문이다.',
+                facts: [
+                  'mf-remote-version:catalog',
+                  'mf-remote-bundle:catalog',
+                  '{expire: 0}',
+                ],
+                src: 'docs/02-architecture/04-remote-lifecycle.md',
+                on: ['c-ver', 'c-bundle'],
+                badge: { 'c-ver': '만료', 'c-bundle': '만료' },
+              },
+              {
+                g: '무효화',
+                title: '② remote 가 살아 있는지 확인한다',
+                no: '00:47',
+                body: '매니페스트를 다시 조회한다. 못 받으면 여기서 502 로 끝낸다 — 페이지 캐시는 손대지 않은 채다.',
+                why: '<b>거부는 안전한 방향이다.</b> 이 시점까지 사용자에게 보이는 화면은 아직 옛 remote 로 구운 정상 페이지다. 중단해도 잃는 게 없다.',
+                facts: ['실패 → 502', '페이지 캐시 그대로'],
+                src: 'apps/host · /api/mf-revalidate',
+                on: ['host-boot', 'manifest'],
+                flow: [['host-boot', 'manifest']],
+              },
+              {
+                g: '무효화',
+                title: '③ warm — 무효화보다 먼저 데운다',
+                no: '00:49',
+                body: 'host 가 자기 자신의 <code>/internal/mf-warm</code> 을 호출한다. SSR 레이어에서 새 번들을 받아 검증하고 평가한다. 성공 판정은 HTTP 상태가 아니라 <b>"이번 warm 세대에 이 버전을 적재했는가"</b> 다.',
+                why: '<b>순서가 전부다.</b> 무효화를 먼저 하면 재생성 렌더가 번들을 네트워크로 받는 동안 <b>Suspense fallback 상태로 캐시에 굳는다.</b> 그 엔트리는 이후 계속 HIT 로 서빙된다. 콜드 프로세스 + 느린 remote(+800ms) 조건에서 결정적으로 재현된다 — 무효화만 하면 4/4 라운드에서 스켈레톤이 캐시됐고, warm 을 먼저 하면 0/4 였다.',
+                facts: [
+                  '무효화만 → 스켈레톤 캐시 4/4',
+                  'warm 먼저 → 0/4',
+                  '캐시를 믿지 않고 매번 재검증',
+                ],
+                src: 'docs/04-experiments/03-cache-modes.md',
+                on: ['c-bundle', 'c-eval', 'assets'],
+                flow: [
+                  ['assets', 'c-bundle'],
+                  ['c-bundle', 'c-eval'],
+                ],
+                badge: { 'c-eval': 'warm 성공' },
+              },
+              {
+                g: '무효화',
+                title: '④ 여기서 처음 페이지 캐시를 무효화한다',
+                no: '00:52',
+                body: '<code>revalidateTag(\'mf-remote:catalog\', "max")</code>. 이 층만 stale-while-revalidate 다.',
+                why: '<b>여기서는 SWR 이 맞다.</b> 번들 층에서 옛 값을 돌려주는 건 위험하지만, 페이지 층에서는 사용자에게 잠깐 옛 화면을 보여주더라도 응답이 빠른 편이 낫다. 같은 도구를 층마다 반대로 쓴다.',
+                facts: ['mf-remote:catalog', '"max" = SWR', '200 + warmed'],
+                src: 'docs/02-architecture/04-remote-lifecycle.md',
+                on: ['c-page', 'c-eval', 'visitor'],
+                flow: [
+                  ['c-eval', 'c-page'],
+                  ['c-page', 'visitor'],
+                ],
+                badge: { 'c-page': '재생성', visitor: '새 remote' },
+              },
+              {
+                g: '한계',
+                title: '웹훅은 인스턴스 하나에만 닿는다',
+                no: '00:55',
+                body: 'host 가 여러 개면 나머지는 웹훅을 못 받는다. 그 인스턴스들은 앞에서 본 TTL 30초 경로로 수렴한다.',
+                why: '<b>그래서 이 설계가 성립한다.</b> 즉시성이 필요하면 공유 캐시 핸들러를 붙여야 하지만, "정확성은 TTL 이 보장하고 웹훅은 속도만 담당한다"로 나눠뒀기 때문에 그건 나중에 붙여도 되는 최적화다.',
+                facts: [
+                  '멀티 인스턴스 → 최대 30초 지연',
+                  '공유 캐시 핸들러는 미적용',
+                ],
+                src: 'docs/02-architecture/04-remote-lifecycle.md',
+                on: ['c-ver', 'manifest'],
+                flow: [['manifest', 'c-ver']],
+              },
+            ],
+          },
+
+          {
+            id: 'tampered',
+            n: '시나리오 C',
+            t: '변조된 remote 가 올라왔다',
+            d: 'host 서버가 남의 코드를 실행하는 구조의 방어선.',
+            accent: 'var(--alert)',
+            steps: [
+              {
+                g: '전제',
+                title: 'host 서버가 remote 코드를 실행한다',
+                no: '00:00',
+                body: 'SSR 을 하려면 host <b>서버</b>가 remote 의 <code>mf-server.cjs</code> 를 받아 <code>new Function</code> 으로 평가해야 한다. 브라우저에서 remote 청크를 실행하는 것과 신뢰 수준은 같지만, 뚫렸을 때 영향 범위가 서버 프로세스다.',
+                why: '<b>그리고 <code>mf-version.json</code> 은 remote 가 주는 값이다.</b> 그대로 믿으면 "저 오리진에서 받아 저 코드를 실행하라"는 지시를 그대로 따르게 된다. 이 시나리오는 그 값이 오염됐을 때 무엇이 막는지를 본다.',
+                facts: ['new Function', '영향 범위 = 서버 프로세스'],
+                src: 'docs/02-architecture/04-remote-lifecycle.md',
+                on: ['manifest', 'c-eval', 'host-boot'],
+              },
+              {
+                g: '공격',
+                title: '오리진이 털려 번들 바이트가 바뀌었다',
+                no: '00:06',
+                body: '배포 자체는 정상으로 끝났고, 매니페스트는 유효한 버전을 가리킨다. 다만 <code>/v{version}/mf-server.cjs</code> 의 내용이 서명 시점과 다르다.',
+                why: '<b>CI 는 이걸 못 잡는다.</b> Dokploy 는 <code>done</code> 을 돌려줬고 버전도 새로 공표됐다. 파이프라인 관점에서는 성공한 배포다 — 판단은 받아 쓰는 쪽에서 해야 한다.',
+                facts: ['배포 status = done', '버전 공표 정상'],
+                src: 'docs/02-architecture/04-remote-lifecycle.md',
+                on: ['assets', 'manifest'],
+                flow: [['manifest', 'assets']],
+                fail: ['assets'],
+                badge: { assets: '바이트 변조' },
+              },
+              {
+                g: '방어',
+                title: '웹훅이 도착하고, warm 이 먼저 돈다',
+                no: '00:12',
+                body: '버전·번들 태그를 만료시키고 <code>/internal/mf-warm</code> 을 호출한다. 여기까지는 시나리오 B 와 완전히 같다. <b>페이지 캐시는 아직 그대로다.</b>',
+                why: '<b>warm 을 먼저 두면 검사도 먼저 온다.</b> 성능을 위해 넣은 순서가 그대로 보안 게이트가 된다 — 나쁜 번들은 사용자에게 도달하기 전에 이 단계에서 걸린다.',
+                facts: ['① ② 만료', '④ 아직 유효'],
+                src: 'apps/host · /api/mf-revalidate',
+                on: ['job-reval', 'host-boot', 'c-ver', 'c-bundle', 'c-page'],
+                flow: [['job-reval', 'host-boot']],
+                hold: ['c-page'],
+                badge: { 'c-page': '옛 화면 유지' },
+              },
+              {
+                g: '방어',
+                title: '네 겹이 순서대로 걸러낸다',
+                no: '00:14',
+                body: '① 오리진 허용 목록 → ② 경로 형태 검증(절대 URL · 경로 탈출 · 버전 불일치) → ③ SHA-384 무결성 → ④ Ed25519 서명. 이 경우는 ③에서 걸린다.',
+                why: '<b>왜 무결성만으로는 부족한가.</b> 해시도 매니페스트도 같은 오리진이 준 값이라, 둘을 맞춰보는 건 자기 증명에 가깝다. 오리진이 통째로 털리면 둘 다 갈아끼우면 그만이다. 서명이 그 고리를 끊는다 — <b>개인키는 remote CI, 공개키는 host.</b> 둘이 같은 곳에 있으면 막으려던 걸 못 막는다.',
+                facts: ['오리진 허용 목록', '경로 검증', 'SHA-384', 'Ed25519'],
+                src: 'docs/02-architecture/04-remote-lifecycle.md',
+                on: ['c-bundle'],
+                flow: [['assets', 'c-bundle', 'bad']],
+                fail: ['c-eval', 'assets'],
+                hold: ['c-page'],
+                badge: {
+                  'c-eval': '적재 거부',
+                  assets: '바이트 변조',
+                  'c-page': '옛 화면 유지',
+                },
+              },
+              {
+                g: '결과',
+                title: '502 로 중단 — 페이지 캐시는 건드리지 않는다',
+                no: '00:15',
+                body: 'warm 이 실패했으므로 ④ 무효화 단계로 넘어가지 않는다. 웹훅은 502 를 돌려주고 CI 의 무효화 job 이 빨간불이 된다.',
+                why: '<b>옛 화면이 스켈레톤보다 낫다.</b> 여기서 굳이 페이지 캐시를 깼다면 재생성 렌더가 깨진 remote 를 기다리다 fallback 상태로 굳었을 것이다. 거부의 대가가 "장애"가 아니라 "갱신 안 됨"이 되도록 순서를 잡아둔 결과다.',
+                facts: [
+                  '502 · 페이지 캐시 그대로',
+                  '마지막 정상 remote 유지',
+                  'CI 무효화 job 실패',
+                ],
+                src: '.github/actions/mf-revalidate',
+                on: ['job-reval', 'c-page', 'visitor'],
+                fail: ['job-reval'],
+                hold: ['c-page', 'visitor'],
+                badge: { 'c-page': '마지막 정상', visitor: '정상 서비스' },
+              },
+              {
+                g: '결과',
+                title: '실측 — 거부해도 서비스는 계속 뜬다',
+                no: '00:20',
+                body: '번들 변조 · 매니페스트가 외부 오리진 지정 · 경로 탈출 · 서명 없이 교체 · 서명 두고 무결성만 교체 — 다섯 가지 모두 502 이고, 다섯 가지 모두 마지막 정상 remote 로 서비스가 유지됐다.',
+                why: '<b>이게 이 설계의 성공 기준이다.</b> "막았다"가 아니라 "막으면서도 200 을 유지했다". 그리고 remote 하나가 터져도 <code>RemoteBoundary</code> 가 그 패널만 에러 상자로 바꾸고 페이지는 산다.',
+                facts: ['5/5 차단', '5/5 서비스 유지', 'RemoteBoundary'],
+                src: 'docs/02-architecture/04-remote-lifecycle.md',
+                on: ['visitor', 'c-page', 'host-boot'],
+                hold: ['visitor', 'c-page'],
+                badge: { visitor: '200' },
+              },
+            ],
+          },
+        ];
+
+        Cinema.mount({
+          lanes: LANES,
+          nodes: NODES,
+          scenarios: SCENARIOS,
+        });
+      })();
+    </script>
+  </body>
+</html>

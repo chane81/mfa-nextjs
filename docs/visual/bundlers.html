@@ -1,0 +1,839 @@
+<!doctype html>
+<!--
+  번들러 시네마 — 같은 계약을 Vite 와 Rsbuild 가 각자 어떻게 만족시키나.
+
+  ## 다른 두 판과의 관계
+
+  `deploy.html` 은 배포(시간), `runtime.html` 은 요청(시간), 이 파일은 **구조**다.
+  remote 두 개를 일부러 다른 번들러로 빌드한 이유와, 그래서 실제로 무엇이 갈렸는지를 본다.
+
+  ## 이 파일이 SSOT 가 아니다
+
+  근거는 `docs/01-research/04-bundler-comparison.md` · `packages/remote-config/src/node.ts` ·
+  각 remote 의 config 에 있고 여기는 그 재생기다. 수치를 고칠 일이 생기면 원본을 먼저 고친다.
+
+  엔진과 스타일은 `./cinema/engine.js` · `./cinema/engine.css` 를 공유한다.
+-->
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>번들러 시네마 — mfa-nextjs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@600;700&display=swap"
+    />
+
+    <link rel="stylesheet" href="./cinema/engine.css" />
+  </head>
+
+  <body>
+    <div class="wrap">
+      <header class="masthead">
+        <p class="eyebrow">mfa-nextjs · 번들러 시네마</p>
+        <h1>
+          remote 둘을 일부러 다른 번들러로 만들었다.<br />그래서 무엇이 갈렸나
+        </h1>
+        <p class="lede">
+          catalog 는 <strong>Vite 8</strong>, cart 는
+          <strong>Rsbuild 2(Rspack)</strong>. "번들러가 달라도 런타임 계약만
+          맞으면 host 가 똑같이 소비한다" 는 Module Federation 의 주장을 실제로
+          세워보기 위해서다. 검증은 통과했고 —
+          <b>그 과정에서 갈린 지점이 이 저장소에서 가장 값진 기록</b>이 됐다.
+          계약이 어디서 오는지, 두 번들러가 그걸 어떻게 다르게 만족시키는지,
+          그리고 어디서 실제로 깨졌는지를 순서대로 본다.
+        </p>
+        <div class="top-links">
+          <a class="chip" href="./anatomy.html">← 구조 해부도</a>
+          <a class="chip" href="./deploy.html">배포 시네마</a>
+          <a class="chip" href="./runtime.html">요청 시네마</a>
+          <a class="chip" href="../01-research/04-bundler-comparison.md"
+            >번들러 비교 문서</a
+          >
+          <button class="chip" id="theme" type="button">테마</button>
+        </div>
+      </header>
+
+      <div class="scenarios" id="scenarios"></div>
+
+      <div class="transport">
+        <button class="btn primary" id="play" type="button">재생</button>
+        <button class="btn" id="prev" type="button">◀ 이전</button>
+        <button class="btn" id="next" type="button">다음 ▶</button>
+        <button class="btn" id="restart" type="button">처음으로</button>
+        <div class="speed" role="group" aria-label="재생 속도">
+          <button type="button" data-rate="0.5">0.5×</button>
+          <button type="button" data-rate="1" aria-pressed="true">1×</button>
+          <button type="button" data-rate="2">2×</button>
+        </div>
+        <span class="clock" id="clock">00 / 00</span>
+        <div class="track" id="track"></div>
+      </div>
+
+      <div class="stage-shell" id="stage">
+        <svg id="wires" aria-hidden="true"></svg>
+        <div id="lanes"></div>
+        <div id="tip" role="tooltip" hidden></div>
+      </div>
+
+      <div class="readout">
+        <section class="panel" id="detail">
+          <span class="step-no" id="d-no">장면</span>
+          <h2 id="d-title">시나리오를 고르고 재생을 누른다</h2>
+          <p id="d-body"></p>
+          <p class="why" id="d-why"></p>
+          <div class="facts" id="d-facts"></div>
+          <div class="src" id="d-src"></div>
+        </section>
+
+        <aside class="panel chapters" aria-label="장면 목록">
+          <div id="chapters"></div>
+        </aside>
+      </div>
+
+      <section class="closing">
+        <h3>이 그림이 주장하는 것</h3>
+        <ul>
+          <li>
+            <b>계약은 번들러 설정에 없다.</b> 파일 이름 · 경로 규칙 · exposes 키
+            · shared 선언 · SSR external 이 전부
+            <code>packages/remote-config</code>
+            한 곳에서 나오고, 두 config 는 그걸 자기 문법으로 받아 적기만 한다.
+            그래서 host 는 어느 remote 가 어느 번들러로 만들어졌는지 모른다.
+          </li>
+          <li>
+            <b>"된다"와 "쉽다"는 다르다.</b> 둘 다 동작한다. 다만 밟은 함정이
+            Vite 5건 · Rsbuild 1건이고, Vite 쪽은 전부 MF 통합 지점의 런타임
+            레이스인 반면 Rsbuild 쪽 하나는 네이티브 바이너리 설치 문제였다.
+            원인은 도구의 품질이 아니라
+            <b>shared 배리어가 런타임 안에 있느냐 어댑터가 밖에서 흉내내느냐</b>
+            다.
+          </li>
+          <li>
+            <b>그래도 바꾸지 않는다.</b> catalog 를 Rsbuild 로 옮기면 "번들러가
+            달라도 된다" 는 검증 자체가 사라진다. 새로 만드는 MF remote 라면
+            Rsbuild 를 고르겠다는 판단과, 이 저장소를 그대로 두겠다는 판단은
+            서로 모순이 아니다.
+          </li>
+        </ul>
+        <p>
+          조작: <span class="kbd">Space</span> 재생/정지 ·
+          <span class="kbd">←</span> <span class="kbd">→</span> 장면 이동 ·
+          눈금을 눌러 그 장면으로 건너뛴다. <b>상자에 마우스를 올리면</b> 그게
+          무엇이고 실제 설정값이 얼마인지가 뜬다(읽는 동안 재생은 멈춘다 ·
+          <span class="kbd">Tab</span> 으로도 넘어간다 ·
+          <span class="kbd">Esc</span> 로 닫는다).
+        </p>
+      </section>
+    </div>
+
+    <script src="./cinema/engine.js"></script>
+    <script>
+      (function () {
+        'use strict';
+
+        /* ================================================================
+           레인 — 계약이 위, 두 구현이 가운데, 그 결과가 아래.
+           ================================================================ */
+        var LANES = [
+          {
+            id: 'contract',
+            name: '계약',
+            sub: 'packages/remote-config',
+            color: 'var(--hostc)',
+          },
+          {
+            id: 'vite',
+            name: 'catalog',
+            sub: 'Vite 8',
+            color: 'var(--cat)',
+          },
+          {
+            id: 'rsbuild',
+            name: 'cart',
+            sub: 'Rsbuild 2 · Rspack',
+            color: 'var(--cart)',
+          },
+          {
+            id: 'out',
+            name: '산출물',
+            sub: 'dist/v<version>/',
+            color: 'var(--ci)',
+          },
+          {
+            id: 'host',
+            name: 'host',
+            sub: '소비하는 쪽',
+            color: 'var(--ink-2)',
+          },
+        ];
+
+        /* ================================================================
+           노드. `info` 는 호버·포커스 설명 — 정의 + 실제 값 + 근거 파일.
+           ================================================================ */
+        var NODES = [
+          // ------------------------------------------------------------ 계약
+          {
+            id: 'files',
+            lane: 'contract',
+            t: 'MF_FILES',
+            s: '산출물 파일 이름 7개',
+            info: {
+              d: '두 번들러가 똑같은 이름으로 내야 하는 파일 목록. 이름을 아는 쪽이 호출부가 아니라 이 상수 하나다.',
+              k: [
+                ['브라우저', 'mf-manifest.json · remoteEntry.js'],
+                ['서버', 'mf-server.cjs'],
+                ['공표 · 스타일', 'mf-version.json · style.css'],
+                ['타입', '@mf-types.d.ts · @mf-types.zip'],
+                ['왜 명시하나', '기본값에 기대면 한쪽만 조용히 안 낸다'],
+              ],
+              f: 'packages/remote-config/src/index.ts',
+            },
+          },
+          {
+            id: 'mfopts',
+            lane: 'contract',
+            t: 'remoteFederationConfig',
+            s: '두 플러그인에 같은 객체',
+            info: {
+              d: 'MF 플러그인 옵션을 만드는 함수 하나. 두 플러그인이 같은 ModuleFederationOptions 를 받는다 — 둘 다 @module-federation/core 위에 있기 때문이다.',
+              k: [
+                ['exposes', 'src/exposes/*.tsx 스캔 (.test.tsx 제외 · 정렬)'],
+                ['filename', 'MF_FILES.webEntry'],
+                ['manifest', 'true (기본값에 기대지 않는다)'],
+                ['dts', 'generateTypes: true · consumeTypes: false'],
+                ['props 소유', 'expose 파일이 자기 인터페이스를 선언한다'],
+              ],
+              f: 'packages/remote-config/src/node.ts',
+            },
+          },
+          {
+            id: 'shared',
+            lane: 'contract',
+            t: 'SHARED_REACT',
+            s: '루트만 · singleton',
+            info: {
+              d: '브라우저에서 공유할 React 선언. 루트 둘만 공유하고 서브엔트리는 넣지 않는다.',
+              k: [
+                ['값', 'react · react-dom (singleton, ^19.0.0)'],
+                ['서브엔트리까지 넣으면', '_jsxDEV is not a function'],
+                ['같아야 하는 곳', 'remote 둘 + host 의 init({ shared })'],
+                ['갈리면', '에러 없이 remote 안에서만 훅이 깨진다'],
+              ],
+              f: 'packages/remote-config/src/index.ts',
+            },
+          },
+          {
+            id: 'ssrext',
+            lane: 'contract',
+            t: 'SSR_EXTERNALS',
+            s: '서브엔트리까지 4개',
+            info: {
+              d: '서버 번들이 external 로 남길 목록. 브라우저 shared 와 의도적으로 다르다 — 서버 번들은 require("react/jsx-runtime") 을 그대로 호출한다.',
+              k: [
+                [
+                  '값',
+                  'react · react-dom · react/jsx-runtime · react/jsx-dev-runtime',
+                ],
+                ['remote 가 안 남기면', 'React 가 서버에서 2벌 → 훅이 깨진다'],
+                ['host 가 안 주입하면', '예상 밖 모듈을 require 했습니다'],
+              ],
+              f: 'packages/remote-config/src/index.ts',
+            },
+          },
+
+          // ------------------------------------------------------------ Vite
+          {
+            id: 'v-plugin',
+            lane: 'vite',
+            t: '@module-federation/vite',
+            s: '1.20.7 · federation()',
+            info: {
+              d: 'Vite 용 MF 어댑터. webpack 런타임이 없는 곳에서 MF 를 흉내낸다 — 이 "흉내" 위치가 뒤에 나오는 함정의 근원이다.',
+              k: [
+                ['호출', 'federation(MF.options)'],
+                ['React 플러그인', '@vitejs/plugin-react 6'],
+                ['target', 'chrome89 (MF 가 top-level await 를 쓴다)'],
+              ],
+              f: 'apps/remote-catalog/vite.config.ts',
+            },
+          },
+          {
+            id: 'v-asset',
+            lane: 'vite',
+            t: 'base',
+            s: '뒤 슬래시가 필수',
+            info: {
+              d: '자산 URL 접두사. 절대 URL 이어야 한다 — 상대 경로면 브라우저가 host 도메인에서 remote 청크를 찾는다.',
+              k: [
+                ['키', 'base'],
+                [
+                  '값',
+                  'assetBase(PUBLIC_URL, version, { trailingSlash: true })',
+                ],
+                [
+                  '왜 슬래시',
+                  'Vite 는 있어야 마지막 세그먼트를 디렉터리로 본다',
+                ],
+              ],
+              f: 'apps/remote-catalog/vite.config.ts',
+            },
+          },
+          {
+            id: 'v-css',
+            lane: 'vite',
+            t: 'CSS 파이프라인',
+            s: '@tailwindcss/vite',
+            info: {
+              d: 'Tailwind 를 1급 플러그인으로 문다. 다만 한 덩어리로 모으고 이름을 고정하는 일은 따로 해야 한다.',
+              k: [
+                ['묶기', 'build.cssCodeSplit: false'],
+                ['이름 고정', 'rollupOptions.output.assetFileNames'],
+                [
+                  'dev 문제',
+                  'CSS 를 <style> 주입 JS 로 서빙 → <link> 가 버린다',
+                ],
+                ['해결', '?direct 로 다시 요청하는 자작 미들웨어'],
+              ],
+              f: 'apps/remote-catalog/vite.config.ts',
+            },
+          },
+          {
+            id: 'v-ssr',
+            lane: 'vite',
+            t: 'SSR 빌드',
+            s: 'rollup · format: cjs',
+            info: {
+              d: 'host 서버가 new Function 으로 평가할 CJS 번들을 만든다. ESM 을 문자열에서 평가하려면 vm.SourceTextModule 플래그가 필요해 실용적이지 않다.',
+              k: [
+                ['엔트리', "build.ssr: './src/server-entry.ts'"],
+                ['출력', "format: 'cjs' · entryFileNames: mf-server.cjs"],
+                ['external', 'rollupOptions.external — 배열 그대로'],
+                ['target', 'node20'],
+              ],
+              f: 'apps/remote-catalog/vite.config.server.ts',
+            },
+          },
+          {
+            id: 'v-dev',
+            lane: 'vite',
+            t: 'dev 서버',
+            s: 'warmup + optimizeDeps',
+            info: {
+              d: 'dev/preview 는 훅 자체가 판별자다(configureServer / configurePreviewServer) — NODE_ENV 나 command 로는 구분되지 않는다.',
+              k: [
+                ['워밍', 'server.warmup.clientFiles = MF.files'],
+                ['사전 번들링', 'optimizeDeps.entries / include'],
+                [
+                  '둘 다 필요한 이유',
+                  '의존성 사전 번들링과 소스 사전 transform 은 다른 단계',
+                ],
+                ['성격', '레이스를 없애지 않고 창을 닫는 회피'],
+              ],
+              f: 'apps/remote-catalog/vite.config.ts',
+            },
+          },
+
+          // --------------------------------------------------------- Rsbuild
+          {
+            id: 'r-plugin',
+            lane: 'rsbuild',
+            t: '@module-federation/rsbuild-plugin',
+            s: '2.8.2 · pluginModuleFederation()',
+            info: {
+              d: 'Rspack 기반이라 MF 런타임이 번들러 안에 있다. 어댑터가 흉내낼 것이 없다.',
+              k: [
+                ['호출', 'pluginModuleFederation(MF.options)'],
+                ['React 플러그인', '@rsbuild/plugin-react 2'],
+                ['옵션 객체', 'Vite 쪽과 같은 것을 그대로 받는다'],
+              ],
+              f: 'apps/remote-cart/rsbuild.config.ts',
+            },
+          },
+          {
+            id: 'r-asset',
+            lane: 'rsbuild',
+            t: 'assetPrefix',
+            s: 'dev 용이 따로 있다',
+            info: {
+              d: '같은 목적, 다른 키. 뒤 슬래시를 요구하지 않고 dev 전용 접두사를 따로 받는다.',
+              k: [
+                ['빌드', 'output.assetPrefix = assetBase(PUBLIC_URL, VERSION)'],
+                ['dev', 'dev.assetPrefix = PUBLIC_URL'],
+                ['출력 루트', 'output.distPath.root'],
+              ],
+              f: 'apps/remote-cart/rsbuild.config.ts',
+            },
+          },
+          {
+            id: 'r-css',
+            lane: 'rsbuild',
+            t: 'CSS 파이프라인',
+            s: 'postcss 경유 · 두 줄',
+            info: {
+              d: 'Tailwind 1급 통합이 없어 postcss 를 거친다. 대신 출력 위치·이름을 맞추는 일이 두 줄로 끝나고 dev 대응 코드가 0이다.',
+              k: [
+                ['연동', '@mfa/tailwind-config/postcss 재-export'],
+                ['위치', "output.distPath.css: '' (기본은 static/css/)"],
+                ['이름', 'output.filename.css = style.css'],
+                ['dev', '실제 파일로 나온다 — 보정 코드 없음'],
+              ],
+              f: 'apps/remote-cart/rsbuild.config.ts',
+            },
+          },
+          {
+            id: 'r-ssr',
+            lane: 'rsbuild',
+            t: 'SSR 빌드',
+            s: 'commonjs2 · externals 객체',
+            info: {
+              d: '같은 mf-server.cjs 를 만들지만 표기 방식이 다르다. Rspack 의 externals 는 "이 id 를 어떤 형태로 가져올지" 까지 받는다.',
+              k: [
+                [
+                  '엔트리',
+                  "source.entry: { 'mf-server': './src/server-entry.ts' }",
+                ],
+                [
+                  '출력',
+                  "filename.js: '[name].cjs' + library.type: 'commonjs2'",
+                ],
+                ['external', "{ react: 'commonjs react', … } 로 조립"],
+                ['target', "output.target: 'node'"],
+              ],
+              f: 'apps/remote-cart/rsbuild.server.config.ts',
+            },
+          },
+          {
+            id: 'r-dev',
+            lane: 'rsbuild',
+            t: 'dev 서버',
+            s: 'server.setup(action)',
+            info: {
+              d: 'dev 와 preview 를 한 훅에서 action 값으로 가른다. 레이스 회피 장치가 없다 — 필요가 없었다.',
+              k: [
+                ['판별', 'server.setup({ server, action })'],
+                ['deprecated', 'dev.setupMiddlewares 는 Rsbuild 2 에서 경고'],
+                ['워밍 장치', '없음'],
+                [
+                  '지연 컴파일',
+                  '기본 켜짐 — 요청을 미룰 뿐 순서를 바꾸지 않는다',
+                ],
+              ],
+              f: 'apps/remote-cart/rsbuild.config.ts',
+            },
+          },
+
+          // ---------------------------------------------------------- 산출물
+          {
+            id: 'o-web',
+            lane: 'out',
+            t: 'remoteEntry.js + manifest',
+            s: '/v<version>/',
+            info: {
+              d: '브라우저가 받는 한 벌. 이름과 경로가 같으므로 host 는 어느 번들러가 만들었는지 구분할 수 없다.',
+              k: [
+                ['경로', 'dist/v<version>/ — 두 config 가 같은 함수를 쓴다'],
+                ['내부 구조', '청크 이름 규칙은 번들러마다 다르다'],
+                ['host 가 보는 것', '매니페스트 한 장'],
+              ],
+              f: 'packages/remote-config/src/node.ts',
+            },
+          },
+          {
+            id: 'o-css',
+            lane: 'out',
+            t: 'style.css',
+            s: '루트 · 해시 없음',
+            info: {
+              d: '해시를 안 붙이는 게 계약이다. 주소를 계산으로 알 수 있어야 host 가 <link> 를 걸 수 있다.',
+              k: [
+                ['캐시 무효화', '/v<version>/ 불변 경로가 맡는다'],
+                ['거는 주체', 'host 의 RemoteComponent'],
+                ['우선순위', '<link precedence="mfa-remote">'],
+                ['중복', 'React 19 가 제거 — 확인됨'],
+              ],
+              f: 'docs/02-architecture/05-styling.md',
+            },
+          },
+          {
+            id: 'o-ssr',
+            lane: 'out',
+            t: 'mf-server.cjs',
+            s: 'CJS · react external',
+            info: {
+              d: 'host 서버가 받아 실행하는 번들. SSR 맵은 정적 import 로 손으로 적고, 키가 브라우저 exposes 와 1:1 인지는 테스트가 본다.',
+              k: [
+                ['형식', 'CommonJS (new Function 평가 전제)'],
+                ['버전', '웹 빌드와 같은 값 (.mf-version 공유)'],
+                ['키 대조', 'src/server-entry.test.tsx'],
+              ],
+              f: 'apps/remote-catalog/src/server-entry.ts',
+            },
+          },
+          {
+            id: 'o-dts',
+            lane: 'out',
+            t: '@mf-types',
+            s: 'props 실제 시그니처',
+            info: {
+              d: 'remote 가 내는 타입 산출물. host 는 이걸 받아 커밋해 두고 네트워크 없이 typecheck 한다.',
+              k: [
+                ['생산', 'dts.generateTypes — 두 번들러 설정이 동일'],
+                ['수취', 'pnpm mf:types (remote 기동 전제)'],
+                ['커밋', 'packages/contracts/src/generated/'],
+                ['낡음 검사', 'CI 가 mf:types 후 git diff --exit-code'],
+              ],
+              f: 'packages/contracts/module-federation.config.ts',
+            },
+          },
+
+          // -------------------------------------------------------------- host
+          {
+            id: 'h-load',
+            lane: 'host',
+            t: 'loadRemoteModule',
+            s: '번들러를 모른다',
+            info: {
+              d: 'host 의 소비 창구 하나. 이 함수 어디에도 Vite·Rsbuild 라는 말이 없다 — 그게 이 실험의 결과다.',
+              k: [
+                ['브라우저', 'MF 런타임 + remoteEntry'],
+                ['서버', 'mf-server.cjs + new Function'],
+                ['분기 기준', "typeof window === 'undefined'"],
+              ],
+              f: 'apps/host/src/mf/loader/index.ts',
+            },
+          },
+          {
+            id: 'h-shared',
+            lane: 'host',
+            t: 'init({ shared })',
+            s: '공유 스코프',
+            info: {
+              d: 'host 가 공표하는 React. 여기 적은 값과 실제 주입하는 모듈이 어긋나면 MF 가 다른 실체를 넘긴다.',
+              k: [
+                ['공유', 'react · react-dom · 서브엔트리 3종'],
+                [
+                  '서브엔트리가 필요한 이유',
+                  'catalog 쪽 플러그인이 자동으로 올린다',
+                ],
+                ['cart 만 보고 지우면', '#RUNTIME-015 로 catalog 가 죽는다'],
+              ],
+              f: 'apps/host/src/mf/loader/index.ts',
+            },
+          },
+          {
+            id: 'h-types',
+            lane: 'host',
+            t: 'mf dts --fetch',
+            s: '버전 경로에서 받는다',
+            info: {
+              d: 'remote 가 낸 타입을 받아 푸는 경로. 매니페스트에서 주소를 유추하지 않고 mf-version.json 을 먼저 읽어 조립한다.',
+              k: [
+                ['순서', 'mf-version.json → /v<version>/@mf-types.zip'],
+                [
+                  '루트에서 찾으면',
+                  '404 인데 CORS 헤더가 없어 Failed to fetch 로만 보인다',
+                ],
+                ['tsconfig', 'paths 를 remote 이름별로 (와일드카드 금지)'],
+              ],
+              f: 'packages/contracts/module-federation.config.ts',
+            },
+          },
+        ];
+
+        /* ================================================================
+           시나리오
+           ================================================================ */
+        var SCENARIOS = [
+          {
+            id: 'same',
+            n: '시나리오 A',
+            t: '같은 계약 — 어디서 오나',
+            d: '번들러 설정이 아니라 패키지 하나가 계약을 쥔다.',
+            accent: 'var(--hostc)',
+            steps: [
+              {
+                g: '계약',
+                title: '파일 이름부터 한 곳에 있다',
+                no: '①',
+                body: '<code>mf-manifest.json</code> · <code>remoteEntry.js</code> · <code>mf-server.cjs</code> · <code>style.css</code> · <code>mf-version.json</code> · 타입 두 개. 두 번들러 config 는 이 상수를 참조만 한다.',
+                why: '<b>기본값에 기대지 않는 게 요점이다.</b> 두 플러그인 모두 <code>remoteEntry.js</code> 를 기본값으로 쓰고 매니페스트도 한쪽은 기본으로 낸다. 그래도 명시한다 — 기본값이 갈리면 <b>한쪽만 조용히 안 내고</b>, 그 증상은 빌드 실패가 아니라 host 가 못 찾는 것이다.',
+                facts: ['MF_FILES 7개', '두 config 가 참조만 한다'],
+                src: 'packages/remote-config/src/index.ts',
+                on: ['files'],
+              },
+              {
+                g: '계약',
+                title: 'MF 옵션도 함수 하나가 만든다',
+                no: '②',
+                body: '<code>remoteFederationConfig(name)</code> 가 exposes · filename · shared · manifest · dts 를 한 덩이로 만들어 두 플러그인에 그대로 넘긴다.',
+                why: '<b>그게 가능한 이유는 둘 다 <code>@module-federation/core</code> 위에 있기 때문이다.</b> 플러그인 이름과 호출 방식만 다르고 받는 옵션 타입은 같다. exposes 는 손으로 적지 않고 <code>src/exposes/*.tsx</code> 를 스캔한다 — 테스트 파일을 같이 집어 dev 가 깨진 적이 있어서(H-2) 제외 규칙이 스캔 쪽에 있다.',
+                facts: [
+                  '같은 ModuleFederationOptions',
+                  'exposes 는 스캔 · .test.tsx 제외',
+                ],
+                src: 'packages/remote-config/src/node.ts',
+                on: ['files', 'mfopts'],
+                flow: [['files', 'mfopts']],
+              },
+              {
+                g: '계약',
+                title: 'shared React 는 루트 둘만',
+                no: '③',
+                body: '<code>react</code> · <code>react-dom</code> 을 singleton 으로 공유한다. <code>react/jsx-runtime</code> 같은 서브엔트리는 <b>넣지 않는다</b>.',
+                why: '<b>넣으면 네임스페이스 모양이 갈려 <code>_jsxDEV is not a function</code> 이 난다.</b> 그리고 이 선언은 remote 둘과 host 세 곳에서 같아야 하는데, 갈렸을 때 증상이 에러가 아니라 <b>remote 안에서만 훅이 깨지는 것</b>이라 원인까지 가는 길이 멀다. 그래서 문자열을 세 번 적지 않고 한 상수를 셋이 참조한다.',
+                facts: ['singleton · ^19.0.0', '같아야 하는 곳 3군데'],
+                src: 'packages/remote-config/src/index.ts',
+                on: ['mfopts', 'shared', 'h-shared'],
+                flow: [
+                  ['mfopts', 'shared'],
+                  ['shared', 'h-shared'],
+                ],
+              },
+              {
+                g: '계약',
+                title: 'SSR external 은 일부러 다르다',
+                no: '④',
+                body: '서버 쪽은 서브엔트리까지 네 개다. remote 의 node 번들이 <code>require("react/jsx-runtime")</code> 를 그대로 호출하기 때문이다.',
+                why: '<b>브라우저와 서버가 같아야 한다고 생각하면 여기서 틀린다.</b> 어긋나는 방향이 둘인데 증상이 반대다 — remote 가 external 로 안 남기면 서버에서 React 가 2벌이 되어 훅이 깨지고, host 가 주입을 빠뜨리면 <code>예상 밖 모듈을 require 했습니다</code> 로 remote 가 통째로 안 뜬다.',
+                facts: [
+                  '4개 (브라우저 shared 는 2개)',
+                  '타입이 누락을 컴파일 타임에 잡는다',
+                ],
+                src: 'packages/remote-config/src/index.ts',
+                on: ['ssrext', 'o-ssr'],
+                flow: [['ssrext', 'o-ssr']],
+              },
+              {
+                g: '적용',
+                title: '같은 객체가 두 플러그인으로 들어간다',
+                no: '⑤',
+                body: '<code>federation(MF.options)</code> 와 <code>pluginModuleFederation(MF.options)</code>. 호출 이름만 다르다.',
+                why: '<b>여기까지가 "같은 것" 의 전부다.</b> 이 아래부터는 같은 결과를 내기 위해 서로 다른 키를 눌러야 한다 — 시나리오 B 가 그 대조다.',
+                facts: [
+                  '@module-federation/vite 1.20.7',
+                  '@module-federation/rsbuild-plugin 2.8.2',
+                ],
+                src: 'docs/01-research/04-bundler-comparison.md',
+                on: ['mfopts', 'v-plugin', 'r-plugin'],
+                flow: [
+                  ['mfopts', 'v-plugin'],
+                  ['mfopts', 'r-plugin'],
+                ],
+              },
+              {
+                g: '결과',
+                title: 'host 는 어느 번들러인지 모른다',
+                no: '⑥',
+                body: '산출물이 같은 이름 · 같은 경로로 나오므로 <code>loadRemoteModule</code> 한 함수가 둘 다 소비한다. 그 함수 어디에도 Vite · Rsbuild 라는 말이 없다.',
+                why: '<b>이게 검증하려던 주장 그 자체다.</b> "번들러가 달라도 런타임 계약만 맞으면 된다" — 통과했다. 그래서 남은 질문은 "되느냐" 가 아니라 <b>"새로 만든다면 어느 쪽이냐"</b> 가 된다.',
+                facts: ['같은 이름 · 같은 경로', '소비 코드에 번들러 이름 0회'],
+                src: 'apps/host/src/mf/loader/index.ts',
+                on: ['o-web', 'o-css', 'o-ssr', 'o-dts', 'h-load'],
+                flow: [
+                  ['v-plugin', 'o-web'],
+                  ['r-plugin', 'o-web'],
+                  ['o-web', 'h-load'],
+                ],
+                badge: { 'h-load': '구분 불가' },
+              },
+            ],
+          },
+
+          {
+            id: 'diff',
+            n: '시나리오 B',
+            t: '다른 구현 — 같은 결과를 어떻게',
+            d: '같은 파일을 내기 위해 서로 다른 키를 누른다.',
+            accent: 'var(--cat)',
+            steps: [
+              {
+                g: '자산 주소',
+                title: '접두사 — 한쪽은 뒤 슬래시가 의미를 바꾼다',
+                no: '①',
+                body: 'Vite 는 <code>base</code> 에 <b>뒤 슬래시를 붙여야</b> 마지막 세그먼트를 디렉터리로 본다. Rsbuild 는 <code>output.assetPrefix</code> 에 슬래시 없이 주고, dev 용 접두사를 <code>dev.assetPrefix</code> 로 따로 받는다.',
+                why: '<b>둘 다 절대 URL 이어야 한다는 게 진짜 계약이다.</b> 상대 경로로 두면 브라우저가 remote 청크를 <b>host 도메인에서</b> 찾는다 — 404 가 나는 자리와 원인이 있는 자리가 다르다.',
+                facts: [
+                  'base (뒤 슬래시 필수)',
+                  'assetPrefix + dev.assetPrefix',
+                ],
+                src: 'apps/remote-catalog/vite.config.ts',
+                on: ['v-asset', 'r-asset', 'o-web'],
+                flow: [
+                  ['v-asset', 'o-web'],
+                  ['r-asset', 'o-web'],
+                ],
+              },
+              {
+                g: 'CSS',
+                title: 'CSS 한 장으로 모으고 이름을 고정한다',
+                no: '②',
+                body: "Vite 는 <code>cssCodeSplit: false</code> 로 묶고 <code>assetFileNames</code> 로 이름을 고정한다. Rsbuild 는 <code>distPath.css: ''</code> + <code>filename.css</code> 두 줄이다.",
+                why: '<b>이름에 해시를 안 붙이는 게 계약인 이유.</b> host 가 <code>&lt;link&gt;</code> 를 걸려면 주소를 <b>계산으로</b> 알 수 있어야 한다. 캐시 무효화는 파일 이름이 아니라 <code>/v&lt;version&gt;/</code> 불변 경로가 맡는다.',
+                facts: ['style.css · 해시 없음', 'host 가 link 를 건다'],
+                src: 'docs/02-architecture/05-styling.md',
+                on: ['v-css', 'r-css', 'o-css'],
+                flow: [
+                  ['v-css', 'o-css'],
+                  ['r-css', 'o-css'],
+                ],
+              },
+              {
+                g: 'CSS',
+                title: 'dev 에서 한쪽만 CSS 가 통째로 무시됐다',
+                no: '③',
+                body: 'dev Vite 는 CSS 를 <code>&lt;style&gt;</code> 주입 JS 모듈로 서빙한다. host 가 <code>&lt;link&gt;</code> 로 걸면 브라우저가 그걸 버린다 — <b>200 이고 콘솔 에러도 없다</b>.',
+                why: '<b>그게 버그가 아니라 정상 동작이라는 게 진단을 어렵게 했다.</b> 응답도 200, 파일도 있는데 화면만 무스타일이다. 해결은 <code>?direct</code> 로 다시 요청해 <code>text/css</code> 로 내보내는 자작 미들웨어. cart 는 dev 에서도 실제 파일로 나와 이 코드가 아예 없다.',
+                facts: ['200 · 에러 없음 · 무스타일', 'Rsbuild 는 해당 없음'],
+                src: 'docs/05-troubleshooting/01-known-issues.md',
+                on: ['v-css', 'o-css'],
+                fail: ['v-css'],
+                hold: ['r-css'],
+                badge: { 'v-css': 'dev 보정 필요', 'r-css': '대응 코드 0' },
+              },
+              {
+                g: 'SSR',
+                title: '같은 CJS 를 만드는 두 가지 표기',
+                no: '④',
+                body: "Vite 는 rollup 의 <code>format: 'cjs'</code>, Rsbuild 는 <code>library.type: 'commonjs2'</code>. external 도 한쪽은 배열 그대로, 다른 쪽은 <code>{ react: 'commonjs react' }</code> 로 조립한다.",
+                why: '<b>Rspack 의 <code>externals</code> 는 "이 id 를 어떤 형태로 가져올지" 까지 받는다.</b> 그래서 같은 목록을 그대로 못 넘기고 변환해야 한다 — 한 번 적으면 끝나는 잡일이지만, 계약이 목록으로만 존재하면 안 되고 <b>변환하는 자리</b>가 필요하다는 뜻이기도 하다.',
+                facts: [
+                  'format: cjs',
+                  'library.type: commonjs2',
+                  '같은 SSR_EXTERNALS',
+                ],
+                src: 'apps/remote-cart/rsbuild.server.config.ts',
+                on: ['v-ssr', 'r-ssr', 'o-ssr', 'ssrext'],
+                flow: [
+                  ['v-ssr', 'o-ssr'],
+                  ['r-ssr', 'o-ssr'],
+                ],
+              },
+              {
+                g: 'dev',
+                title: 'dev 와 preview 를 가르는 방법도 다르다',
+                no: '⑤',
+                body: 'Vite 는 훅 자체가 판별자다(<code>configureServer</code> / <code>configurePreviewServer</code>). Rsbuild 는 <code>server.setup({ action })</code> 한 훅에서 값으로 가른다.',
+                why: '<b>Vite 쪽이 훅을 둘로 나눈 건 우연이 아니라 필요였다.</b> <code>NODE_ENV</code> 나 <code>command</code> 로는 dev 와 preview 가 구분되지 않는다. 미들웨어가 dev 에서는 <code>mf-version.json</code> 을 일부러 404 로, preview 에서는 정상으로 내야 해서 이 구분이 계약의 일부다.',
+                facts: [
+                  'dev 는 mf-version.json 을 404',
+                  'preview 는 둘 다 서빙',
+                ],
+                src: 'packages/remote-config/src/node.ts',
+                on: ['v-dev', 'r-dev'],
+              },
+              {
+                g: '분량',
+                title: '설정 분량 — 지금 측정값',
+                no: '⑥',
+                body: "주석·빈 줄을 뺀 웹 config 가 <b>Vite 112줄 · Rsbuild 48줄</b>, SSR config 는 <b>23줄 · 29줄</b>이다. 측정식은 <code>grep -vE '^\\s*($|//|/\\*|\\*)'</code>.",
+                why: '<b>줄 수 자체가 결론은 아니다.</b> Vite 쪽 초과분은 대부분 dev 레이스 회피(워밍·사전 번들링)와 dev CSS 보정이라, "설정이 길다" 가 아니라 <b>"런타임 차이를 설정으로 메우고 있다"</b> 로 읽어야 한다. SSR 쪽은 오히려 Rsbuild 가 길다 — external 표기 변환 때문이다.',
+                facts: ['웹 112 / 48', 'SSR 23 / 29', '측정식 명시'],
+                src: 'docs/01-research/04-bundler-comparison.md',
+                on: ['v-dev', 'v-css', 'r-dev', 'r-css'],
+              },
+            ],
+          },
+
+          {
+            id: 'broke',
+            n: '시나리오 C',
+            t: '실제로 갈린 지점',
+            d: '함정 분포가 5 대 1. 이유가 구조에 있다.',
+            accent: 'var(--alert)',
+            steps: [
+              {
+                g: '분포',
+                title: '밟은 함정은 Vite 5건 · Rsbuild 1건',
+                no: '①',
+                body: 'Vite 쪽 다섯은 <b>전부 MF 통합 지점</b>에서 났다. Rsbuild 쪽 하나는 MF 와 무관한 <b>네이티브 바이너리 설치 타임아웃</b>이다.',
+                why: '<b>수를 세는 게 목적이 아니라 성격을 보는 게 목적이다.</b> 설치 타임아웃은 <code>--fetch-timeout</code> 한 줄로 끝나고 다시는 안 나온다. 런타임 레이스는 머신이 느려지거나 expose 가 커지면 다시 나온다.',
+                facts: [
+                  'Vite 5건 · Rsbuild 1건',
+                  '한쪽은 런타임 · 다른 쪽은 설치',
+                ],
+                src: 'docs/01-research/04-bundler-comparison.md',
+                on: ['v-plugin', 'r-plugin'],
+                fail: ['v-plugin'],
+              },
+              {
+                g: '레이스',
+                title: '콜드 dev 첫 로드에서만 _jsxDEV 가 undefined',
+                no: '②',
+                body: 'dev 서버 재시작 + <b>새 브라우저 세션</b>의 첫 로드에서 <code>_jsxDEV is not a function</code>. 관측 <b>3/3 실패</b>, 같은 세션에서 새로고침하면 <b>5/5 정상</b>.',
+                why: '<b>재현 조건이 "콜드" 라는 게 진단의 전부였다.</b> 리소스 타임라인을 보면 <code>loadShare(react/jsx-dev-runtime)</code> 가 캐시 miss 로 <code>undefined</code> 인 채 굳고, 실제 모듈은 <b>20ms 뒤에</b> 도착한다. 처음 의심한 스테일 <code>?v=</code> 해시 가설은 아니었다 — 실패 페이지의 요청이 전부 200 이었다.',
+                facts: [
+                  '콜드 3/3 실패',
+                  '웜 5/5 정상',
+                  '실제 모듈이 20ms 늦게 도착',
+                ],
+                src: 'docs/05-troubleshooting/01-known-issues.md',
+                on: ['v-plugin', 'v-dev', 'h-shared'],
+                flow: [['v-plugin', 'h-shared', 'bad']],
+                fail: ['v-plugin'],
+              },
+              {
+                g: '원인',
+                title: '배리어가 런타임 안이냐 어댑터 밖이냐',
+                no: '③',
+                body: 'Rspack 은 shared 해석이 청크 로드 파이프라인 <b>안</b>에 있다(<code>ensureChunk</code> → <code>f.consumes</code>). Vite 어댑터는 그 배리어를 <code>import()</code> <b>뒤</b>에 둔 가상 모듈로 흉내낸다.',
+                why: '<b>그래서 이건 플러그인 버그라기보다 위치 문제다.</b> 흔한 오해 — "Rsbuild 는 미리 다 컴파일해서 안 나는 것" — 도 아니다. cart 도 지연 컴파일이 켜져 있다. 레이스가 없는 이유는 <b>지연 컴파일이 요청을 미룰 뿐 순서를 바꾸지 않기</b> 때문이다.',
+                facts: [
+                  'f.consumes 는 ensureChunk 안',
+                  'Vite 는 import() 뒤',
+                  '지연 컴파일은 원인이 아니다',
+                ],
+                src: 'docs/01-research/04-bundler-comparison.md',
+                on: ['v-plugin', 'r-plugin'],
+                fail: ['v-plugin'],
+                hold: ['r-plugin'],
+              },
+              {
+                g: '회피',
+                title: '해결이 아니라 창을 닫는 것이다',
+                no: '④',
+                body: '<code>server.warmup.clientFiles</code> 로 소스를 미리 transform 하고 <code>optimizeDeps</code> 로 의존성을 사전 번들링한다. 검증표: 워밍 없음 <b>3/3 실패</b> · 수동 워밍 <b>4/4 성공</b> · 설정 적용 <b>5/5 성공</b>.',
+                why: '<b>오진을 문서에 남겨뒀다.</b> 처음엔 <code>optimizeDeps</code> 만으로 해결했다고 적었는데 같은 에러가 재발했다 — 재현 창을 좁혔을 뿐이었다. 둘은 다른 단계(의존성 사전 번들링 vs 소스 사전 transform)라 <b>둘 다</b> 필요하다. 그리고 이건 레이스를 없애는 게 아니라 <b>확률을 낮추는</b> 조치라고 문서에 명시해 뒀다.',
+                facts: ['3/3 → 5/5', '오진 정정 기록 보존', '확률적 회피'],
+                src: 'docs/05-troubleshooting/01-known-issues.md',
+                on: ['v-dev'],
+                badge: { 'v-dev': '회피 장치' },
+              },
+              {
+                g: '비대칭',
+                title: '매니페스트에 오르는 shared 가 다르다',
+                no: '⑤',
+                body: '선언은 둘 다 <code>react</code> · <code>react-dom</code> 인데, 매니페스트에 오른 건 catalog 넷 · cart 둘이다. catalog 쪽 플러그인이 서브엔트리를 <b>자동으로 추가</b>한다.',
+                why: '<b>그래서 host 의 서브엔트리 공유는 catalog 하나 때문에 존재한다.</b> cart 설정만 보고 "안 쓰는데 왜 있지" 하고 지우면 catalog 이 <code>#RUNTIME-015</code> 로 죽는다. 게다가 <code>react/jsx-dev-runtime</code> 은 프로덕션 매니페스트에 없어서 <b>프로덕션 빌드만 돌려서는 필요 여부를 알 수 없다</b>.',
+                facts: ['catalog 4 · cart 2', 'dev 에서만 보이는 항목이 있다'],
+                src: 'docs/05-troubleshooting/01-known-issues.md',
+                on: ['h-shared', 'o-web'],
+                fail: ['h-shared'],
+              },
+              {
+                g: '판단',
+                title: '그래도 바꾸지 않는다',
+                no: '⑥',
+                body: '새로 만드는 MF remote 라면 <b>Rsbuild</b>. 기존 Vite 앱을 옮긴다면 Vite 를 유지하고 회피 장치를 복사한다. 이 저장소는 <b>둘 다 그대로 둔다</b>.',
+                why: '<b>catalog 를 Rsbuild 로 옮기면 "번들러가 달라도 된다" 는 검증 자체가 사라진다.</b> 그리고 Vite 를 고르는 게 맞는 경우도 남아 있다 — remote 가 독립 실행 앱을 겸하고 dev 체감이 중요할 때. 다만 그 경우도 remote 는 host 페이지 안에서 로드되므로 HMR 이점 대부분을 못 쓴다.',
+                facts: ['두 번들러 공존이 실험 대상', '삽질 기록도 산출물'],
+                src: 'docs/01-research/04-bundler-comparison.md',
+                on: ['v-plugin', 'r-plugin', 'h-load'],
+                hold: ['v-plugin', 'r-plugin', 'h-load'],
+                badge: { 'h-load': '둘 다 소비' },
+              },
+            ],
+          },
+        ];
+
+        Cinema.mount({
+          lanes: LANES,
+          nodes: NODES,
+          scenarios: SCENARIOS,
+        });
+      })();
+    </script>
+  </body>
+</html>
