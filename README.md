@@ -114,7 +114,16 @@ remote CSS 에 대한 지식이 없다. 근거와 실측은
 
 - **[전체 구조 해부도](https://chane81.github.io/mfa-nextjs/anatomy.html)** — 배포 파이프라인,
   host↔remote 런타임, remote 번들러(Vite vs Rsbuild) 비교를 그림으로. 단독 HTML 이라 저장소 화면에서는 소스로 보이므로
-  **GitHub Pages 로 올려 둔다**([소스](./docs/anatomy.html) · 로컬은 `open docs/anatomy.html`)
+  **GitHub Pages 로 올려 둔다**([소스](./docs/visual/anatomy.html) · 로컬은 `open docs/visual/anatomy.html`)
+- **[배포 시네마](https://chane81.github.io/mfa-nextjs/deploy.html)** — `git push` 이후
+  무엇이 어떤 순서로 일어나는지를 장면 단위로 재생한다. 정상 배포 · remote 만 배포 ·
+  변조된 배포를 거부하는 경로 세 가지([소스](./docs/visual/deploy.html))
+- **[요청 시네마](https://chane81.github.io/mfa-nextjs/runtime.html)** — 사용자가 주소를
+  연 뒤 host 와 remote 사이에서 벌어지는 일. remote 가 어떻게 SSR 되는지, 경계를 넘는데
+  왜 하드 내비가 안 나는지, remote 가 죽으면 어떻게 되는지([소스](./docs/visual/runtime.html))
+- **[번들러 시네마](https://chane81.github.io/mfa-nextjs/bundlers.html)** — remote 둘을
+  일부러 다른 번들러(Vite 8 · Rsbuild 2)로 만든 결과. 계약이 어디서 오는지, 두 설정이
+  같은 산출물을 어떻게 다르게 만드는지, 어디서 실제로 깨졌는지([소스](./docs/visual/bundlers.html))
 - [진행 상황](./docs/00-progress.md)
 - [nextjs-mf 가 왜 죽었나](./docs/01-research/01-nextjs-mf-eol.md)
 - [대체재 비교](./docs/01-research/02-alternatives.md)

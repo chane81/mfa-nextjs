@@ -63,20 +63,23 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 
 ## 뭔가 안 될 때 · 배경이 필요할 때
 
-| 알고 싶은 것                        | 읽을 파일                                     |
-| ----------------------------------- | --------------------------------------------- |
-| 전체 지도 · 6줄 요약                | `docs/README.md`                              |
-| **구조를 그림으로** (배포 · 런타임) | `docs/anatomy.html` (Pages 로도 공개된다)     |
-| 회차별 작업 기록 · 다음에 할 것     | `docs/00-progress.md`                         |
-| **에러 증상으로 원인 찾기**         | `docs/05-troubleshooting/01-known-issues.md`  |
-| 아키텍처 결정과 기각 사유(ADR)      | `docs/02-architecture/01-decision.md`         |
-| 패키지 구조 · remote 계약           | `docs/02-architecture/02-topology.md`         |
-| SSR · 소프트 내비게이션 설계        | `docs/02-architecture/03-ssr-and-soft-nav.md` |
-| 버전 공표 · 캐시 무효화 · 신뢰 경계 | `docs/02-architecture/04-remote-lifecycle.md` |
-| 스타일링 전략                       | `docs/02-architecture/05-styling.md`          |
-| **host `src/mf` 폴더 배치**         | `docs/02-architecture/06-host-mf-layout.md`   |
-| 버전 고정 근거                      | `docs/03-setup/02-versions.md`                |
-| 테스트를 어디에 어떻게 쓰나         | `docs/06-testing/01-test-plan.md`             |
+| 알고 싶은 것                        | 읽을 파일                                            |
+| ----------------------------------- | ---------------------------------------------------- |
+| 전체 지도 · 6줄 요약                | `docs/README.md`                                     |
+| **구조를 그림으로** (배포 · 런타임) | `docs/visual/anatomy.html` (Pages 로도 공개된다)     |
+| **배포 순서를 움직여서**            | `docs/visual/deploy.html` (장면 재생 · Pages 공개)   |
+| **요청 경로를 움직여서**            | `docs/visual/runtime.html` (장면 재생 · Pages 공개)  |
+| **번들러 둘의 차이를 그림으로**     | `docs/visual/bundlers.html` (장면 재생 · Pages 공개) |
+| 회차별 작업 기록 · 다음에 할 것     | `docs/00-progress.md`                                |
+| **에러 증상으로 원인 찾기**         | `docs/05-troubleshooting/01-known-issues.md`         |
+| 아키텍처 결정과 기각 사유(ADR)      | `docs/02-architecture/01-decision.md`                |
+| 패키지 구조 · remote 계약           | `docs/02-architecture/02-topology.md`                |
+| SSR · 소프트 내비게이션 설계        | `docs/02-architecture/03-ssr-and-soft-nav.md`        |
+| 버전 공표 · 캐시 무효화 · 신뢰 경계 | `docs/02-architecture/04-remote-lifecycle.md`        |
+| 스타일링 전략                       | `docs/02-architecture/05-styling.md`                 |
+| **host `src/mf` 폴더 배치**         | `docs/02-architecture/06-host-mf-layout.md`          |
+| 버전 고정 근거                      | `docs/03-setup/02-versions.md`                       |
+| 테스트를 어디에 어떻게 쓰나         | `docs/06-testing/01-test-plan.md`                    |
 
 **추측하기 전에 먼저 트러블슈팅 문서의 "증상으로 찾기" 표를 본다.** 여기 있는 문제는
 대부분 한 번 이상 밟은 것이고, 재현 조건과 오진 기록까지 남아 있다.

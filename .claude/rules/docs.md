@@ -18,11 +18,14 @@ paths:
 | 설계 판단(채택 · 기각 사유)       | `docs/02-architecture/01-decision.md` (ADR)  |
 | 계약 · 구조                       | `docs/02-architecture/0*.md`                 |
 | 버전 고정 근거                    | `docs/03-setup/02-versions.md`               |
-| 구조 도해(배포 · 런타임 · 번들러) | `docs/anatomy.html`                          |
+| 구조 도해(배포 · 런타임 · 번들러) | `docs/visual/anatomy.html`                   |
+| 배포 순서 재생(장면 · 애니메이션) | `docs/visual/deploy.html`                    |
+| 요청 경로 재생(SSR · 내비 · 장애) | `docs/visual/runtime.html`                   |
+| 번들러 대조 재생(계약 · 구현 차)  | `docs/visual/bundlers.html`                  |
 
 같은 내용을 두 곳에 쓰지 않는다. 진행 기록은 요약 + 링크, 상세는 해당 문서에 둔다.
 
-## `docs/anatomy.html`
+## `docs/visual/anatomy.html`
 
 경로와 순서를 보여주는 그림만 둔다. **근거·실측의 SSOT 가 아니다** — 각 절의 "근거 문서"
 링크가 원본 마크다운을 가리키고, 수치는 거기서 가져온다. 설계가 바뀌면 마크다운을 먼저
@@ -32,10 +35,33 @@ paths:
 Pages 에서만 도는 `.md` 링크 재작성이다. 빌드에 들어가지 않으므로 라이브러리를 끌어오지
 않는다 — SVG 는 손으로 쓴다.
 
-`docs/` 는 `.github/workflows/pages.yml` 이 GitHub Pages 로 올린다
-(<https://chane81.github.io/mfa-nextjs/anatomy.html>). 그래서 이 폴더에 새 파일을 놓으면
-**공개된다**. Pages 는 마크다운을 렌더링하지 않으므로 해부도의 `.md` 링크는 그 자리에서
-GitHub blob 주소로 바뀐다 — 상대 경로(`./02-architecture/…`)를 유지해야 그 치환이 먹는다.
+브라우저로 볼 것(HTML)은 전부 `docs/visual/` 에 모아 둔다. `.github/workflows/pages.yml` 이
+**그 폴더만** GitHub Pages 로 올리고, 그래서 그 폴더가 사이트 루트다 —
+공개 주소는 평평하다(<https://chane81.github.io/mfa-nextjs/anatomy.html>).
+`visual/index.html` 이 `/` 를 받아 해부도로 보낸다.
+
+마크다운은 **올라가지 않는다.** Pages 가 렌더링하지 않으므로 올려도 소스가 노출될 뿐이고,
+저장소 화면에서 읽는 편이 낫다. 대신 그림 안의 `.md` 링크는 서빙된 페이지에서
+GitHub blob 주소로 **반드시 치환된다**(각 HTML 의 스크립트 · 로컬 `file:` 은 예외).
+그래서 링크는 상대 경로(`../02-architecture/…`)로 유지해야 한다 — 그래야 치환이 먹고,
+로컬에서 파일로 열었을 때도 그대로 열린다.
+
+## 시네마 판 (`docs/*.html` 중 장면 재생판)
+
+`deploy.html`(배포) · `runtime.html`(요청)은 **같은 엔진**을 쓴다.
+엔진과 스타일은 `docs/visual/cinema/engine.js` · `docs/visual/cinema/engine.css` 한 벌뿐이다 —
+판이 늘어도 복제하지 않는다(`SSOT 를 복제하지 않는다` 가 문서 자산에도 적용된다).
+
+새 판을 만들 때 각 HTML 이 갖는 건 셋뿐이다.
+
+1. 자기 머리말·헤더·맺음말 마크업
+2. `LANES` · `NODES` · `SCENARIOS` 데이터
+3. `Cinema.mount({ lanes, nodes, scenarios })` 호출
+
+엔진을 고치면 **모든 판이 같이 바뀐다.** 한 판에만 필요한 동작은 엔진에 넣지 말고
+그 HTML 안에 둔다.
+
+`anatomy.html` 은 여기 참여하지 않는다 — 단독 HTML(외부 의존 없음) 계약을 유지한다.
 
 ## 형식
 

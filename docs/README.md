@@ -4,16 +4,19 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 
 ## 문서 지도
 
-| 폴더                                                              | 내용                                                                                                                             |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| [anatomy.html](https://chane81.github.io/mfa-nextjs/anatomy.html) | **전체 구조 해부도** — 배포 파이프라인 · host↔remote 런타임 · remote 번들러 비교를 그림으로. GitHub Pages 로 바로 열린다        |
-| [00-progress.md](./00-progress.md)                                | 작업 진행 기록                                                                                                                   |
-| [01-research](./01-research/)                                     | `@module-federation/nextjs-mf` EOL 현황, 대체재 리서치, Vite MF 검토, DTS 플러그인 검토, **remote 번들러 비교(Vite vs Rsbuild)** |
-| [02-architecture](./02-architecture/)                             | 아키텍처 결정(ADR), 토폴로지, SSR + 소프트 내비게이션 설계, **remote 수명주기(버전·캐시·신뢰)**, 스타일링                        |
-| [03-setup](./03-setup/)                                           | 실행 방법, 버전 고정 근거(Node·pnpm·TS), **환경변수**, Dokploy 컨테이너 배포                                                     |
-| [04-experiments](./04-experiments/)                               | 실험 A(런타임 MF) / B(Multi-Zones·기각) / **C(ISR·Cache Components)** 결과와 비교                                                |
-| [05-troubleshooting](./05-troubleshooting/)                       | 구축 중 실제로 터진 문제와 해결책                                                                                                |
-| [06-testing](./06-testing/)                                       | **테스트 계획과 진척도** — 무엇을 왜 테스트하는가, 러너 구조, 테스트를 쓸 때의 함정                                              |
+| 폴더                                                                       | 내용                                                                                                                                         |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| [visual/anatomy.html](https://chane81.github.io/mfa-nextjs/anatomy.html)   | **전체 구조 해부도** — 배포 파이프라인 · host↔remote 런타임 · remote 번들러 비교를 그림으로. GitHub Pages 로 바로 열린다                    |
+| [visual/deploy.html](https://chane81.github.io/mfa-nextjs/deploy.html)     | **배포 시네마** — `git push` 이후 일어나는 일을 장면 단위로 재생한다. 정상 배포 · remote 만 배포 · 변조 배포 거부 세 시나리오                |
+| [visual/runtime.html](https://chane81.github.io/mfa-nextjs/runtime.html)   | **요청 시네마** — 사용자가 사이트를 연 뒤 host·remote 사이에서 일어나는 일. 첫 방문(remote SSR) · 경계를 넘는 이동 · remote 장애 세 시나리오 |
+| [visual/bundlers.html](https://chane81.github.io/mfa-nextjs/bundlers.html) | **번들러 시네마** — Vite 8(catalog)과 Rsbuild 2(cart)가 같은 계약을 각자 어떻게 만족시키나. 같은 계약 · 다른 구현 · 실제로 갈린 지점         |
+| [00-progress.md](./00-progress.md)                                         | 작업 진행 기록                                                                                                                               |
+| [01-research](./01-research/)                                              | `@module-federation/nextjs-mf` EOL 현황, 대체재 리서치, Vite MF 검토, DTS 플러그인 검토, **remote 번들러 비교(Vite vs Rsbuild)**             |
+| [02-architecture](./02-architecture/)                                      | 아키텍처 결정(ADR), 토폴로지, SSR + 소프트 내비게이션 설계, **remote 수명주기(버전·캐시·신뢰)**, 스타일링                                    |
+| [03-setup](./03-setup/)                                                    | 실행 방법, 버전 고정 근거(Node·pnpm·TS), **환경변수**, Dokploy 컨테이너 배포                                                                 |
+| [04-experiments](./04-experiments/)                                        | 실험 A(런타임 MF) / B(Multi-Zones·기각) / **C(ISR·Cache Components)** 결과와 비교                                                            |
+| [05-troubleshooting](./05-troubleshooting/)                                | 구축 중 실제로 터진 문제와 해결책                                                                                                            |
+| [06-testing](./06-testing/)                                                | **테스트 계획과 진척도** — 무엇을 왜 테스트하는가, 러너 구조, 테스트를 쓸 때의 함정                                                          |
 
 ## 6줄 요약
 
@@ -33,7 +36,7 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 핵심 설계 두 편:
 
 - 그림으로 먼저 보려면 — **[해부도(GitHub Pages)](https://chane81.github.io/mfa-nextjs/anatomy.html)**
-  (저장소 화면은 HTML 을 렌더링하지 않는다. 소스는 [anatomy.html](./anatomy.html))
+  (저장소 화면은 HTML 을 렌더링하지 않는다. 소스는 [anatomy.html](./visual/anatomy.html))
 - 렌더링 — [02-architecture/03-ssr-and-soft-nav.md](./02-architecture/03-ssr-and-soft-nav.md)
 - 배포·캐시·신뢰 — [02-architecture/04-remote-lifecycle.md](./02-architecture/04-remote-lifecycle.md)
 - 스타일링 — [02-architecture/05-styling.md](./02-architecture/05-styling.md)
