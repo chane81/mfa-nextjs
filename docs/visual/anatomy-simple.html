@@ -1529,7 +1529,7 @@
             수렴하므로 정합성 문제가 아니다. 데운 뒤 버리는 순서 =
             <b>warm-then-revalidate</b>. 캐시는 네 층이고 무효화 태그도 층마다
             따로다(<code>ADR-007</code>) — 전부
-            <a href="./02-architecture/04-remote-lifecycle.md"
+            <a href="../02-architecture/04-remote-lifecycle.md"
               >04-remote-lifecycle.md</a
             >.
           </p>
@@ -1692,7 +1692,7 @@
             오리진 지정 · 경로 탈출 · 서명 없이 매니페스트 교체 · 서명은 둔 채
             해시만 교체,
             <b>다섯 가지 모두 502 로 거부하면서 서비스는 계속 떴다</b>(<a
-              href="./02-architecture/04-remote-lifecycle.md"
+              href="../02-architecture/04-remote-lifecycle.md"
               >04-remote-lifecycle.md</a
             >).
           </p>
@@ -1854,7 +1854,7 @@
             했고, 서버용 번들을 만드는 설정도 더 길다. 한 줄 결론 —
             <b>MF remote 전용으로 새로 짓는다면 Rsbuild</b>. 그래도 catalog 를
             옮기지 않는 건 <b>두 번들러가 공존하는 것 자체가 이 실험</b>이기
-            때문이다 (<a href="./01-research/04-bundler-comparison.md"
+            때문이다 (<a href="../01-research/04-bundler-comparison.md"
               >04-bundler-comparison.md</a
             >).
           </p>
@@ -2048,7 +2048,7 @@
             에러 상자 = <code>RemoteBoundary</code>
             (<code>apps/host/src/mf/components/</code>). 그리고 remote → remote
             의존을 금지하는 이 규칙이
-            <a href="./02-architecture/02-topology.md">02-topology.md</a> 의
+            <a href="../02-architecture/02-topology.md">02-topology.md</a> 의
             "remote 는 host 하고만 대화한다"다.
           </p>
         </div>
@@ -2110,7 +2110,7 @@
                 <td>복도를 걸어간다</td>
                 <td>소프트 내비게이션 (document 요청 0건)</td>
                 <td>
-                  <a href="./02-architecture/03-ssr-and-soft-nav.md"
+                  <a href="../02-architecture/03-ssr-and-soft-nav.md"
                     >03-ssr-and-soft-nav.md</a
                   >
                 </td>
@@ -2119,7 +2119,7 @@
                 <td>정문 메뉴판</td>
                 <td>버전 공표 — <code>mf-version.json</code></td>
                 <td>
-                  <a href="./02-architecture/04-remote-lifecycle.md"
+                  <a href="../02-architecture/04-remote-lifecycle.md"
                     >04-remote-lifecycle.md</a
                   >
                 </td>
@@ -2148,7 +2148,7 @@
                 <td>콘센트 규격</td>
                 <td>Module Federation</td>
                 <td>
-                  <a href="./02-architecture/02-topology.md">02-topology.md</a>
+                  <a href="../02-architecture/02-topology.md">02-topology.md</a>
                 </td>
               </tr>
               <tr>
@@ -2198,14 +2198,17 @@
             정확한 판. 배포 파이프라인 · 런타임 · 번들러 비교를 레인까지 그린다
           </li>
           <li>
-            <a href="./README.md">docs/README.md</a> — 문서 전체 지도와 6줄 요약
+            <a href="../README.md">docs/README.md</a> — 문서 전체 지도와 6줄
+            요약
           </li>
           <li>
-            <a href="./02-architecture/01-decision.md">아키텍처 결정(ADR)</a> —
+            <a href="../02-architecture/01-decision.md">아키텍처 결정(ADR)</a> —
             무엇을 골랐고 <b>무엇을 왜 버렸는지</b>
           </li>
           <li>
-            <a href="./05-troubleshooting/01-known-issues.md">밟은 지뢰 목록</a>
+            <a href="../05-troubleshooting/01-known-issues.md"
+              >밟은 지뢰 목록</a
+            >
             — 증상으로 원인을 찾는 표가 앞에 있다
           </li>
         </ul>
@@ -2263,15 +2266,18 @@
       // `.md` 상대 링크를 GitHub blob 주소로 돌린다 — 로컬(file://)에서는 옆
       // 파일을 그대로 가리켜야 하므로 건드리지 않는다. (해부도와 같은 처리)
       (function () {
-        if (location.hostname.indexOf('github.io') === -1) return;
+        // 로컬에서 파일로 열었을 때는 상대 경로가 그대로 맞는다.
+        // 그 외(= 서빙된 페이지)는 마크다운이 같이 올라가지 않으므로 반드시 치환한다.
+        if (location.protocol === 'file:') return;
 
         var BLOB = 'https://github.com/chane81/mfa-nextjs/blob/main/docs/';
 
         document.querySelectorAll('a[href$=".md"]').forEach(function (a) {
           var href = a.getAttribute('href');
-          if (href.slice(0, 2) !== './') return;
+          // HTML 은 `docs/visual/` 에 있고 문서는 그 위에 있다 — `../` 를 벗겨 blob 으로 보낸다
+          if (href.slice(0, 3) !== '../') return;
 
-          a.href = BLOB + href.slice(2);
+          a.href = BLOB + href.slice(3);
           a.target = '_blank';
           a.rel = 'noopener';
         });

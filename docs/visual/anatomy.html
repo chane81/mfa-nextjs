@@ -693,6 +693,15 @@
             <span class="port">:3002</span></span
           >
         </div>
+        <p class="lede" style="margin-top: 18px">
+          배포는 <b>순서가 곧 정확성</b>이라 정지 그림으로는 핵심이 안 보인다 —
+          그 순서만 따로 움직여서 보는 판이 있다:
+          <a href="./deploy.html"><b>배포 시네마</b></a> (세 시나리오를 장면
+          단위로 재생한다). 사용자가 주소를 연 뒤 host 와 remote 사이에서
+          벌어지는 일은 <a href="./runtime.html"><b>요청 시네마</b></a> 쪽이고,
+          remote 둘을 일부러 다른 번들러로 만든 결과는
+          <a href="./bundlers.html"><b>번들러 시네마</b></a> 에 있다.
+        </p>
       </header>
 
       <!-- ============================================================ PART 1 -->
@@ -704,15 +713,15 @@
 
         <div class="srcdocs">
           <span class="srcdocs-h">근거 문서</span>
-          <a href="./03-setup/04-dokploy.md">03-setup/04-dokploy.md</a>
-          <a href="./02-architecture/04-remote-lifecycle.md"
+          <a href="../03-setup/04-dokploy.md">03-setup/04-dokploy.md</a>
+          <a href="../02-architecture/04-remote-lifecycle.md"
             >02-architecture/04-remote-lifecycle.md</a
           >
-          <a href="./03-setup/03-environment.md">03-setup/03-environment.md</a>
-          <a href="./04-experiments/03-cache-modes.md"
+          <a href="../03-setup/03-environment.md">03-setup/03-environment.md</a>
+          <a href="../04-experiments/03-cache-modes.md"
             >04-experiments/03-cache-modes.md</a
           >
-          <a href="./05-troubleshooting/01-known-issues.md"
+          <a href="../05-troubleshooting/01-known-issues.md"
             >05-troubleshooting/01-known-issues.md</a
           >
         </div>
@@ -1971,25 +1980,25 @@
 
         <div class="srcdocs">
           <span class="srcdocs-h">근거 문서</span>
-          <a href="./02-architecture/03-ssr-and-soft-nav.md"
+          <a href="../02-architecture/03-ssr-and-soft-nav.md"
             >02-architecture/03-ssr-and-soft-nav.md</a
           >
-          <a href="./02-architecture/02-topology.md"
+          <a href="../02-architecture/02-topology.md"
             >02-architecture/02-topology.md</a
           >
-          <a href="./02-architecture/01-decision.md"
+          <a href="../02-architecture/01-decision.md"
             >02-architecture/01-decision.md</a
           >
-          <a href="./02-architecture/04-remote-lifecycle.md"
+          <a href="../02-architecture/04-remote-lifecycle.md"
             >02-architecture/04-remote-lifecycle.md</a
           >
-          <a href="./02-architecture/05-styling.md"
+          <a href="../02-architecture/05-styling.md"
             >02-architecture/05-styling.md</a
           >
-          <a href="./02-architecture/06-host-mf-layout.md"
+          <a href="../02-architecture/06-host-mf-layout.md"
             >02-architecture/06-host-mf-layout.md</a
           >
-          <a href="./01-research/04-bundler-comparison.md"
+          <a href="../01-research/04-bundler-comparison.md"
             >01-research/04-bundler-comparison.md</a
           >
         </div>
@@ -3476,13 +3485,13 @@
 
         <div class="srcdocs">
           <span class="srcdocs-h">근거 문서</span>
-          <a href="./01-research/04-bundler-comparison.md"
+          <a href="../01-research/04-bundler-comparison.md"
             >01-research/04-bundler-comparison.md</a
           >
-          <a href="./01-research/02-alternatives.md"
+          <a href="../01-research/02-alternatives.md"
             >01-research/02-alternatives.md</a
           >
-          <a href="./05-troubleshooting/01-known-issues.md"
+          <a href="../05-troubleshooting/01-known-issues.md"
             >05-troubleshooting/01-known-issues.md</a
           >
         </div>
@@ -4225,7 +4234,7 @@
           >라이브 데모
           <a href="https://mfa.lakegreen.net">mfa.lakegreen.net</a></span
         >
-        <span>문서 지도 <a href="./README.md">docs/README.md</a></span>
+        <span>문서 지도 <a href="../README.md">docs/README.md</a></span>
         <span>노출 모듈 6개 · 기준일 2026-09-05 (37차)</span>
         <span
           >이 파일은 지도다. 수치와 실측의 원본은 각 절의 근거 문서에
@@ -4275,15 +4284,18 @@
       // 저장소에서 받아 로컬(file://)로 열었을 때는 옆 파일을 그대로 가리켜야 하므로
       // 건드리지 않는다.
       (function () {
-        if (location.hostname.indexOf('github.io') === -1) return;
+        // 로컬에서 파일로 열었을 때는 상대 경로가 그대로 맞는다.
+        // 그 외(= 서빙된 페이지)는 마크다운이 같이 올라가지 않으므로 반드시 치환한다.
+        if (location.protocol === 'file:') return;
 
         var BLOB = 'https://github.com/chane81/mfa-nextjs/blob/main/docs/';
 
         document.querySelectorAll('a[href$=".md"]').forEach(function (a) {
           var href = a.getAttribute('href');
-          if (href.slice(0, 2) !== './') return;
+          // HTML 은 `docs/visual/` 에 있고 문서는 그 위에 있다 — `../` 를 벗겨 blob 으로 보낸다
+          if (href.slice(0, 3) !== '../') return;
 
-          a.href = BLOB + href.slice(2);
+          a.href = BLOB + href.slice(3);
           a.target = '_blank';
           a.rel = 'noopener';
         });
