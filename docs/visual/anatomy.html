@@ -182,6 +182,110 @@
         border-left: 3px solid var(--hostc);
       }
 
+      /* -------------------------------------------------- 시네마 안내판 */
+      .cine-lead {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+        margin: 26px 0 12px;
+      }
+
+      .cine {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 12px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .cine a {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        height: 100%;
+        padding: 16px 18px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--line-2);
+        border-radius: 3px;
+        text-decoration: none;
+        color: inherit;
+        transition:
+          transform 0.14s ease,
+          border-color 0.14s ease,
+          box-shadow 0.14s ease;
+      }
+
+      .cine a:hover,
+      .cine a:focus-visible {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgb(0 0 0 / 0.1);
+      }
+
+      .cine .cine-t {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 700;
+        font-size: 17px;
+      }
+
+      /* ▶ 표식 — 이 판은 정지 그림이 아니라 재생된다는 뜻 */
+      .cine .cine-t::before {
+        content: '▶';
+        display: inline-grid;
+        place-items: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        font-size: 9px;
+        color: var(--surface);
+        background: var(--line-2);
+        transition: background 0.14s ease;
+      }
+
+      .cine .cine-d {
+        font-size: 13.5px;
+        line-height: 1.6;
+        color: var(--ink-2);
+      }
+
+      .cine li.dep a {
+        border-left-color: var(--hostc);
+      }
+      .cine li.dep a:hover,
+      .cine li.dep a:focus-visible {
+        border-color: var(--hostc);
+      }
+      .cine li.dep .cine-t::before {
+        background: var(--hostc);
+      }
+
+      .cine li.run a {
+        border-left-color: var(--cat);
+      }
+      .cine li.run a:hover,
+      .cine li.run a:focus-visible {
+        border-color: var(--cat);
+      }
+      .cine li.run .cine-t::before {
+        background: var(--cat);
+      }
+
+      .cine li.bdl a {
+        border-left-color: var(--cart);
+      }
+      .cine li.bdl a:hover,
+      .cine li.bdl a:focus-visible {
+        border-color: var(--cart);
+      }
+      .cine li.bdl .cine-t::before {
+        background: var(--cart);
+      }
+
       /* ---------------------------------------------------------- 섹션 */
       section {
         padding-top: 68px;
@@ -693,15 +797,36 @@
             <span class="port">:3002</span></span
           >
         </div>
-        <p class="lede" style="margin-top: 18px">
-          배포는 <b>순서가 곧 정확성</b>이라 정지 그림으로는 핵심이 안 보인다 —
-          그 순서만 따로 움직여서 보는 판이 있다:
-          <a href="./deploy.html"><b>배포 시네마</b></a> (세 시나리오를 장면
-          단위로 재생한다). 사용자가 주소를 연 뒤 host 와 remote 사이에서
-          벌어지는 일은 <a href="./runtime.html"><b>요청 시네마</b></a> 쪽이고,
-          remote 둘을 일부러 다른 번들러로 만든 결과는
-          <a href="./bundlers.html"><b>번들러 시네마</b></a> 에 있다.
-        </p>
+        <p class="cine-lead">움직여서 보는 판 — 시네마 셋</p>
+        <ul class="cine">
+          <li class="dep">
+            <a href="./deploy.html">
+              <span class="cine-t">배포 시네마</span>
+              <span class="cine-d"
+                >배포는 <b>순서가 곧 정확성</b>이라 정지 그림으로는 핵심이 안
+                보인다. 세 시나리오를 장면 단위로 재생한다.</span
+              >
+            </a>
+          </li>
+          <li class="run">
+            <a href="./runtime.html">
+              <span class="cine-t">요청 시네마</span>
+              <span class="cine-d"
+                >사용자가 주소를 연 뒤 <b>host 와 remote 사이</b>에서 벌어지는
+                일 — SSR 과 소프트 내비게이션을 한 장면씩 따라간다.</span
+              >
+            </a>
+          </li>
+          <li class="bdl">
+            <a href="./bundlers.html">
+              <span class="cine-t">번들러 시네마</span>
+              <span class="cine-d"
+                >remote 둘을 일부러 <b>다른 번들러</b>(Vite · Rsbuild)로 만든
+                결과 — 같은 계약이 어떻게 갈라지는지 비교한다.</span
+              >
+            </a>
+          </li>
+        </ul>
       </header>
 
       <!-- ============================================================ PART 1 -->
