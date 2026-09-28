@@ -21,9 +21,9 @@
   "devDependencies": {
     "@mfa/eslint-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.2",
-    "eslint": "^10.8.1",
-    "typescript": "6.0.3"
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:"
   }
 }

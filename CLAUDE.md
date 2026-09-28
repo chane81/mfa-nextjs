@@ -37,7 +37,11 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 - 커밋은 목적별로 나눈다. push 는 별도 요청 없으면 하지 않는다.
 - **SSOT 를 복제하지 않는다.** remote 배치는 `packages/remote-config`, 모듈 이름 목록은
   `packages/contracts`, 런타임 공유 상태는 `packages/store`, 디자인 토큰은
-  `packages/tailwind-config` 한 곳에만 있다.
+  `packages/tailwind-config`, **공용 의존성 버전은 `pnpm-workspace.yaml` 의 `catalog:`**
+  한 곳에만 있다.
+- **공용 의존성은 `package.json` 에 버전을 적지 않는다.** `"catalog:"` 로 가리킨다
+  (peer 는 `"catalog:peers"`). 버전을 올릴 때는 `pnpm-workspace.yaml` 만 고친다.
+  `catalogMode: strict` 라 `pnpm add` 로 우회하면 설치가 실패한다.
 - **remote 모듈의 props 는 remote 가 소유한다.** `apps/remote-*/src/exposes/` 안에 선언하고
   host 는 MF DTS 로 받아간다. 계약 패키지로 옮기면 host·remote 가 같은 선언을 가리키게
   되어 DTS 가 아무것도 전달하지 못한다(known-issues I-2).
