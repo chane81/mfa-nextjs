@@ -44,13 +44,6 @@ catalog:
   concurrently: ^9.2.1
   '@vitejs/plugin-react': ^6.0.5
 
-catalogs:
-  # peerDependencies 전용. 소비자 쪽 범위는 **일부러 느슨하게** 둔다 —
-  # 기본 카탈로그(^19.2.8)를 peer 에 그대로 쓰면 라이브러리가 패치 버전까지
-  # 강제하게 된다.
-  peers:
-    react: ^19.0.0
-
 # `pnpm add` 가 카탈로그를 우회하지 못하게 한다.
 # strict: 카탈로그에 있는 패키지는 카탈로그 범위로만 추가된다. 범위 밖 버전을
 # 넣으려 하면 설치가 실패한다 — SSOT 가 조용히 갈라지는 대신 그 자리에서 막힌다.
