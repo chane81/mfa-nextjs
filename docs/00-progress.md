@@ -1,5 +1,56 @@
 # 진행 상황
 
+## 2026-09-28 (46차) — 공용 의존성 버전을 pnpm catalog 한 곳으로 모은다
+
+`typescript` 가 9개 `package.json` 에, `eslint` 가 10개에, `@types/react` 가 8개에 같은
+문자열로 적혀 있었다. 올릴 때 한 곳을 빠뜨려도 **설치는 성공한다** — pnpm 이 두 버전을
+각각 링크해 준다. 이 저장소에서 그 실패는 런타임까지 밀린다(React 인스턴스 분리 → hook
+파괴, MF 세대 불일치 → `remoteEntry` 미해석).
+
+실제로 `react` 가 `^19.2.8`(deps)과 `^19.0.0`(peer)로 이미 갈라져 있었다.
+
+### 한 일
+
+`pnpm-workspace.yaml` 에 `catalog:` 를 두고 각 `package.json` 을 `"catalog:"` 로 바꿨다.
+21종 · 96개 선언이 한 곳을 가리킨다.
+
+| 묶음       | 항목                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------ |
+| React 19   | `react` · `react-dom` · `@types/react` · `@types/react-dom`                                      |
+| MF         | `runtime` · `cli` · `rsbuild-plugin` · `vite`                                                    |
+| Next 16    | `next` · `@next/eslint-plugin-next`                                                              |
+| Tailwind 4 | `tailwindcss` · `@tailwindcss/postcss` · `@tailwindcss/vite`                                     |
+| Turbo      | `turbo` · `eslint-plugin-turbo`                                                                  |
+| 툴체인     | `typescript` · `eslint` · `@eslint/js` · `@types/node` · `concurrently` · `@vitejs/plugin-react` |
+
+### 올리지 않은 것이 더 중요하다
+
+`@rsbuild/*`(cart 전용) · `vite`(catalog 전용) · `zustand`(store 전용) · 테스트 도구
+일체(루트 전용)는 그 `package.json` 에 남겼다. **소유자가 하나뿐인 의존성을 카탈로그에
+올리면 "어디서 쓰는지" 가 오히려 흐려진다.** 기준은 "최신인가" 가 아니라 "공유되는가" 다.
+
+### peer 는 나눠야 했다
+
+`@mfa/store` · `@mfa/ui` 의 `peerDependencies.react` 를 기본 카탈로그(`^19.2.8`)로 묶으면
+라이브러리가 소비자에게 **패치 버전까지 강제**하게 된다. `catalogs.peers.react: ^19.0.0`
+로 나눴다 — 갈라져 있던 두 문자열이 "실수" 가 아니라 "의도" 였다는 게 이때 드러났다.
+
+### `catalogMode: strict` 를 같이 켠다
+
+이걸 빼면 `pnpm add react@19.1` 한 줄이 카탈로그를 조용히 우회한다. 막으려던 상태로
+그대로 돌아가므로, 규칙과 그 규칙을 강제하는 스위치를 같은 커밋에 넣었다.
+
+### 검증
+
+전환 전후 `pnpm-lock.yaml` 의 해석 그래프를 대조했다 — **패키지 591개, 추가·제거 0**.
+버전 정리가 아니라 **선언 위치 정리**임을 그걸로 확인했다.
+`typecheck` · `lint` · `test`(706) · `build`(host 프리렌더) 전부 통과.
+
+### 다음에 할 것
+
+- [ ] 의존성을 올릴 때 카탈로그만 고치면 되는지 실제 업그레이드 한 번으로 확인
+- [ ] `pnpm outdated` 출력이 카탈로그 항목을 어떻게 보여주는지 확인(12.x 동작 미검증)
+
 ## 2026-09-26 (45차) — 그림을 `docs/visual/` 로 모으고, 엔진을 한 벌로 줄인다
 
 `docs/` 아래에 HTML 이 다섯 개(해부도 둘 + 시네마 셋)가 되면서 마크다운과 섞여 목록이
