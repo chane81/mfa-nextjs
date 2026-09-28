@@ -19,24 +19,24 @@
     "@mfa/tailwind-config": "workspace:*",
     "@mfa/ui": "workspace:*",
     "@mfa/utils": "workspace:*",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
     "@mfa/eslint-config": "workspace:*",
     "@mfa/remote-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
-    "@module-federation/rsbuild-plugin": "^2.8.2",
+    "@module-federation/rsbuild-plugin": "catalog:",
     "@rsbuild/core": "^2.1.13",
     "@rsbuild/plugin-react": "^2.1.0",
-    "@tailwindcss/postcss": "^4.3.3",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.2",
-    "@types/react-dom": "^19.2.2",
-    "concurrently": "^9.2.1",
-    "eslint": "^10.8.1",
+    "@tailwindcss/postcss": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "concurrently": "catalog:",
+    "eslint": "catalog:",
     "postcss": "^8.5.6",
-    "tailwindcss": "^4.3.3",
-    "typescript": "6.0.3"
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:"
   }
 }

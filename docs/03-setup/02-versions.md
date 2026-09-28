@@ -2,6 +2,21 @@
 
 조회일: 2026-08-14 (npm registry 직접 조회) · Tailwind 항목은 2026-08-19 · 테스트 도구는 2026-08-24 조회
 
+## 버전은 어디에 적혀 있나
+
+공용 의존성의 버전 범위는 **`pnpm-workspace.yaml` 의 `catalog:`** 한 곳에 있다.
+각 `package.json` 은 `"catalog:"` 로 가리키기만 한다 — 아래 표의 버전을 올릴 때
+고칠 파일은 워크스페이스 파일 하나다(근거: ADR-027).
+
+- `catalogMode: strict` 라 `pnpm add` 로 카탈로그를 우회할 수 없다. 우회가 필요하면
+  카탈로그를 먼저 고친다.
+- 소유자가 하나뿐인 의존성(`@rsbuild/*` · `vite` · `zustand` · 테스트 도구 일체)은
+  **카탈로그에 없다.** 그 `package.json` 에 그대로 적는다.
+- **`peerDependencies` 에는 `catalog:` 를 쓰지 않는다.** pnpm 12.1.0 의
+  `pnpm peers check` 가 해석하지 못해 오탐이 상주한다
+  (`docs/05-troubleshooting/01-known-issues.md` K-1). `@mfa/store` · `@mfa/ui` 는
+  peer 선언 자체를 뺐다 — 근거는 ADR-027.
+
 ## 채택 버전
 
 | 패키지                              | 최신   | 채택         | 비고                          |

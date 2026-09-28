@@ -21,16 +21,13 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist .turbo"
   },
-  "peerDependencies": {
-    "react": "^19.0.0"
-  },
   "devDependencies": {
     "@mfa/eslint-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
-    "@types/react": "^19.2.2",
-    "eslint": "^10.8.1",
-    "react": "^19.2.8",
-    "typescript": "6.0.3"
+    "@types/react": "catalog:",
+    "eslint": "catalog:",
+    "react": "catalog:",
+    "typescript": "catalog:"
   },
   "dependencies": {
     "@mfa/utils": "workspace:*"

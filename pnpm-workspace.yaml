@@ -2,6 +2,53 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+# 공용 의존성 버전의 SSOT. 패키지들은 `catalog:` 로만 가리킨다.
+#
+# 여기 없는 것은 그 앱 하나만 쓰는 의존성이다(예: remote-cart 의 @rsbuild/*,
+# remote-catalog 의 vite). 두 곳 이상이 쓰거나, 같은 계열끼리 버전이 어긋나면
+# 곧장 런타임 사고가 되는 것(react / MF / tailwind / turbo)만 올린다.
+catalog:
+  # React 19 — host 와 remote 가 **같은 인스턴스**를 공유해야 한다.
+  # 여기가 어긋나면 remote 가 자기 React 를 번들해 hook 이 깨진다.
+  react: ^19.2.8
+  react-dom: ^19.2.8
+  '@types/react': ^19.2.2
+  '@types/react-dom': ^19.2.2
+
+  # Module Federation — runtime(host) · cli(DTS) · 번들러 플러그인(remote) 이
+  # 같은 프로토콜 세대여야 remoteEntry 를 서로 읽는다.
+  '@module-federation/runtime': ^2.8.2
+  '@module-federation/cli': ^2.8.2
+  '@module-federation/rsbuild-plugin': ^2.8.2
+  '@module-federation/vite': ^1.20.7
+
+  # Next.js 16 — 본체와 eslint 플러그인을 같이 올린다.
+  next: ^16.3.1
+  '@next/eslint-plugin-next': ^16.3.1
+
+  # Tailwind 4 — postcss(host·cart) 와 vite(catalog) 경로가 같은 엔진을 써야
+  # 같은 토큰에서 같은 CSS 가 나온다.
+  tailwindcss: ^4.3.3
+  '@tailwindcss/postcss': ^4.3.3
+  '@tailwindcss/vite': ^4.3.3
+
+  # Turborepo — 본체와 eslint 플러그인 버전을 묶는다.
+  turbo: 2.10.9
+  eslint-plugin-turbo: ^2.10.9
+
+  # 툴체인
+  typescript: 6.0.3
+  eslint: ^10.8.1
+  '@eslint/js': ^10.0.1
+  '@types/node': ^24.10.1
+  concurrently: ^9.2.1
+  '@vitejs/plugin-react': ^6.0.5
+
+# `pnpm add` 가 카탈로그를 우회하지 못하게 한다.
+# strict: 카탈로그에 있는 패키지는 카탈로그 범위로만 추가된다. 범위 밖 버전을
+# 넣으려 하면 설치가 실패한다 — SSOT 가 조용히 갈라지는 대신 그 자리에서 막힌다.
+catalogMode: strict
+
 # package.json 의 engines.node 범위를 **실패**로 만든다.
 #
 # 이게 없으면 범위를 벗어난 Node 에서도 경고만 찍고 설치를 끝낸다(pnpm 11.22.0 실측).

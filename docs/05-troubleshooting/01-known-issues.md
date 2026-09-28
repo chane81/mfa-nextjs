@@ -9,14 +9,15 @@
 
 ### 설치 · 기동
 
-| 증상                                                               | 항목                                                                                                                                                                                |
-| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm install` 이 `@rspack/binding-*` 에서 멈춤 · 타임아웃         | [8](#8-pnpm-설치-중-rspack-바이너리-타임아웃)                                                                                                                                       |
-| `ERR_PNPM_UNSUPPORTED_ENGINE` / `Expected version: >=24.19.0 <25`  | Node 가 범위 밖이다 — [실행 방법 › 요구사항](../03-setup/01-getting-started.md#요구사항)                                                                                            |
-| 포트가 안 비어서 기동 실패 / 옛 빌드가 계속 응답                   | [0-1](#0-1-pkill--f-next-start-가-안-먹혀서-옛-빌드를-계속-테스트함), [B-4](#b-4-dev-서버가-떠-있으면-포트-충돌조차-안-난다), [B-4b](#b-4b-pnpm-start-가-자기-자신과-포트를-다툰다) |
-| `Directory import … is not supported` / `Cannot find module './x'` | dist 를 raw Node 로 로드했다 — [D-1](#d-1-확장자-없는-상대-경로는-번들러에서만-풀린다)                                                                                              |
-| `ERR_PNPM_FROZEN_LOCKFILE_WITH_OUTDATED_LOCKFILE`                  | 실행 중인 pnpm 이 락파일에 기록된 `packageManager` 핀과 다르다 — [버전 › Node / 패키지 매니저](../03-setup/02-versions.md#node--패키지-매니저)                                      |
-| `pnpm install` 은 성공했는데 새 패키지의 CLI(`.bin`)가 없다        | 락파일의 peer 표기가 snapshots 와 어긋났다 — [I-1](#i-1-pnpm-install-이-새-devdependency-의-bin-을-안-심는다)                                                                       |
+| 증상                                                                         | 항목                                                                                                                                                                                |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install` 이 `@rspack/binding-*` 에서 멈춤 · 타임아웃                   | [8](#8-pnpm-설치-중-rspack-바이너리-타임아웃)                                                                                                                                       |
+| `ERR_PNPM_UNSUPPORTED_ENGINE` / `Expected version: >=24.19.0 <25`            | Node 가 범위 밖이다 — [실행 방법 › 요구사항](../03-setup/01-getting-started.md#요구사항)                                                                                            |
+| 포트가 안 비어서 기동 실패 / 옛 빌드가 계속 응답                             | [0-1](#0-1-pkill--f-next-start-가-안-먹혀서-옛-빌드를-계속-테스트함), [B-4](#b-4-dev-서버가-떠-있으면-포트-충돌조차-안-난다), [B-4b](#b-4b-pnpm-start-가-자기-자신과-포트를-다툰다) |
+| `Directory import … is not supported` / `Cannot find module './x'`           | dist 를 raw Node 로 로드했다 — [D-1](#d-1-확장자-없는-상대-경로는-번들러에서만-풀린다)                                                                                              |
+| `ERR_PNPM_FROZEN_LOCKFILE_WITH_OUTDATED_LOCKFILE`                            | 실행 중인 pnpm 이 락파일에 기록된 `packageManager` 핀과 다르다 — [버전 › Node / 패키지 매니저](../03-setup/02-versions.md#node--패키지-매니저)                                      |
+| `pnpm peers check` 가 `Wanted: catalog:` 로 unmet 을 보고 (설치·빌드는 정상) | pnpm 이 peer 의 카탈로그를 해석 못 한다 — [K-1](#k-1-pnpm-peers-check-가-peerdependencies-의-catalog-를-해석하지-않는다)                                                            |
+| `pnpm install` 은 성공했는데 새 패키지의 CLI(`.bin`)가 없다                  | 락파일의 peer 표기가 snapshots 와 어긋났다 — [I-1](#i-1-pnpm-install-이-새-devdependency-의-bin-을-안-심는다)                                                                       |
 
 ### `pnpm build` 실패
 
@@ -116,6 +117,49 @@
 | 증상                                                           | 항목                                                                    |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련) | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다) |
+
+## K. (46차) 카탈로그가 진단을 조용히 망가뜨린 자리
+
+### K-1. `pnpm peers check` 가 `peerDependencies` 의 `catalog:` 를 해석하지 않는다
+
+공용 버전을 카탈로그로 모으면서 `@mfa/store` · `@mfa/ui` 의 `peerDependencies.react` 도
+카탈로그를 가리키게 했다. 설치 · 타입체크 · 빌드 · 테스트가 전부 통과했는데
+진단 명령만 이렇게 나왔다.
+
+```
+$ pnpm peers check
+✕ unmet peer react
+  Installed: 19.2.8
+  Wanted:
+    catalog:peers:          ← 범위가 아니라 **프로토콜 문자열 그대로**
+      @mfa/store@0.1.0
+      @mfa/ui@0.1.0
+```
+
+`catalog:`(기본 카탈로그)로 바꿔도 같다 — `Wanted: catalog::` 가 된다. pnpm 12.1.0 의
+`peers check` 가 `peerDependencies` 안의 카탈로그 프로토콜을 **해석하지 않고 설치된
+버전과 문자열로 비교**한다. `dependencies` · `devDependencies` 쪽은 정상이다.
+
+**동작은 멀쩡하다.** install 은 제대로 해석하고, 실제 실체는 `react@19.2.8` 하나다.
+망가진 것은 진단 쪽이다 — 이 오탐 3건이 상주하면 **나중에 진짜 peer 문제가 그 사이에
+묻힌다.** 실제로 이 저장소에는 `eslint-plugin-react` 의 진짜 미충족 peer 가 한 건 있고,
+오탐이 그걸 목록 맨 위에서 밀어냈다.
+
+**고친 방법: `peerDependencies` 자체를 뺐다.** 되돌린 게 아니라 다시 판단한 것이다 —
+두 패키지는 `private` 이고 소비자가 워크스페이스 안 세 앱뿐인데, 그 셋이 전부 같은
+카탈로그를 본다. **react 인스턴스가 하나라는 보장을 이제 카탈로그가 구조적으로 준다.**
+peer 선언은 같은 것을 관례로 바랄 뿐이었다.
+
+> 전환 전에는 이 오탐이 없었다(main 에서 `pnpm peers check` 로 대조). **카탈로그가
+> 만든 것**이라 "원래 그랬나" 로 넘어갈 자리였다.
+
+`peerDependencies` 를 뺐는데 **`pnpm-lock.yaml` 이 한 글자도 안 바뀌었다.** pnpm 이
+워크스페이스 패키지의 peer 도, `catalogs.peers` 항목도 락파일에 기록하지 않는다 —
+그 선언이 해석 그래프에 아무 영향이 없었다는 증거다.
+
+남은 대안 둘은 기각했다. 리터럴 `^19.0.0` 으로 되돌리기는 버전 문자열을 두 파일에
+다시 복제하는 것이고, 오탐을 안고 가기는 진단을 영구히 못 믿게 만든다.
+근거는 ADR-027.
 
 ## J. (41차) 진단과 배치가 조용히 거짓말하던 자리
 
