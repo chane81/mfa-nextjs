@@ -12,8 +12,10 @@
   카탈로그를 먼저 고친다.
 - 소유자가 하나뿐인 의존성(`@rsbuild/*` · `vite` · `zustand` · 테스트 도구 일체)은
   **카탈로그에 없다.** 그 `package.json` 에 그대로 적는다.
-- `peerDependencies.react` 만 `catalogs.peers` 로 나뉜다 — 소비자 쪽 범위는
-  일부러 느슨하다(`^19.0.0`).
+- **`peerDependencies` 에는 `catalog:` 를 쓰지 않는다.** pnpm 12.1.0 의
+  `pnpm peers check` 가 해석하지 못해 오탐이 상주한다
+  (`docs/05-troubleshooting/01-known-issues.md` K-1). `@mfa/store` · `@mfa/ui` 는
+  peer 선언 자체를 뺐다 — 근거는 ADR-027.
 
 ## 채택 버전
 
