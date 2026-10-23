@@ -23,8 +23,8 @@ catalog:
   '@module-federation/vite': ^1.20.7
 
   # Next.js 16 — 본체와 eslint 플러그인을 같이 올린다.
-  next: ^16.3.1
-  '@next/eslint-plugin-next': ^16.3.1
+  next: ^16.4.2
+  '@next/eslint-plugin-next': ^16.4.2
 
   # Tailwind 4 — postcss(host·cart) 와 vite(catalog) 경로가 같은 엔진을 써야
   # 같은 토큰에서 같은 CSS 가 나온다.
