@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: pnpm/setup@v2
         with:
-          runtime: node@^24.19.0
+          runtime: node@^24.22.1
           cache: true
 
       # `pnpm install` 은 pnpm/setup 이 이미 돌렸다(install 기본값 true).
@@ -82,7 +82,7 @@ jobs:
       # 세 job 이 같은 캐시 키를 공유한다(같은 lockfile · 같은 Node 범위).
       - uses: pnpm/setup@v2
         with:
-          runtime: node@^24.19.0
+          runtime: node@^24.22.1
           cache: true
 
       # `pnpm test` 는 일부러 turbo 를 안 탄다 — 패키지별 대응 태스크가 없어 얻는 게
@@ -96,7 +96,7 @@ jobs:
 
       - uses: pnpm/setup@v2
         with:
-          runtime: node@^24.19.0
+          runtime: node@^24.22.1
           cache: true
 
       # turbo 가 `@mfa/host#build.dependsOn` 으로 remote 를 먼저 빌드하고,

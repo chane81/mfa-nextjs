@@ -21,7 +21,7 @@ description: 바뀐 경로로 어떤 앱을 배포할지 정한다 (Dokploy Watc
 # Node 를 그냥 쓰면 이 저장소가 어디서도 검증하지 않은 버전 위에서 돈다. 이미지가
 # 옛 Node 로 롤백되면 `ERR_UNKNOWN_FILE_EXTENSION` 하나로 **배포 워크플로 전체가 막힌다**.
 # 그래서 `install: false` 로 pnpm install 만 빼고, 런타임은 ci.yml 세 job 과 같은
-# 범위 표현(`node@^24.19.0`, package.json 의 engines 와 같은 범위)을 쓴다.
+# 범위 표현(`node@^24.22.1`, package.json 의 engines 와 같은 범위)을 쓴다.
 #
 # 출력의 `remotes` 는 **객체 배열**이다. 이름만 넘기면 워크플로가 저장소 Variable 이름을
 # 다시 조립해야 하고, 그러면 그 규칙이 YAML 과 SSOT 두 곳에 산다.
@@ -59,7 +59,7 @@ runs:
     # 이 액션이 pnpm install 없이 도는 성질은 그대로 두고 런타임만 고정하는 것이다.
     - uses: pnpm/setup@v2
       with:
-        runtime: node@^24.19.0
+        runtime: node@^24.22.1
         install: false
 
     # `git diff` 를 쓰므로 호출부가 `fetch-depth: 0` 으로 체크아웃해 둬야 한다.
