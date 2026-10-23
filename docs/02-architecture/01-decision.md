@@ -118,7 +118,8 @@
 - 결과:
   - ⭕ remote 추가/삭제 시 고칠 파일이 하나다. `satisfies` 가 누락을 컴파일 타임에 잡는다.
   - ⭕ host 코드에 remote 이름이 남지 않는다(`config/index.ts` 에 한 줄도 없다).
-  - ❌ `engines.node >= 24.19.0` 이 하드 요구사항이 된다. 그 아래에서는 패키지가 로드조차 안 된다.
+  - ❌ **Node 24.19.0 이상이 하드 요구사항**이 된다. 그 아래에서는 패키지가 로드조차 안 된다.
+    (`engines.node` 하한은 지금 그보다 높다 — 보안 패치 때문이다. ADR-010 참고.)
   - ⚠️ `docker-compose.yml` 만 예외다. 정적 YAML 이라 이 모듈을 읽을 수 없어 손으로 맞춘다.
 - 상세: [03-setup/03-environment.md](../03-setup/03-environment.md)
 
@@ -138,18 +139,29 @@
     `@swc/helpers` 의 `esm/` 누락은 `outputFileTracingIncludes` 로 따로 담는다.
 - 상세: [03-setup/04-dokploy.md](../03-setup/04-dokploy.md)
 
-## ADR-010 — Node 는 `>=24.19.0 <25` 로 고정한다
+## ADR-010 — Node 는 `>=24.22.1 <25` 로 고정한다
 
-- 상태: 채택 (2026-08-19 9차)
+- 상태: 채택 (2026-08-19 9차) · 하한 개정 (2026-10-23 — `>=24.19.0` → `>=24.22.1`)
 - 맥락: ADR-008 이 Node 타입 스트리핑에 기대므로 버전이 곧 기능 요구사항이다. 그런데
   범위를 벗어난 Node 에서 pnpm 은 경고만 찍고 설치를 끝냈다(실측). 그러면 실패가 설치
   시점이 아니라 dev 서버나 프리렌더 한복판으로 밀리는데, 거기서 나오는 에러는 Node 버전을
   한 글자도 언급하지 않는다 — `SyntaxError: Missing initializer in const declaration` 이 전부다.
-- 결정: `engines.node` 를 `>=24.19.0 <25` 로 두고 `pnpm-workspace.yaml` 에
+- 결정: `engines.node` 를 `>=24.22.1 <25` 로 두고 `pnpm-workspace.yaml` 에
   `engineStrict: true` 를 켠다. `.nvmrc` 도 같이 둔다.
+- **하한이 둘이고 높은 쪽을 쓴다.**
+  - 기능 하한 **24.19.0** — ADR-008 의 타입 스트리핑. 그 아래면 `@mfa/remote-config` 가 로드조차 안 된다.
+  - 보안 하한 **24.22.1** — 2026-10-21 Node 보안 릴리스(CVE 10건). 근거는
+    [03-setup/02-versions.md](../03-setup/02-versions.md#node--패키지-매니저).
+  - `engines.node` 하한은 **둘 중 높은 쪽**이다. 보안 릴리스가 나오면 기능 하한은 그대로 두고
+    이 값만 올린다 — 그래야 "왜 이 숫자인가"가 두 줄로 갈려 보인다.
 - 결과:
-  - ⭕ 안 맞으면 `pnpm install` 이 `ERR_PNPM_UNSUPPORTED_ENGINE` 으로 **먼저** 막는다.
-  - ⭕ CI 도 같은 값을 쓴다(`pnpm/setup` 의 `runtime: node@^24.19.0`).
+  - ⭕ 안 맞으면 `pnpm install` 이 `ERR_PNPM_UNSUPPORTED_ENGINE` 으로 **먼저** 막는다 —
+    단 **설치가 실제로 일어날 때만**이다. 이미 설치된 트리에서 Node 만 갈아타면 조용히
+    통과한다(47차 실측: known-issues L-1). 그래서 하한을 올린 뒤에는 `node -v` 를 직접 본다.
+  - ⭕ CI 도 같은 값을 쓴다(`pnpm/setup` 의 `runtime: node@^24.22.1`).
+  - ❌ 보안 릴리스마다 고칠 자리가 여섯이다(`package.json` · `.nvmrc` · `ci.yml` ·
+    `detect-targets/action.yml` · 이 ADR · 버전 문서). 숫자가 복제돼 있으므로 올릴 때는
+    `grep -rn '24\.22\.1'` 로 전수 확인한다.
 - 상세: [03-setup/02-versions.md](../03-setup/02-versions.md)
 
 ## ADR-011 — 스타일은 Tailwind v4 로 가고, host 가 remote CSS 주소를 건다

@@ -34,7 +34,8 @@
  * `packages/remote-config/src/index.ts` — node_modules 밖이 되어 통과한다(실측).
  * Vite config 로드와 Next 브라우저 번들에서도 같이 확인했다.
  *
- * 그래서 `engines.node` 가 `>=24.19.0` 이다. 그 아래 버전에서는 이 패키지가 로드되지 않는다.
+ * 그래서 이 패키지는 **Node 24.19.0 이상**을 요구한다. 그 아래 버전에서는 로드되지 않는다.
+ * `engines.node` 하한은 그보다 높다(`>=24.22.1`) — 보안 릴리스 때문이고, 이유가 다르다(ADR-010).
  *
  * ⚠️ 타입 스트리핑은 **지울 수 있는 문법만** 처리한다(enum·namespace·파라미터 프로퍼티 불가).
  * `tsconfig.json` 의 `erasableSyntaxOnly` 가 그걸 컴파일 타임에 막아준다.

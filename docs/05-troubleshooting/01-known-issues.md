@@ -9,15 +9,16 @@
 
 ### 설치 · 기동
 
-| 증상                                                                         | 항목                                                                                                                                                                                |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm install` 이 `@rspack/binding-*` 에서 멈춤 · 타임아웃                   | [8](#8-pnpm-설치-중-rspack-바이너리-타임아웃)                                                                                                                                       |
-| `ERR_PNPM_UNSUPPORTED_ENGINE` / `Expected version: >=24.19.0 <25`            | Node 가 범위 밖이다 — [실행 방법 › 요구사항](../03-setup/01-getting-started.md#요구사항)                                                                                            |
-| 포트가 안 비어서 기동 실패 / 옛 빌드가 계속 응답                             | [0-1](#0-1-pkill--f-next-start-가-안-먹혀서-옛-빌드를-계속-테스트함), [B-4](#b-4-dev-서버가-떠-있으면-포트-충돌조차-안-난다), [B-4b](#b-4b-pnpm-start-가-자기-자신과-포트를-다툰다) |
-| `Directory import … is not supported` / `Cannot find module './x'`           | dist 를 raw Node 로 로드했다 — [D-1](#d-1-확장자-없는-상대-경로는-번들러에서만-풀린다)                                                                                              |
-| `ERR_PNPM_FROZEN_LOCKFILE_WITH_OUTDATED_LOCKFILE`                            | 실행 중인 pnpm 이 락파일에 기록된 `packageManager` 핀과 다르다 — [버전 › Node / 패키지 매니저](../03-setup/02-versions.md#node--패키지-매니저)                                      |
-| `pnpm peers check` 가 `Wanted: catalog:` 로 unmet 을 보고 (설치·빌드는 정상) | pnpm 이 peer 의 카탈로그를 해석 못 한다 — [K-1](#k-1-pnpm-peers-check-가-peerdependencies-의-catalog-를-해석하지-않는다)                                                            |
-| `pnpm install` 은 성공했는데 새 패키지의 CLI(`.bin`)가 없다                  | 락파일의 peer 표기가 snapshots 와 어긋났다 — [I-1](#i-1-pnpm-install-이-새-devdependency-의-bin-을-안-심는다)                                                                       |
+| 증상                                                                                     | 항목                                                                                                                                                                                |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install` 이 `@rspack/binding-*` 에서 멈춤 · 타임아웃                               | [8](#8-pnpm-설치-중-rspack-바이너리-타임아웃)                                                                                                                                       |
+| `ERR_PNPM_UNSUPPORTED_ENGINE` / `Expected version: >=24.22.1 <25`                        | Node 가 범위 밖이다 — [실행 방법 › 요구사항](../03-setup/01-getting-started.md#요구사항)                                                                                            |
+| 포트가 안 비어서 기동 실패 / 옛 빌드가 계속 응답                                         | [0-1](#0-1-pkill--f-next-start-가-안-먹혀서-옛-빌드를-계속-테스트함), [B-4](#b-4-dev-서버가-떠-있으면-포트-충돌조차-안-난다), [B-4b](#b-4b-pnpm-start-가-자기-자신과-포트를-다툰다) |
+| `Directory import … is not supported` / `Cannot find module './x'`                       | dist 를 raw Node 로 로드했다 — [D-1](#d-1-확장자-없는-상대-경로는-번들러에서만-풀린다)                                                                                              |
+| `ERR_PNPM_FROZEN_LOCKFILE_WITH_OUTDATED_LOCKFILE`                                        | 실행 중인 pnpm 이 락파일에 기록된 `packageManager` 핀과 다르다 — [버전 › Node / 패키지 매니저](../03-setup/02-versions.md#node--패키지-매니저)                                      |
+| `pnpm peers check` 가 `Wanted: catalog:` 로 unmet 을 보고 (설치·빌드는 정상)             | pnpm 이 peer 의 카탈로그를 해석 못 한다 — [K-1](#k-1-pnpm-peers-check-가-peerdependencies-의-catalog-를-해석하지-않는다)                                                            |
+| `pnpm install` 은 성공했는데 새 패키지의 CLI(`.bin`)가 없다                              | 락파일의 peer 표기가 snapshots 와 어긋났다 — [I-1](#i-1-pnpm-install-이-새-devdependency-의-bin-을-안-심는다)                                                                       |
+| 범위 밖 Node 인데 `pnpm install` 이 그냥 통과함 (`ERR_PNPM_UNSUPPORTED_ENGINE` 이 안 뜸) | 이미 설치된 트리에서는 게이트가 안 돈다 — [L-1](#l-1-engines-게이트는-pnpm-이-실제로-설치할-일이-있을-때만-돈다)                                                                    |
 
 ### `pnpm build` 실패
 
@@ -117,6 +118,84 @@
 | 증상                                                           | 항목                                                                    |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련) | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다) |
+
+## L. (47차) Node 보안 하한을 올리며 드러난 것
+
+### L-1. `engines` 게이트는 pnpm 이 실제로 설치할 일이 있을 때만 돈다
+
+2026-10-21 Node 보안 릴리스 때문에 `engines.node` 하한을 `>=24.19.0` → `>=24.22.1` 로
+올렸다. ADR-010 이 "범위 밖이면 `pnpm install` 이 **먼저** 막는다"고 적고 있으니
+그걸 확인했다. **안 막혔다.** 범위에서 두 메이저나 벗어난 Node 22.11.0 에서도 통과한다.
+
+```
+$ fnm exec --using=22.11.0 -- pnpm install --frozen-lockfile
+Scope: all 12 workspace projects
+✓ Lockfile passes supply-chain policies (verified 33s ago)
+Lockfile is up to date, resolution step is skipped
+Done in 66ms using pnpm v12.1.0
+```
+
+#### 오진 하나를 거쳤다
+
+처음엔 **pnpm 이 셸의 Node 를 안 본다**고 의심했다. Homebrew 의 pnpm 은 Mach-O 단독
+실행 파일이라(`file $(which pnpm)` → `Mach-O 64-bit executable arm64`) 자기 런타임으로
+돌 수 있기 때문이다. 틀렸다 — `pnpm exec node -v` 는 `v22.11.0` 을 돌려준다. 셸 Node 를
+제대로 보고 있었다.
+
+#### 실제 원인: 할 일이 없으면 검사 자체를 안 한다
+
+빈 디렉터리에 최소 재현을 만들어 갈랐다(`engines.node: ">=24.22.1 <25"` +
+`engineStrict: true` + 의존성 1개).
+
+| 상태                        | Node 22.11.0 에서 `pnpm install`            |
+| --------------------------- | ------------------------------------------- |
+| `node_modules` 가 없음      | **`ERR_PNPM_UNSUPPORTED_ENGINE` 으로 실패** |
+| 24.22.1 로 설치한 뒤 재실행 | `Already up to date` — 조용히 통과          |
+
+```
+$ fnm exec --using=22.11.0 -- pnpm install      # 빈 디렉터리
+Error: ERR_PNPM_UNSUPPORTED_ENGINE
+
+  × Unsupported engine for …/engine-probe: wanted: {"node":">=24.22.1 <25"}
+  │ (current: {"node":"22.11.0"})
+
+$ fnm exec --using=24.22.1 -- pnpm install      # 정상 설치
++ is-odd 3.0.1
+Done in 337ms using pnpm v12.11.2
+
+$ fnm exec --using=22.11.0 -- pnpm install      # 설치된 뒤 다시
+Already up to date
+Done in 2ms using pnpm v12.11.2
+```
+
+게이트는 **있다.** 다만 `Already up to date` / `resolution step is skipped` 로 빠지는
+경로에서는 검사 지점에 도달하지 않는다. 재현은 pnpm 12.1.0(저장소)과 12.11.2(재현용,
+`packageManager` 핀 없음) 양쪽에서 같았다.
+
+#### 그래서 무엇이 참인가
+
+| 상황                                     | 게이트가 막나                 |
+| ---------------------------------------- | ----------------------------- |
+| 새로 clone 해서 처음 설치                | O                             |
+| 락파일 · `package.json` 이 바뀌어 재설치 | O                             |
+| **이미 설치된 트리에서 Node 만 갈아탐**  | **X — 아무 말도 안 한다**     |
+| CI                                       | O (매번 깨끗한 러너에서 설치) |
+
+하한을 올린 직후가 정확히 세 번째 칸이다. **기존 작업자의 머신에서는 `pnpm install` 이
+통과하므로 Node 가 올라갔다는 신호가 전혀 없다.** 그 상태로 돌려도 지금은 기능이 깨지지
+않는다 — 보안 하한은 기능 하한(24.19.0)보다 높을 뿐이어서, 구버전 Node 는 **조용히
+취약한 채로 돈다.** 이게 이 함정이 보안 문제인 이유다.
+
+대응: 하한을 올렸으면 `node -v` 를 직접 본다. `pnpm install` 의 침묵을 근거로 쓰지 않는다.
+
+```bash
+node -v                      # v24.22.1 이어야 한다
+fnm use                      # .nvmrc 를 읽는다
+fnm install                  # .nvmrc 의 버전이 없으면 받아온다
+```
+
+`.nvmrc` 를 고쳐도 **셸이 이미 띄운 Node 는 바뀌지 않는다.** fnm 의 디렉터리 자동 전환
+(`--use-on-cd`)을 안 켜 뒀으면 디렉터리에 들어가도 그대로다.
 
 ## K. (46차) 카탈로그가 진단을 조용히 망가뜨린 자리
 
@@ -720,8 +799,8 @@ TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension ".ts"
 
 | 자리                   | Node 고정                                 |
 | ---------------------- | ----------------------------------------- |
-| `ci.yml` 의 세 job     | O — `pnpm/setup` `runtime: node@^24.19.0` |
-| `package.json` engines | O — `>=24.19.0 <25`                       |
+| `ci.yml` 의 세 job     | O — `pnpm/setup` `runtime: node@^24.22.1` |
+| `package.json` engines | O — `>=24.22.1 <25`                       |
 | **detect job**         | **X — 러너 이미지가 정했다**              |
 
 `deploy` 워크플로는 `detect` 없이는 아무 job 도 못 뜬다. 그래서 이건 remote 하나가 아니라

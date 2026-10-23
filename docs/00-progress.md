@@ -1,5 +1,150 @@
 # 진행 상황
 
+## 2026-10-23 (47차) — Node 보안 하한을 24.22.1 로, next 를 16.4.2 로 올린다
+
+2026-10-21 Node 보안 릴리스가 세 라인(26.x · 24.x · 22.x)에서 CVE 10건을 고쳤다.
+**24.x 에 해당하는 것이 8건**(High 4 · Medium 3 · Low 1)이고 패치 버전은 **24.22.1** 이다.
+이 저장소는 `>=24.19.0 <25` 에 고정돼 있었으므로 전부 해당된다.
+
+가장 무거운 건 **CVE-2026-111497 — Brotli 디코더 out-of-bounds write → 원격 코드 실행**
+이다. 이 저장소에 그냥 "Node 취약점"이 아니라 **구조적 접점**이 있다: host 는 remote 의
+매니페스트와 SSR 번들(`mf-server.cjs`)을 HTTP 로 받아 **평가한다.** 응답이
+`content-encoding: br` 이면 그 바이트가 바로 이 디코더를 지난다. TLS 인증서 호스트명
+우회 둘(CVE-2026-106069 · CVE-2026-105483)과 keep-alive 응답 뒤섞임
+(CVE-2026-105481)도 같은 host → remote 경로에 붙는다.
+
+CVE 목록과 저장소 접점 표: [03-setup/02-versions.md](03-setup/02-versions.md#하한이-둘이다--기능-24190-보안-24221).
+
+### 하한을 둘로 갈라 적었다
+
+`engines.node` 하한에 이유가 두 개 섞여 있었다. 바뀌는 속도가 달라서 갈랐다.
+
+| 하한                | 값          | 근거                               | 움직이는 때            |
+| ------------------- | ----------- | ---------------------------------- | ---------------------- |
+| 기능(타입 스트리핑) | 24.19.0     | ADR-008 · `packages/remote-config` | ADR-008 이 뒤집힐 때   |
+| 보안                | **24.22.1** | 2026-10-21 Node 보안 릴리스        | 보안 릴리스마다        |
+| → `engines.node`    | `>=24.22.1` | 둘 중 **높은 쪽**                  | 둘 중 하나가 올라갈 때 |
+
+이걸 안 갈라 두면 다음 보안 릴리스에서 `packages/remote-config` 주석까지 숫자가 따라
+올라가고, "왜 24.19.0 이었나"(타입 스트리핑)가 기록에서 사라진다. ADR-010 에 개정 줄을
+남기고 기능 하한을 말하던 네 자리는 숫자를 안 올렸다
+(`packages/remote-config/src/index.ts` · `02-topology.md` · `01-getting-started.md` ·
+ADR-008 의 결과 줄).
+
+### 고친 자리 여섯
+
+| 자리                                        | 값                       |
+| ------------------------------------------- | ------------------------ |
+| `package.json` 의 `engines.node`            | `>=24.22.1 <25`          |
+| `.nvmrc`                                    | `24.22.1`                |
+| `.github/workflows/ci.yml` (세 job)         | `runtime: node@^24.22.1` |
+| `.github/actions/detect-targets/action.yml` | `runtime: node@^24.22.1` |
+| ADR-010                                     | 하한 개정 줄             |
+| `docs/03-setup/02-versions.md`              | CVE 표 + 갱신 절차       |
+
+**Docker 는 안 고쳤다.** 세 `Dockerfile` 이 `ARG NODE_VERSION=24-slim` 으로 떠 있는
+태그를 쓰므로 재빌드하면 최신 24.x 를 받는다. 대신 **재빌드 없이는 패치가 안 붙는다** —
+보안 릴리스 뒤에는 세 이미지를 다시 빌드한다. 이걸 버전 문서에 적었다.
+
+### 함정: `engines` 게이트가 조용히 통과했다 (L-1)
+
+ADR-010 이 "범위 밖이면 `pnpm install` 이 먼저 막는다"고 적고 있어서 확인했는데,
+두 메이저나 벗어난 Node 22.11.0 에서도 통과했다. 처음엔 Homebrew pnpm 이 단독 실행
+파일이라 셸 Node 를 안 본다고 의심했는데 **오진**이었다(`pnpm exec node -v` 가 셸
+버전을 제대로 돌려준다).
+
+실제 원인은 **할 일이 없으면 검사 지점에 도달하지 않는다**는 것이다. 최소 재현으로
+갈랐다 — 빈 디렉터리면 `ERR_PNPM_UNSUPPORTED_ENGINE` 으로 막고, 한 번 설치한 뒤
+재실행하면 `Already up to date` 로 통과한다.
+
+하한을 올린 직후가 정확히 그 상황이다. **기존 작업자 머신에서는 아무 신호도 없고,
+기능이 깨지지도 않는다** — 보안 하한은 기능 하한보다 높을 뿐이라 구버전 Node 는
+조용히 취약한 채로 돈다. 그래서 이건 진단 함정이 아니라 보안 함정이다.
+
+상세 · 로그: [L-1](05-troubleshooting/01-known-issues.md#l-1-engines-게이트는-pnpm-이-실제로-설치할-일이-있을-때만-돈다).
+
+### 검증
+
+Node v24.22.1 · pnpm 12.1.0 에서 전부 통과했다(2026-10-23).
+
+| 명령             | 결과                                      |
+| ---------------- | ----------------------------------------- |
+| `pnpm typecheck` | 13/13                                     |
+| `pnpm lint`      | 통과                                      |
+| `pnpm test`      | 51 파일 · **706개** 통과                  |
+| `pnpm build`     | 6/6 — **host 프리렌더가 remote SSR 실행** |
+
+`pnpm build` 가 통과했으므로 "Next 16 에서 런타임 MF + remote SSR 이 된다"는 주장은
+24.22.1 에서도 참이다.
+
+### 같이 드러난 것: npm 의존성 취약점 66건
+
+`pnpm audit` 을 돌렸다(2026-10-23). **critical 6 · high 25 · moderate 27 · low 8.**
+Node 를 올리려고 켠 점검에서 **Node 보다 더 급한 게 나왔다.**
+
+| 패키지            | 현재            | 필요            | 등급               | 성격                                                |
+| ----------------- | --------------- | --------------- | ------------------ | --------------------------------------------------- |
+| **`next`**        | 16.3.1          | **16.4.1**      | critical ×6 · high | 이미지 최적화 · `next/og` · `use cache` **RCE** 6건 |
+| `sharp`           | 0.35.3          | 0.35.5          | high ×2            | libheif · librsvg (host 런타임 의존)                |
+| `vite`            | 8.2.1           | 8.2.4           | high · moderate    | catalog 전용 dev 의존                               |
+| `undici`          | 7.29.0 / 8.10.0 | 7.29.1 / 8.10.2 | high ×3            | TLS 검증 우회 · 캐시 오염 · DoS                     |
+| `@vitest/mocker`  | 4.1.11          | 4.1.12          | moderate ×2        | 코드 주입                                           |
+| `shell-quote`     | 1.9.0           | 1.11.0          | critical           | 명령 주입 (전이 dev)                                |
+| `adm-zip`         | 0.6.0           | 0.6.1           | high ×4            | 전이 dev (MF CLI 경로)                              |
+| `fast-uri`        | 3.1.5           | 3.1.8           | high ×5            | 전이 dev (cart)                                     |
+| `source-map-js`   | 1.2.1           | 1.2.2           | high               | 전이                                                |
+| `brace-expansion` | 1.1.18 / 5.0.9  | 1.1.21 / 5.0.12 | high ×4            | 전이                                                |
+| `braces`          | 3.0.3           | **패치 없음**   | high               | `eslint-config` 경로 — 올릴 곳이 없다               |
+
+### `next` 16.3.1 → 16.4.2 로 올렸다 — `sharp` 가 딸려 왔다
+
+critical 6건 중 5건이 `next` 고 전부 **인증 없는 RCE** 다. 그래서 런타임에 실리는 둘
+(`next` · `sharp`)만 이번에 올리고 나머지는 남겼다.
+
+`sharp` 는 `package.json` 에 선언한 데가 없다 — `next` 의 `optionalDependencies` 다.
+
+```
+$ pnpm why sharp
+sharp@0.35.3
+└─┬ next@16.3.1
+  └── @mfa/host@0.1.0 (dependencies)
+```
+
+`next@16.4.2` 가 `sharp: ^0.35.5` 를 요구하므로(레지스트리 조회) **카탈로그 한 줄로 둘이
+같이 닫힌다.** `sharp` 용 `overrides` 를 따로 넣을 필요가 없었다.
+
+카탈로그 `^16.3.1` 이 16.4.2 를 이미 허용하지만 **범위도 같이 올렸다.** 범위를 그대로
+두면 다음 사람이 `pnpm install --frozen-lockfile` 로 받을 때 락파일이 기준이 되는데,
+그 락파일이 왜 16.4.2 여야 하는지가 어디에도 안 남는다. 하한이 곧 근거다.
+
+| 자리                                   | 전      | 후          |
+| -------------------------------------- | ------- | ----------- |
+| `pnpm-workspace.yaml` 의 `next`        | ^16.3.1 | **^16.4.2** |
+| 같은 파일의 `@next/eslint-plugin-next` | ^16.3.1 | **^16.4.2** |
+| `next` (설치)                          | 16.3.1  | **16.4.2**  |
+| `sharp` (`next` 가 끌고 오는 것)       | 0.35.3  | **0.35.5**  |
+
+재검증 — Node v24.22.1 · next 16.4.2 에서 전부 통과(2026-10-23): typecheck 13/13 ·
+lint · 테스트 51파일 706개 · build 6/6(host 프리렌더가 remote SSR 실행). **마이너 한 칸
+올렸는데 MF 런타임 · remote SSR 이 그대로 돌았다.**
+
+`pnpm audit` 재실행: **66건 → 51건, critical 6 → 1.** `next` · `sharp` 권고는 0건이다.
+
+```
+남은 것: critical 1 · high 21 · moderate 22 · low 7
+```
+
+남은 critical 하나는 `shell-quote`(전이 dev, MF CLI 경로)다.
+
+### 다음에 할 것
+
+- [ ] `vite` 8.2.4 · `undici` · `@vitest/mocker` · `adm-zip` · `fast-uri` · `shell-quote` —
+      전부 전이 dev 의존이다. 직접 선언이 없으니 `overrides` 를 쓸지 상위를 올릴지 먼저 정한다
+- [ ] `braces` 3.0.3 은 패치가 없다 — `@mfa/eslint-config` 의 의존 경로를 봐야 한다
+- [ ] `source-map-js` · `brace-expansion` — 전이, 상위 재해석으로 닫히는지 본다
+- [ ] 보안 릴리스 대응을 반복 가능하게 만들지 검토(의존성 봇 · `pnpm audit` 을 CI 에 붙이는 안).
+      이번에 Node 8건 + npm critical 6건이 **아무 신호 없이** 쌓여 있었다는 게 근거다
+
 ## 2026-09-28 (46차) — 공용 의존성 버전을 pnpm catalog 한 곳으로 모은다
 
 `typescript` 가 9개 `package.json` 에, `eslint` 가 10개에, `@types/react` 가 8개에 같은

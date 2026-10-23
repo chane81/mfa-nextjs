@@ -2,11 +2,13 @@
 
 ## 요구사항
 
-- Node.js **>=24.19.0 <25** (검증: v24.19.0) — `packages/remote-config` 가 타입 스트리핑으로
-  `.ts` 를 직접 실행하므로 이 아래 버전에서는 로드되지 않는다. 상한을 둔 이유는 25 이상을
-  **한 번도 검증하지 않았기** 때문이다 — 상한이 없으면 Node 26 이 그대로 통과해서
+- Node.js **>=24.22.1 <25** (검증: v24.22.1) — 하한이 둘인데 높은 쪽을 쓴다.
+  **기능 하한 24.19.0**: `packages/remote-config` 가 타입 스트리핑으로 `.ts` 를 직접
+  실행하므로 그 아래에서는 로드되지 않는다. **보안 하한 24.22.1**: 2026-10-21 Node
+  보안 릴리스(CVE 10건, Brotli RCE 포함). 상한을 둔 이유는 또 다르다 — 25 이상을
+  **한 번도 검증하지 않았기** 때문이다. 상한이 없으면 Node 26 이 그대로 통과해서
   실패가 설치 시점이 아니라 런타임 한복판으로 밀린다
-- pnpm **11.x** (검증: 11.22.0)
+- pnpm **12.x** (검증: 12.1.0) — `packageManager` 핀이 있으니 pnpm 이 스스로 맞춘다
 
 저장소 루트에 `.nvmrc` 가 있다.
 
@@ -22,7 +24,7 @@ fnm 은 `.nvmrc` 도 읽는다 — 즉 `.nvmrc` 하나가 nvm 과 fnm 을 모두
 
 ```
 [ERR_PNPM_UNSUPPORTED_ENGINE] Unsupported environment
-Expected version: >=24.19.0 <25
+Expected version: >=24.22.1 <25
 Got: v26.5.0
 ```
 
@@ -30,6 +32,17 @@ Got: v26.5.0
 pnpm 은 경고만 찍고 설치를 끝낸다**(pnpm 11.22.0 실측 — pnpm.io 문서 설명과 다르다).
 그러면 실패가 설치가 아니라 dev 한복판으로 밀리고, 거기서 나오는 메시지엔
 Node 라는 단어가 없다.
+
+⚠️ **이 게이트는 설치가 실제로 일어날 때만 돈다.** 이미 설치를 마친 트리에서 Node 만
+갈아타면 `pnpm install` 이 `Already up to date` 로 조용히 통과한다(47차 실측:
+[L-1](../05-troubleshooting/01-known-issues.md#l-1-engines-게이트는-pnpm-이-실제로-설치할-일이-있을-때만-돈다)).
+`git pull` 로 하한이 올라왔을 때가 정확히 그 상황이다 — `node -v` 를 직접 본다.
+
+```bash
+node -v        # v24.22.1 이어야 한다
+fnm install    # .nvmrc 의 버전이 없으면 받아온다
+fnm use        # .nvmrc 를 읽어 이 셸에 적용한다
+```
 
 ## 설치
 
@@ -246,7 +259,8 @@ host **서버**가 받아 실행하는 SSR 번들 URL(`…/mf-server.cjs`), remo
 > Node 24 의 타입 스트리핑이 실행 시점에 타입을 지운다. 번들러 config 의 import 는
 > 프로세스 시작 즉시 일어나서 watch 빌드가 `dist/` 를 만들 틈이 없기 때문이다
 > (tsc 빌드형으로 두면 `failed to load config from vite.config.ts` 로 죽는다 — 실측).
-> 그래서 `engines.node` 가 `>=24.19.0` 이고, `erasableSyntaxOnly` 로 타입 스트리핑이
+> 그래서 Node 하한이 24.19.0 이상이고(`engines.node` 는 보안 릴리스 때문에 더 높다),
+> `erasableSyntaxOnly` 로 타입 스트리핑이
 > 처리 못 하는 문법(enum·namespace 등)을 컴파일 타임에 막는다.
 
 ### 브라우저용 값이 전달되는 경로

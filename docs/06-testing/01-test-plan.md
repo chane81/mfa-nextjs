@@ -292,3 +292,5 @@ remote 이름인지. 그 파일은 **아무것도 export 하지 않는다** — 
 - jsdom 30.0.1 / @testing-library/react 16.3.2 / @testing-library/dom 10.4.1 /
   @testing-library/jest-dom 7.0.1 / @vitejs/plugin-react 6.0.5.
 - 검증일: 2026-08-31. Node v24.19.0, pnpm 12.1.0 (619개 전부 통과).
+- 재검증: 2026-10-23. **Node v24.22.1**, pnpm 12.1.0, next 16.4.2 (51 파일 · 706개 전부 통과).
+  Node 보안 하한을 올린 뒤 확인했다(47차).
