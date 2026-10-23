@@ -1,6 +1,6 @@
 # 진행 상황
 
-## 2026-10-23 (47차) — Node 보안 하한을 24.22.1 로, next 를 16.4.2 로 올린다
+## 2026-10-23 (47차) — 보안 상향: Node 24.22.1 · next 16.4.2 · critical 0
 
 2026-10-21 Node 보안 릴리스가 세 라인(26.x · 24.x · 22.x)에서 CVE 10건을 고쳤다.
 **24.x 에 해당하는 것이 8건**(High 4 · Medium 3 · Low 1)이고 패치 버전은 **24.22.1** 이다.
@@ -134,12 +134,79 @@ lint · 테스트 51파일 706개 · build 6/6(host 프리렌더가 remote SSR �
 남은 것: critical 1 · high 21 · moderate 22 · low 7
 ```
 
-남은 critical 하나는 `shell-quote`(전이 dev, MF CLI 경로)다.
+### 마지막 critical: `concurrently` 를 올려 `shell-quote` 를 닫았다
+
+남은 critical 은 `shell-quote` 1.9.0 의 명령 주입(`quote()`)이었다. 전이 의존이다.
+
+```
+$ pnpm why -r shell-quote
+shell-quote@1.9.0
+└─┬ concurrently@9.2.4
+  ├── @mfa/contracts@0.1.0 (devDependencies)
+  ├── @mfa/remote-cart@0.1.0 (devDependencies)
+  └── @mfa/remote-catalog@0.1.0 (devDependencies)
+```
+
+**`overrides` 를 쓰지 않았다.** `concurrently@9.2.4` 는 `shell-quote` 를 범위가 아니라
+**정확한 버전 `1.9.0`** 으로 박아 둔다(레지스트리 조회). 그래서 락파일 재해석으로는 안
+움직이고, 남는 길은 둘이었다 — 전이 의존을 `overrides` 로 덮거나, **소유자를 올리거나.**
+후자를 골랐다. `concurrently@10.0.6` 이 `shell-quote: 1.12.0` 을 박고 있어서
+카탈로그 한 줄(`^9.2.1` → `^10.0.6`)로 닫힌다. `overrides` 는 "누가 이 버전을 원했나"를
+지우는 쪽이라, 상위를 올릴 수 있으면 그게 먼저다.
+
+메이저 한 칸이라 v10 의 파괴적 변경을 공식 릴리스 노트에서 하나씩 대조했다.
+
+| v10.0.0 파괴적 변경               | 이 저장소                                               |
+| --------------------------------- | ------------------------------------------------------- |
+| Node <22 지원 중단                | 무관 — 이미 24.22.1                                     |
+| **ESM 전용**                      | 무관 — CLI 로만 쓴다. `require('concurrently')` 가 없다 |
+| prefix 색이 자동 선택으로 기본값  | 무관 — `-c` 로 명시한다                                 |
+| `--name-separator` 제거           | 안 쓴다                                                 |
+| API `killOthers` → `killOthersOn` | 무관 — API 를 안 쓴다                                   |
+
+쓰는 자리는 remote 둘의 `dev` 스크립트뿐이다
+(`concurrently -n web,ssr -c … --kill-others-on-fail "web" "ssr"`).
+**`concurrently` 는 dev 에서만 돌아서 `build` · `test` 가 안 덮는다.** 그래서 그 CLI 표면을
+직접 돌렸다.
+
+```
+$ pnpm exec concurrently -n web,ssr -c magenta,gray --kill-others-on-fail \
+    "node -e \"console.log('web ok')\"" "node -e \"console.log('ssr ok')\""
+[web] web ok
+[ssr] ssr ok
+
+$ # 한쪽을 실패시키면
+[web] node -e "process.exit(1)" exited with code 1
+--> Sending SIGTERM to other processes..
+[ssr] … exited with code SIGTERM          # exit=1
+```
+
+`--> Sending SIGTERM to other processes..` 는 시작 가이드가 적어 둔 그 줄이다 —
+연쇄 종료 동작이 v9 과 같다.
+
+재검증(Node v24.22.1 · next 16.4.2 · concurrently 10.0.6): typecheck 13/13 · lint ·
+테스트 51파일 706개 · build 6/6.
+
+**`pnpm audit`: critical 0.**
+
+```
+critical 0 · high 21 · moderate 22 · low 7   (66건 → 50건)
+```
+
+남은 것은 전부 high 이하이고 `braces` 하나를 빼면 전이 dev 의존이다.
+
+### 곁가지로 나온 것
+
+`packages/contracts` 의 `concurrently` devDependency 는 **쓰는 스크립트가 없다.**
+그 패키지 `scripts` 어디에도 `concurrently` 가 안 나온다(`build` · `dev` · `lint` ·
+`typecheck` · `clean` · `mf:types`). 이번엔 안 건드렸다 — 취약점은 버전 상향으로 닫혔고,
+안 쓰는 의존을 빼는 건 성격이 다른 변경이다.
 
 ### 다음에 할 것
 
-- [ ] `vite` 8.2.4 · `undici` · `@vitest/mocker` · `adm-zip` · `fast-uri` · `shell-quote` —
-      전부 전이 dev 의존이다. 직접 선언이 없으니 `overrides` 를 쓸지 상위를 올릴지 먼저 정한다
+- [ ] `packages/contracts` 의 안 쓰는 `concurrently` devDependency 를 뺀다
+- [ ] `vite` 8.2.4 · `undici` · `@vitest/mocker` · `adm-zip` · `fast-uri` — 전부 전이 dev
+      의존이다. `concurrently` 처럼 **소유자를 올려서** 닫히는지 먼저 본다
 - [ ] `braces` 3.0.3 은 패치가 없다 — `@mfa/eslint-config` 의 의존 경로를 봐야 한다
 - [ ] `source-map-js` · `brace-expansion` — 전이, 상위 재해석으로 닫히는지 본다
 - [ ] 보안 릴리스 대응을 반복 가능하게 만들지 검토(의존성 봇 · `pnpm audit` 을 CI 에 붙이는 안).
