@@ -76,7 +76,7 @@ remote 자산은 **버전 디렉터리 아래 불변 경로**에 올라가고, �
 `@mfa/remote-config` 만 **빌드 산출물이 없다**. `exports` 가 소스 `.ts` 를 직접 가리킨다.
 번들러 config(`vite.config.ts` · `rsbuild.config.ts`)가 프로세스 시작 즉시 이 모듈을 읽는데,
 그 시점엔 watch 빌드가 `dist/` 를 만들 틈이 없기 때문이다. Node 24 의 타입 스트리핑이
-`.ts` 를 그대로 실행해주는 덕에 성립한다 — Node 하한이 24.19.0 인 이유다
+`.ts` 를 그대로 실행해주는 덕에 성립한다 — Node **기능 하한이 24.19.0** 인 이유다
 (`engines.node` 는 보안 릴리스 때문에 그보다 높다. ADR-010).
 
 `@mfa/tailwind-config` 도 빌드하지 않는다. `theme.css` 를 **소스 그대로** 내보내고

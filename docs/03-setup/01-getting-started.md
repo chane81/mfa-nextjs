@@ -2,11 +2,13 @@
 
 ## 요구사항
 
-- Node.js **>=24.22.1 <25** (검증: v24.22.1) — 하한이 둘인데 높은 쪽을 쓴다.
+- Node.js **>=26.12.1 <27** (검증: v26.12.1) — 값을 정하는 입력이 셋이다.
   **기능 하한 24.19.0**: `packages/remote-config` 가 타입 스트리핑으로 `.ts` 를 직접
-  실행하므로 그 아래에서는 로드되지 않는다. **보안 하한 24.22.1**: 2026-10-21 Node
-  보안 릴리스(CVE 10건, Brotli RCE 포함). 상한을 둔 이유는 또 다르다 — 25 이상을
-  **한 번도 검증하지 않았기** 때문이다. 상한이 없으면 Node 26 이 그대로 통과해서
+  실행하므로 그 아래에서는 로드되지 않는다(지금은 가려져 있지만 폐기된 숫자가 아니다).
+  **라인 26.x**: 24 라인은 2026-10-20 부로 maintenance 로 내려갔고 26 라인이 2026-10-28
+  에 Active LTS 가 된다. **보안 하한 26.12.1**: 2026-10-21 Node 보안 릴리스(26 라인은
+  CVE 10건 전부 해당, Brotli RCE 포함). 상한을 둔 이유는 또 다르다 — 27 이상을
+  **한 번도 검증하지 않았기** 때문이다. 상한이 없으면 다음 메이저가 그대로 통과해서
   실패가 설치 시점이 아니라 런타임 한복판으로 밀린다
 - pnpm **12.x** (검증: 12.1.0) — `packageManager` 핀이 있으니 pnpm 이 스스로 맞춘다
 
@@ -24,8 +26,8 @@ fnm 은 `.nvmrc` 도 읽는다 — 즉 `.nvmrc` 하나가 nvm 과 fnm 을 모두
 
 ```
 [ERR_PNPM_UNSUPPORTED_ENGINE] Unsupported environment
-Expected version: >=24.22.1 <25
-Got: v26.5.0
+Expected version: >=26.12.1 <27
+Got: v24.22.1
 ```
 
 이게 에러인 건 `pnpm-workspace.yaml` 의 `engineStrict: true` 덕분이다. **그게 없으면
@@ -39,7 +41,7 @@ Node 라는 단어가 없다.
 `git pull` 로 하한이 올라왔을 때가 정확히 그 상황이다 — `node -v` 를 직접 본다.
 
 ```bash
-node -v        # v24.22.1 이어야 한다
+node -v        # v26.12.1 이어야 한다
 fnm install    # .nvmrc 의 버전이 없으면 받아온다
 fnm use        # .nvmrc 를 읽어 이 셸에 적용한다
 ```
@@ -256,10 +258,11 @@ host **서버**가 받아 실행하는 SSR 번들 URL(`…/mf-server.cjs`), remo
 컴파일 타임에 막는다 — remote 추가가 반쯤 된 채로 넘어가지 않는다.
 
 > 이 패키지만 **빌드 산출물이 없다.** `exports` 가 `src/index.ts` 를 직접 가리키고
-> Node 24 의 타입 스트리핑이 실행 시점에 타입을 지운다. 번들러 config 의 import 는
+> Node 의 타입 스트리핑이 실행 시점에 타입을 지운다. 번들러 config 의 import 는
 > 프로세스 시작 즉시 일어나서 watch 빌드가 `dist/` 를 만들 틈이 없기 때문이다
 > (tsc 빌드형으로 두면 `failed to load config from vite.config.ts` 로 죽는다 — 실측).
-> 그래서 Node 하한이 24.19.0 이상이고(`engines.node` 는 보안 릴리스 때문에 더 높다),
+> 그래서 Node **기능 하한이 24.19.0** 이고(`engines.node` 는 LTS 라인과 보안 릴리스
+> 때문에 더 높다 — ADR-010),
 > `erasableSyntaxOnly` 로 타입 스트리핑이
 > 처리 못 하는 문법(enum·namespace 등)을 컴파일 타임에 막는다.
 
