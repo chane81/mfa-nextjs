@@ -7,7 +7,7 @@
 #
 # remote 매니페스트 URL 은 클라이언트 번들에 **구워진다**. 런타임 env 로는 못 바꾼다.
 # 그래서 remote 오리진을 빌드 인자로 받는다.
-ARG NODE_VERSION=24-slim
+ARG NODE_VERSION=26-slim
 
 # ---------------------------------------------------------------- base
 FROM node:${NODE_VERSION} AS base

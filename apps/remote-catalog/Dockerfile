@@ -14,7 +14,7 @@
 #
 # 불변 경로 `/v<ver>/` 의 버전은 인자로 받지 않는다. `.git` 이 컨텍스트에 없어서
 # 여기서는 타임스탬프로 정해진다 — 의도한 것이다(docs/03-setup/04-dokploy.md).
-ARG NODE_VERSION=24-slim
+ARG NODE_VERSION=26-slim
 
 FROM node:${NODE_VERSION} AS base
 ENV PNPM_HOME=/pnpm
