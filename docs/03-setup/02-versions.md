@@ -278,8 +278,11 @@ HTTP 로 받아 **평가한다**. 응답이 `content-encoding: br` 이면 그 �
 하나뿐). 그래서 배포판 교체가 닿을 자리가 없다. 네이티브 모듈도 전부 Node-API 선빌드라
 glibc 가 올라가는 방향(2.36 → 2.41)은 선빌드 바이너리에 안전하다.
 
-⚠️ **이 이미지 빌드는 로컬에서 검증하지 않았다**(Docker 데몬 미기동). 세 이미지 빌드는
-`deploy` 워크플로가 실제로 수행하므로, 그 실행이 이 변경의 검증 지점이다.
+실제로 돌렸다(2026-10-24). `node:26-slim` 안은 Node v26.12.1 · npm 11.20.0 ·
+Debian 13(trixie) · glibc 2.41 이고 `git` 은 없다(24-slim 과 같다). `pnpm docker:up` 이
+exit 0, 세 컨테이너 전부 healthy, host 가 remote 를 서버에서 렌더해 응답했다.
+상세는 [00-progress.md](../00-progress.md) 48차. 남은 것은 **Dokploy 빌드 환경**이다 —
+같은 `Dockerfile` 이지만 네트워크·캐시·빌드 시크릿이 다르다.
 
 ### `@types/node` 는 런타임 메이저를 따라간다
 

@@ -201,18 +201,58 @@ HTTP 로 받아 실행했다. **Node 26 에서도 이 저장소의 중심 주장
 `/` 의 프리렌더 HTML 은 0바이트인데 정상이다 — `ƒ (Dynamic)` 이라 빌드 때 안 만든다.
 `◐ (Partial Prerender)` 페이지에서 봐야 한다.
 
+#### Docker 이미지도 26-slim 에서 돌렸다
+
+`node:26-slim` 의 실체부터 확인했다(digest `sha256:36793bcb…` — 레지스트리로 잰 값과 일치).
+
+```
+$ docker run --rm node:26-slim sh -c 'node -v; npm -v; . /etc/os-release; echo $PRETTY_NAME; ldd --version | head -1'
+v26.12.1
+11.20.0
+Debian GNU/Linux 13 (trixie)
+ldd (Debian GLIBC 2.41-12+deb13u4) 2.41
+```
+
+`git` 바이너리는 **없다** — 24-slim 에서 실측했던 사실([04-dokploy.md](03-setup/04-dokploy.md))이
+26-slim 에서도 그대로다.
+
+`pnpm docker:up` 이 exit 0 으로 끝났다. 세 컨테이너 전부 healthy.
+
+| 이미지                      | 크기  | 상태    |
+| --------------------------- | ----- | ------- |
+| `mfa-nextjs-host`           | 312MB | healthy |
+| `mfa-nextjs-remote-catalog` | 274MB | healthy |
+| `mfa-nextjs-remote-cart`    | 273MB | healthy |
+
+컨테이너가 응답만 하는 게 아니라 **remote 를 실제로 당겨 서버에서 렌더하는지** 봤다.
+버전 경로 둘이 모든 응답에 걸려 있다(`/vtmvm13dyg/` catalog · `/vtmvm13m13/` cart).
+
+| 경로          | HTTP | bytes  | remote 전용 클래스         | remote 가 렌더한 텍스트     |
+| ------------- | ---- | ------ | -------------------------- | --------------------------- |
+| `/`           | 200  | 23,665 | O                          | 상품 목록 · 장바구니 · 결제 |
+| `/products/1` | 200  | 18,084 | O                          | 관련 상품 · 장바구니 · 결제 |
+| `/lab/ssr`    | 200  | 26,576 | O                          | 상품 목록 · 장바구니 · 결제 |
+| `/cart`       | 200  | 10,020 | —(이 화면엔 그리드가 없다) | 장바구니 · 결제             |
+| `/checkout`   | 200  | 10,963 | —(같음)                    | 장바구니 · 결제             |
+
+runner 스테이지는 빌더와 별도 `FROM` 이라 따로 확인했다 — 컨테이너 안에서 `node -v` 가
+`v26.12.1`, OS 가 trixie 다.
+
+> `docker compose build` 만으로는 host 이미지가 안 만들어진다. 프리렌더가 `:3001` 의
+> remote SSR 번들을 받아야 하는데 remote 가 안 떠 있어서다 — `ECONNREFUSED`. compose 를
+> 2단계로 나눠 둔 이유가 그것이고(`docker:up`), 이미 기록돼 있다. **Node 26 과 무관하다.**
+
 ### 확인 못 한 것
 
-- **세 이미지 Docker 빌드.** 로컬 Docker 데몬이 안 떠 있었다. `deploy` 워크플로가 실제로
-  빌드하므로 그 실행이 이 변경의 검증 지점이다. `apt-get` 의존이 없다는 점(위)이 위험을
-  낮추지만 "돌려봤다"는 아니다.
+- **Dokploy 에서의 빌드.** 로컬 `docker compose` 와 Dokploy 는 같은 `Dockerfile` 을 쓰지만
+  빌드 환경이 다르다(네트워크 · 캐시 · 빌드 시크릿). `deploy` 실행이 그 확인 지점이다.
 - **26.x 에서의 장기 운용.** 이번 검증은 한 번의 전체 통과다.
 
 ### 다음에 할 것
 
 - [ ] 2026-10-28 이후 `nodejs/dist/index.json` 에서 26.12.1 의 `lts` 가 `false` → 코드네임으로
       바뀌는지 확인(지금은 `lts=false`)
-- [ ] `deploy` 워크플로에서 세 이미지가 `node:26-slim` 으로 실제 빌드되는지 확인
+- [ ] `deploy` → Dokploy 에서도 세 이미지가 빌드되는지 확인(로컬 `docker:up` 은 통과했다)
 - [ ] jsdom · vitest 가 Node 26 내장 `localStorage` 에 맞춰지면 M-1 을 닫는다
 - [ ] `packages/contracts` 의 안 쓰는 `concurrently` devDependency 를 뺀다 (47차 이월)
 - [ ] `vite` · `undici` · `@vitest/mocker` · `adm-zip` · `fast-uri` — 소유자를 올려서 닫히는지
