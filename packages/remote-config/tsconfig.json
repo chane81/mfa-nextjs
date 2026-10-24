@@ -3,7 +3,7 @@
   "compilerOptions": {
     /**
      * 빌드 산출물이 없는 패키지다. `exports` 가 `src/index.ts` 를 직접 가리키고,
-     * Node 24 의 타입 스트리핑이 실행 시점에 타입만 지운다 (src/index.ts 상단 주석 참고).
+     * Node 의 타입 스트리핑이 실행 시점에 타입만 지운다 (src/index.ts 상단 주석 참고).
      * tsc 는 emit 하지 않고 검사만 한다.
      */
     "noEmit": true,

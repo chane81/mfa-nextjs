@@ -13,7 +13,7 @@ description: 바뀐 경로로 어떤 앱을 배포할지 정한다 (Dokploy Watc
 # 테스트가 붙어 있다(`scripts/deploy-targets.test.ts`). 여기 남은 일은 git 에게 바뀐 경로를
 # 물어보는 것뿐이다.
 #
-# 그 스크립트는 `pnpm install` 을 요구하지 않는다 — 상대 경로로 SSOT 를 직접 읽고 Node 24
+# 그 스크립트는 `pnpm install` 을 요구하지 않는다 — 상대 경로로 SSOT 를 직접 읽고 Node
 # 타입 스트리핑으로 돈다. 배포 대상을 정하려고 의존성 전체를 받을 이유가 없다.
 #
 # ⚠️ 그 대신 **Node 버전은 여기서 직접 고정한다.** `.ts` 를 그대로 `node` 에 넘기는 건
