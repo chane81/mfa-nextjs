@@ -119,7 +119,8 @@
   - ⭕ remote 추가/삭제 시 고칠 파일이 하나다. `satisfies` 가 누락을 컴파일 타임에 잡는다.
   - ⭕ host 코드에 remote 이름이 남지 않는다(`config/index.ts` 에 한 줄도 없다).
   - ❌ **Node 24.19.0 이상이 하드 요구사항**이 된다. 그 아래에서는 패키지가 로드조차 안 된다.
-    (`engines.node` 하한은 지금 그보다 높다 — 보안 패치 때문이다. ADR-010 참고.)
+    (`engines.node` 하한은 지금 그보다 훨씬 높다 — LTS 라인과 보안 패치 때문이다. 이 숫자는
+    가려져 있을 뿐 폐기된 게 아니다: "왜 20.9.0 이 아닌가"의 답이다. ADR-010 참고.)
   - ⚠️ `docker-compose.yml` 만 예외다. 정적 YAML 이라 이 모듈을 읽을 수 없어 손으로 맞춘다.
 - 상세: [03-setup/03-environment.md](../03-setup/03-environment.md)
 
@@ -139,29 +140,52 @@
     `@swc/helpers` 의 `esm/` 누락은 `outputFileTracingIncludes` 로 따로 담는다.
 - 상세: [03-setup/04-dokploy.md](../03-setup/04-dokploy.md)
 
-## ADR-010 — Node 는 `>=24.22.1 <25` 로 고정한다
+## ADR-010 — Node 는 `>=26.12.1 <27` 로 고정한다
 
-- 상태: 채택 (2026-08-19 9차) · 하한 개정 (2026-10-23 — `>=24.19.0` → `>=24.22.1`)
+- 상태: 채택 (2026-08-19 9차) · 하한 개정 (2026-10-23 — `>=24.19.0` → `>=24.22.1`) ·
+  **라인 개정 (2026-10-24 48차 — 24 라인 → 26 라인, `>=26.12.1 <27`)**
 - 맥락: ADR-008 이 Node 타입 스트리핑에 기대므로 버전이 곧 기능 요구사항이다. 그런데
   범위를 벗어난 Node 에서 pnpm 은 경고만 찍고 설치를 끝냈다(실측). 그러면 실패가 설치
   시점이 아니라 dev 서버나 프리렌더 한복판으로 밀리는데, 거기서 나오는 에러는 Node 버전을
   한 글자도 언급하지 않는다 — `SyntaxError: Missing initializer in const declaration` 이 전부다.
-- 결정: `engines.node` 를 `>=24.22.1 <25` 로 두고 `pnpm-workspace.yaml` 에
+- 결정: `engines.node` 를 `>=26.12.1 <27` 로 두고 `pnpm-workspace.yaml` 에
   `engineStrict: true` 를 켠다. `.nvmrc` 도 같이 둔다.
-- **하한이 둘이고 높은 쪽을 쓴다.**
+- **값을 정하는 입력이 셋이다.**
   - 기능 하한 **24.19.0** — ADR-008 의 타입 스트리핑. 그 아래면 `@mfa/remote-config` 가 로드조차 안 된다.
-  - 보안 하한 **24.22.1** — 2026-10-21 Node 보안 릴리스(CVE 10건). 근거는
+  - 라인 선택 **26.x** — 24 라인은 2026-10-20 부로 maintenance 로 내려갔고, 26 라인이
+    2026-10-28 에 Active LTS 가 된다(`nodejs/Release` 의 `schedule.json` 실측).
+  - 보안 하한 **26.12.1** — 2026-10-21 Node 보안 릴리스. **26 라인은 CVE 10건 전부에
+    해당한다**(24 라인은 8건이었다). 근거는
     [03-setup/02-versions.md](../03-setup/02-versions.md#node--패키지-매니저).
-  - `engines.node` 하한은 **둘 중 높은 쪽**이다. 보안 릴리스가 나오면 기능 하한은 그대로 두고
-    이 값만 올린다 — 그래야 "왜 이 숫자인가"가 두 줄로 갈려 보인다.
+  - 셋을 합치면 **선택한 라인 안에서 보안 하한**이 된다. 기능 하한은 지워지지 않는다 —
+    지금은 가려져 있을 뿐이다. 그래야 "왜 이 숫자인가"가 세 줄로 갈려 보인다.
+- **기각: 24 라인에 머문다.** 24 는 2028-04-30 까지 보안 패치를 받으므로 위험하진 않다.
+  그런데 maintenance 는 **보안·중대 버그만** 받는다 — 비용이 "패치를 못 받는다"가 아니라
+  "패치만 받는다"다. 그리고 "LTS 라서 24 에 있는다"는 설명은 2026-10-20 부로 더는 참이
+  아니다. 전환 비용이 실측으로 0 에 가까웠으므로(아래) 라인을 옮기는 쪽을 골랐다.
+- **기각: 10-28 까지 기다린다.** 나흘이면 26 이 Active LTS 가 되니 그때 옮기는 게 설명이
+  깔끔하다. 다만 그 나흘 동안 24 는 이미 maintenance 이고 26.12.1 은 이미 보안 패치판이라
+  **어느 쪽도 노출이 없다.** 기다림이 사는 것은 레이블뿐이어서 지금 옮겼다 — 이 ADR 이
+  나흘 빠른 이유를 대신 기록한다.
+- **26 에서 실제로 돌려본 기록**(2026-10-24, Node v26.12.1 · `@types/node` 26.6.5):
+  타입 스트리핑 OK(export 집합 24 와 동일) · `typecheck` 13/13 · `lint` 13/13 ·
+  `test` 51파일 706개 · `build` 6/6. host 프리렌더가 remote SSR 번들을 **실제로 실행**한
+  것까지 산출물로 확인했다(상세: [00-progress.md](../00-progress.md) 48차).
 - 결과:
   - ⭕ 안 맞으면 `pnpm install` 이 `ERR_PNPM_UNSUPPORTED_ENGINE` 으로 **먼저** 막는다 —
     단 **설치가 실제로 일어날 때만**이다. 이미 설치된 트리에서 Node 만 갈아타면 조용히
     통과한다(47차 실측: known-issues L-1). 그래서 하한을 올린 뒤에는 `node -v` 를 직접 본다.
-  - ⭕ CI 도 같은 값을 쓴다(`pnpm/setup` 의 `runtime: node@^24.22.1`).
-  - ❌ 보안 릴리스마다 고칠 자리가 여섯이다(`package.json` · `.nvmrc` · `ci.yml` ·
-    `detect-targets/action.yml` · 이 ADR · 버전 문서). 숫자가 복제돼 있으므로 올릴 때는
-    `grep -rn '24\.22\.1'` 로 전수 확인한다.
+  - ⭕ CI 도 같은 값을 쓴다(`pnpm/setup` 의 `runtime: node@^26.12.1`).
+  - ❌ 고칠 자리가 **여덟**이다(`package.json` · `.nvmrc` · `ci.yml` ·
+    `detect-targets/action.yml` · 세 `Dockerfile` 의 `ARG NODE_VERSION` ·
+    `pnpm-workspace.yaml` 의 `@types/node` · 이 ADR · 버전 문서). 숫자가 복제돼 있으므로
+    올릴 때는 `grep -rn '26\.12\.1'` 과 `grep -rn '26-slim'` 으로 전수 확인한다.
+  - ❌ **메이저를 옮기면 Docker 배포판도 같이 바뀐다.** `node:24-slim` 은 Debian
+    bookworm, `node:26-slim` 은 trixie 다(digest 대조 실측). 이 저장소는 `Dockerfile` 에
+    `apt-get install` 이 하나도 없어서 닿는 자리가 없었지만, 패치 상향과 달리 **메이저
+    상향은 OS 교체를 끼고 온다**는 점을 기억한다.
+  - ⚠️ `@types/node` 는 런타임 버전을 주장하지 않으므로, 안 올려도 타입 검사가 통과한다
+    (Node 26 + 24.x 타입으로 13/13 통과 실측). 조용히 어긋나므로 라인을 옮길 때 같이 올린다.
 - 상세: [03-setup/02-versions.md](../03-setup/02-versions.md)
 
 ## ADR-011 — 스타일은 Tailwind v4 로 가고, host 가 remote CSS 주소를 건다

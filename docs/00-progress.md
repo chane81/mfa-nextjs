@@ -1,5 +1,266 @@
 # 진행 상황
 
+## 2026-10-24 (48차) — Node 를 26 LTS 라인으로 옮긴다 (26.12.1)
+
+출발은 "26 은 아직 LTS 가 아닌데 쓰기 무리인가"라는 질문이었다. `nodejs/Release` 의
+`schedule.json` 을 보니 **전제가 뒤집혀 있었다.**
+
+| 라인 | start      | lts            | maintenance | end        | 비고               |
+| ---- | ---------- | -------------- | ----------- | ---------- | ------------------ |
+| v24  | 2025-05-06 | 2025-10-28     | 2026-10-20  | 2028-04-30 | **이미 maint.**    |
+| v25  | 2025-10-15 | —              | 2026-04-01  | 2026-06-01 | 홀수 · EOL         |
+| v26  | 2026-05-05 | **2026-10-28** | 2027-10-20  | 2029-04-30 | Active LTS 가 된다 |
+| v27  | 2027-04-22 | 2027-10-20     | —           | 2030-04-30 | alpha 2026-10-28   |
+
+둘 다 참이다. **26 은 나흘 뒤 LTS 로 올라가고, 24 는 나흘 전에 maintenance 로 내려갔다.**
+어제(47차) 올린 24.22.1 은 maintenance 라인의 보안 패치였다. 그래서 "LTS 라서 24 에
+머문다"는 설명은 2026-10-20 부로 더는 참이 아니었다.
+
+머무는 비용은 "패치를 못 받는다"가 아니다 — 24 는 2028-04-30 까지 보안 패치를 받는다.
+비용은 **"패치만 받는다"** 다(새 기능·개선 백포트 없음). 즉 급한 전환은 아니었고,
+양쪽 다 안전한 구간에서 라인을 옮겼다.
+
+### 고치기 전에 26 에서 먼저 돌려봤다
+
+순서를 거꾸로 했다 — 버전을 올리고 깨지는지 보는 대신, **올리기 전에 26 에서 전부
+돌려보고** 그 다음에 숫자를 고쳤다. `fnm` 이 그걸 가능하게 한다(셸 전역을 안 건드린다).
+
+```bash
+fnm install v26.12.1
+fnm exec --using=v26.12.1 -- pnpm test     # fnm default 는 손대지 않는다
+```
+
+막는 것을 찾으려고 세 군데를 봤다.
+
+**① 의존성의 `engines`** — 설치된 트리에서 직접 읽었다. 상한을 건 패키지가 없었다.
+
+| 패키지          | 버전   | `engines.node`                     |
+| --------------- | ------ | ---------------------------------- |
+| `next`          | 16.4.2 | `>=20.9.0`                         |
+| `vite`          | 8.2.1  | `^20.19.0 \|\| >=22.12.0`          |
+| `@rsbuild/core` | 2.1.13 | `^20.19.0 \|\| >=22.12.0`          |
+| `vitest`        | 4.1.11 | `^20.0.0 \|\| ^22.0.0 \|\| >=24`   |
+| `eslint`        | 10.8.1 | `^20.19.0 \|\| ^22.13.0 \|\| >=24` |
+| `typescript`    | 6.0.3  | `>=14.17`                          |
+| `sharp`         | 0.35.5 | `>=20.9.0`                         |
+
+**② 네이티브 바인딩** — 메이저 업그레이드가 터지던 전형적 원인이다. `.node` 파일의
+미해결 심볼을 직접 셌다(`nm -u`).
+
+| 바인딩                    | `napi_*` | `v8::` |
+| ------------------------- | -------- | ------ |
+| `@next/swc-darwin-arm64`  | 76       | 0      |
+| `@rspack/binding-*`       | 75       | 0      |
+| `@img/sharp-darwin-arm64` | 다수     | 0      |
+| `lightningcss-*`          | 55       | 0      |
+| `@tailwindcss/oxide-*`    | 38       | 0      |
+| `@rolldown/binding-*`     | 0(동적)  | 0      |
+
+전부 Node-API 다. **V8 내부 심볼을 직접 당기는 바인딩이 하나도 없다** — 그래서 Node
+메이저가 바뀌어도 `.node` 재빌드가 필요 없다.
+
+**③ ADR-008 의 타입 스트리핑** — 이 저장소에서 유일하게 Node 버전이 *기능*인 자리다.
+`packages/remote-config` 는 빌드 산출물 없이 `src/index.ts` 를 그대로 export 한다.
+두 버전에서 같은 것을 import 해 export 집합을 대조했다.
+
+```bash
+# cwd 를 패키지 안에 두어야 self-reference(exports 필드)가 먹는다
+fnm exec --using=v26.12.1 -- node --input-type=module \
+  -e 'const ns = await import("@mfa/remote-config"); console.log(Object.keys(ns).sort().join(", "))'
+```
+
+| 모듈                      | Node 24.22.1 | Node 26.12.1    |
+| ------------------------- | ------------ | --------------- |
+| `@mfa/remote-config`      | export 25개  | **동일한 25개** |
+| `@mfa/remote-config/node` | export 7개   | **동일한 7개**  |
+
+> 처음에 이 probe 를 scratchpad 에 `.mjs` 로 두고 돌렸다가 양쪽 모두
+> `Cannot find package '@mfa/remote-config'` 로 실패했다. Node 버전 문제가 아니라
+> **resolution 이 스크립트 위치에서 시작**하기 때문이다. `cwd` 를 패키지 안으로 옮기고
+> `-e` 로 돌려야 워크스페이스 링크가 보인다.
+
+### 고친 자리 여덟
+
+```bash
+grep -rn '26\.12\.1'   # 숫자가 복제돼 있다
+grep -rn '26-slim'
+```
+
+| 자리                                        | 값                       |
+| ------------------------------------------- | ------------------------ |
+| `package.json` 의 `engines.node`            | `>=26.12.1 <27`          |
+| `.nvmrc`                                    | `26.12.1`                |
+| `.github/workflows/ci.yml` (세 job)         | `runtime: node@^26.12.1` |
+| `.github/actions/detect-targets/action.yml` | `runtime: node@^26.12.1` |
+| 세 `Dockerfile` 의 `ARG NODE_VERSION`       | `26-slim`                |
+| `pnpm-workspace.yaml` 카탈로그              | `'@types/node': ^26.6.5` |
+| ADR-010                                     | 라인 개정 줄             |
+| `03-setup/02-versions.md`                   | 근거 · 스케줄 · CVE 표   |
+
+47차 때는 여섯이었고 Docker 를 **일부러 건드리지 않았다**(떠 있는 태그라 재빌드만 하면
+패치가 따라온다). 이번엔 다르다 — **메이저를 옮기려면 그 `ARG` 자체를 고쳐야 한다.**
+
+### Docker 메이저 상향은 Debian 교체를 끼고 온다
+
+Docker Hub manifest digest 를 대조했다(확인일 2026-10-24).
+
+| 태그           | 같은 digest 를 공유하는 태그                                |
+| -------------- | ----------------------------------------------------------- |
+| `node:24-slim` | `24.22.1-slim` · **`24.22.1-bookworm-slim`** · `24.22-slim` |
+| `node:26-slim` | `26.12.1-slim` · **`26.12.1-trixie-slim`** · `26.12-slim`   |
+
+Node 24→26 에 **Debian 12(bookworm) → 13(trixie)** 이 함께 온다. 노출면을 확인했다 —
+세 `Dockerfile` 에 `apt-get install` 이 **하나도 없다**(깔는 것은 `npm install -g pnpm@12.1.0`
+하나뿐). 그래서 배포판 교체가 닿을 자리가 없었다. 선빌드 바이너리는 glibc 가 올라가는
+방향에 안전하다.
+
+`node:26-slim` 이 가리키는 패치가 공교롭게 **26.12.1** — `engines` 하한과 같다.
+
+### `@types/node` 는 조용히 어긋난다
+
+Node 26 에서 `@types/node@24.13.3` 으로도 `typecheck` 가 **13/13 통과**했다(실측).
+타입 패키지는 런타임 버전을 주장하지 않는다. 그래서 안 올리면 아무 신호가 없고,
+26 에 추가된 API 는 타입에 안 보이고 24 에서 빠진 API 는 타입에 남는다.
+
+카탈로그를 `^26.6.5` 로 올렸다. `ts6.0` dist-tag 가 가리키는 버전이고(이 저장소
+typescript 6.0.3), 2026-10-09 공개다.
+
+### 라인을 옮기면 CVE 집합이 바뀐다
+
+47차에 두 건을 **"26.x 전용이라 우리와 무관"** 으로 적어 뒀다. 라인을 옮기니 그 둘이
+범위로 들어왔다. 둘 다 **low** 이고 26.12.1 에 이미 패치돼 있어 실질 노출은 없지만,
+"무관"의 근거가 버전이었다는 점은 기록해 둔다.
+
+| CVE             | 등급 | 내용                                                        | 접점        |
+| --------------- | ---- | ----------------------------------------------------------- | ----------- |
+| CVE-2026-106070 | low  | `zlib.ZipFile` 이 헤더 검증 실패 후 공격자 제어 바이트 반환 | 없음(아래)  |
+| CVE-2026-106071 | low  | Permission Model 와일드카드 radix 조회가 권한 과다 부여     | 없음(안 씀) |
+
+`zlib.ZipFile` 쪽은 한 번 더 봤다. 저장소 코드에 `ZipFile` · `node:zlib` · `unzip` 호출이
+없다. zip 을 다루는 유일한 자리는 `pnpm mf:types` 가 remote 타입 아카이브를 푸는
+경로인데 `@module-federation/dts-plugin` → **`adm-zip@0.6.0`**(userland)이고 Node 내장
+API 가 아니다 — CVE 경로와 다른 구현이다.
+
+따라서 26 라인 기준으로는 **CVE 10건 전부가 해당 범위**이고 전부 26.12.1 에 닫혀 있다
+(24 라인은 8건이었다).
+
+### L-1 이 메이저 두 칸에서도 똑같이 재현된다
+
+47차에 적은 함정 — `engines` 게이트는 pnpm 이 **실제로 설치할 일이 있을 때만** 돈다.
+이번에 반대 방향으로 확인했다. `engines` 가 `>=26.12.1 <27` 인 상태에서 Node 24.22.1 로:
+
+```
+$ fnm exec --using=v24.22.1 -- pnpm install
+Scope: all 12 workspace projects
+Already up to date
+Done in 6ms using pnpm v12.1.0
+```
+
+exit 0. **범위 이탈 폭과 무관하다** — 메이저 두 칸 밖이어도 설치할 일이 없으면 안 돈다.
+반대로 이번엔 `@types/node` 가 바뀌어 설치 작업이 생겼고, 그래서 게이트가 실제로 돌아
+Node 26 을 통과시켰다. known-issues L-1 에 추가 실측으로 붙였다.
+
+### 검증
+
+Node v26.12.1 · `@types/node` 26.6.5 · pnpm 12.1.0 (2026-10-24).
+turbo 캐시는 **전부 `--force` 로 우회했다** — 안 그러면 13/13 cache hit 로 "통과"가 찍히지만
+실제로는 아무것도 안 돈다.
+
+| 검사         | 결과                                             |
+| ------------ | ------------------------------------------------ |
+| `typecheck`  | 13/13 (0 cached) · 타입 에러 0                   |
+| `lint`       | 13/13 (0 cached) · 경고 1(기존, 아래)            |
+| `test`       | 51 파일 · 706개 전부 통과                        |
+| `build`      | 6/6 (0 cached)                                   |
+| `pnpm audit` | 60건 · **critical 0** (high 23 · mod 28 · low 9) |
+
+`lint` 경고 1건은 `vitest.config.ts:103` 의 `turbo/no-undeclared-env-vars`(CI) 로, Node
+24.22.1 에서도 똑같이 난다 — 이번 변경과 무관하다.
+
+**`pnpm audit` 이 47차의 50건에서 60건으로 늘었다. 내 변경 탓이 아니다.** main 의 락파일로
+같은 시점에 돌려 갈랐다 — main 도 60건(9 low · 28 moderate · 23 high)이다. 하루 사이
+권고 DB 가 바뀐 것이다. **audit 수치는 저장소의 스냅샷이 아니라 DB 의 스냅샷**이라는
+뜻이므로, 회차 간 비교에는 같은 시점의 대조군이 필요하다.
+
+#### remote SSR 이 실제로 실행됐다
+
+`build` 통과만으로는 부족하다 — 프리렌더가 remote 를 건너뛰고도 성공할 수 있다.
+remote 소스에만 있는 클래스를 산출물에서 추적했다.
+
+```
+시그니처 : repeat(auto-fill,minmax(220px,1fr))
+출처     : apps/remote-catalog/src/exposes/{ProductGrid,RelatedProducts}.tsx
+host 소스 : 없음                              ← 복제가 아니다
+host 산출 : .next/server/app/lab/{isr,cache}.html  ← 들어 있다
+```
+
+양쪽 remote 가 `mf-server.cjs` 를 냈고(cart 104.1 kB · catalog 61.52 kB), host 빌드가
+`serve-all-remotes` 로 :3001/:3002 에 dist 를 띄운 뒤 `next build` 프리렌더가 그것을
+HTTP 로 받아 실행했다. **Node 26 에서도 이 저장소의 중심 주장이 참이다.**
+
+`/` 의 프리렌더 HTML 은 0바이트인데 정상이다 — `ƒ (Dynamic)` 이라 빌드 때 안 만든다.
+`◐ (Partial Prerender)` 페이지에서 봐야 한다.
+
+#### Docker 이미지도 26-slim 에서 돌렸다
+
+`node:26-slim` 의 실체부터 확인했다(digest `sha256:36793bcb…` — 레지스트리로 잰 값과 일치).
+
+```
+$ docker run --rm node:26-slim sh -c 'node -v; npm -v; . /etc/os-release; echo $PRETTY_NAME; ldd --version | head -1'
+v26.12.1
+11.20.0
+Debian GNU/Linux 13 (trixie)
+ldd (Debian GLIBC 2.41-12+deb13u4) 2.41
+```
+
+`git` 바이너리는 **없다** — 24-slim 에서 실측했던 사실([04-dokploy.md](03-setup/04-dokploy.md))이
+26-slim 에서도 그대로다.
+
+`pnpm docker:up` 이 exit 0 으로 끝났다. 세 컨테이너 전부 healthy.
+
+| 이미지                      | 크기  | 상태    |
+| --------------------------- | ----- | ------- |
+| `mfa-nextjs-host`           | 312MB | healthy |
+| `mfa-nextjs-remote-catalog` | 274MB | healthy |
+| `mfa-nextjs-remote-cart`    | 273MB | healthy |
+
+컨테이너가 응답만 하는 게 아니라 **remote 를 실제로 당겨 서버에서 렌더하는지** 봤다.
+버전 경로 둘이 모든 응답에 걸려 있다(`/vtmvm13dyg/` catalog · `/vtmvm13m13/` cart).
+
+| 경로          | HTTP | bytes  | remote 전용 클래스         | remote 가 렌더한 텍스트     |
+| ------------- | ---- | ------ | -------------------------- | --------------------------- |
+| `/`           | 200  | 23,665 | O                          | 상품 목록 · 장바구니 · 결제 |
+| `/products/1` | 200  | 18,084 | O                          | 관련 상품 · 장바구니 · 결제 |
+| `/lab/ssr`    | 200  | 26,576 | O                          | 상품 목록 · 장바구니 · 결제 |
+| `/cart`       | 200  | 10,020 | —(이 화면엔 그리드가 없다) | 장바구니 · 결제             |
+| `/checkout`   | 200  | 10,963 | —(같음)                    | 장바구니 · 결제             |
+
+runner 스테이지는 빌더와 별도 `FROM` 이라 따로 확인했다 — 컨테이너 안에서 `node -v` 가
+`v26.12.1`, OS 가 trixie 다.
+
+> `docker compose build` 만으로는 host 이미지가 안 만들어진다. 프리렌더가 `:3001` 의
+> remote SSR 번들을 받아야 하는데 remote 가 안 떠 있어서다 — `ECONNREFUSED`. compose 를
+> 2단계로 나눠 둔 이유가 그것이고(`docker:up`), 이미 기록돼 있다. **Node 26 과 무관하다.**
+
+### 확인 못 한 것
+
+- **Dokploy 에서의 빌드.** 로컬 `docker compose` 와 Dokploy 는 같은 `Dockerfile` 을 쓰지만
+  빌드 환경이 다르다(네트워크 · 캐시 · 빌드 시크릿). `deploy` 실행이 그 확인 지점이다.
+- **26.x 에서의 장기 운용.** 이번 검증은 한 번의 전체 통과다.
+
+### 다음에 할 것
+
+- [ ] 2026-10-28 이후 `nodejs/dist/index.json` 에서 26.12.1 의 `lts` 가 `false` → 코드네임으로
+      바뀌는지 확인(지금은 `lts=false`)
+- [ ] `deploy` → Dokploy 에서도 세 이미지가 빌드되는지 확인(로컬 `docker:up` 은 통과했다)
+- [ ] jsdom · vitest 가 Node 26 내장 `localStorage` 에 맞춰지면 M-1 을 닫는다
+- [ ] `packages/contracts` 의 안 쓰는 `concurrently` devDependency 를 뺀다 (47차 이월)
+- [ ] `vite` · `undici` · `@vitest/mocker` · `adm-zip` · `fast-uri` — 소유자를 올려서 닫히는지
+      본다 (47차 이월)
+- [ ] `braces` 는 패치가 없다 — `@mfa/eslint-config` 의 의존 경로를 본다 (47차 이월)
+- [ ] 보안 릴리스 · LTS 전환 대응을 반복 가능하게 만들지 검토. 이번에 **라인 전환 시점을
+      사람이 눈으로 확인**해야 했다는 게 근거다(의존성 봇 · `pnpm audit` 을 CI 에)
+
 ## 2026-10-23 (47차) — 보안 상향: Node 24.22.1 · next 16.4.2 · critical 0
 
 2026-10-21 Node 보안 릴리스가 세 라인(26.x · 24.x · 22.x)에서 CVE 10건을 고쳤다.
@@ -13,7 +274,7 @@
 우회 둘(CVE-2026-106069 · CVE-2026-105483)과 keep-alive 응답 뒤섞임
 (CVE-2026-105481)도 같은 host → remote 경로에 붙는다.
 
-CVE 목록과 저장소 접점 표: [03-setup/02-versions.md](03-setup/02-versions.md#하한이-둘이다--기능-24190-보안-24221).
+CVE 목록과 저장소 접점 표: [03-setup/02-versions.md](03-setup/02-versions.md#node--패키지-매니저).
 
 ### 하한을 둘로 갈라 적었다
 

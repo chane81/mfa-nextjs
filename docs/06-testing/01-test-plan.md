@@ -293,4 +293,7 @@ remote 이름인지. 그 파일은 **아무것도 export 하지 않는다** — 
   @testing-library/jest-dom 7.0.1 / @vitejs/plugin-react 6.0.5.
 - 검증일: 2026-08-31. Node v24.19.0, pnpm 12.1.0 (619개 전부 통과).
 - 재검증: 2026-10-23. **Node v24.22.1**, pnpm 12.1.0, next 16.4.2 (51 파일 · 706개 전부 통과).
+- 재검증: 2026-10-24. **Node v26.12.1**, `@types/node` 26.6.5, pnpm 12.1.0 (51 파일 · 706개
+  전부 통과). Node 26 에서만 jsdom 프로젝트에 `localStorage` ExperimentalWarning 이 7건
+  찍히지만 실패는 아니다 — known-issues M-1.
   Node 보안 하한을 올린 뒤 확인했다(47차).

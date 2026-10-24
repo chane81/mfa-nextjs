@@ -12,7 +12,7 @@
 | 증상                                                                                     | 항목                                                                                                                                                                                |
 | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm install` 이 `@rspack/binding-*` 에서 멈춤 · 타임아웃                               | [8](#8-pnpm-설치-중-rspack-바이너리-타임아웃)                                                                                                                                       |
-| `ERR_PNPM_UNSUPPORTED_ENGINE` / `Expected version: >=24.22.1 <25`                        | Node 가 범위 밖이다 — [실행 방법 › 요구사항](../03-setup/01-getting-started.md#요구사항)                                                                                            |
+| `ERR_PNPM_UNSUPPORTED_ENGINE` / `Expected version: >=26.12.1 <27`                        | Node 가 범위 밖이다 — [실행 방법 › 요구사항](../03-setup/01-getting-started.md#요구사항)                                                                                            |
 | 포트가 안 비어서 기동 실패 / 옛 빌드가 계속 응답                                         | [0-1](#0-1-pkill--f-next-start-가-안-먹혀서-옛-빌드를-계속-테스트함), [B-4](#b-4-dev-서버가-떠-있으면-포트-충돌조차-안-난다), [B-4b](#b-4b-pnpm-start-가-자기-자신과-포트를-다툰다) |
 | `Directory import … is not supported` / `Cannot find module './x'`                       | dist 를 raw Node 로 로드했다 — [D-1](#d-1-확장자-없는-상대-경로는-번들러에서만-풀린다)                                                                                              |
 | `ERR_PNPM_FROZEN_LOCKFILE_WITH_OUTDATED_LOCKFILE`                                        | 실행 중인 pnpm 이 락파일에 기록된 `packageManager` 핀과 다르다 — [버전 › Node / 패키지 매니저](../03-setup/02-versions.md#node--패키지-매니저)                                      |
@@ -115,9 +115,51 @@
 
 ### 테스트
 
-| 증상                                                           | 항목                                                                    |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련) | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다) |
+| 증상                                                                                            | 항목                                                                                                                   |
+| ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련)                                  | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다)                                                |
+| `pnpm test` 에 `ExperimentalWarning: localStorage is not available` 가 7번 찍힘 (테스트는 통과) | Node 26 내장 전역과 jsdom 이 겹친다 — [M-1](#m-1-node-26-의-내장-localstorage-때문에-jsdom-테스트가-경고를-7번-찍는다) |
+
+## M. (48차) Node 26 라인으로 옮기며 드러난 것
+
+### M-1. Node 26 의 내장 `localStorage` 때문에 jsdom 테스트가 경고를 7번 찍는다
+
+Node 24 → 26 으로 올린 직후 `pnpm test` 출력에 없던 줄이 생겼다. **테스트는 전부
+통과한다**(51 파일 · 706개) — 실패가 아니라 소음이다.
+
+```
+(node:77625) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+```
+
+갈라 본 결과(실측 2026-10-24):
+
+| 조건                                   | 경고 건수 |
+| -------------------------------------- | --------- |
+| Node 24.22.1 · 전체                    | 0         |
+| Node 26.12.1 · `--project=unit` (node) | 0         |
+| Node 26.12.1 · `--project=dom` (jsdom) | **7**     |
+
+**저장소 코드가 원인이 아니다.** 런타임에서 `localStorage` 를 쓰는 자리가 없다 —
+이 저장소는 SSR 때문에 의도적으로 쿠키를 쓴다(근거:
+`packages/store/src/cart/cookie-storage.ts` 의 "왜 localStorage 가 아닌가"). 저장소에서
+`localStorage` 가 나오는 곳은 전부 주석·문서다.
+
+원인은 바깥에 있다. Node 26 이 `localStorage` 를 **내장 실험 기능**으로 넣었고, 그 전역은
+`--localstorage-file` 없이 접근하면 경고를 찍는다. jsdom 환경은 자기 `localStorage` 를
+전역에 심는데 그 과정에서 Node 쪽 전역을 건드린다. 7은 jsdom 워커 프로세스 수다
+(프로세스마다 한 번씩 — `(node:77625)` 처럼 PID 가 전부 다르다).
+
+| 이 경고가 뜻하는 것                          | 뜻하지 않는 것                  |
+| -------------------------------------------- | ------------------------------- |
+| Node 26 전역과 jsdom 전역이 같은 이름을 쓴다 | 테스트가 깨졌다                 |
+| jsdom · vitest 가 아직 26 에 맞춰지지 않았다 | 저장소가 `localStorage` 를 쓴다 |
+| 워커가 7개 떴다                              | 경고가 7개의 서로 다른 문제다   |
+
+대응: **아무것도 하지 않는다.** 끄려고 `--localstorage-file` 을 주면 안 쓰는 기능에
+파일 경로를 하나 만들게 되고, 그게 진짜 SSOT 가 아닌 설정 자리를 늘린다. jsdom 또는
+vitest 가 26 에 맞추면 사라진다. 여기 적어 두는 이유는 **출력이 달라진 이유를 찾을 때
+저장소 코드부터 뒤지게 되기 때문**이다 — 원인은 저장소에 없다.
 
 ## L. (47차) Node 보안 하한을 올리며 드러난 것
 
@@ -186,10 +228,14 @@ Done in 2ms using pnpm v12.11.2
 않는다 — 보안 하한은 기능 하한(24.19.0)보다 높을 뿐이어서, 구버전 Node 는 **조용히
 취약한 채로 돈다.** 이게 이 함정이 보안 문제인 이유다.
 
+48차 추가 실측(2026-10-24): 하한을 **메이저 두 칸** 올린 뒤에도(`>=26.12.1 <27` 에서
+Node 24.22.1 로 실행) `pnpm install` 이 `Already up to date` 로 **똑같이 통과**했다
+(exit 0). 범위 이탈 폭과 무관하다 — 설치할 일이 있느냐만 본다.
+
 대응: 하한을 올렸으면 `node -v` 를 직접 본다. `pnpm install` 의 침묵을 근거로 쓰지 않는다.
 
 ```bash
-node -v                      # v24.22.1 이어야 한다
+node -v                      # v26.12.1 이어야 한다
 fnm use                      # .nvmrc 를 읽는다
 fnm install                  # .nvmrc 의 버전이 없으면 받아온다
 ```
@@ -799,8 +845,8 @@ TypeError [ERR_UNKNOWN_FILE_EXTENSION]: Unknown file extension ".ts"
 
 | 자리                   | Node 고정                                 |
 | ---------------------- | ----------------------------------------- |
-| `ci.yml` 의 세 job     | O — `pnpm/setup` `runtime: node@^24.22.1` |
-| `package.json` engines | O — `>=24.22.1 <25`                       |
+| `ci.yml` 의 세 job     | O — `pnpm/setup` `runtime: node@^26.12.1` |
+| `package.json` engines | O — `>=26.12.1 <27`                       |
 | **detect job**         | **X — 러너 이미지가 정했다**              |
 
 `deploy` 워크플로는 `detect` 없이는 아무 job 도 못 뜬다. 그래서 이건 remote 하나가 아니라
