@@ -281,8 +281,9 @@ glibc 가 올라가는 방향(2.36 → 2.41)은 선빌드 바이너리에 안전
 실제로 돌렸다(2026-10-24). `node:26-slim` 안은 Node v26.12.1 · npm 11.20.0 ·
 Debian 13(trixie) · glibc 2.41 이고 `git` 은 없다(24-slim 과 같다). `pnpm docker:up` 이
 exit 0, 세 컨테이너 전부 healthy, host 가 remote 를 서버에서 렌더해 응답했다.
-상세는 [00-progress.md](../00-progress.md) 48차. 남은 것은 **Dokploy 빌드 환경**이다 —
-같은 `Dockerfile` 이지만 네트워크·캐시·빌드 시크릿이 다르다.
+Dokploy 배포(2026-10-24, `e99b2a0`)도 통과했다 — 세 앱이 같은 `Dockerfile` 로 다시
+빌드돼 올라갔고 라이브에서 remote 가 서버 렌더로 들어온다. 상세는
+[00-progress.md](../00-progress.md) 48차.
 
 ### `@types/node` 는 런타임 메이저를 따라간다
 

@@ -244,15 +244,43 @@ runner 스테이지는 빌더와 별도 `FROM` 이라 따로 확인했다 — �
 
 ### 확인 못 한 것
 
-- **Dokploy 에서의 빌드.** 로컬 `docker compose` 와 Dokploy 는 같은 `Dockerfile` 을 쓰지만
-  빌드 환경이 다르다(네트워크 · 캐시 · 빌드 시크릿). `deploy` 실행이 그 확인 지점이다.
 - **26.x 에서의 장기 운용.** 이번 검증은 한 번의 전체 통과다.
+
+#### Dokploy 배포까지 확인했다
+
+PR #19 를 머지(`e99b2a0`)하자 `ci` 와 `deploy` 가 같이 떴고 둘 다 통과했다.
+세 앱이 Dokploy 에서 **같은 `Dockerfile` 로 다시 빌드돼** 올라갔다(`status=done`).
+
+| job            | 소요     |
+| -------------- | -------- |
+| 배포 대상 판별 | 7초      |
+| cart 배포      | 1분 5초  |
+| catalog 배포   | 1분 43초 |
+| host 배포      | 1분 4초  |
+
+라이브에서 remote 가 **서버에서 렌더되는지** 확인했다.
+
+| 경로                           | HTTP | remote 전용 클래스 | remote 가 렌더한 텍스트     |
+| ------------------------------ | ---- | ------------------ | --------------------------- |
+| `mfa.lakegreen.net/`           | 200  | O                  | 상품 목록 · 장바구니 · 결제 |
+| `mfa.lakegreen.net/products/1` | 200  | O                  | 관련 상품 · 장바구니 · 결제 |
+| `mfa.lakegreen.net/lab/ssr`    | 200  | O                  | 상품 목록 · 장바구니 · 결제 |
+
+버전 경로가 **로컬 빌드와 다르다** — Dokploy 가 새로 빌드한 산출물이라는 뜻이다.
+각 remote 는 자기 버전 경로만 서빙한다(루트 `mf-manifest.json` 이 404 인 것은 설계대로다).
+
+| remote  | 버전 경로      | `exposes`                                           |
+| ------- | -------------- | --------------------------------------------------- |
+| catalog | `/vtmvm1h0ae/` | `ProductDetail` · `ProductGrid` · `RelatedProducts` |
+| cart    | `/vtmvm1gb1d/` | `CheckoutFlow` · `CartPanel` · `CartBadge`          |
+
+즉 Node 26.12.1 · Debian 13 기반 이미지로 **런타임 MF + remote SSR 이 운영에서 돈다.**
 
 ### 다음에 할 것
 
 - [ ] 2026-10-28 이후 `nodejs/dist/index.json` 에서 26.12.1 의 `lts` 가 `false` → 코드네임으로
       바뀌는지 확인(지금은 `lts=false`)
-- [ ] `deploy` → Dokploy 에서도 세 이미지가 빌드되는지 확인(로컬 `docker:up` 은 통과했다)
+- [x] `deploy` → Dokploy 에서도 세 이미지가 빌드되는지 확인 — 통과(위)
 - [ ] jsdom · vitest 가 Node 26 내장 `localStorage` 에 맞춰지면 M-1 을 닫는다
 - [ ] `packages/contracts` 의 안 쓰는 `concurrently` devDependency 를 뺀다 (47차 이월)
 - [ ] `vite` · `undici` · `@vitest/mocker` · `adm-zip` · `fast-uri` — 소유자를 올려서 닫히는지

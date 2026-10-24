@@ -8,7 +8,7 @@ import { createPrivateKey, generateKeyPairSync, sign } from 'node:crypto';
  * 여기서 형식을 하나라도 바꾸면 테스트는 자기들끼리만 맞는 라운드트립이 되어,
  * 실제 파이프라인이 갈라져도 초록으로 통과한다.
  *
- * Node 24 는 WebCrypto Ed25519 를 네이티브로 지원하므로 host 쪽 검증도 모킹 없이 돈다.
+ * Node 는 WebCrypto Ed25519 를 네이티브로 지원하므로(24 부터) host 쪽 검증도 모킹 없이 돈다.
  */
 export interface SigningKeyPair {
   /** `MF_SIGNING_KEY` — remote 빌드 파이프라인에만 둔다 */

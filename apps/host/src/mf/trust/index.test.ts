@@ -19,7 +19,7 @@ import {
 /**
  * host **서버**가 remote 코드를 받아 `new Function` 으로 실행한다. 여기가 그 앞을 막는
  * 세 겹(오리진 허용 목록 → 경로 형태 → 무결성·서명)이고, 앞의 것 없이는 뒤의 것도
- * 의미가 없다. Node 24 의 WebCrypto Ed25519 를 그대로 쓰므로 모킹이 없다.
+ * 의미가 없다. Node 의 WebCrypto Ed25519(24 부터 네이티브)를 그대로 쓰므로 모킹이 없다.
  */
 
 const ORIGINS = ['https://catalog.example.com', 'https://cart.example.com'];

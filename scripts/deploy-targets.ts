@@ -14,7 +14,7 @@
  * ⚠️ SSOT 를 **상대 경로 + `.ts` 확장자**로 들인다. detect job 은 체크아웃만 하고
  * `pnpm install` 을 하지 않기 때문이다(배포 대상을 정하려고 의존성 전체를 받을 이유가
  * 없다). 워크스페이스 별칭은 pnpm 심링크가 있어야 풀리므로 그 경로에서는 못 쓴다.
- * `packages/remote-config/src/index.ts` 에 import 가 하나도 없어서 Node 24 의 타입
+ * `packages/remote-config/src/index.ts` 에 import 가 하나도 없어서 Node 의 타입
  * 스트리핑만으로 그냥 읽힌다 — 그 파일에 import 를 추가하면 이 job 이 깨진다.
  *
  * 확장자를 붙이는 건 저장소 전역 규칙의 **예외**다. 근거는 `.claude/rules/mf-runtime.md`
