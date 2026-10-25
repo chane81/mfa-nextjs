@@ -36,62 +36,24 @@ const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = (rel: string): string =>
   readFileSync(resolve(REPO_ROOT, rel), 'utf8');
 
-/**
- * turbo.json 은 JSONC 다(블록 주석이 설계 근거를 들고 있다). 주석을 걷어내고 읽는다.
- *
- * ⚠️ 정규식으로는 안 된다. 이 파일의 값에 `".next/**"` 같은 글롭이 있어서
- * `/\*[\s\S]*?\*\//` 가 **문자열 안의 `/**` 부터** 먹어버린다(실측: 그 아래 태스크가
- * 통째로 사라지고 JSON 파싱이 엉뚱한 자리에서 깨진다). 그래서 문자열 안팎을 구분하며
- * 한 글자씩 지나간다.
- */
-function stripJsonc(text: string): string {
-  let out = '';
-  let inString = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i]!;
-
-    if (inString) {
-      out += char;
-      if (char === '\\') {
-        out += text[i + 1] ?? '';
-        i += 1;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inString = true;
-      out += char;
-      continue;
-    }
-
-    if (char === '/' && text[i + 1] === '*') {
-      const end = text.indexOf('*/', i + 2);
-      i = end === -1 ? text.length : end + 1;
-      continue;
-    }
-
-    if (char === '/' && text[i + 1] === '/') {
-      const end = text.indexOf('\n', i);
-      i = end === -1 ? text.length : end - 1;
-      continue;
-    }
-
-    out += char;
-  }
-
-  return out;
-}
-
 interface TurboConfig {
   tasks: Record<string, { dependsOn?: string[] } | undefined>;
 }
 
+/**
+ * turbo.json 은 **순수 JSON** 이다. 설계 근거는 주석이 아니라
+ * `docs/02-architecture/07-turbo-tasks.md` 에 둔다(49차). 주석을 다시 넣으면 여기서 죽는다.
+ */
 const turbo = (): TurboConfig => {
-  const parsed = JSON.parse(stripJsonc(read('turbo.json'))) as TurboConfig;
+  let parsed: TurboConfig;
+  try {
+    parsed = JSON.parse(read('turbo.json')) as TurboConfig;
+  } catch (cause) {
+    throw new Error(
+      'turbo.json 을 JSON 으로 읽지 못했습니다. 주석을 넣었다면 빼고 근거는 docs/02-architecture/07-turbo-tasks.md 에 쓰세요.',
+      { cause },
+    );
+  }
   if (!parsed.tasks) {
     throw new Error(
       'turbo.json 에서 `tasks` 를 찾지 못했습니다. 스키마가 바뀌었으면 이 파서를 같이 고치세요.',

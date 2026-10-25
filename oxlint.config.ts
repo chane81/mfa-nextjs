@@ -183,12 +183,12 @@ export default defineConfig({
     {
       /**
        * turbo 태스크 밖에서만 도는 파일. `pnpm test` 는 turbo 를 거치지 않고 vitest 를
-       * 직접 부른다(turbo.json 의 `//#typecheck:tests` 주석).
+       * 직접 부른다(docs/02-architecture/07-turbo-tasks.md).
        *
        * `turbo/no-undeclared-env-vars` 는 "turbo 가 이 env 를 걸러낼 것"을 경고하는데,
        * 여기는 turbo 가 끼지 않으니 그 전제가 없다. 경고를 따라 `globalEnv` 에 넣으면
        * 그 값이 바뀔 때마다 **모든 태스크가 캐시를 놓친다** — `TZ` 때 이미 그렇게 판단해
-       * 뺐다(turbo.json 의 `TZ` 주석). `CI`(vitest.config.ts 의 `slowTestThreshold`)도 같다.
+       * 뺐다(같은 문서의 `globalEnv` 절). `CI`(vitest.config.ts 의 `slowTestThreshold`)도 같다.
        */
       files: ['vitest.config.ts', 'tests/**', '**/*.test.{ts,tsx}'],
       rules: {

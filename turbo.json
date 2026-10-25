@@ -4,90 +4,17 @@
   "globalDependencies": [".env", "pnpm-lock.yaml"],
   "globalEnv": [
     "NODE_ENV",
-    /**
-     * remote 별 주소 설정 전체를 **와일드카드 한 줄**로 받는다. 이름 하나하나를 적으면
-     * remote 를 추가할 때마다 `packages/remote-config` 와 이 파일을 같이 고쳐야 하는데,
-     * 그러면 SSOT 가 반쪽이 된다. turbo 는 접두사 와일드카드를 지원하므로 이름 목록을
-     * 여기 복제하지 않아도 된다.
-     *
-     *   REMOTE_*  → remote 오리진(…_PUBLIC_URL — remote 당 이거 하나다),
-     *               신뢰 경계(REMOTE_ALLOWED_ORIGINS)
-     *
-     * 브라우저용 매니페스트 URL 과 host 서버용 SSR 번들 URL 은 전부 `…_PUBLIC_URL` 에서
-     * 파생된다. 파일명은 `MF_FILES` 에 있고 코드가 붙인다 — env 로 오지 않는다.
-     *
-     * 여기 등록하지 않은 변수는 turbo 가 태스크 환경에서 걸러낸다(strict env).
-     */
     "REMOTE_*",
-    /**
-     * 위 `REMOTE_*_PUBLIC_URL` 을 순회해 만든 매니페스트 URL 들을 `next.config.ts` 가
-     * 이 이름으로 번들에 굽는다(그래야 host 코드가 remote 이름을 몰라도 된다 — 그쪽 주석 참고).
-     * 보통은 환경에서 오지 않지만, 밖에서 직접 넣어 덮어쓰는 것도 유효한 사용이라
-     * turbo 가 캐시 키로 추적하게 둔다. remote 개수와 무관한 단일 이름이다.
-     */
     "MFA_REMOTE_WEB_ENTRIES",
-    /**
-     * MF 운영 변수. remote 개수와 무관한 단일 값들이라 그대로 나열한다.
-     *   MF_REVALIDATE_SECRET  재배포 → host 캐시 무효화 웹훅 시크릿
-     *   MF_SELF_ORIGIN        warm 자기호출 주소 (기본 루프백, 보통 미설정)
-     *   MF_REMOTE_PUBLIC_KEY  매니페스트 서명 검증용 공개키 (host)
-     *   MF_SIGNING_KEY        매니페스트 서명용 개인키 (remote 파이프라인 전용)
-     *   MF_REQUIRE_*          서명·무결성 강제 여부
-     * 신뢰 경계 배경: docs/04-experiments/03-cache-modes.md 발견 9
-     */
     "MF_*",
-    // Next 서버가 실제로 바인딩한 포트. warm 자기호출 주소를 만들 때 읽는다.
     "PORT",
-    // host dev 가 remote 를 기다리는 시간 (scripts/wait-for-remotes.ts).
-    // 등록 전에는 `WAIT_FOR_REMOTES_TIMEOUT=1` 을 줘도 60초를 다 기다렸다 — 실측.
     "WAIT_FOR_REMOTES_TIMEOUT"
-
-    /**
-     * ⚠️ `TZ` 는 여기 넣지 않는다.
-     *
-     * `globalEnv` 에 든 값이 바뀌면 **모든 태스크가 캐시를 놓친다**(turbo 문서:
-     * "any change to these variables will cause all tasks to miss the cache").
-     * 그런데 `TZ` 를 읽는 건 vitest 테스트 하나뿐이고 `pnpm test` 는 애초에 turbo 를
-     * 안 탄다(아래 `//#typecheck:tests` 주석 참고) — 얻는 것 없이 전역 캐시만 깨는 셈이었다.
-     *
-     * `turbo/no-undeclared-env-vars` 경고 때문에 넣었었는데, 그 테스트가
-     * `process.env.TZ` 대신 `vi.stubEnv('TZ', …)` 를 쓰게 되면서 경고 자체가 사라졌다.
-     */
   ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
-    /**
-     * host 빌드는 순수한 컴파일이 아니다. 프리렌더 중에 remote 의 SSR 번들을 HTTP 로 받아
-     * 실행하므로(`apps/host/src/mf/server-loader.ts`) 빌드 시점에 remote 오리진이 살아 있어야 한다.
-     * 배포에서는 remote 가 이미 떠 있어서 안 보이던 요구사항이다.
-     *
-     * 그래서 두 가지가 필요하다.
-     *   ① remote 를 먼저 빌드한다        → 여기서 선언한다
-     *   ② 빌드된 dist 를 띄운 채로 둔다   → turbo 가 못 한다
-     *
-     * ②를 turbo 로 쓰면 `with`(사이드카) + 유한 readiness 프로브 조합인데, 사이드카가
-     * `persistent: true` 라 host 빌드가 끝나도 죽지 않아 **`turbo run build` 가 종료하지 않는다**
-     * (실측). 그 패턴은 Ctrl-C 로 끝내는 `dev` 용이지 반드시 exit 해야 하는 `build` 용이 아니다.
-     * 그래서 ②는 host 의 `build` 스크립트가 `scripts/serve-all-remotes.ts` 로 처리한다 —
-     * `REMOTE_LIST` 를 순회해 정적 서버를 in-process 로 전부 띄우고 `next build` 를 자식으로
-     * 돌린 뒤, 빌드가 끝나면(또는 시그널을 받으면) 같이 내린다. 띄울 목록이 SSOT 에서
-     * 나오므로 remote 를 추가해도 이 파일도 그 스크립트도 안 바뀐다.
-     *
-     * 준비 대기는 따로 안 한다. 서버 바인딩은 +1ms, `next build` 의 첫 remote 요청은
-     * +6451ms 다(실측). 컴파일·타입체크가 그 앞을 막고 있어서 경쟁이 성립하지 않는다.
-     *
-     * ⚠️ 패키지 스코프 설정은 기본 `build` 를 **상속하지 않고 대체**한다. outputs 를 다시 적는 이유다.
-     *
-     * `inputs` 의 `.env*` 는 보험이다. turbo 의 기본 입력 집합은 git 이 추적하는 파일이라
-     * gitignore 된 `.env.local` 이 빠지는데, 그 파일에 `REMOTE_*_PUBLIC_URL` 을 적으면
-     * **프리렌더 결과가 거기 달린다**. 없으면 오리진을 바꿔도 캐시된 옛 `.next` 가 그대로
-     * 복원된다(실측: FULL TURBO). 지금 저장소에 `.env.local` 은 없다 — 기본값이 코드에
-     * 있어서 필요 없다 — 하지만 누가 만들면 그 순간 이 줄이 일한다.
-     * `$TURBO_DEFAULT$` 는 기본 집합을 유지하면서 덧붙이라는 뜻이다.
-     */
     "@mfa/host#build": {
       "dependsOn": [
         "^build",
@@ -97,21 +24,6 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
-
-    /**
-     * 이미지용 host 빌드. `build` 와 산출물은 같고 **remote 게이트만 없다.**
-     *
-     * 이미지 안에서 remote 는 이미 배포된 공개 도메인이다. 워크스페이스 remote 를 빌드할
-     * 이유가 없을 뿐 아니라, 빌드해버리면 catalog 빌드가 깨질 때 host 배포까지 같이 깨진다 —
-     * 이 저장소가 증명하려는 독립 배포가 빌드 그래프에서 다시 묶인다.
-     *
-     * 이름을 나눠 끊는다. `--filter` 는 `pkg#task` 의존을 필터와 무관하게 끌고 오므로
-     * 같은 `build` 이름으로는 못 끊는다(끊으려면 Dockerfile 이 `--only` 같은 플래그로
-     * turbo.json 을 되돌려야 하고, 그러면 의도가 두 파일에 흩어진다).
-     *
-     * 로컬에서 이걸 직접 부를 일은 없다. remote 가 안 떠 있으면 프리렌더가 ECONNREFUSED 로
-     * 죽는다 — 그게 `build` 가 감싸주는 부분이다.
-     */
     "@mfa/host#docker:build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
@@ -121,95 +33,26 @@
       "cache": false,
       "persistent": true
     },
-
-    /**
-     * host 는 remote 가 준비된 뒤에 뜬다.
-     *
-     * turbo 로는 "remote dev 가 먼저" 를 직접 못 쓴다 — persistent 태스크에는 의존할 수
-     * 없기 때문이다(끝나지 않는 태스크에 의존하면 의존하는 쪽이 영영 안 돈다. turbo 가
-     * `persistent: true` 로 그 상황을 막는다). `with` 는 동시 실행이지 순서가 아니다.
-     *
-     * 그래서 **끝나는** 태스크로 준비를 기다리게 하고 host 만 거기에 의존시킨다.
-     * `dev` 전체에 걸면 remote 도 이 태스크를 기다리게 되어 교착한다 — 대기 태스크는
-     * remote 가 뜨기를 기다리는데 remote 는 대기 태스크가 끝나기를 기다린다.
-     *
-     * 근거: scripts/wait-for-remotes.ts
-     */
     "@mfa/host#dev": {
       "cache": false,
       "persistent": true,
       "dependsOn": ["//#dev:wait-remotes"]
     },
-
-    // 캐시하면 두 번째 실행부터 대기를 건너뛰어 존재 이유가 사라진다
     "//#dev:wait-remotes": {
       "cache": false
     },
-    /**
-     * ⚠️ `pnpm start` 는 루트에서 `pnpm build && turbo run start` 로 부른다. 순서가 필요하다.
-     *
-     * host 의 `build` 는 빌드하는 동안 3001/3002 에 정적 서버를 띄운다. 그런데 remote 의
-     * `start` 도 같은 포트다. `turbo run start` 만 부르면 둘이 **동시에** 스케줄되어
-     * EADDRINUSE 로 같이 죽는다(`start` 는 자기 패키지의 `build` 만 기다린다).
-     *
-     * 먼저 `pnpm build` 로 빌드를 끝내두면 여기서는 캐시 히트라 host 빌드가 실행되지
-     * 않고(따라서 임시 서버도 안 뜨고) remote 만 포트를 잡는다.
-     */
     "start": {
       "dependsOn": ["build"],
       "cache": false,
       "persistent": true
     },
-    /**
-     * `lint` 태스크는 없다. 루트 `pnpm lint` 가 oxlint 를 **저장소 전체에 한 번** 돌린다.
-     * oxlint 는 전체를 0.1초 안에 끝내서 패키지별로 쪼개 캐시할 게 없고, 규칙은
-     * 루트 `oxlint.config.ts` 한 곳에 overrides 로 모여 있다(ADR-028).
-     */
     "typecheck": {
       "dependsOn": ["^build"]
     },
-
-    /**
-     * `scripts/` 는 워크스페이스 패키지가 아니라 루트에 있어서 위의 패키지 태스크에 안 잡힌다.
-     * 루트 태스크(`//#…`)로 따로 걸어야 `turbo run typecheck` 에 포함된다.
-     *
-     * `^build` 가 필요한 이유: `stamp-remote-version.ts` 와 `wait-for-remotes.ts` 가
-     * `@mfa/remote-config` 를 읽는데, 그 패키지는 빌드가 없지만 tsc 가 타입을 풀려면
-     * 워크스페이스 그래프가 서 있어야 한다.
-     */
-    /**
-     * `packages/utils` 가 inputs 에 있는 이유: `scripts/*.test.ts` 가
-     * `@mfa/utils/test/*` 를 import 하는데 그 패키지는 **빌드가 없어서**
-     * `exports` 가 소스를 그대로 가리킨다 — 헬퍼 소스가 **이 프로그램 안에** 들어온다
-     * (`tsc -p tsconfig.json --listFiles` 로 확인). 빼두면 헬퍼를 깨도 turbo 가
-     * 캐시된 PASS 를 재생한다. `^build` 로는 안 잡힌다(빌드 태스크가 없으니 건너뛴다).
-     */
     "//#typecheck:scripts": {
       "dependsOn": ["^build"],
       "inputs": ["scripts/**/*.ts", "packages/utils/src/**", "tsconfig.json"]
     },
-
-    /**
-     * `tests/` 도 `scripts/` 와 같은 처지다 — 워크스페이스 패키지가 아니라 루트에 있어서
-     * 패키지 태스크에 안 잡힌다. 루트 태스크로 걸어야 `turbo run typecheck` 에 붙는다.
-     *
-     * `^build` 를 걸지 않는다. 테스트는 `vitest.config.ts` 와 `tsconfig.test.json` 의 alias 로
-     * 워크스페이스 패키지의 **`src` 를 직접** 가리키므로 `dist` 가 필요 없다. 걸어두면
-     * 테스트 한 줄 고칠 때마다 전체 빌드를 기다리게 된다.
-     *
-     * ⚠️ `test` 는 여기 없다. `pnpm test` 는 turbo 를 거치지 않고 vitest 를 직접 부른다 —
-     * 패키지별 대응 태스크가 없어서 turbo 가 더해줄 게 캐시뿐인데, 그 대가로
-     * `pnpm test --project=dom` 같은 러너 플래그가 turbo 에 먹혀버린다(`-- --project=dom` 이 된다).
-     * 매일 쓰는 쪽을 살렸다.
-     *
-     * inputs 에 앱·패키지의 src 글롭은 넣지 않는다. 소스 옆 테스트는 **각 패키지
-     * tsconfig 가** 검사하고, `tsconfig.test.json` 이 include 하는 건 루트 `tests` 와
-     * `vitest.config.ts` 뿐이다 — `--listFiles` 로 확인하면 이 프로그램에 그쪽 파일은
-     * 하나도 안 들어온다. 넣으면 소스를 고칠 때마다 영향받을 수 없는 검사의 캐시가 날아간다.
-     *
-     * ⚠️ 이 파일의 블록 주석 안에 `*` 와 `/` 가 붙은 글롭을 적으면 안 된다.
-     * turbo 의 JSONC 파서가 그 자리를 주석 끝으로 읽고 파싱이 통째로 깨진다(실측).
-     */
     "//#typecheck:tests": {
       "inputs": ["tests/**", "vitest.config.ts", "tsconfig.test.json"]
     },
