@@ -23,8 +23,8 @@
     "typecheck": "turbo run typecheck typecheck:scripts typecheck:tests",
     "typecheck:scripts": "tsc -p tsconfig.json --noEmit",
     "typecheck:tests": "tsc -p tsconfig.test.json --noEmit",
-    "format": "oxfmt && dockerfmt -w -n apps/*/Dockerfile",
-    "format:check": "oxfmt --check && dockerfmt -c -n apps/*/Dockerfile",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "clean": "turbo run clean && rm -rf node_modules",
     "mf:types": "pnpm --filter @mfa/contracts mf:types"
   },
@@ -32,7 +32,6 @@
     "@mfa/remote-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
     "@mfa/utils": "workspace:*",
-    "@reteps/dockerfmt": "0.5.4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",

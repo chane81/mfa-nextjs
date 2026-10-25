@@ -175,9 +175,6 @@ importers:
       '@mfa/utils':
         specifier: workspace:*
         version: link:packages/utils
-      '@reteps/dockerfmt':
-        specifier: 0.5.4
-        version: 0.5.4
       '@testing-library/dom':
         specifier: ^10.4.1
         version: 10.4.1
@@ -1313,31 +1310,6 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [win32]
-
-  '@reteps/dockerfmt-darwin-arm64@0.5.4':
-    resolution: {integrity: sha512-urMqV+dQyvVI8/WrXwClX9e1PEyS35wFdwJjpZYmL09AkV4Io5U1oam8UBKK7jZk0+YsdF88ay6e86Kn6DIyQg==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@reteps/dockerfmt-darwin-x64@0.5.4':
-    resolution: {integrity: sha512-fJORy6DFxbgDiMqxpLTPZlb5KUY0Vq0iR4NGnyKnuYZ9LdZUS508DK2kt/AJ87/jIKNV1qRG0JXG1Tc6xdvWjw==}
-    cpu: [x64]
-    os: [darwin]
-
-  '@reteps/dockerfmt-linux-arm64@0.5.4':
-    resolution: {integrity: sha512-6pVakO06eXtDuvxy1Dnjs/gQyUoGGycle8PRSt5IFRwLi/AVaOQwfkfmW0WP8VH9wNUeti6BfJ3ksTn2G+XMxg==}
-    cpu: [arm64]
-    os: [linux]
-
-  '@reteps/dockerfmt-linux-x64@0.5.4':
-    resolution: {integrity: sha512-OD6SIlUV1D4TgJoTui3FMBAZsGbTSPYsiT0BKhD6jMUcJb3GpFTa7dY9rL8rP9FUqfL7OTHVUGUOL4Rh64Olog==}
-    cpu: [x64]
-    os: [linux]
-
-  '@reteps/dockerfmt@0.5.4':
-    resolution: {integrity: sha512-HEGgXVVOb+JtGUSSzXl/XPKFIZjMDTUoHarCjaQdkY+cb5M9K/O3b5xm+x0IPIk3SfHurbc0bSgcFsQlzjitxA==}
-    engines: {node: ^v12.20.0 || ^14.13.0 || >=16.0.0}
-    hasBin: true
 
   '@rolldown/binding-android-arm64@1.2.4':
     resolution: {integrity: sha512-jHC2cnyKz5xU2fhECtFl8OZ83cYNt13GZQD+0uMJ/X3o+ijmd56okHhTUwxVSHPx1IRVIJEZ1/1pPzeLCU6XKA==}
@@ -3605,25 +3577,6 @@ snapshots:
 
   '@oxlint/binding-win32-x64-msvc@1.89.0':
     optional: true
-
-  '@reteps/dockerfmt-darwin-arm64@0.5.4':
-    optional: true
-
-  '@reteps/dockerfmt-darwin-x64@0.5.4':
-    optional: true
-
-  '@reteps/dockerfmt-linux-arm64@0.5.4':
-    optional: true
-
-  '@reteps/dockerfmt-linux-x64@0.5.4':
-    optional: true
-
-  '@reteps/dockerfmt@0.5.4':
-    optionalDependencies:
-      '@reteps/dockerfmt-darwin-arm64': 0.5.4
-      '@reteps/dockerfmt-darwin-x64': 0.5.4
-      '@reteps/dockerfmt-linux-arm64': 0.5.4
-      '@reteps/dockerfmt-linux-x64': 0.5.4
 
   '@rolldown/binding-android-arm64@1.2.4':
     optional: true

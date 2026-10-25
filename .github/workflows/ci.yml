@@ -70,7 +70,7 @@ jobs:
       # (`typecheck:scripts` · `typecheck:tests`)를 함께 돌린다.
       # `lint:docker` 는 Dockerfile 을 BuildKit 빌드 검사(`docker build --check`)로 본다.
       # 빌드는 하지 않는다. 러너에 docker 가 있어서 따로 설치할 게 없다.
-      # `format:check` 는 oxfmt + dockerfmt 다.
+      # `format:check` 는 oxfmt 다. Dockerfile 은 포매터를 두지 않는다(ADR-028 보강).
       - run: pnpm lint
       - run: pnpm lint:docker
       - run: pnpm typecheck

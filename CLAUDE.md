@@ -62,7 +62,7 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 | `pnpm lint:docker` | Dockerfile 을 `docker build --check` 로 본다(docker 필요)             |
 | `pnpm typecheck`   | 네트워크 없이 돈다 — `@mf-types` 를 커밋해서 그 성질을 지킨다         |
 | `pnpm mf:types`    | remote 에서 MF DTS 타입을 다시 받아온다 (remote 기동 전제)            |
-| `pnpm format`      | oxfmt(설정 `oxfmt.config.ts`) + Dockerfile 은 dockerfmt               |
+| `pnpm format`      | oxfmt. 설정은 `oxfmt.config.ts`                                       |
 
 `pnpm build` 통과 = "Next 16 에서 런타임 MF + SSR 이 된다"는 이 저장소의 주장이 아직 참이라는 뜻이다.
 그래서 빌드 실패를 우회하지 말고 원인을 고친다.
