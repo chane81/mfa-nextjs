@@ -405,9 +405,8 @@ describe('서명 계약 라운드트립 — stamp(서명) ↔ host(검증)', () 
      * 것이라 둘이 같이 틀려도 초록으로 통과할 수 있다. 여기서는 배포가 실제로 부르는
      * `scripts/stamp-remote-version.ts` 의 `signManifest` 를 그대로 태운다.
      */
-    const { signManifest } = await import(
-      '../../../../../scripts/stamp-remote-version'
-    );
+    const { signManifest } =
+      await import('../../../../../scripts/stamp-remote-version');
     const { privateKey, publicKey } = generateSigningKeyPair();
     vi.stubEnv('MF_REMOTE_PUBLIC_KEY', publicKey);
     vi.stubEnv('MF_REQUIRE_SIGNATURE', '1');

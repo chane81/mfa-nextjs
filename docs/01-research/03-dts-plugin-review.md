@@ -228,12 +228,12 @@ import type { RemoteModuleMap } from '@mfa/contracts';
 
 /** `catalog/X` 계약 키 → `./X` expose 키 매핑을 타입으로 강제 */
 type CatalogExposes = {
-  [K in Extract<
-    keyof RemoteModuleMap,
-    `catalog/${string}`
-  > as K extends `catalog/${infer N}`
-    ? `./${N}`
-    : never]: RemoteModuleMap[K]['default'];
+  [
+    K in Extract<
+      keyof RemoteModuleMap,
+      `catalog/${string}`
+    > as K extends `catalog/${infer N}` ? `./${N}` : never
+  ]: RemoteModuleMap[K]['default'];
 };
 
 const exposes: CatalogExposes = {

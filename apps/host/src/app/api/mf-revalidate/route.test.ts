@@ -201,9 +201,8 @@ describe('성공 경로 — warm-then-revalidate', () => {
   it('버전·번들 태그를 먼저 깨고, warm 이 끝난 뒤에 페이지 태그를 깬다', async () => {
     const { POST, fetchMock, revalidateTag } = await world();
     const { remoteVersionTag } = await import('@/mf/versions/server');
-    const { remoteBundleTag, remoteCacheTag } = await import(
-      '@/mf/loader/server'
-    );
+    const { remoteBundleTag, remoteCacheTag } =
+      await import('@/mf/loader/server');
 
     await POST(request());
 

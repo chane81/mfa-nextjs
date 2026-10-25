@@ -220,10 +220,10 @@ async function loadServerBundle(
     throw new Error(
       timedOut
         ? `remote '${remote}' 가 ${REMOTE_FETCH_TIMEOUT_MS}ms 안에 SSR 번들을 다 주지 못했습니다: ${url}. ` +
-          `연결은 됐으나 응답이 끝나지 않았습니다 — 배포 중이거나 프록시에 막힌 상태일 수 있습니다.`
+            `연결은 됐으나 응답이 끝나지 않았습니다 — 배포 중이거나 프록시에 막힌 상태일 수 있습니다.`
         : `remote '${remote}' SSR 번들을 가져오지 못했습니다: ${url}. ` +
-          `그 오리진에 remote 가 떠 있는지 확인하세요 — dev 는 \`pnpm dev\`, ` +
-          `빌드 산출물은 \`pnpm --filter @mfa/remote-${remote} start\` 로 뜹니다.`,
+            `그 오리진에 remote 가 떠 있는지 확인하세요 — dev 는 \`pnpm dev\`, ` +
+            `빌드 산출물은 \`pnpm --filter @mfa/remote-${remote} start\` 로 뜹니다.`,
       { cause },
     );
   }
