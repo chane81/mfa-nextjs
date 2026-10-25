@@ -68,8 +68,11 @@ jobs:
       # `lint` 는 oxlint 가 저장소 전체(테스트 · scripts 포함)를 한 번에 돈다.
       # `typecheck` 는 루트 스크립트가 turbo 로 패키지 태스크와 루트 태스크
       # (`typecheck:scripts` · `typecheck:tests`)를 함께 돌린다.
-      # `format:check` 는 oxfmt 다.
+      # `lint:docker` 는 Dockerfile 을 BuildKit 빌드 검사(`docker build --check`)로 본다.
+      # 빌드는 하지 않는다. 러너에 docker 가 있어서 따로 설치할 게 없다.
+      # `format:check` 는 oxfmt + dockerfmt 다.
       - run: pnpm lint
+      - run: pnpm lint:docker
       - run: pnpm typecheck
       - run: pnpm format:check
 
