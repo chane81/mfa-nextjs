@@ -53,8 +53,8 @@ COPY packages/utils/package.json packages/utils/
 # 네트워크/공급망 설정은 base 스테이지의 pnpm_config_* 참고.
 RUN --mount=type=cache,target=/pnpm/store,sharing=locked \
     pnpm install --frozen-lockfile \
-    --filter '!@mfa/host' \
-    --filter '!@mfa/remote-cart'
+      --filter '!@mfa/host' \
+      --filter '!@mfa/remote-cart'
 
 FROM base AS builder
 COPY --from=deps /repo/node_modules ./node_modules
