@@ -124,7 +124,7 @@ export default function ProductGrid({ … }: ProductGridProps) { … }
 
 **이 remote 는 `@mfa/contracts` 의 배럴만 쓴다.** `@mfa/contracts/remote` 를 import 하면
 그 순간 remote 가 자기 빌드 산출물(`@mf-types`)을 요구하는 순환이 생긴다.
-이 규칙은 각 remote 의 `eslint.config.js` 가 `no-restricted-imports` 로 막는다 —
+이 규칙은 루트 `oxlint.config.ts` 의 remote override 가 `no-restricted-imports` 로 막는다 —
 어기면 결국 빌드가 죽지만 에러가 모듈 해석 실패로만 보여 원인을 안 가리킨다.
 
 ## dev 기동 순서

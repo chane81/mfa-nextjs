@@ -58,10 +58,10 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 | `pnpm dev`       | 프로세스 5개(host 1 + remote 2 × web·ssr). host 는 remote 를 기다린다 |
 | `pnpm build`     | 전체 빌드. **host 프리렌더가 remote SSR 번들을 실제로 실행한다**      |
 | `pnpm test`      | Vitest 4. `--project=unit`(node) / `--project=dom`(jsdom) 로 좁힌다   |
-| `pnpm lint`      | ESLint 10 flat config                                                 |
+| `pnpm lint`      | oxlint. 설정은 루트 `oxlint.config.ts` 한 파일                        |
 | `pnpm typecheck` | 네트워크 없이 돈다 — `@mf-types` 를 커밋해서 그 성질을 지킨다         |
 | `pnpm mf:types`  | remote 에서 MF DTS 타입을 다시 받아온다 (remote 기동 전제)            |
-| `pnpm format`    | prettier                                                              |
+| `pnpm format`    | oxfmt. 설정은 루트 `oxfmt.config.ts`                                  |
 
 `pnpm build` 통과 = "Next 16 에서 런타임 MF + SSR 이 된다"는 이 저장소의 주장이 아직 참이라는 뜻이다.
 그래서 빌드 실패를 우회하지 말고 원인을 고친다.

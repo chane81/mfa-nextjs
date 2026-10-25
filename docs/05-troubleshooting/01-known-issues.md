@@ -107,11 +107,14 @@
 
 ### lint · 툴체인
 
-| 증상                                            | 항목                                                                                  |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `eslint-plugin-react` 가 ESLint 10 에서 크래시  | [4](#4-eslint-plugin-react-7375-가-eslint-10-에서-크래시)                             |
-| `react-hooks@7` 이 렌더 중 컴포넌트 생성을 막음 | [5](#5-react-hooks7--렌더-중-컴포넌트-생성-금지)                                      |
-| `@next/next/no-html-link-for-pages` 오탐        | [6](#6-multi-zone-경계에서-nextnextno-html-link-for-pages-오탐-앱-삭제됨) (앱 삭제됨) |
+| 증상                                                                      | 항목                                                                                                      |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `eslint-plugin-react` 가 ESLint 10 에서 크래시                            | [4](#4-eslint-plugin-react-7375-가-eslint-10-에서-크래시) (ESLint 시절)                                   |
+| `oxlint-disable-next-line` 을 달았는데 에러가 그대로                      | 설명 주석이 사이에 끼었다 — [N-1](#n-1-oxlint-disable-next-line-은-바로-다음-줄에만-걸린다)               |
+| oxlint 가 `react(purity)` 로 `Date` 를 잡는데 ESLint 는 안 잡았다         | 판정이 갈린다 — [N-2](#n-2-reactpurity-판정이-eslint-의-react-hookspurity-와-갈린다)                      |
+| `pnpm lint` 가 `docs/visual/cinema/engine.js` 의 `no-var` 를 수십 건 보고 | 루트 한 번 실행은 범위가 저장소 전체다 — [N-3](#n-3-루트에서-한-번-돌리면-린트-범위가-저장소-전체가-된다) |
+| `react-hooks@7` 이 렌더 중 컴포넌트 생성을 막음                           | [5](#5-react-hooks7--렌더-중-컴포넌트-생성-금지)                                                          |
+| `@next/next/no-html-link-for-pages` 오탐                                  | [6](#6-multi-zone-경계에서-nextnextno-html-link-for-pages-오탐-앱-삭제됨) (앱 삭제됨)                     |
 
 ### 테스트
 
@@ -119,6 +122,69 @@
 | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련)                                  | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다)                                                |
 | `pnpm test` 에 `ExperimentalWarning: localStorage is not available` 가 7번 찍힘 (테스트는 통과) | Node 26 내장 전역과 jsdom 이 겹친다 — [M-1](#m-1-node-26-의-내장-localstorage-때문에-jsdom-테스트가-경고를-7번-찍는다) |
+
+## N. (49차) ESLint · prettier 를 oxlint · oxfmt 로 옮기며 밟은 것
+
+배경과 결정: ADR-028.
+
+### N-1. `oxlint-disable-next-line` 은 바로 다음 줄에만 걸린다
+
+이유를 여러 줄로 적으려고 디렉티브를 **설명 주석 맨 위에** 두었더니 아무것도 꺼지지 않았다.
+
+```tsx
+// oxlint-disable-next-line react/purity -- 렌더 시각을 찍는 실험 패널이다.
+// 요청마다 렌더하는 게 이 실험의 목적이다. ...
+return <LabPanel mode="ssr" renderedAt={new Date().toISOString()} />;
+```
+
+```
+apps/host/src/app/lab/ssr/page.tsx:26:43: error react(purity): Cannot call impure function during render ...
+apps/host/src/app/lab/ssr/page.tsx:23:3: warning: Unused oxlint-disable directive (no problems were reported).
+```
+
+"다음 줄"은 **바로 다음 물리적 줄**이다 — 여기서는 설명 주석 줄이고, 거기엔 문제가 없으니
+"안 쓰인 디렉티브"가 된다. 두 번째 줄(unused)은 `--report-unused-disable-directives` 를 줘야만
+나온다. 안 주면 **에러 한 줄만 보여서** 디렉티브 문법이 틀린 것처럼 보인다.
+
+**해결**: 설명을 위에 쓰고 디렉티브를 **대상 줄 바로 위**에 둔다.
+
+```tsx
+// 렌더 시각을 찍는 실험 패널이다. ...
+// oxlint-disable-next-line react/purity
+return <LabPanel ... />;
+```
+
+ESLint 시절엔 이유를 `--` 뒤 한 줄에 몰아 써서 이 모양이 나올 일이 없었다.
+
+### N-2. `react/purity` 판정이 ESLint 의 `react-hooks/purity` 와 갈린다
+
+같은 이름의 규칙이 양쪽에서 **error** 로 켜져 있었는데, oxlint 만 아래 셋을 잡았다
+(실측 2026-10-24, `eslint-plugin-react-hooks@7.1.1` vs `oxlint@1.89.0`).
+
+| 파일                                   | 렌더 함수                                      |
+| -------------------------------------- | ---------------------------------------------- |
+| `apps/host/src/app/lab/ssr/page.tsx`   | `async` 서버 컴포넌트, `await connection()` 뒤 |
+| `apps/host/src/app/lab/cache/page.tsx` | `async` + `'use cache'`                        |
+| `apps/host/src/app/lab/isr/page.tsx`   | `async` + `'use cache'`                        |
+
+셋 다 `new Date()` 로 렌더 시각을 찍는 실험 패널이라 **일부러 비순수**하다. 이유를 적고
+줄 단위로 껐다. ESLint 쪽이 왜 안 잡았는지는 확인하지 않았다 — 세 곳의 공통점이 async 서버
+컴포넌트라는 것까지만 안다.
+
+**함의**: 규칙 이름이 같아도 구현이 다르다. oxlint 를 올릴 때 이 계열(React Compiler 규칙)에서
+새 진단이 나오면 회귀가 아니라 판정 차이일 수 있다.
+
+### N-3. 루트에서 한 번 돌리면 린트 범위가 저장소 전체가 된다
+
+`pnpm lint`(= 루트 `oxlint`)를 처음 돌렸더니 진단 101건 중 96건이
+`docs/visual/cinema/engine.js` 였다(`no-var` · `no-unused-expressions`).
+
+ESLint 시절엔 **패키지마다** `eslint .` 를 돌았고, 루트 설정은 `apps/**` · `packages/**` 를
+무시한 채 `scripts` · `tests` · `vitest.config.ts` 만 받았다. `docs/` 는 어느 실행에도 안
+걸렸다. 루트 한 번 실행으로 바꾸면 그 암묵적인 범위가 사라진다.
+
+**해결**: `oxlint.config.ts` 의 `ignorePatterns` 에 `docs/**` 를 넣었다. 그 스크립트는 Pages 로
+나가는 단독 브라우저 스크립트라 저장소 린트 규칙의 대상이 아니다.
 
 ## M. (48차) Node 26 라인으로 옮기며 드러난 것
 
@@ -1371,6 +1437,7 @@ curl -s http://localhost:3000/lab | grep -c "is on the client"
 
 고친 방법은 그 한 줄을 지우는 것이고, 재발은 **린트로 막았다** —
 `packages/store/eslint.config.js` 가 `src/server.ts` 한정으로 그 디렉티브를 금지한다.
+(49차부터는 루트 `oxlint.config.ts` 의 store override 가 같은 규칙을 JS 플러그인으로 돌린다 — ADR-028.)
 ADR-015 가 "이 불변식을 지키는 건 주석뿐"이라고 적어둔 자리를 메운 것이다.
 
 ## D. (11차) 상태 패키지(`@mfa/store`)에서 밟은 것
@@ -2246,6 +2313,8 @@ TypeScript 는 컴파일 출력에도 디렉티브 프롤로그를 보존한다(
 
 ## 4. `eslint-plugin-react` 7.37.5 가 ESLint 10 에서 크래시
 
+> ESLint 시절 기록이다. 49차에 oxlint 로 옮기며 이 플러그인은 빠졌다(ADR-028).
+
 ```
 TypeError: Error while loading rule 'react/display-name':
   contextOrFilename.getFilename is not a function
@@ -2292,7 +2361,7 @@ function getLazyRemote(id: RemoteModuleId) {
 }
 ```
 
-JSX 사용 지점에는 캐시 근거를 적은 `eslint-disable-next-line` 을 남겼다.
+JSX 사용 지점에는 캐시 근거를 적은 `eslint-disable-next-line` 을 남겼다(49차에 `oxlint-disable-next-line react/static-components` 로 바꿨다).
 (린터는 동적 remote 라는 맥락을 알 수 없다)
 
 ## 6. Multi-Zone 경계에서 `@next/next/no-html-link-for-pages` 오탐 (앱 삭제됨)

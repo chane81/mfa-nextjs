@@ -70,7 +70,6 @@ remote 자산은 **버전 디렉터리 아래 불변 경로**에 올라가고, �
 | `@mfa/remote-config`     | **remote 배치의 SSOT** — 이름 · 포트 · env 이름 · 산출물 파일명 · URL 조립  |
 | `@mfa/tailwind-config`   | **디자인 토큰 SSOT** — Tailwind v4 `@theme` + PostCSS 설정 원본             |
 | `@mfa/ui`                | 공용 컴포넌트 — Tailwind 클래스만 내보내고 CSS 는 만들지 않는다             |
-| `@mfa/eslint-config`     | ESLint 10 flat config (base / react / next)                                 |
 | `@mfa/typescript-config` | tsconfig 프리셋 (base / nextjs / react-library / vite)                      |
 
 `@mfa/remote-config` 만 **빌드 산출물이 없다**. `exports` 가 소스 `.ts` 를 직접 가리킨다.

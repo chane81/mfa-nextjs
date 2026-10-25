@@ -104,8 +104,8 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] `tests/setup/dom.ts` — jest-dom 매처 + `afterEach(cleanup)` (globals 를 끄면 자동 cleanup 이 안 걸린다)
 - [x] `tsconfig.test.json` — 루트 `tests/` 와 `vitest.config.ts` 검사
 - [x] 패키지 tsconfig — 소스 옆 테스트를 **포함**하고, emit 하는 셋만 `tsconfig.build.json` 분리
-- [x] 루트 `eslint.config.js` — `tests/**` 에 React 규칙 적용
-- [x] `turbo.json` — `//#typecheck:tests` · `//#lint:tests` 루트 태스크.
+- [x] 루트 `oxlint.config.ts` — `tests/**` 에 React 규칙 적용 (49차까지는 루트 `eslint.config.js`)
+- [x] `turbo.json` — `//#typecheck:tests` 루트 태스크(`//#lint:tests` 는 49차에 없앴다 — `pnpm lint` 가 oxlint 로 저장소 전체를 돈다).
       `test` 는 일부러 turbo 를 안 태운다 — 패키지별 대응 태스크가 없어 얻는 게 캐시뿐인데,
       그 대가로 `pnpm test --project=dom` 같은 러너 플래그가 turbo 에 먹힌다
 - [x] `.github/workflows/ci.yml` — `pnpm test` 는 **`test` job 단독**. `verify`(lint · typecheck ·

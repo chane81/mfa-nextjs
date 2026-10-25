@@ -1,5 +1,46 @@
 # 진행 상황
 
+## 2026-10-25 (49차) — 린트를 oxlint, 포맷을 oxfmt 로 옮긴다
+
+출발은 "ESLint 는 아직 TS 7 을 지원하지 않나"였다. 확인해 보니 `typescript-eslint@8.72.0`
+(canary 포함)의 peer 가 여전히 `typescript <6.1.0` 이었고, TS 7 에 JS compiler API 가 없어
+당분간 풀릴 수 없는 구조였다. 그런데 이 저장소는 type-aware 규칙을 안 쓴다 — 그렇다면
+**린터를 바꾸면 TS 7 의 걸림돌이 빠진다.** 결정과 기각안은 ADR-028.
+
+### 한 일
+
+| 무엇           | 이전                                               | 이후                                   |
+| -------------- | -------------------------------------------------- | -------------------------------------- |
+| 린터           | ESLint 10 · `packages/eslint-config` · 설정 9개    | oxlint 1.89.0 · `oxlint.config.ts` 1개 |
+| 포매터         | prettier 3.6.2 · `.prettierrc` · `.prettierignore` | oxfmt 0.74.0 · `oxfmt.config.ts`       |
+| `pnpm lint`    | turbo 가 패키지별 `eslint .` + 루트 태스크 2개     | 루트에서 `oxlint` 한 번                |
+| 린트 시간      | 3.75s (CPU 17.5s, `--force`)                       | ~0.1s                                  |
+| 포맷 검사 시간 | 2.97s                                              | ~0.35s                                 |
+
+ESLint 실효 규칙을 영역별로 `--print-config` 로 뽑아 `oxlint --rules` 와 대조했고, 켜져
+있던 건 그대로 켰다. 내장 안 된 것 중 **불변식 규칙 둘**(turbo env · store 의 `'use client'`)은
+JS 플러그인으로 살렸고, 셋 다(remote import 차단 포함) 위반을 직접 넣어 걸리는 걸 확인했다.
+
+포맷 결과가 바뀐 파일은 8개(+23 −29)다. `style:` 커밋 하나로 분리했다.
+
+### 밟은 것 → known-issues N
+
+- **N-1** `oxlint-disable-next-line` 을 설명 주석 위에 두면 아무것도 안 꺼진다.
+- **N-2** `react/purity` 가 ESLint 와 판정이 갈린다 — lab 페이지 3곳의 `new Date()`.
+- **N-3** 루트 한 번 실행으로 바꾸자 `docs/visual/cinema/engine.js` 가 린트 범위에 들어왔다.
+
+### 확인
+
+`pnpm lint` · `format:check` · `typecheck` · `test`(51 파일 · 706) · `build` 통과. Node 26.12.1.
+
+### 다음에 할 것
+
+- TS 7 실험 — 린터는 더 이상 막지 않는다. `pnpm mf:types`(MF DTS) · Next 16 · Vite 8 ·
+  Rsbuild 2 를 TS 7 에서 돌려 본다. 결과는 [02-versions.md](03-setup/02-versions.md) 의 TS 7 절.
+- oxlint 를 올릴 때마다 JS 플러그인 규칙 둘이 계속 도는지 주입 확인을 다시 한다(alpha).
+- `vitest.config.ts` 의 `process.env.CI` 가 `turbo/no-undeclared-env-vars` 경고를 낸다.
+  ESLint 시절부터 있던 경고다(이번에 같은 경고가 나는 걸 확인만 했다).
+
 ## 2026-10-24 (48차) — Node 를 26 LTS 라인으로 옮긴다 (26.12.1)
 
 출발은 "26 은 아직 LTS 가 아닌데 쓰기 무리인가"라는 질문이었다. `nodejs/Release` 의

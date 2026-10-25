@@ -150,7 +150,7 @@ pnpm build          # 전체 빌드 (remote 는 웹/노드 두 타깃)
 pnpm start          # 빌드 후 프로덕션 기동
 pnpm lint
 pnpm typecheck
-pnpm format         # prettier --write .
+pnpm format         # oxfmt
 pnpm format:check   # CI 가 검사하는 것
 ```
 
