@@ -1919,6 +1919,24 @@ oxlint 는 `correctness` 카테고리만 기본으로 켜므로, **ESLint 에서
 - **prettier 를 3.9 로 먼저 올리고 비교** — diff 중 어디까지가 버전 차이인지 가를 수
   있었지만, 어차피 버리는 도구라 그 구분이 결정을 바꾸지 않는다.
 
+### 보강 — Dockerfile 도 린트 · 포맷한다 (같은 회차)
+
+oxlint · oxfmt 는 Dockerfile 을 다루지 않는다. 그래서 따로 붙였다.
+
+| 할 일 | 도구                                        | 고른 이유                                                                        |
+| ----- | ------------------------------------------- | -------------------------------------------------------------------------------- |
+| 린트  | `docker build --check` (`pnpm lint:docker`) | Docker 내장이라 새 의존성이 없다. 에디터의 Docker DX 확장이 **같은 규칙**을 쓴다 |
+| 포맷  | `@reteps/dockerfmt` 0.5.4                   | npm 으로 설치된다(Go 를 WebAssembly 로 감쌌다). `-c` 로 CI 검사가 된다           |
+
+- `lint:docker` 는 `pnpm lint` 에 넣지 않았다. docker 데몬이 있어야 돌고, 베이스 이미지
+  메타데이터를 받으러 네트워크를 쓴다. CI `verify` job 에서는 따로 돈다(러너에 docker 가 있다).
+- 위반을 넣어 실패하는 것을 확인했다 — `CMD node index.js` 를 붙이자 `JSONArgsRecommended`
+  경고와 함께 exit 1.
+- 기각: **hadolint** — 규칙은 더 많지만 Haskell 바이너리라 brew · 도커 이미지 · 별도 액션으로
+  깔아야 하고, npm 의 `hadolint` 패키지는 제3자 래퍼다. 에디터(Docker DX)와 CLI 가 같은 규칙을
+  보는 쪽을 골랐다.
+- dockerfmt 를 처음 돌렸을 때 바뀐 건 Dockerfile 마다 2줄 — `RUN` 이어지는 줄의 들여쓰기(6칸 → 4칸)다.
+
 ### 확인
 
 `pnpm lint` · `format:check` · `typecheck` · `test`(51 파일 · 706) · `build`(host 프리렌더

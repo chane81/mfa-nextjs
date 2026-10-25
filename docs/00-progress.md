@@ -53,6 +53,12 @@ ESLint 에서도 같은 경고를 확인). `globalEnv` 에 넣는 게 아니라 
 `.vscode/settings.json` · `extensions.json`. Oxc 확장으로 저장 시 포맷 → 린트 수정이 돈다.
 설정별 근거는 [01-getting-started.md](03-setup/01-getting-started.md#에디터-vs-code).
 
+### Dockerfile 도 린트 · 포맷한다
+
+린트는 `docker build --check`(`pnpm lint:docker`, CI `verify` 에서도 돈다), 포맷은 dockerfmt
+(`pnpm format` 에 합쳤다). 에디터는 Docker DX 확장이 같은 빌드 검사 규칙을 보여준다.
+근거와 기각안(hadolint)은 ADR-028 보강 절.
+
 ### 확인
 
 `pnpm lint` · `format:check` · `typecheck` · `test`(51 파일 · 706) · `build` 통과. Node 26.12.1.
