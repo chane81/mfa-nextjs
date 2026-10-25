@@ -56,7 +56,6 @@ COPY apps/remote-catalog/package.json apps/remote-catalog/
 # docs/05-troubleshooting/01-known-issues.md
 # 이 목록이 워크스페이스와 같은지는 `scripts/docker-context.test.ts` 가 본다.
 COPY packages/contracts/package.json packages/contracts/
-COPY packages/eslint-config/package.json packages/eslint-config/
 COPY packages/remote-config/package.json packages/remote-config/
 COPY packages/store/package.json packages/store/
 COPY packages/tailwind-config/package.json packages/tailwind-config/

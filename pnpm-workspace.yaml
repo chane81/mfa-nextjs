@@ -22,9 +22,8 @@ catalog:
   '@module-federation/rsbuild-plugin': ^2.8.2
   '@module-federation/vite': ^1.20.7
 
-  # Next.js 16 — 본체와 eslint 플러그인을 같이 올린다.
+  # Next.js 16
   next: ^16.4.2
-  '@next/eslint-plugin-next': ^16.4.2
 
   # Tailwind 4 — postcss(host·cart) 와 vite(catalog) 경로가 같은 엔진을 써야
   # 같은 토큰에서 같은 CSS 가 나온다.
@@ -33,13 +32,12 @@ catalog:
   '@tailwindcss/vite': ^4.3.3
 
   # Turborepo — 본체와 eslint 플러그인 버전을 묶는다.
+  # 플러그인은 oxlint 의 JS 플러그인으로 돈다(`oxlint.config.ts`).
   turbo: 2.10.9
   eslint-plugin-turbo: ^2.10.9
 
   # 툴체인
   typescript: 6.0.3
-  eslint: ^10.8.1
-  '@eslint/js': ^10.0.1
   '@types/node': ^26.6.5
   concurrently: ^10.0.6
   '@vitejs/plugin-react': ^6.0.5
@@ -61,7 +59,6 @@ engineStrict: true
 minimumReleaseAgeExclude:
   - '@module-federation/vite@1.20.7'
   - '@next/env@16.3.1'
-  - '@next/eslint-plugin-next@16.3.1'
   - '@next/swc-darwin-arm64@16.3.1'
   - '@next/swc-darwin-x64@16.3.1'
   - '@next/swc-linux-arm64-gnu@16.3.1'

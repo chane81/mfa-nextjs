@@ -20,6 +20,10 @@ async function CachedShell() {
   cacheLife('minutes');
   cacheTag(remoteCacheTag(LAB_REMOTE));
 
+  // 렌더 시각을 찍는 실험 패널이다.
+  // `'use cache'` 스코프 안이라 이 값은 캐시와 함께 고정된다 — 그 시각을 보여주는 게 목적이다.
+  // (ESLint 의 react-hooks/purity 는 이 줄을 잡지 않았다 — 실측.)
+  // oxlint-disable-next-line react/purity
   return <LabPanel mode="cache" renderedAt={new Date().toISOString()} />;
 }
 

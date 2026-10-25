@@ -21,7 +21,6 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
-    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist .turbo"
   },
@@ -31,11 +30,9 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@mfa/eslint-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
     "@mfa/utils": "workspace:*",
     "@types/react": "catalog:",
-    "eslint": "catalog:",
     "react": "catalog:",
     "typescript": "catalog:"
   }

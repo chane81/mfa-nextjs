@@ -160,16 +160,18 @@
       "cache": false,
       "persistent": true
     },
-    "lint": {
-      "dependsOn": ["^build"]
-    },
+    /**
+     * `lint` 태스크는 없다. 루트 `pnpm lint` 가 oxlint 를 **저장소 전체에 한 번** 돌린다.
+     * oxlint 는 전체를 0.1초 안에 끝내서 패키지별로 쪼개 캐시할 게 없고, 규칙은
+     * 루트 `oxlint.config.ts` 한 곳에 overrides 로 모여 있다(ADR-028).
+     */
     "typecheck": {
       "dependsOn": ["^build"]
     },
 
     /**
      * `scripts/` 는 워크스페이스 패키지가 아니라 루트에 있어서 위의 패키지 태스크에 안 잡힌다.
-     * 루트 태스크(`//#…`)로 따로 걸어야 `turbo run typecheck` / `lint` 에 포함된다.
+     * 루트 태스크(`//#…`)로 따로 걸어야 `turbo run typecheck` 에 포함된다.
      *
      * `^build` 가 필요한 이유: `stamp-remote-version.ts` 와 `wait-for-remotes.ts` 가
      * `@mfa/remote-config` 를 읽는데, 그 패키지는 빌드가 없지만 tsc 가 타입을 풀려면
@@ -186,14 +188,10 @@
       "dependsOn": ["^build"],
       "inputs": ["scripts/**/*.ts", "packages/utils/src/**", "tsconfig.json"]
     },
-    "//#lint:scripts": {
-      "dependsOn": ["^build"],
-      "inputs": ["scripts/**/*.ts", "eslint.config.js"]
-    },
 
     /**
      * `tests/` 도 `scripts/` 와 같은 처지다 — 워크스페이스 패키지가 아니라 루트에 있어서
-     * 패키지 태스크에 안 잡힌다. 루트 태스크로 걸어야 `turbo run typecheck` / `lint` 에 붙는다.
+     * 패키지 태스크에 안 잡힌다. 루트 태스크로 걸어야 `turbo run typecheck` 에 붙는다.
      *
      * `^build` 를 걸지 않는다. 테스트는 `vitest.config.ts` 와 `tsconfig.test.json` 의 alias 로
      * 워크스페이스 패키지의 **`src` 를 직접** 가리키므로 `dist` 가 필요 없다. 걸어두면
@@ -214,9 +212,6 @@
      */
     "//#typecheck:tests": {
       "inputs": ["tests/**", "vitest.config.ts", "tsconfig.test.json"]
-    },
-    "//#lint:tests": {
-      "inputs": ["tests/**", "vitest.config.ts", "eslint.config.js"]
     },
     "clean": {
       "cache": false
