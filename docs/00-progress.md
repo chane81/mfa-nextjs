@@ -53,6 +53,17 @@ ESLint 에서도 같은 경고를 확인). `globalEnv` 에 넣는 게 아니라 
 `.vscode/settings.json` · `extensions.json`. Oxc 확장으로 저장 시 포맷 → 린트 수정이 돈다.
 설정별 근거는 [01-getting-started.md](03-setup/01-getting-started.md#에디터-vs-code).
 
+### Tailwind 클래스도 린트한다
+
+`oxlint-tailwindcss` 1.16.0 을 JS 플러그인으로 붙였다. 앱의 **실제 진입 CSS** 를 읽어 `@theme`
+토큰과 `@utility` 까지 아는 상태로 클래스를 본다. 진입 CSS 는 파일마다 그 파일을 컴파일하는
+쪽으로 매핑했다(host · cart · catalog 각자, `@mfa/ui` 는 `theme.css`).
+
+가장 값진 건 `no-dynamic-classes` 다 — styling 규칙의 "조용히 깨지는 셋" ②(`bg-${variant}`)가
+이제 린트 에러다. 패키지 넷 모두에 오타 · 조립 클래스를 넣어 걸리는 것과 자체 토큰
+(`bg-surface` · `remote-boundary`)은 통과하는 것을 확인했다. 기존 코드에서 나온 건 정렬 경고
+4건뿐이라 `oxlint --fix` 로 맞췄다(`style:` 커밋). 판단은 ADR-028 보강 절.
+
 ### Dockerfile 은 린트만 한다
 
 린트는 `docker build --check`(`pnpm lint:docker`, CI `verify` 에서도 돈다). 에디터는 Docker DX

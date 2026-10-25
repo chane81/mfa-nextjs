@@ -1940,6 +1940,28 @@ oxlint · oxfmt 는 Dockerfile 을 다루지 않는다. 린트는 따로 붙였�
   하나 더 고정 · 추적하는 비용에 비해 얻는 것이 Dockerfile 마다 2줄(`RUN` 이어지는 줄 들여쓰기)
   이었다. 그 들여쓰기 변경도 같이 되돌렸다.
 
+### 보강 — Tailwind 클래스는 `oxlint-tailwindcss` 로 본다 (같은 회차)
+
+ESLint 시절에는 Tailwind 린트가 없었다. styling 규칙의 "조용히 깨지는 셋" 중 ②(클래스 이름
+조립)는 **문서로만** 막고 있었다. oxlint 로 옮긴 김에 JS 플러그인 `oxlint-tailwindcss` 1.16.0 을
+붙였다.
+
+| 선택                                | 이유                                                                                  |
+| ----------------------------------- | ------------------------------------------------------------------------------------- |
+| 진입 CSS 를 앱마다 매핑             | 앱 셋이 각자 컴파일한다. 하나로 묶으면 앱별 `@source` · `@utility` 차이를 못 본다     |
+| 매핑은 루트 `settings` 에           | oxlint 가 `overrides` 안의 `settings` 를 거부한다. nested config 는 ADR 본문에서 기각 |
+| 규칙은 recommended 그대로           | 기존 코드에서 정렬 경고 4건만 나왔다. 더 엄격한 가드레일은 필요할 때 켠다             |
+| 범위는 `apps/**` · `packages/ui/**` | 클래스를 쓰는 곳이 거기뿐이다                                                         |
+| 정렬은 린트만(`enforce-sort-order`) | oxfmt 의 `sortTailwindcss` 를 켜면 진입 CSS 를 거기에도 따로 적어야 한다(두 곳)       |
+
+- 위반을 넣어 걸리는 것을 확인했다 — 패키지 넷 각각에 `flx` · `items-cetner`(`no-unknown-classes`),
+  `bg-${v}`(`no-dynamic-classes`). 같은 줄의 `bg-surface` · `text-origin` · `remote-boundary` 는
+  통과했다. `DEBUG=oxlint-tailwindcss` 로 파일마다 고른 CSS 도 확인했다.
+- ❌ JS 플러그인이 **셋**이 됐다. alpha 위에 얹힌 제3자 플러그인이라 oxlint 를 올릴 때 위 주입 확인을
+  같이 한다.
+- 기각: **`no-default-palette` · `no-arbitrary-value` 켜기** — 지금 위반이 없어 켜도 비용은 없지만,
+  `text-[13px]` 같은 임의값을 토큰으로 올릴지는 디자인 판단이다. 린트 도입과 섞지 않았다.
+
 ### 확인
 
 `pnpm lint` · `format:check` · `typecheck` · `test`(51 파일 · 706) · `build`(host 프리렌더
