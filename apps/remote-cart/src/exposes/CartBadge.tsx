@@ -26,7 +26,7 @@ export default function CartBadge({
     <span
       // cart 의 경계 색. 값은 Panel 이 쓰는 것과 같은 통로로 내려간다.
       style={hueVar(ORIGIN_HUE)}
-      className="remote-boundary inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-mono text-xs text-text"
+      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-mono text-xs text-text remote-boundary"
     >
       🛒 {label}
       <strong className="text-origin">{totalQuantity}</strong>
