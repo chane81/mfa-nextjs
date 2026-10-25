@@ -48,6 +48,11 @@ ESLint 에서도 같은 경고를 확인). `globalEnv` 에 넣는 게 아니라 
 덤으로 `remote-wiring.test.ts` 의 JSONC 스캐너가 빠지고 `JSON.parse` 하나가 됐다. 주석을
 다시 넣으면 그 테스트가 죽는다. F-2(블록 주석 속 글롭이 파서를 깨는 함정)는 재현 조건이 사라졌다.
 
+### VS Code 설정을 커밋했다
+
+`.vscode/settings.json` · `extensions.json`. Oxc 확장으로 저장 시 포맷 → 린트 수정이 돈다.
+설정별 근거는 [01-getting-started.md](03-setup/01-getting-started.md#에디터-vs-code).
+
 ### 확인
 
 `pnpm lint` · `format:check` · `typecheck` · `test`(51 파일 · 706) · `build` 통과. Node 26.12.1.
