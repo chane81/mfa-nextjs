@@ -2,7 +2,7 @@ import { cacheLife, cacheTag } from 'next/cache';
 
 import { LabPanel } from '@/components/lab/LabPanel';
 import { LAB_REMOTE } from '@/components/lab/modes';
-import { readRenderClock } from '@/components/lab/render-clock';
+import { readRenderClock } from '@/lib/render-clock';
 import { remoteCacheTag } from '@/mf/loader/server';
 
 /**
