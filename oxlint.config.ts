@@ -23,6 +23,8 @@ export default defineConfig({
     // ESLint 코어 규칙 중 oxlint 가 아직 구현하지 않은 것(no-restricted-syntax).
     // `eslint` 이름은 oxlint 가 예약해서 별칭을 붙인다.
     { name: 'eslint-js', specifier: 'oxlint-plugin-eslint' },
+    // Tailwind v4 클래스를 앱의 실제 디자인 시스템(@theme)에 대고 본다. 규칙은 아래 overrides.
+    'oxlint-tailwindcss',
   ],
   categories: {
     correctness: 'error',
@@ -30,6 +32,29 @@ export default defineConfig({
   // 모노레포라 Next 앱 위치를 알려줘야 `nextjs/no-html-link-for-pages` 가 pages 를 찾는다.
   settings: {
     next: { rootDir: 'apps/host/' },
+    /**
+     * 파일마다 **그 파일을 실제로 컴파일하는 진입 CSS** 를 고른다. 위에서부터 첫 매칭이 이긴다.
+     *
+     * 앱 셋은 각자 자기 진입 CSS 를 컴파일한다(공유 CSS 산출물이 없다 — `.claude/rules/styling.md`).
+     * 셋 다 `@mfa/tailwind-config` 를 import 하지만 `@source` · `@utility` 가 앱마다 다를 수 있어
+     * 하나로 묶지 않는다. `@mfa/ui` 는 스스로 컴파일되지 않으니 토큰 원본 `theme.css` 를 본다.
+     *
+     * oxlint 는 overrides 안의 `settings` 를 거부해서 여기 한 곳에 매핑으로 둔다.
+     */
+    tailwindcss: {
+      entryPoint: [
+        { files: 'apps/host/**', use: 'apps/host/src/app/globals.css' },
+        {
+          files: 'apps/remote-cart/**',
+          use: 'apps/remote-cart/src/styles.css',
+        },
+        {
+          files: 'apps/remote-catalog/**',
+          use: 'apps/remote-catalog/src/styles.css',
+        },
+        { files: '**', use: 'packages/tailwind-config/theme.css' },
+      ],
+    },
   },
   env: {
     builtin: true,
@@ -103,6 +128,39 @@ export default defineConfig({
         'react/unsupported-syntax': 'warn',
         // React 19 + 자동 JSX 런타임에서는 불필요
         'react/react-in-jsx-scope': 'off',
+      },
+    },
+    {
+      /**
+       * Tailwind 클래스를 쓰는 곳. 규칙 · 심각도는 oxlint-tailwindcss 의 recommended 그대로다.
+       * JS 플러그인 규칙은 `categories` 로 켜지지 않아 하나씩 적는다.
+       *
+       * `no-dynamic-classes` 가 이 저장소에서 가장 값지다. `bg-${variant}` 처럼 조립한 클래스는
+       * 소스 스캔이 못 찾아 CSS 가 안 나오는데 에러도 없다(styling 규칙의 "조용히 깨지는 셋" ②).
+       */
+      files: ['apps/**', 'packages/ui/**'],
+      rules: {
+        // Correctness
+        'tailwindcss/no-conflicting-classes': 'error',
+        'tailwindcss/no-contradicting-variants': 'warn',
+        'tailwindcss/no-dark-without-light': 'warn',
+        'tailwindcss/no-duplicate-classes': 'warn',
+        'tailwindcss/no-dynamic-classes': 'error',
+        'tailwindcss/no-unknown-classes': 'error',
+        // Modernization
+        'tailwindcss/enforce-canonical': 'warn',
+        'tailwindcss/enforce-negative-arbitrary-values': 'warn',
+        'tailwindcss/no-deprecated-classes': 'error',
+        'tailwindcss/no-unnecessary-arbitrary-value': 'warn',
+        // Consistency — 정렬은 린트만 맡는다. oxfmt 의 `sortTailwindcss` 는 켜지 않았다.
+        'tailwindcss/consistent-variant-order': 'warn',
+        'tailwindcss/enforce-consistent-important-position': 'warn',
+        'tailwindcss/enforce-consistent-variable-syntax': 'warn',
+        'tailwindcss/enforce-shorthand': 'warn',
+        'tailwindcss/enforce-sort-order': 'warn',
+        'tailwindcss/no-unnecessary-whitespace': 'warn',
+        // Design-system guardrails
+        'tailwindcss/no-hardcoded-colors': 'warn',
       },
     },
     {
