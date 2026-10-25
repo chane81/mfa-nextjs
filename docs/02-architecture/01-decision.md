@@ -1919,14 +1919,14 @@ oxlint 는 `correctness` 카테고리만 기본으로 켜므로, **ESLint 에서
 - **prettier 를 3.9 로 먼저 올리고 비교** — diff 중 어디까지가 버전 차이인지 가를 수
   있었지만, 어차피 버리는 도구라 그 구분이 결정을 바꾸지 않는다.
 
-### 보강 — Dockerfile 도 린트 · 포맷한다 (같은 회차)
+### 보강 — Dockerfile 은 린트만 한다 (같은 회차)
 
-oxlint · oxfmt 는 Dockerfile 을 다루지 않는다. 그래서 따로 붙였다.
+oxlint · oxfmt 는 Dockerfile 을 다루지 않는다. 린트는 따로 붙였고, 포맷은 붙였다가 뺐다.
 
 | 할 일 | 도구                                        | 고른 이유                                                                        |
 | ----- | ------------------------------------------- | -------------------------------------------------------------------------------- |
 | 린트  | `docker build --check` (`pnpm lint:docker`) | Docker 내장이라 새 의존성이 없다. 에디터의 Docker DX 확장이 **같은 규칙**을 쓴다 |
-| 포맷  | `@reteps/dockerfmt` 0.5.4                   | npm 으로 설치된다(Go 를 WebAssembly 로 감쌌다). `-c` 로 CI 검사가 된다           |
+| 포맷  | 없음                                        | 아래 기각 참고                                                                   |
 
 - `lint:docker` 는 `pnpm lint` 에 넣지 않았다. docker 데몬이 있어야 돌고, 베이스 이미지
   메타데이터를 받으러 네트워크를 쓴다. CI `verify` job 에서는 따로 돈다(러너에 docker 가 있다).
@@ -1935,7 +1935,10 @@ oxlint · oxfmt 는 Dockerfile 을 다루지 않는다. 그래서 따로 붙였�
 - 기각: **hadolint** — 규칙은 더 많지만 Haskell 바이너리라 brew · 도커 이미지 · 별도 액션으로
   깔아야 하고, npm 의 `hadolint` 패키지는 제3자 래퍼다. 에디터(Docker DX)와 CLI 가 같은 규칙을
   보는 쪽을 골랐다.
-- dockerfmt 를 처음 돌렸을 때 바뀐 건 Dockerfile 마다 2줄 — `RUN` 이어지는 줄의 들여쓰기(6칸 → 4칸)다.
+- 기각: **`@reteps/dockerfmt`** — 한 번 넣었다가 뺐다. npm 으로 깔리고(Go 를 WebAssembly 로 감쌌다)
+  `-c` 로 CI 검사도 됐지만, 포매터는 **oxc 툴체인이 제공하는 것만 쓴다**고 정했다. 0.x 도구를
+  하나 더 고정 · 추적하는 비용에 비해 얻는 것이 Dockerfile 마다 2줄(`RUN` 이어지는 줄 들여쓰기)
+  이었다. 그 들여쓰기 변경도 같이 되돌렸다.
 
 ### 확인
 

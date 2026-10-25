@@ -74,8 +74,8 @@ ESLint · Prettier 확장은 비권장으로 표시한다 — 저장소가 둘 �
 `"source.fixAll.oxc": "explicit"` 로 덮는다(명시적으로 실행할 때만 돈다).
 
 Dockerfile 은 Docker DX 가 맡는다. 편집 중에 BuildKit 빌드 검사 경고를 띄우는데, `pnpm lint:docker`
-(`docker build --check`)와 **같은 규칙**이다. 저장 시 포맷은 걸지 않았다 — dockerfmt 는 에디터
-확장이 없어서, 포맷은 `pnpm format` 이 Dockerfile 까지 같이 맞춘다.
+(`docker build --check`)와 **같은 규칙**이다. Dockerfile 포매터는 두지 않는다
+(ADR-028 보강).
 
 설정 파일이 TypeScript(`oxlint.config.ts` · `oxfmt.config.ts`)라 **TS 를 실행할 수 있는 Node** 가
 필요하다(oxlint 문서: Node v22.18+ 또는 v24+). 확장은 시스템의 `node` 를 찾는데, Dock 에서 띄운

@@ -19,29 +19,28 @@
 
 ## 채택 버전
 
-| 패키지                              | 최신    | 채택         | 비고                            |
-| ----------------------------------- | ------- | ------------ | ------------------------------- |
-| `next`                              | 16.4.2  | **16.4.2**   | Turbopack 기본 · 보안 하한 ⬇    |
-| `react` / `react-dom`               | 19.2.8  | **19.2.8**   |                                 |
-| `turbo`                             | 2.10.9  | **2.10.9**   |                                 |
-| `typescript`                        | 7.0.2   | **6.0.3** ⚠️ | 아래 참고                       |
-| `oxlint`                            | 1.89.0  | **1.89.0**   | 정확 고정 ⬇                     |
-| `oxlint-plugin-eslint`              | 1.89.0  | **1.89.0**   | oxlint 와 같이 올린다           |
-| `oxfmt`                             | 0.74.0  | **0.74.0**   | 정확 고정 ⬇                     |
-| `@reteps/dockerfmt`                 | 0.5.4   | **0.5.4**    | Dockerfile 포매터 · 정확 고정 ⬇ |
-| `eslint-plugin-turbo`               | 2.11.10 | **2.10.9**   | `turbo` 와 묶는다               |
-| `vite`                              | 8.2.1   | **8.2.1**    |                                 |
-| `@vitejs/plugin-react`              | 6.0.5   | **6.0.5**    |                                 |
-| `@module-federation/vite`           | 1.20.7  | **1.20.7**   | peer `vite ^5~^8`               |
-| `@rsbuild/core`                     | 2.1.13  | **2.1.13**   |                                 |
-| `@rsbuild/plugin-react`             | 2.1.0   | **2.1.0**    |                                 |
-| `@module-federation/rsbuild-plugin` | 2.8.2   | **2.8.2**    |                                 |
-| `@module-federation/runtime`        | 2.8.2   | **2.8.2**    | host 가 쓰는 유일한 MF 패키지   |
-| `tailwindcss`                       | 4.3.3   | **4.3.3**    | v4 — 설정이 CSS 안에 있다       |
-| `@tailwindcss/postcss`              | 4.3.3   | **4.3.3**    | host · cart                     |
-| `@tailwindcss/vite`                 | 4.3.3   | **4.3.3**    | catalog                         |
-| `zustand`                           | 5.0.15  | **5.0.15**   | `@mfa/store` 전용               |
-| `use-sync-external-store`           | 1.6.0   | **1.6.0**    | `zustand/traditional` 의 peer   |
+| 패키지                              | 최신    | 채택         | 비고                          |
+| ----------------------------------- | ------- | ------------ | ----------------------------- |
+| `next`                              | 16.4.2  | **16.4.2**   | Turbopack 기본 · 보안 하한 ⬇  |
+| `react` / `react-dom`               | 19.2.8  | **19.2.8**   |                               |
+| `turbo`                             | 2.10.9  | **2.10.9**   |                               |
+| `typescript`                        | 7.0.2   | **6.0.3** ⚠️ | 아래 참고                     |
+| `oxlint`                            | 1.89.0  | **1.89.0**   | 정확 고정 ⬇                   |
+| `oxlint-plugin-eslint`              | 1.89.0  | **1.89.0**   | oxlint 와 같이 올린다         |
+| `oxfmt`                             | 0.74.0  | **0.74.0**   | 정확 고정 ⬇                   |
+| `eslint-plugin-turbo`               | 2.11.10 | **2.10.9**   | `turbo` 와 묶는다             |
+| `vite`                              | 8.2.1   | **8.2.1**    |                               |
+| `@vitejs/plugin-react`              | 6.0.5   | **6.0.5**    |                               |
+| `@module-federation/vite`           | 1.20.7  | **1.20.7**   | peer `vite ^5~^8`             |
+| `@rsbuild/core`                     | 2.1.13  | **2.1.13**   |                               |
+| `@rsbuild/plugin-react`             | 2.1.0   | **2.1.0**    |                               |
+| `@module-federation/rsbuild-plugin` | 2.8.2   | **2.8.2**    |                               |
+| `@module-federation/runtime`        | 2.8.2   | **2.8.2**    | host 가 쓰는 유일한 MF 패키지 |
+| `tailwindcss`                       | 4.3.3   | **4.3.3**    | v4 — 설정이 CSS 안에 있다     |
+| `@tailwindcss/postcss`              | 4.3.3   | **4.3.3**    | host · cart                   |
+| `@tailwindcss/vite`                 | 4.3.3   | **4.3.3**    | catalog                       |
+| `zustand`                           | 5.0.15  | **5.0.15**   | `@mfa/store` 전용             |
+| `use-sync-external-store`           | 1.6.0   | **1.6.0**    | `zustand/traditional` 의 peer |
 
 ### `next` 16.4.2 는 보안 하한이다
 
@@ -138,22 +137,21 @@ TypeError: Error while loading rule 'react/display-name':
 settings: { react: { version: "19.2" } },
 ```
 
-## oxlint · oxfmt · dockerfmt 는 정확한 버전으로 고정한다
+## oxlint · oxfmt 는 정확한 버전으로 고정한다
 
 `^` 를 붙이지 않는다. 둘 다 아직 **변경이 잦고, semver 가 지켜준다고 볼 수 없다.**
 
-| 패키지              | 근거                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------ |
-| `oxfmt`             | 0.x 다. 최근 릴리스에도 BREAKING 이 잦다(0.72.0 에서 markdown 포매터 교체)           |
-| `oxlint`            | 1.x 지만 JS 플러그인은 alpha 이고 **semver 대상이 아니라고** 설정 스키마에 적혀 있다 |
-| `…-eslint`          | oxlint 와 같은 저장소 · 같은 번호로 나온다. 둘을 같이 올린다                         |
-| `@reteps/dockerfmt` | 0.x 다. Go 구현을 WebAssembly 로 감싼 npm 배포라 Go 설치 없이 돈다                   |
+| 패키지     | 근거                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------ |
+| `oxfmt`    | 0.x 다. 최근 릴리스에도 BREAKING 이 잦다(0.72.0 에서 markdown 포매터 교체)           |
+| `oxlint`   | 1.x 지만 JS 플러그인은 alpha 이고 **semver 대상이 아니라고** 설정 스키마에 적혀 있다 |
+| `…-eslint` | oxlint 와 같은 저장소 · 같은 번호로 나온다. 둘을 같이 올린다                         |
 
 포매터 버전이 움직이면 코드를 한 줄도 안 고쳤는데 `format:check` 가 깨진다. 올릴 때는
 `pnpm format` 결과를 **따로 `style:` 커밋**으로 남긴다(49차의 `style: oxfmt 출력으로 다시 맞춘다`
 가 그 모양이다).
 
-이 넷은 카탈로그에 올리지 않는다. 루트 `package.json` 하나만 쓴다(ADR-027 의 "소유자가
+이 셋은 카탈로그에 올리지 않는다. 루트 `package.json` 하나만 쓴다(ADR-027 의 "소유자가
 하나뿐이면 그 `package.json` 에 남긴다"). `eslint-plugin-turbo` 는 예외로 카탈로그에 남는다 —
 `turbo` 와 버전을 묶는 이유가 그대로라서다.
 
