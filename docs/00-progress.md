@@ -30,6 +30,14 @@ JS 플러그인으로 살렸고, 셋 다(remote import 차단 포함) 위반을 
   disable 대신 측정점을 `readRenderClock()` 하나로 모았다.
 - **N-3** 루트 한 번 실행으로 바꾸자 `docs/visual/cinema/engine.js` 가 린트 범위에 들어왔다.
 
+### ESLint 시절부터 있던 경고 하나를 지웠다
+
+`vitest.config.ts` 의 `process.env.CI` 가 `turbo/no-undeclared-env-vars` 경고를 냈다(main 의
+ESLint 에서도 같은 경고를 확인). `globalEnv` 에 넣는 게 아니라 **규칙 범위를 고쳤다** —
+`vitest.config.ts` · `tests/**` · `*.test.*` 는 turbo 태스크 밖에서만 돌아 이 규칙의 전제가
+없다. `TZ` 를 `globalEnv` 에서 뺀 판단(turbo.json 주석)과 같은 근거다. 이제 `pnpm lint` 는
+진단 0건이다.
+
 ### 확인
 
 `pnpm lint` · `format:check` · `typecheck` · `test`(51 파일 · 706) · `build` 통과. Node 26.12.1.
@@ -39,8 +47,6 @@ JS 플러그인으로 살렸고, 셋 다(remote import 차단 포함) 위반을 
 - TS 7 실험 — 린터는 더 이상 막지 않는다. `pnpm mf:types`(MF DTS) · Next 16 · Vite 8 ·
   Rsbuild 2 를 TS 7 에서 돌려 본다. 결과는 [02-versions.md](03-setup/02-versions.md) 의 TS 7 절.
 - oxlint 를 올릴 때마다 JS 플러그인 규칙 둘이 계속 도는지 주입 확인을 다시 한다(alpha).
-- `vitest.config.ts` 의 `process.env.CI` 가 `turbo/no-undeclared-env-vars` 경고를 낸다.
-  ESLint 시절부터 있던 경고다(이번에 같은 경고가 나는 걸 확인만 했다).
 
 ## 2026-10-24 (48차) — Node 를 26 LTS 라인으로 옮긴다 (26.12.1)
 
