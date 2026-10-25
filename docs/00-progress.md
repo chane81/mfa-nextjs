@@ -27,6 +27,7 @@ JS 플러그인으로 살렸고, 셋 다(remote import 차단 포함) 위반을 
 
 - **N-1** `oxlint-disable-next-line` 을 설명 주석 위에 두면 아무것도 안 꺼진다.
 - **N-2** `react/purity` 가 ESLint 와 판정이 갈린다 — lab 페이지 3곳의 `new Date()`.
+  disable 대신 측정점을 `readRenderClock()` 하나로 모았다.
 - **N-3** 루트 한 번 실행으로 바꾸자 `docs/visual/cinema/engine.js` 가 린트 범위에 들어왔다.
 
 ### 확인

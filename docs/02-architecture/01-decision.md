@@ -1900,7 +1900,8 @@ oxlint 는 `correctness` 카테고리만 기본으로 켜므로, **ESLint 에서
 - ⭕ TS 7 을 막던 린터 제약이 사라졌다. 남은 건 MF DTS · 번들러 쪽 확인이다.
 - ⭕ 린트 설정이 `packages/eslint-config`(3개 파일) + 설정 파일 9개에서 **한 파일**이 됐다. 영역 차이가 한 화면에 보인다.
 - ⭕ ESLint 가 못 잡던 것 4건이 새로 잡혔다(`react/purity` 3 · `no-useless-empty-export` 1).
-  전부 의도된 코드라 이유를 적고 껐다 — 판정이 갈린 기록은 known-issues 에 있다.
+  전부 의도된 코드다. `export {}` 는 이유를 적고 껐고, `Date` 셋은 측정점을
+  `readRenderClock()` 하나로 모아 disable 없이 통과시켰다 — 판정이 갈린 기록은 known-issues N-2.
 - ❌ 불변식 규칙 둘이 **alpha 인 JS 플러그인**에 기댄다. semver 대상이 아니라 oxlint 를
   올릴 때 그 둘이 계속 도는지 확인해야 한다(위 주입 확인을 다시 한다).
 - ❌ 포매터가 0.x 다. 이 저장소는 문서가 산출물인데 markdown 포매터는 0.72.0 에 막 교체됐다.

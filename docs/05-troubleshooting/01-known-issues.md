@@ -167,9 +167,29 @@ ESLint 시절엔 이유를 `--` 뒤 한 줄에 몰아 써서 이 모양이 나�
 | `apps/host/src/app/lab/cache/page.tsx` | `async` + `'use cache'`                        |
 | `apps/host/src/app/lab/isr/page.tsx`   | `async` + `'use cache'`                        |
 
-셋 다 `new Date()` 로 렌더 시각을 찍는 실험 패널이라 **일부러 비순수**하다. 이유를 적고
-줄 단위로 껐다. ESLint 쪽이 왜 안 잡았는지는 확인하지 않았다 — 세 곳의 공통점이 async 서버
-컴포넌트라는 것까지만 안다.
+셋 다 `new Date()` 로 렌더 시각을 찍는 실험 패널이라 **일부러 비순수**하다. ESLint 쪽이
+왜 안 잡았는지는 확인하지 않았다 — 세 곳의 공통점이 async 서버 컴포넌트라는 것까지만 안다.
+
+**처음엔 줄마다 `oxlint-disable-next-line react/purity` 로 껐다가 걷어냈다.** 같은 이유의
+disable 이 세 곳에 복제되고, 실험 페이지를 하나 더 만들면 또 복제해야 한다. 대신 측정점을
+`readRenderClock()`(`apps/host/src/components/lab/render-clock.ts`) 하나로 모았다.
+
+```tsx
+// 전: 렌더 함수 안에서 시계를 직접 읽는다 → react(purity) error
+return <LabPanel mode="ssr" renderedAt={new Date().toISOString()} />;
+
+// 후: 시계 읽기는 렌더 함수가 아닌 곳 한 군데에만 있다
+return <LabPanel mode="ssr" renderedAt={readRenderClock()} />;
+```
+
+**정직하게 적어 둔다 — 비순수성이 사라진 게 아니라 한 곳에 모였다.** `react/purity` 는 렌더
+함수 안의 알려진 비순수 호출(`Date` 등)을 보고, 호출한 함수 안까지 따라가지 않는다. 그래서
+통과한다. 이게 정당한 이유는 그 비순수성이 **이 실험의 측정 대상**이기 때문이다(값이 캐시와
+함께 얼어붙는지 · 요청마다 바뀌는지). 일반 컴포넌트에서 같은 방식으로 규칙을 피하면 안 된다.
+
+`'use cache'` 는 컴포넌트에 그대로 뒀다. 데이터 함수로 옮기면 규칙은 더 자연스럽게 통과하지만
+캐시 엔트리가 시각 하나만 덮고 **remote 마크업(`CatalogSection`)이 캐시 밖으로 빠진다** —
+"remote 마크업이 캐시되는가"라는 실험의 본체가 사라진다.
 
 **함의**: 규칙 이름이 같아도 구현이 다르다. oxlint 를 올릴 때 이 계열(React Compiler 규칙)에서
 새 진단이 나오면 회귀가 아니라 판정 차이일 수 있다.
