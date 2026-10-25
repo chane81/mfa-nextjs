@@ -41,6 +41,7 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 - 배포·캐시·신뢰 — [02-architecture/04-remote-lifecycle.md](./02-architecture/04-remote-lifecycle.md)
 - 스타일링 — [02-architecture/05-styling.md](./02-architecture/05-styling.md)
 - host 의 `src/mf` 배치 — [02-architecture/06-host-mf-layout.md](./02-architecture/06-host-mf-layout.md)
+- `turbo.json` 각 설정의 근거 — [02-architecture/07-turbo-tasks.md](./02-architecture/07-turbo-tasks.md)
 
 ## 지금 상태
 

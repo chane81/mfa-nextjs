@@ -38,6 +38,16 @@ ESLint 에서도 같은 경고를 확인). `globalEnv` 에 넣는 게 아니라 
 없다. `TZ` 를 `globalEnv` 에서 뺀 판단(turbo.json 주석)과 같은 근거다. 이제 `pnpm lint` 는
 진단 0건이다.
 
+### `turbo.json` 의 주석을 문서로 옮겼다
+
+220줄 중 151줄이 주석이라 설정이 안 보였고, 에디터가 JSON 으로 읽어 빨간 줄을 그었다.
+주석을 전부 [07-turbo-tasks.md](02-architecture/07-turbo-tasks.md) 로 옮기고(절 제목 = 키 이름)
+`turbo.json` 은 순수 JSON 70줄로 줄였다. `turbo.jsonc` 로 이름만 바꾸는 안은 빨간 줄만 풀고
+가독성은 그대로라 기각했다.
+
+덤으로 `remote-wiring.test.ts` 의 JSONC 스캐너가 빠지고 `JSON.parse` 하나가 됐다. 주석을
+다시 넣으면 그 테스트가 죽는다. F-2(블록 주석 속 글롭이 파서를 깨는 함정)는 재현 조건이 사라졌다.
+
 ### 확인
 
 `pnpm lint` · `format:check` · `typecheck` · `test`(51 파일 · 706) · `build` 통과. Node 26.12.1.

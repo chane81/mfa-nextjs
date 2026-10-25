@@ -1254,6 +1254,9 @@ Fri Jan 02 2026 03:04:05 GMT+0000 (GMT+00:00)
 
 ### F-2. `turbo.json` 블록 주석에 글롭을 적으면 파서가 깨진다
 
+> 49차부터 `turbo.json` 에 주석이 없다(근거는 [07-turbo-tasks.md](../02-architecture/07-turbo-tasks.md)).
+> 이 함정은 더 재현되지 않는다. 주석을 다시 넣으면 `scripts/remote-wiring.test.ts` 가 먼저 죽는다.
+
 turbo inputs 를 왜 이렇게 뒀는지 주석에 적으면서 글롭을 그대로 붙였더니 이렇게 죽었다.
 
 ```
