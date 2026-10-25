@@ -2,6 +2,7 @@ import { cacheLife, cacheTag } from 'next/cache';
 
 import { LabPanel } from '@/components/lab/LabPanel';
 import { LAB_REMOTE } from '@/components/lab/modes';
+import { readRenderClock } from '@/components/lab/render-clock';
 import { remoteCacheTag } from '@/mf/loader/server';
 
 /**
@@ -20,11 +21,7 @@ async function IsrEquivalent() {
   // remote 재배포 웹훅은 이 태그만 만료시키면 되고, 라우트 목록을 알 필요가 없다.
   cacheTag(remoteCacheTag(LAB_REMOTE));
 
-  // 렌더 시각을 찍는 실험 패널이다.
-  // `'use cache'` 스코프 안이라 이 값은 캐시와 함께 고정된다 — 그 시각을 보여주는 게 목적이다.
-  // (ESLint 의 react-hooks/purity 는 이 줄을 잡지 않았다 — 실측.)
-  // oxlint-disable-next-line react/purity
-  return <LabPanel mode="isr" renderedAt={new Date().toISOString()} />;
+  return <LabPanel mode="isr" renderedAt={readRenderClock()} />;
 }
 
 export default function LabIsrPage() {

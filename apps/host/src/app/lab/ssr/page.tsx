@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { Skeleton } from '@mfa/ui';
 
 import { LabPanel } from '@/components/lab/LabPanel';
+import { readRenderClock } from '@/components/lab/render-clock';
 
 /**
  * 실험 A — 요청마다 렌더 (cacheComponents 브랜치 버전).
@@ -20,11 +21,7 @@ import { LabPanel } from '@/components/lab/LabPanel';
 async function DynamicPanel() {
   await connection();
 
-  // 렌더 시각을 찍는 실험 패널이다.
-  // 요청마다 렌더하는 게 이 실험의 목적이다. `connection()` 뒤라 순수할 필요가 없다.
-  // (ESLint 의 react-hooks/purity 는 이 줄을 잡지 않았다 — 실측.)
-  // oxlint-disable-next-line react/purity
-  return <LabPanel mode="ssr" renderedAt={new Date().toISOString()} />;
+  return <LabPanel mode="ssr" renderedAt={readRenderClock()} />;
 }
 
 export default function LabSsrPage() {
