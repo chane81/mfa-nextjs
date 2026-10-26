@@ -1914,6 +1914,7 @@ oxlint 는 `correctness` 카테고리만 기본으로 켜므로, **ESLint 에서
   그대로 남는다.
 - **패키지마다 nested config** — oxlint 가 지원하지만, 패키지별로 쪼갤 이유였던 turbo 캐시가
   0.1초짜리 작업에서 의미가 없다. 규칙이 9개 파일에 흩어지는 비용만 남는다.
+  **2026-10-26 에 실제로 만들어 보고 되돌렸다** — 아래 보강 절.
 - **포매터는 prettier 유지** — 가능했다. 다만 린터와 포매터의 설정 · 무시 목록 · 에디터
   연동이 두 생태계로 갈라진다. diff 가 8개 파일(+23 −29)뿐이라 같이 옮겼다.
 - **prettier 를 3.9 로 먼저 올리고 비교** — diff 중 어디까지가 버전 차이인지 가를 수
@@ -1966,3 +1967,52 @@ ESLint 시절에는 Tailwind 린트가 없었다. styling 규칙의 "조용히 �
 
 `pnpm lint` · `format:check` · `typecheck` · `test`(51 파일 · 706) · `build`(host 프리렌더
 포함) 모두 통과. Node 26.12.1.
+
+### 보강 — 패키지별 중첩 설정을 만들어 보고 되돌렸다 (2026-10-26)
+
+위 "기각한 대안"의 첫 항목을 **실제로 구현해 본 기록**이다. ESLint 시절 배치를 그대로
+옮겨 `packages/oxlint-config`(base · react · next · remote · tailwind)을 만들고, 앱 · 패키지
+아홉 곳에 `oxlint.config.ts` 를 놓았다. `lint` · `typecheck` · `test`(706) · `build`(6/6)
+전부 통과했고, 영역별 위반 주입 7건도 다 걸렸다. **그래도 되돌렸다.**
+
+#### 그 과정에서 알아낸 oxlint 1.89.0 의 중첩 설정 규칙
+
+문서가 아니라 설치된 바이너리로 확인한 것이다. 쪼개지 않기로 했어도 이 성질은 남는다.
+
+| 성질                                                                         | 확인 방법                                                          |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 중첩 설정은 루트를 **상속하지 않고 교체**한다                                | 빈 `{"rules":{}}` 를 놓자 상위 규칙이 전부 사라졌다                |
+| `--config` 를 주면 **중첩 탐색이 꺼진다**                                    | 같은 상태에서 `-c` 를 주면 루트 규칙이 되살아난다                  |
+| `.oxlintrc.json` 은 `.ts` 설정을 `extends` 못 한다                           | `Failed to parse jsonc file … Kind(InvalidData)`                   |
+| `extends` 는 **`settings` 를 버린다**                                        | `oxlint-tailwindcss` 의 `dist/config.mjs` 주석이 같은 말을 한다    |
+| `extends` 는 `overrides` 를 가져가고, glob 은 상속한 설정 기준으로 다시 맞다 | base 의 `**/*.test.*` override 가 다른 패키지 파일에 적용됐다      |
+| glob 은 **그 설정 파일 디렉터리 기준**이다                                   | `GlobSet` 타입 주석 + `src/server.ts` 로 줄여 맞는 것을 확인       |
+| 공용 설정이 JS 플러그인을 **패키지 이름**으로 등록하면 해석되지 않는다       | pnpm isolated 에서 루트 `node_modules` 에 없다. 절대 경로로 넘긴다 |
+| oxlint 는 `.gitignore` 를 읽는다                                             | `ignorePatterns` 네 줄을 지워도 린트 대상 163개가 그대로였다       |
+
+#### 되돌린 이유
+
+규칙 수는 그대로인데 **조용히 깨지는 길이 셋 늘어난다.** 이 저장소가 가장 비싸게 치는 종류다.
+
+1. 어디서든 `--config` 가 끼면 저장소 전체가 base 로 돈다 — React · Next · Tailwind · 불변식
+   규칙이 다 빠지는데 **`pnpm lint` 는 통과한다.** 에디터 확장 설정 한 줄로도 그렇게 된다.
+2. 패키지에 설정 파일을 빠뜨리면 base 로 조용히 떨어진다. 새 remote 를 추가하며 잊으면
+   `@mfa/contracts/remote` 금지가 없는 remote 가 생긴다 — `remotes.md` 의 "손으로 해야 하는
+   아홉 곳"이 열 곳이 된다.
+3. `settings` 를 공용 설정에 적으면 버려진다. Tailwind 는 `designSystemUnavailable` 로 티가
+   나지만 `next.rootDir` 은 그냥 아무것도 안 잡는다.
+
+얻는 것은 **진입 CSS 소유권 4줄**과 glob 이 짧아지는 것뿐이었다. 관리 지점은 설정 파일
+1 → 15개, 워크스페이스 패키지 +1(카탈로그 3줄 · Dockerfile COPY 3줄 · `docker-context.test.ts`
+대상 +1), `tsconfig.test.json` 제외 한 줄이 늘었다. "host 에 어떤 규칙이 도나"를 보려면
+파일 넷을 따라가야 한다. 유지하려면 **가드 테스트가 필수**였다(패키지마다 설정이 있는지,
+`lint` 스크립트에 `-c` 가 없는지) — 비용이 이득을 넘겼다.
+
+#### 남긴 것
+
+실험에서 건진 두 줄은 쪼개지 않고도 쓸 수 있어서 반영했다.
+
+- `ignorePatterns` 를 **둘로 줄였다**. `.next` · `dist` · `.turbo` · `coverage` 는 `.gitignore` 가
+  이미 거른다. 남은 둘(`@mf-types` · `docs/**`)은 gitignore 밖이라 거기 있는 이유가 분명하다.
+- `packages/eslint-config/` **빈 디렉터리를 지웠다**. 49차에 없앴다고 적었는데 `node_modules/`
+  만 남은 껍데기가 디스크에 있었다.

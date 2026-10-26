@@ -1,5 +1,33 @@
 # 진행 상황
 
+## 2026-10-26 (50차) — 린트 설정을 패키지별로 쪼개 보고 되돌린다
+
+질문은 "ESLint 때처럼 앱 · 패키지마다 설정을 두는 게 낫지 않나"였다. ADR-028 이 이미
+기각해둔 안이지만 근거가 "turbo 캐시가 의미 없다"뿐이어서, **만들어 보고 판단했다.**
+
+`packages/oxlint-config`(base · react · next · remote · tailwind) + 아홉 곳의 중첩
+`oxlint.config.ts`. `lint` · `typecheck` · `test`(706) · `build`(6/6) 전부 통과하고 영역별
+위반 주입 7건도 다 걸렸다. 그래도 되돌렸다 — 규칙 수는 그대로인데 **조용히 깨지는 길이
+셋 늘어난다**(`--config` 하나로 전체가 base 로 떨어짐 · 설정 파일 누락이 무신호 ·
+공용 설정의 `settings` 가 버려짐). 실측한 oxlint 중첩 설정 규칙 여덟 가지와 비용 대조는
+[ADR-028 보강 절](02-architecture/01-decision.md#보강--패키지별-중첩-설정을-만들어-보고-되돌렸다-2026-10-26).
+
+### 실험에서 건져 반영한 둘
+
+| 무엇                                | 이전                                                   | 이후                          |
+| ----------------------------------- | ------------------------------------------------------ | ----------------------------- |
+| `oxlint.config.ts` `ignorePatterns` | 6줄(`dist` · `.next` · `.turbo` · `coverage` 포함)     | **2줄**(`@mf-types` · `docs`) |
+| `packages/eslint-config/`           | 49차에 지웠다고 적었는데 `node_modules/` 껍데기가 남음 | 삭제                          |
+
+oxlint 가 `.gitignore` 를 읽는다 — 네 줄을 지워도 린트 대상이 163개 그대로다
+(`oxlint --debug=files` 전수 대조, 2026-10-26). 남은 둘은 gitignore 밖이라 거기 적힌
+이유가 분명해졌다(생성물인데 커밋하는 `@mf-types`, Pages 로 공개하는 `docs/**`).
+
+### 확인
+
+`pnpm lint`(진단 0) · `format:check` · `typecheck` 13/13 · `test` 51파일 · 706 통과.
+Node 26.12.1. 되돌린 뒤 린트 대상 파일 수가 실험 전과 같은 163개임을 전수 대조로 확인했다.
+
 ## 2026-10-25 (49차) — 린트를 oxlint, 포맷을 oxfmt 로 옮긴다
 
 출발은 "ESLint 는 아직 TS 7 을 지원하지 않나"였다. 확인해 보니 `typescript-eslint@8.72.0`
