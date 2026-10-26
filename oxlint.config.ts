@@ -61,11 +61,16 @@ export default defineConfig({
     browser: true,
     node: true,
   },
+  /**
+   * **빌드 산출물은 적지 않는다.** oxlint 가 `.gitignore` 를 읽어 `.next` · `dist` ·
+   * `.turbo` · `coverage` 를 이미 제외한다(그 네 줄을 지워도 린트 대상 163개 그대로 —
+   * `oxlint --debug=files` 로 전수 대조했다).
+   *
+   * 그래서 여기 남는 건 **gitignore 밖인데 린트하지 않을 것** 둘뿐이다. 적힌 이유가
+   * 둘 다 "그 자리에 있어야 할 근거"라서, 목록이 설명이 된다.
+   */
   ignorePatterns: [
-    '**/dist/**',
-    '**/.next/**',
-    '**/.turbo/**',
-    '**/coverage/**',
+    // 생성물이지만 커밋한다 — `pnpm typecheck` 가 네트워크 없이 돌아야 한다(루트 CLAUDE.md).
     '**/@mf-types/**',
     // Pages 로 공개하는 시각화 페이지의 스크립트. ESLint 시절에도 린트 범위 밖이었다.
     'docs/**',
