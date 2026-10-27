@@ -2112,3 +2112,73 @@ lockfile 두 입력만 본다(`hashFiles('packages/tailwind-config/theme.css', '
 - 기각: **로컬도 저장소 안 경로로 고정** — 예측 가능해지는 대신 `pnpm clean` 마다 3.8s 를
   다시 낸다. 로컬에서 캐시가 비는 건 TMPDIR 청소 때뿐이고, 그때 왜 느린지는
   `oxlint.config.ts` 주석이 설명한다.
+
+## ADR-029 — remote 는 `lazy()` 가 아니라 `use(promise)` 로 그린다
+
+**날짜** 2026-10-27 (52차) · **상태** 채택 · **관련** ADR-028(oxlint), known-issues 5 · O
+
+### 맥락
+
+`RemoteComponent` 는 모듈 id 하나로 remote 를 그린다. 어느 remote 를 그릴지는 런타임에
+정해지므로 `lazy()` 를 모듈 스코프 `Map` 에 캐시해 두고 렌더에서 꺼내 썼다(known-issues 5).
+
+꺼낸 값이 **컴포넌트**라 JSX 로 쓰는 순간 린터가 "렌더 중 컴포넌트 생성"으로 잡는다.
+ESLint 시절부터 그 자리에는 근거를 적은 disable 주석이 있었다 —
+49차에 `oxlint-disable-next-line react/static-components` 로 이름만 바뀌었다.
+
+저장소에 남은 `oxlint-disable` 셋을 걷어내면서 이 자리를 다시 봤다. **린터가 틀린 게 아니다.**
+캐시 미스일 때 `lazy()` 호출이 실제로 렌더 중에 일어나고, 린터는 캐시 키가 안정적이라는
+맥락을 알 수 없다. 경고를 끄는 게 아니라 **경고의 근거를 없애는** 쪽을 택할 수 있다.
+
+### 결정
+
+캐시가 들고 있는 것을 **컴포넌트에서 적재 promise 로** 바꾼다. 화면에 붙는 컴포넌트는
+모듈 스코프에 한 번 정의되는 `RemoteModuleView` 하나로 고정되고, 어느 remote 를 그리느냐는
+컴포넌트 정체성이 아니라 **prop 으로** 전달된다.
+
+```tsx
+const modulePromises = new Map<string, RemoteModulePromise>();
+
+function RemoteModuleView({ promise, props }) {
+  const { default: Remote } = use(promise);
+  return <Remote {...props} />;
+}
+
+// RemoteComponent 안
+const cacheKey = remoteCacheKey(moduleId, reloadKey);
+<Suspense fallback={placeholder}>
+  <RemoteModuleView
+    key={cacheKey}
+    promise={remoteModulePromise(cacheKey, moduleId)}
+    props={(props ?? {}) as Record<string, unknown>}
+  />
+</Suspense>;
+```
+
+`key={cacheKey}` 가 예전에 "새 lazy 를 만든다"가 하던 일을 대신한다 — 버전이 바뀌면 뷰가
+갈아끼워져 옛 remote 의 상태가 새 코드로 넘어오지 않는다. 더 명시적이다.
+`remoteCacheKey` 의 규칙(**버전이 키에 들어간다**)은 그대로다. 그게 바뀌면 재배포해도
+옛 모듈이 프로세스 수명 내내 고정된다.
+
+React 19.2.8 기준. `use` 는 19.0 부터의 안정 API다.
+
+### 결과
+
+- ⭕ **disable 주석이 사라진다.** 끈 게 아니라 렌더 중 컴포넌트가 정말로 안 만들어진다.
+- ⭕ 캐시 무효화 의미가 한 군데로 모인다 — 키가 곧 "지금 그려야 하는 remote 의 정체"다.
+- ⭕ SSR 경로는 그대로다. `pnpm build` 의 프리렌더가 remote SSR 번들을 실제로 실행해 통과한다.
+- ❌ **jsdom 테스트 11개가 깨졌다.** RTL 의 동기 `render` 안에서 `use()` 로 suspend 하면
+  재개되지 않는다 — 적재 완료를 보는 테스트는 `await act` 로 감싸야 한다(O-1 · O-2).
+  런타임이 아니라 테스트 하네스의 제약이지만, 구현을 바꾼 것만으로 테스트가 깨진다는 뜻이라
+  비용으로 적어둔다.
+
+### 기각한 대안
+
+- **`createElement(Remote, props)` 로 바꾼다** — 린트는 통과한다. 그런데 의미는 하나도 안
+  바뀌고 린터 휴리스틱만 피한다. 다음 사람이 왜 JSX 가 아닌지 알 수 없고, 주석으로 설명하면
+  disable 주석과 비용이 같다. **가장 나쁜 선택지다 — 통과했다는 사실이 아무것도 보증하지 않는다.**
+- **`oxlint.config.ts` 에 파일 단위 override 를 둔다** — 인라인 주석은 사라지고 근거가 설정
+  한 파일에 모인다(저장소 철학과 맞다). 런타임 위험 0. 그래도 **규칙을 끄는 것**이고, 린터가
+  지적한 구조는 그대로 남는다. `use()` 전환이 빌드까지 통과하는 걸 확인한 뒤 이쪽을 접었다.
+- **`MODULE_IDS` 로 모든 remote 의 lazy 를 미리 만든다** — 목록은 컴파일 타임에 유한하지만
+  버전 · `reloadKey` 가 키에 들어가므로 결국 런타임 생성이 남는다. 문제를 못 없앤다.

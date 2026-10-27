@@ -1,10 +1,5 @@
 #!/usr/bin/env node
 
-/* oxlint-disable turbo/no-undeclared-env-vars --
- * 여기서 읽는 env 는 GitHub Actions 런타임이 주는 값이고 turbo 태스크에서는 안 읽힌다.
- * `globalEnv` 에 넣으면 그 값이 바뀔 때마다 모든 태스크가 캐시를 놓친다(turbo 문서).
- */
-
 /**
  * 무엇을 배포할지 정한다. `.github/actions/detect-targets` 가 부른다.
  *

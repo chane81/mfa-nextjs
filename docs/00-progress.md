@@ -1,5 +1,48 @@
 # 진행 상황
 
+## 2026-10-27 (52차) — 저장소에 남은 `oxlint-disable` 셋을 없앤다
+
+세 자리 모두 근거 주석이 달린 **의도한** disable 이었다. 그래서 "끄는 게 맞나"를 하나씩 다시
+봤고, 셋 다 **끄지 않고 끝낼 수 있었다** — 둘은 근거가 이미 낡았고, 하나는 린터가 옳았다.
+
+| 자리                                              | 규칙                                 | 어떻게 없앴나                                  |
+| ------------------------------------------------- | ------------------------------------ | ---------------------------------------------- |
+| `scripts/deploy-targets.ts` (파일 전체)           | `turbo/no-undeclared-env-vars`       | 이미 있던 "turbo 밖" override 에 파일을 넣는다 |
+| `packages/contracts/src/contract-check.ts`        | `typescript/no-useless-empty-export` | `export {}` 를 지운다 — 정말 불필요했다        |
+| `apps/host/src/mf/components/RemoteComponent.tsx` | `react/static-components`            | `lazy()` → `use(promise)` (ADR-029)            |
+
+### `export {}` 는 정말 필요 없었다
+
+근거 주석은 "`isolatedModules` 아래에서 모듈로 인정받기 위한 최소 export" 였다. 그런데 공용
+tsconfig 에 `moduleDetection: "force"` 가 있어 **모든 파일이 이미 모듈이다.** 지워도
+`pnpm typecheck` 가 통과한다. 다만 "여기에 아무것도 export 하지 말 것"이라는 경고는 살아 있는
+계약(emit 되는 `.d.ts` 에 `@mf-types` 참조가 살아나면 계약이 조용히 `any` 가 된다)이라
+파일 머리말로 옮겼다. 상세: [O-3](05-troubleshooting/01-known-issues.md#o-3-export--는-moduledetection-force-아래에서-정말로-불필요하다).
+
+### remote 는 이제 `use(promise)` 로 그린다
+
+캐시가 들고 있던 것을 **컴포넌트에서 적재 promise 로** 바꿨다. 화면에 붙는 컴포넌트는 모듈
+스코프의 `RemoteModuleView` 하나로 고정되고, 어느 remote 냐는 prop 으로 간다 — 린터가
+지적하던 "렌더 중 컴포넌트 생성"이 **정말로 사라진다.** 버전이 바뀌면 상태가 초기화되는
+성질은 `key={cacheKey}` 가 맡는다(예전엔 "새 lazy 를 만든다"가 암묵적으로 하던 일이다).
+근거와 기각한 대안 셋: [ADR-029](02-architecture/01-decision.md#adr-029--remote-는-lazy-가-아니라-usepromise-로-그린다).
+
+- **기각: `createElement(Remote, props)`** — 린트는 통과하는데 의미는 안 바뀐다. 휴리스틱만
+  피하는 거라 가장 나쁜 선택지였다. 실제로 해보고 통과하는 것까지 확인한 뒤 버렸다.
+- **기각: config override 로 옮기기** — 런타임 위험 0 이지만 결국 규칙을 끄는 것이다.
+  `use()` 전환이 빌드까지 통과하는 걸 확인하고 접었다.
+
+### 대가는 테스트 11개였다
+
+`use()` 로 suspend 하면 RTL 의 **동기** `render` 안에서 재개되지 않는다. 프로덕션은 멀쩡한데
+jsdom 테스트만 제한 시간까지 스켈레톤에 머문다. 적재 완료를 보는 테스트만 `await act` 로
+감쌌고, 스켈레톤 상태만 보는 테스트는 동기 `render` 그대로 뒀다 — 거기선 재개할 게 없다.
+변종 하나([O-2](05-troubleshooting/01-known-issues.md#o-2-두-번째-렌더부터는-fallback-조차-커밋되지-않는다))는
+증상이 "두 번째 렌더부터 화면이 통째로 빔"이라 라벨이나 `Suspense` 배치를 의심하게 만든다.
+
+- 확인: `lint` · `typecheck` · `test`(55파일 · 706) · `build`(6/6) 통과. Node 26.12.1.
+  테스트 수는 그대로다 — 하네스만 고쳤고 단언은 안 건드렸다.
+
 ## 2026-10-27 (51차) — `@mfa/ui` 를 컴포넌트마다 폴더 하나로 나눈다
 
 `packages/ui/src/components.tsx` 한 파일에 프리미티브 다섯(`Panel` · `Button` · `Badge` ·
