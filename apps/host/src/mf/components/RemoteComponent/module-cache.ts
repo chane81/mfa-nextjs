@@ -25,8 +25,9 @@ const modulePromises = new Map<string, RemoteModulePromise>();
  * 적재 캐시 키. **버전이 키에 들어가는 것이 핵심**이라 규칙을 함수로 떼어 둔다 —
  * 빠지면 재배포해도 옛 모듈이 프로세스 수명 내내 고정된다(known-issues A-2 · G-1).
  *
- * `reloadKey` 는 같은 버전으로 되돌리는 롤백에서 로더를 반드시 한 번 태우는 탈출구다.
- * 지금 쓰는 쪽은 `MfWarmup`(nonce) 하나다.
+ * 둘째 인자는 같은 버전으로 되돌리는 롤백에서 로더를 반드시 한 번 태우는 탈출구다.
+ * 이걸 쓰는 쪽은 `MfWarmup`(nonce) 하나다 — 이름이 같은 `RemoteComponent` 의 `reloadKey`
+ * **prop** 은 소비자가 없다(그쪽 주석).
  */
 export function remoteCacheKey(id: RemoteModuleId, reloadKey?: string): string {
   const remote = id.split('/')[0] as RemoteName;

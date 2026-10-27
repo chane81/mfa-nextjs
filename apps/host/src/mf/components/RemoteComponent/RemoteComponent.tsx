@@ -24,8 +24,9 @@ interface RemoteComponentProps<K extends RemoteModuleId> {
   /**
    * 적재 캐시를 우회하는 키. 같은 버전으로 되돌리는 롤백에서 로더를 반드시 한 번 태운다.
    *
-   * ⚠️ 지금 이 prop 을 쓰는 프로덕션 호출부는 없다 — `MfWarmup` 은 렌더가 아니라 적재라서
-   * `loadRemoteModule` 을 직접 부른다. 검증된 탈출구이지 쓰이는 경로가 아니다.
+   * ⚠️ 지금 이 **prop** 을 쓰는 프로덕션 호출부는 없다 — `MfWarmup` 은 렌더가 아니라 적재라서
+   * `loadRemoteModule` 을 직접 부른다. 키 규칙 자체(`remoteCacheKey` 의 둘째 인자)는
+   * 그쪽이 계속 쓴다. 검증된 탈출구이지 쓰이는 경로가 아니다.
    */
   reloadKey?: string;
 }

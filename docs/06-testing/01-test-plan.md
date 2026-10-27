@@ -275,7 +275,7 @@ remote 이름인지. 그 파일은 **아무것도 export 하지 않는다** — 
    `beforeEach` 에서 부른다.
 
 3. **모듈 스코프 가변 상태** — `loader/server.ts` 의 `bundleCache`, `loader/index.ts` 의 `clientCache` ·
-   `initialized`, `components/RemoteComponent.tsx` 의 `lazyCache`, `utils/cookie-storage.ts` 의 `warned: Set`.
+   `initialized`, `components/RemoteComponent/module-cache.ts` 의 `modulePromises`, `utils/cookie-storage.ts` 의 `warned: Set`.
    리셋 API 가 없어 `vi.resetModules()` + 동적 import 로만 격리된다.
 
 4. **ICU 로케일 의존** — `formatKRW`(`toLocaleString('ko-KR')`)와 `formatKst`(`Intl.DateTimeFormat`)의
