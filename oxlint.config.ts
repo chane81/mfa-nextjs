@@ -173,7 +173,15 @@ export default defineConfig({
     {
       // turbo 태스크 밖에서 도는 파일 — env 규칙의 전제가 없다.
       // 근거: `docs/02-architecture/07-turbo-tasks.md`
-      files: ['vitest.config.ts', 'tests/**', '**/*.test.{ts,tsx}'],
+      //
+      // `scripts/deploy-targets.ts` 는 GitHub Actions 런타임이 주는 env 를 읽는다.
+      // `globalEnv` 에 넣으면 그 값이 바뀔 때마다 모든 태스크가 캐시를 놓친다.
+      files: [
+        'vitest.config.ts',
+        'tests/**',
+        '**/*.test.{ts,tsx}',
+        'scripts/deploy-targets.ts',
+      ],
       rules: {
         'turbo/no-undeclared-env-vars': 'off',
       },
