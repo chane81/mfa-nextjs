@@ -4,8 +4,9 @@
 
 `packages/ui/src/components.tsx` 한 파일에 프리미티브 다섯(`Panel` · `Button` · `Badge` ·
 `Skeleton` · `ErrorBox`)이 있었다. `src/<이름>/<이름>.tsx` 로 나누고 테스트도 같은 폴더에
-`<이름>.test.tsx` 로 같이 나눴다. 패키지 자체가 UI 라 `components/` 층은 두지 않았고, 폴더마다
-배럴도 두지 않는다 — 공개 표면은 그대로 `src/index.ts` 배럴 하나다.
+`<이름>.test.tsx` 로 같이 나눴다. 패키지 자체가 UI 라 `components/` 층은 두지 않았다.
+폴더마다 `index.ts` 가 본체를 재수출하고(`export * from './Badge'`), 루트 `src/index.ts` 는
+폴더를 가리킨다(`'./Badge'`). 패키지 공개 표면은 그대로 루트 배럴 하나다.
 
 | 무엇             | before                     | after                                                 |
 | ---------------- | -------------------------- | ----------------------------------------------------- |
@@ -19,6 +20,7 @@
 - **`Badge/index.tsx` · `index.test.tsx` 로 바꿨다가 되돌렸다.** 배럴이 `'./Badge'` 로 짧아지는
   대신 파일 이름이 전부 `index` 가 된다 — `cmd + p` 에 컴포넌트 이름을 쳐도 파일 이름으로는
   안 걸리고, 에디터 탭도 전부 `index.tsx` 로 보인다. 찾는 비용이 import 한 줄 길이보다 비싸다.
+  짧은 import 는 폴더 `index.ts`(재수출 한 줄)로 얻는다 — 본체 이름은 `Badge.tsx` 로 남는다.
 - 확인: `lint` · `typecheck` · `test`(55파일 · 706) · `build`(6/6) 통과. `dist/` 에 테스트가
   안 실리는 것(`tsconfig.build.json` 의 `**/*.test.tsx` 제외)도 확인했다. Node 26.12.1.
 
