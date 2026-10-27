@@ -22,16 +22,16 @@
 
 ### `pnpm build` 실패
 
-| 증상                                                                 | 항목                                                                                                                            |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `Error occurred prerendering page` + `fetch failed` / `ECONNREFUSED` | [B-1](#b-1-host-빌드는-remote-가-떠-있어야-끝난다), [1](#1-next-build-프리렌더가-mf-런타임을-호출해서-죽음)                     |
-| `매니페스트에 무결성 값이 없습니다`                                  | 그 포트에 dev 서버가 떠 있다 — [B-4](#b-4-dev-서버가-떠-있으면-포트-충돌조차-안-난다)                                           |
-| 빌드가 안 끝나고 매달림 (사이드카가 안 죽음)                         | [B-2](#b-2-turbo-의-with-사이드카로는-build-를-못-끝낸다), [B-3](#b-3-그-게이트를-host-이미지가-타면-안-된다--끊는-건-이름으로) |
-| `new URL("")` / `Invalid URL`                                        | 빈 문자열 env — [B-5](#b-5-빈-문자열-env-가-new-url-로-터질-자리가-남아-있었다)                                                 |
-| Turbopack 이 상대경로 `.js` 를 못 찾음                               | [2](#2-turbopack-이-상대경로-js-확장자를-못-찾음)                                                                               |
-| `You're importing a component that imports react-dom/client`         | 공유 모듈 파일이 RSC 그래프에 딸려 들어갔다 — [H-1](#h-1-공유-모듈-표에-react-domclient-실체를-담으면-rsc-그래프가-막는다)      |
-| `@mfa/contracts` 빌드가 `window` 를 못 찾음                          | [7](#7-mfacontracts-빌드가-window-를-못-찾음)                                                                                   |
-| 배포 빌드만 다른 경로로 통과함                                       | [B-6](#b-6-배포-빌드는-문서에-없는-경로로-통과하고-있었다)                                                                      |
+| 증상                                                                 | 항목                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Error occurred prerendering page` + `fetch failed` / `ECONNREFUSED` | [B-1](#b-1-host-빌드는-remote-가-떠-있어야-끝난다), [1](#1-next-build-프리렌더가-mf-런타임을-호출해서-죽음)                                                                                                                             |
+| `매니페스트에 무결성 값이 없습니다`                                  | 그 포트에 dev 서버가 떠 있다 — [B-4](#b-4-dev-서버가-떠-있으면-포트-충돌조차-안-난다)                                                                                                                                                   |
+| 빌드가 안 끝나고 매달림 (사이드카가 안 죽음)                         | [B-2](#b-2-turbo-의-with-사이드카로는-build-를-못-끝낸다), [B-3](#b-3-그-게이트를-host-이미지가-타면-안-된다--끊는-건-이름으로)                                                                                                         |
+| `new URL("")` / `Invalid URL`                                        | 빈 문자열 env — [B-5](#b-5-빈-문자열-env-가-new-url-로-터질-자리가-남아-있었다)                                                                                                                                                         |
+| Turbopack 이 상대경로 `.js` 를 못 찾음                               | [2](#2-turbopack-이-상대경로-js-확장자를-못-찾음)                                                                                                                                                                                       |
+| `You're importing a component that imports react-dom/client`         | 공유 모듈 파일이 RSC 그래프에 딸려 들어갔다 — [H-1](#h-1-공유-모듈-표에-react-domclient-실체를-담으면-rsc-그래프가-막는다). 컴포넌트를 폴더로 쪼갠 직후라면 배럴이 경계를 삼켰다 — [P-1](#p-1-배럴을-거치면-use-client-경계가-사라진다) |
+| `@mfa/contracts` 빌드가 `window` 를 못 찾음                          | [7](#7-mfacontracts-빌드가-window-를-못-찾음)                                                                                                                                                                                           |
+| 배포 빌드만 다른 경로로 통과함                                       | [B-6](#b-6-배포-빌드는-문서에-없는-경로로-통과하고-있었다)                                                                                                                                                                              |
 
 ### remote 가 안 뜨거나 깨짐
 
@@ -127,6 +127,50 @@
 | `pnpm test` 에 `ExperimentalWarning: localStorage is not available` 가 7번 찍힘 (테스트는 통과) | Node 26 내장 전역과 jsdom 이 겹친다 — [M-1](#m-1-node-26-의-내장-localstorage-때문에-jsdom-테스트가-경고를-7번-찍는다) |
 | 컴포넌트가 제한 시간까지 스켈레톤에 머묾 + `A component suspended inside an act scope`          | 렌더를 `await act` 로 안 감쌌다 — [O-1](#o-1-usepromise-로-suspend-하면-rtl-의-동기-render-에서-영원히-스켈레톤이다)   |
 | 두 번째 렌더부터 화면이 통째로 빔 (fallback 도 없음)                                            | 같은 thenable 로 다시 suspend 했다 — [O-2](#o-2-두-번째-렌더부터는-fallback-조차-커밋되지-않는다)                      |
+
+## P. (53차) host 의 MF 컴포넌트를 폴더로 나누며 밟은 것
+
+### P-1. 배럴을 거치면 `'use client'` 경계가 사라진다
+
+`components/RemoteComponent.tsx` 를 `components/RemoteComponent/` 폴더로 쪼개고
+(`RemoteComponent.tsx` · `module-cache.ts` · `RemoteModuleView.tsx` · `RemoteStyleLink.tsx`)
+호출부 경로를 그대로 두려고 폴더에 `index.ts` 재수출을 뒀다. 코드는 한 줄도 옮기지
+않았는데 `pnpm build` 가 죽었다.
+
+```
+Error: You're importing a component that imports react-dom/client. It only works in a Client Component but none of its parents are marked with "use client", so they're Server Components by default.
+```
+
+```
+  Client Component Browser:
+    ./apps/host/src/mf/loader/index.ts [Client Component Browser]
+    ./apps/host/src/mf/components/RemoteComponent/module-cache.ts [Client Component Browser]
+    ./apps/host/src/mf/components/RemoteComponent/RemoteComponent.tsx [Client Component Browser]
+    ./apps/host/src/mf/components/RemoteComponent/RemoteComponent.tsx [Server Component]
+    ./apps/host/src/app/products/[id]/page.tsx [Server Component]
+```
+
+원인은 `'use client'` 가 **파일 단위 경계**라는 것이다. 쪼개기 전에는 디렉티브가 붙은
+`RemoteComponent.tsx` 하나가 `loader` 까지 가는 모든 길의 입구였다. 폴더로 나누자
+배럴 `index.ts` 가 그 앞에 서는데 **배럴에는 디렉티브가 없다** — 그래서 배럴이 서버
+모듈이 되고, 배럴이 재수출하는 `module-cache.ts`(디렉티브 없음 → `loader/index.ts` →
+`react-dom/client`)가 RSC 그래프에 그대로 남는다. 같은 메시지를 다른 경로로 밟은
+[H-1](#h-1-공유-모듈-표에-react-domclient-실체를-담으면-rsc-그래프가-막는다) 과 짝이다.
+
+**import trace 에 배럴이 안 나온다.** 위 추적은 `page.tsx` 다음에 바로
+`RemoteComponent.tsx [Server Component]` 를 적는다 — 재수출 한 줄짜리 모듈은 접혀서
+보이지 않으므로, 원인이 "파일을 옮긴 것"이 아니라 "사이에 파일이 하나 생긴 것"이라는
+사실이 추적에서는 읽히지 않는다.
+
+해결은 `module-cache.ts` 머리에 `'use client'` 를 적는 것이다. 이 모듈은 `loader` 를
+부르므로 원래부터 client 경계 안쪽이고, 디렉티브가 그 사실을 파일에 적어 둔다.
+
+- **기각: 배럴에 `'use client'` 를 적기.** 지금은 통하지만 "그 폴더의 모든 수출이
+  client 다"를 배럴에 고정하는 것이다. 바로 옆 `RemoteVersionSync/index.ts` 는 서버
+  컴포넌트를 재수출하므로 같은 처방을 쓸 수 없다 — 규칙이 폴더마다 달라진다.
+- **기각: 호출부를 본체 파일로 직접 가리키기**(`components/RemoteComponent/RemoteComponent`).
+  배럴을 없애 경계를 되찾지만 import 가 이름을 두 번 적고, `@mfa/ui` 가 쓰는 폴더 규칙과
+  어긋난다.
 
 ## O. (52차) `lazy()` 를 `use()` 로 바꾸며 밟은 것
 
