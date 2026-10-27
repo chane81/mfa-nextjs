@@ -32,29 +32,9 @@ export default defineConfig({
   // 모노레포라 Next 앱 위치를 알려줘야 `nextjs/no-html-link-for-pages` 가 pages 를 찾는다.
   settings: {
     next: { rootDir: 'apps/host/' },
-    /**
-     * 파일마다 **그 파일을 실제로 컴파일하는 진입 CSS** 를 고른다. 위에서부터 첫 매칭이 이긴다.
-     *
-     * 앱 셋은 각자 자기 진입 CSS 를 컴파일한다(공유 CSS 산출물이 없다 — `.claude/rules/styling.md`).
-     * 셋 다 `@mfa/tailwind-config` 를 import 하지만 `@source` · `@utility` 가 앱마다 다를 수 있어
-     * 하나로 묶지 않는다. `@mfa/ui` 는 스스로 컴파일되지 않으니 토큰 원본 `theme.css` 를 본다.
-     *
-     * oxlint 는 overrides 안의 `settings` 를 거부해서 여기 한 곳에 매핑으로 둔다.
-     */
-    tailwindcss: {
-      entryPoint: [
-        { files: 'apps/host/**', use: 'apps/host/src/app/globals.css' },
-        {
-          files: 'apps/remote-cart/**',
-          use: 'apps/remote-cart/src/styles.css',
-        },
-        {
-          files: 'apps/remote-catalog/**',
-          use: 'apps/remote-catalog/src/styles.css',
-        },
-        { files: '**', use: 'packages/tailwind-config/theme.css' },
-      ],
-    },
+    // Tailwind 디자인 시스템의 원본. 앱이 자기 `@theme` · `@utility` 를 갖게 되면
+    // `{ files, use }` 배열로 앱별 매핑을 돌려놓는다.
+    tailwindcss: { entryPoint: 'packages/tailwind-config/theme.css' },
   },
   env: {
     builtin: true,
