@@ -1,3 +1,5 @@
+// 폴더 배럴에는 디렉티브가 없다 — 없으면 이 파일이 RSC 그래프에 남아
+// `loader` → `react-dom/client` 로 빌드가 막힌다(known-issues P-1).
 'use client';
 
 import type { ComponentType } from 'react';
