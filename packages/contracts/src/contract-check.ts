@@ -22,6 +22,13 @@ import type { MODULE_IDS, RemoteModuleId } from './generated/module-ids';
  * 참조가 남지 않는다. 검사는 `tsc` 가 이 파일을 컴파일하는 것만으로 끝난다 —
  * `tsconfig.json` 의 `include` 가 이미 `src` 전체를 잡고 있다.
  *
+ * ⚠️ **여기에 아무것도 export 하지 말 것.** 하나라도 내보내면 `@mf-types` 참조가
+ * emit 되는 `.d.ts` 에 다시 살아나고, 위의 조용한 `any` 문제가 돌아온다.
+ *
+ * 모듈로 인정받기 위한 `export {}` 도 필요 없다 — 공용 tsconfig 가
+ * `moduleDetection: "force"` 라 모든 파일이 이미 모듈이다
+ * (`packages/typescript-config/base.json`).
+ *
  * ## 무엇을 잡나
  *
  * `scripts/gen-module-ids.ts` 는 `apis.d.ts` 를 정규식으로 파싱한다. dts-plugin 의
@@ -55,12 +62,3 @@ type _ModuleIdsAreExhaustive = Expect<
 type _ModuleIdsArePrefixed = Expect<
   RemoteModuleId extends `${RemoteName}/${string}` ? true : false
 >;
-
-/**
- * `isolatedModules` 아래에서 모듈로 인정받기 위한 최소 export.
- *
- * ⚠️ **여기에 타입을 export 하지 말 것.** 하나라도 내보내면 `@mf-types` 참조가
- * emit 되는 `.d.ts` 에 다시 살아나고, 위 머리말의 조용한 `any` 문제가 돌아온다.
- */
-// oxlint-disable-next-line typescript/no-useless-empty-export -- 위 이유로 일부러 비운 export 다.
-export {};
