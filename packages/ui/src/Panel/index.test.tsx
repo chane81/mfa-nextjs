@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { Panel } from './Panel';
+import { Panel } from '.';
 
 describe('Panel', () => {
   it('origin 라벨을 항상 보여준다', () => {
