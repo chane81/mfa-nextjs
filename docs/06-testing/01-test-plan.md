@@ -152,7 +152,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 25. `packages/store/src/hooks/use-revalidate-on-focus.ts` — visibility 가드 / **ref latest** / cleanup
 - [x] 26. `use-hydrated.ts` · `use-cart-lines.ts` — `renderToString` SSR 경로 / 클라이언트 전환
 - [x] 27. `packages/store/src/cart/use-cart-sync.ts` — 기준선 3-상태 / 동일 원문 스킵 / **정규화 후 reseed**
-- [x] 28. `packages/ui/src/<컴포넌트>/`(소스와 `*.test.tsx` 가 한 폴더) — `--hue` 변수(통로는 `@mfa/utils/style/hue` 의
+- [x] 28. `packages/ui/src/<컴포넌트>/`(`index.tsx` 와 `index.test.tsx` 가 한 폴더) — `--hue` 변수(통로는 `@mfa/utils/style/hue` 의
       `hueVar` 다 — 감추는 건 함수가 아니라 **변수 이름이 계약이라는 사실**이다) /
       조건부 렌더 / variant 클래스 매핑
 - [x] 29. `apps/host/src/mf/components/RemoteBoundary.tsx` — 자식 throw → `ErrorBox` 내용.

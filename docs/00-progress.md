@@ -3,16 +3,17 @@
 ## 2026-10-27 (51차) — `@mfa/ui` 를 컴포넌트마다 폴더 하나로 나눈다
 
 `packages/ui/src/components.tsx` 한 파일에 프리미티브 다섯(`Panel` · `Button` · `Badge` ·
-`Skeleton` · `ErrorBox`)이 있었다. `src/<이름>/<이름>.tsx` 로 나누고 테스트도 같은 폴더에
-`<이름>.test.tsx` 로 같이 나눴다. 패키지 자체가 UI 라 `components/` 층은 두지 않았고, 폴더마다
-배럴도 두지 않는다 — 공개 표면은 그대로 `src/index.ts` 배럴 하나다.
+`Skeleton` · `ErrorBox`)이 있었다. `src/<이름>/index.tsx` 로 나누고 테스트도 같은 폴더에
+`index.test.tsx` 로 같이 나눴다. 패키지 자체가 UI 라 `components/` 층은 두지 않았다.
+폴더의 `index.tsx` 는 재수출 배럴이 아니라 **컴포넌트 본체**다 — 그래서 `src/index.ts` 가
+`'./Panel'` 로 가리키면 한 번에 닿는다. 공개 표면은 그대로 `src/index.ts` 배럴 하나다.
 
-| 무엇             | before                     | after                                                 |
-| ---------------- | -------------------------- | ----------------------------------------------------- |
-| 소스             | `components.tsx` 1개       | `<이름>/<이름>.tsx` 5개                               |
-| 테스트           | `components.test.tsx` 1개  | 같은 폴더 `<이름>.test.tsx` 5개(테스트 수 706 그대로) |
-| props 타입       | `Panel` · `Button` 만 이름 | 다섯 다 `<이름>Props` 로 export                       |
-| 패키지 설명 주석 | `components.tsx` 머리      | `index.ts` 머리                                       |
+| 무엇             | before                     | after                                                |
+| ---------------- | -------------------------- | ---------------------------------------------------- |
+| 소스             | `components.tsx` 1개       | `<이름>/index.tsx` 5개                               |
+| 테스트           | `components.test.tsx` 1개  | 같은 폴더 `index.test.tsx` 5개(테스트 수 706 그대로) |
+| props 타입       | `Panel` · `Button` 만 이름 | 다섯 다 `<이름>Props` 로 export                      |
+| 패키지 설명 주석 | `components.tsx` 머리      | `index.ts` 머리                                      |
 
 - 클래스 문자열은 한 글자도 안 바꿨다. `@mfa/tailwind-config` 의 `@source '../ui/src'` 는
   디렉터리를 재귀로 훑으므로 하위 폴더로 옮겨도 스캔 범위가 같다.
