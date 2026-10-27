@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 
 import { MF_FILES, stylesPath } from '@mfa/remote-config';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearGlobalRegistries } from '@mfa/utils/test/globals';
@@ -56,6 +57,36 @@ beforeEach(() => {
 });
 
 const load = () => import('./RemoteComponent');
+
+/**
+ * ⚠️ **적재가 끝나는 것을 보는 테스트는 렌더를 `await act` 로 감싼다.**
+ *
+ * remote 는 `use(promise)` 로 suspend 하는데, RTL 의 `render` 는 **동기** `act` 로
+ * 감싼다. 그 스코프 안에서 suspend 된 트리는 promise 가 풀려도 재개되지 않고 React 가
+ * "A component suspended inside an `act` scope, but the `act` call was not awaited"
+ * 로 경고한다 — 화면은 스켈레톤에 영원히 머물고 `findBy*` 가 제한 시간까지 간다.
+ *
+ * `await act(async () => …)` 안에서는 마이크로태스크가 비워지고 재개까지 같은 act
+ * 스코프에서 끝난다. 스켈레톤 상태만 보는 테스트(로더가 영영 pending)는 그냥 `render`
+ * 를 쓴다 — 거기서는 재개할 것이 없고, 동기 렌더가 보려는 상태에 더 가깝다.
+ */
+const renderDone = async (ui: ReactElement) => {
+  let result!: ReturnType<typeof render>;
+  await act(async () => {
+    result = render(ui);
+  });
+  return result;
+};
+
+/** 같은 이유로 `rerender` 도 감싼다 — 새 promise 가 그 안에서 풀린다. */
+const rerenderDone = async (
+  rerender: (ui: ReactElement) => void,
+  ui: ReactElement,
+) => {
+  await act(async () => {
+    rerender(ui);
+  });
+};
 
 /**
  * 서버가 인라인 스크립트로 심어주는 값(`RemoteVersionSync`)을 흉내낸다.
@@ -116,7 +147,7 @@ describe('로딩 전이', () => {
     });
     const { RemoteComponent } = await load();
 
-    render(<RemoteComponent module="catalog/ProductGrid" />);
+    await renderDone(<RemoteComponent module="catalog/ProductGrid" />);
 
     expect(await screen.findByText('remote 가 그린 목록')).toBeInTheDocument();
   });
@@ -127,7 +158,7 @@ describe('로딩 전이', () => {
     });
     const { RemoteComponent } = await load();
 
-    render(
+    await renderDone(
       <RemoteComponent
         module="catalog/ProductGrid"
         props={{ category: 'keyboard' }}
@@ -141,7 +172,7 @@ describe('로딩 전이', () => {
     loadRemoteModule.mockResolvedValue({ default: () => <p>ok</p> });
     const { RemoteComponent } = await load();
 
-    render(<RemoteComponent module="cart/CartBadge" />);
+    await renderDone(<RemoteComponent module="cart/CartBadge" />);
 
     await screen.findByText('ok');
     expect(loadRemoteModule).toHaveBeenCalledWith('cart/CartBadge');
@@ -240,7 +271,7 @@ describe('실패', () => {
     loadRemoteModule.mockRejectedValue(new Error('ECONNREFUSED'));
     const { RemoteComponent } = await load();
 
-    render(
+    await renderDone(
       <>
         <p>host 는 살아 있다</p>
         <RemoteComponent module="catalog/ProductGrid" />
@@ -261,7 +292,7 @@ describe('실패', () => {
     loadRemoteModule.mockRejectedValue(new Error('실패'));
     const { RemoteComponent } = await load();
 
-    render(<RemoteComponent module="catalog/ProductGrid" />);
+    await renderDone(<RemoteComponent module="catalog/ProductGrid" />);
 
     const detail = await screen.findByText(/entry:/);
     expect(detail).toHaveTextContent(
@@ -276,7 +307,7 @@ describe('실패', () => {
 
 describe('remoteCacheKey', () => {
   it('버전을 키에 넣는다', async () => {
-    // 안 넣으면 React 의 lazy() 가 옛 컴포넌트를 프로세스 수명 내내 고정한다.
+    // 안 넣으면 옛 모듈이 프로세스 수명 내내 고정된다.
     const { remoteCacheKey } = await load();
     const { rememberVersion } = await import('../versions/server');
 
@@ -296,7 +327,7 @@ describe('remoteCacheKey', () => {
   });
 
   it('브라우저에서는 심어준 버전이 키에 들어간다', async () => {
-    // 여기가 `unversioned` 로 굳으면 재배포해도 브라우저의 lazy 캐시가 안 무효화된다.
+    // 여기가 `unversioned` 로 굳으면 재배포해도 브라우저의 적재 캐시가 안 무효화된다.
     stubInjectedVersions({
       catalog: {
         version: 't9zzz',
@@ -341,48 +372,54 @@ describe('remoteCacheKey', () => {
   });
 });
 
-describe('lazy 캐시', () => {
+describe('적재 캐시', () => {
   it('같은 모듈 · 같은 버전이면 로더를 한 번만 부른다', async () => {
-    // lazy() 를 렌더마다 새로 만들면 remote 상태가 매번 초기화된다.
+    // 적재 promise 를 렌더마다 새로 만들면 remote 상태가 매번 초기화된다.
     loadRemoteModule.mockResolvedValue({ default: () => <p>ok</p> });
     const { RemoteComponent } = await load();
 
-    const { rerender } = render(
+    const { rerender } = await renderDone(
       <RemoteComponent module="catalog/ProductGrid" />,
     );
     await screen.findByText('ok');
-    rerender(<RemoteComponent module="catalog/ProductGrid" />);
+    await rerenderDone(
+      rerender,
+      <RemoteComponent module="catalog/ProductGrid" />,
+    );
 
     expect(loadRemoteModule).toHaveBeenCalledTimes(1);
   });
 
   it('reloadKey 가 바뀌면 로더를 다시 태운다', async () => {
     /**
-     * 같은 버전으로 되돌리는 롤백에서는 그 버전의 lazy 엔트리가 이미 캐시에 남아 있어
+     * 같은 버전으로 되돌리는 롤백에서는 그 버전의 promise 가 이미 캐시에 남아 있어
      * 로더가 호출되지 않는다. 그러면 "무엇을 적재했는지" 가 갱신되지 않아 warm 이
      * 성공을 증명하지 못한다.
      */
     loadRemoteModule.mockResolvedValue({ default: () => <p>ok</p> });
     const { RemoteComponent } = await load();
 
-    const { rerender } = render(
+    const { rerender } = await renderDone(
       <RemoteComponent module="catalog/ProductGrid" reloadKey="a" />,
     );
     await screen.findByText('ok');
-    rerender(<RemoteComponent module="catalog/ProductGrid" reloadKey="b" />);
+    await rerenderDone(
+      rerender,
+      <RemoteComponent module="catalog/ProductGrid" reloadKey="b" />,
+    );
     await screen.findByText('ok');
 
     expect(loadRemoteModule).toHaveBeenCalledTimes(2);
   });
 
-  it('버전이 바뀌면 새 lazy 를 만든다', async () => {
-    // React 의 lazy() 는 한 번 resolve 되면 그 결과를 영구히 들고 있다. 버전을 키에
-    // 안 넣으면 재배포해도 옛 컴포넌트가 프로세스 수명 내내 고정된다.
+  it('버전이 바뀌면 새로 적재한다', async () => {
+    // 한 번 resolve 된 promise 는 그 결과를 영구히 들고 있다. 버전을 키에
+    // 안 넣으면 재배포해도 옛 모듈이 프로세스 수명 내내 고정된다.
     loadRemoteModule.mockResolvedValue({ default: () => <p>ok</p> });
     const { RemoteComponent } = await load();
     const { rememberVersion } = await import('../versions/server');
 
-    const { rerender } = render(
+    const { rerender } = await renderDone(
       <RemoteComponent module="catalog/ProductGrid" />,
     );
     await screen.findByText('ok');
@@ -392,7 +429,8 @@ describe('lazy 캐시', () => {
       ssrEntry: `/vt2def/${MF_FILES.ssrBundle}`,
       webEntry: `/vt2def/${MF_FILES.webManifest}`,
     });
-    rerender(
+    await rerenderDone(
+      rerender,
       <RemoteComponent
         module="catalog/ProductGrid"
         props={{ category: 'all' }}

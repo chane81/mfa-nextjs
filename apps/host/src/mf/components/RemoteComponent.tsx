@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, lazy, type ComponentType } from 'react';
+import { Suspense, use, type ComponentType } from 'react';
 
 import type {
   RemoteModule,
@@ -18,23 +18,32 @@ import { RemoteBoundary } from './RemoteBoundary';
 type PropsOf<K extends RemoteModuleId> =
   RemoteModule<K>['default'] extends ComponentType<infer P> ? P : never;
 
-/**
- * lazy() 는 반드시 렌더 바깥에서 한 번만 만들어야 한다.
- * 렌더마다 새로 만들면 remote 컴포넌트 상태가 매번 초기화된다.
- *
- * ⚠️ 그런데 **remote 버전을 키에 넣지 않으면 무효화가 로더까지 닿지 않는다.**
- * React 의 `lazy()` 는 한 번 resolve 되면 그 결과를 영구히 들고 있어서, remote 를
- * 재배포하고 번들 캐시를 비워도 이 캐시가 옛 컴포넌트를 프로세스 수명 내내 고정한다.
- * 실측에서 warm 요청이 네트워크를 전혀 타지 않는 형태로 드러났다.
- *
- * 버전이 바뀌면 새 lazy 를 만든다. 컴포넌트 정체성이 바뀌어 remote 상태는 초기화되지만,
- * remote 코드 자체가 교체된 시점이므로 그게 맞다.
- */
-const lazyCache = new Map<string, ComponentType<Record<string, unknown>>>();
+type RemoteModulePromise = Promise<{
+  default: ComponentType<Record<string, unknown>>;
+}>;
 
 /**
- * lazy 캐시 키. **버전이 키에 들어가는 것이 핵심**이라 규칙을 함수로 떼어 둔다 —
- * 여기가 조용히 바뀌면 재배포해도 옛 컴포넌트가 프로세스 수명 내내 고정된다.
+ * 적재 promise 는 반드시 렌더 바깥에서 한 번만 만들어야 한다.
+ * 렌더마다 새로 만들면 매번 다시 적재하고 remote 상태가 초기화된다.
+ *
+ * ⚠️ 그런데 **remote 버전을 키에 넣지 않으면 무효화가 로더까지 닿지 않는다.**
+ * 한 번 resolve 된 promise 는 그 결과를 영구히 들고 있어서, remote 를 재배포하고
+ * 번들 캐시를 비워도 이 캐시가 옛 모듈을 프로세스 수명 내내 고정한다.
+ * 실측에서 warm 요청이 네트워크를 전혀 타지 않는 형태로 드러났다.
+ *
+ * 버전이 바뀌면 새 promise 를 만들고, 아래 `key` 가 뷰를 갈아끼워 remote 상태를
+ * 초기화한다 — remote 코드 자체가 교체된 시점이므로 그게 맞다.
+ *
+ * 캐시가 들고 있는 것은 **컴포넌트가 아니라 promise** 다. 컴포넌트를 캐시하면
+ * (예전의 `lazy()` 방식) 그 값을 렌더 중에 JSX 로 꺼내 쓰게 되고, 그건 "렌더 중
+ * 컴포넌트 생성"과 구분이 안 된다. promise 를 캐시하면 화면에 붙는 컴포넌트가
+ * 모듈 스코프의 `RemoteModuleView` 하나로 고정된다.
+ */
+const modulePromises = new Map<string, RemoteModulePromise>();
+
+/**
+ * 적재 캐시 키. **버전이 키에 들어가는 것이 핵심**이라 규칙을 함수로 떼어 둔다 —
+ * 여기가 조용히 바뀌면 재배포해도 옛 모듈이 프로세스 수명 내내 고정된다.
  */
 export function remoteCacheKey(id: RemoteModuleId, reloadKey?: string): string {
   const remote = id.split('/')[0] as RemoteName;
@@ -43,23 +52,31 @@ export function remoteCacheKey(id: RemoteModuleId, reloadKey?: string): string {
   return `${id}@${version}${reloadKey ? `#${reloadKey}` : ''}`;
 }
 
-function getLazyRemote(
-  id: RemoteModuleId,
-  reloadKey?: string,
-): ComponentType<Record<string, unknown>> {
-  const key = remoteCacheKey(id, reloadKey);
-
-  const cached = lazyCache.get(key);
+function remoteModulePromise(key: string, id: RemoteModuleId) {
+  const cached = modulePromises.get(key);
   if (cached) return cached;
 
-  const Component = lazy(
-    () =>
-      loadRemoteModule(id) as Promise<{
-        default: ComponentType<Record<string, unknown>>;
-      }>,
-  );
-  lazyCache.set(key, Component);
-  return Component;
+  const promise = loadRemoteModule(id) as RemoteModulePromise;
+  modulePromises.set(key, promise);
+  return promise;
+}
+
+/**
+ * 적재된 remote 모듈을 그린다. **모듈 스코프에 한 번 정의되는 고정 컴포넌트다** —
+ * 어느 remote 를 그리느냐는 컴포넌트 정체성이 아니라 promise 로 전달된다.
+ *
+ * `use()` 가 promise 를 풀고, 아직이면 바깥 `Suspense` 가 받는다. 실패하면 던져서
+ * `RemoteBoundary` 가 받는다 — `lazy()` 때와 같은 동작이다.
+ */
+function RemoteModuleView({
+  promise,
+  props,
+}: {
+  promise: RemoteModulePromise;
+  props: Record<string, unknown>;
+}) {
+  const { default: Remote } = use(promise);
+  return <Remote {...props} />;
 }
 
 interface RemoteComponentProps<K extends RemoteModuleId> {
@@ -67,9 +84,9 @@ interface RemoteComponentProps<K extends RemoteModuleId> {
   props?: PropsOf<K>;
   fallbackLabel?: string;
   /**
-   * lazy 캐시를 우회하는 키.
+   * 적재 캐시를 우회하는 키.
    *
-   * 같은 버전으로 되돌리는 롤백에서는 그 버전의 lazy 엔트리가 이미 캐시에 남아 있어
+   * 같은 버전으로 되돌리는 롤백에서는 그 버전의 promise 가 이미 캐시에 남아 있어
    * 로더가 호출되지 않는다. 그러면 "무엇을 적재했는지"가 갱신되지 않는다.
    * 이 키를 매번 바꾸면 로더를 반드시 한 번 태운다.
    *
@@ -128,9 +145,9 @@ export function RemoteComponent<K extends RemoteModuleId>({
     <Skeleton label={fallbackLabel ?? `${moduleId} 불러오는 중…`} />
   );
 
-  // lazyCache 덕분에 moduleId 당 컴포넌트 정체성이 고정된다.
-  // 린터는 "렌더 중 컴포넌트 생성"으로 보지만 실제로는 모듈 스코프 캐시에서 꺼내 쓴다.
-  const Remote = getLazyRemote(moduleId, reloadKey);
+  // 캐시 키가 곧 "지금 그려야 하는 remote 의 정체" 다. 키가 바뀌면 아래 `key` 가
+  // 뷰를 갈아끼워 옛 remote 의 상태가 새 코드로 넘어오지 않는다.
+  const cacheKey = remoteCacheKey(moduleId, reloadKey);
 
   return (
     <RemoteBoundary remoteName={remoteName}>
@@ -145,8 +162,11 @@ export function RemoteComponent<K extends RemoteModuleId>({
         precedence="mfa-remote"
       />
       <Suspense fallback={placeholder}>
-        {/* oxlint-disable-next-line react/static-components */}
-        <Remote {...(props as Record<string, unknown>)} />
+        <RemoteModuleView
+          key={cacheKey}
+          promise={remoteModulePromise(cacheKey, moduleId)}
+          props={(props ?? {}) as Record<string, unknown>}
+        />
       </Suspense>
     </RemoteBoundary>
   );

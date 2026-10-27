@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 
 import { MF_FILES } from '@mfa/remote-config';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearGlobalRegistries } from '@mfa/utils/test/globals';
@@ -143,16 +143,23 @@ describe('LabPanel', () => {
 
   it('세 모드가 같은 remote 를 그린다 — 캐시 차이만 남기려는 설계다', async () => {
     /**
-     * 로더 호출 횟수로는 못 본다. `RemoteComponent` 의 `lazyCache` 가 모듈 id + 버전으로
+     * 로더 호출 횟수로는 못 본다. `RemoteComponent` 의 적재 캐시가 모듈 id + 버전으로
      * 캐시하므로 두 번째 모드부터는 로더가 아예 안 불린다 — 그게 정상 동작이다.
      * 그래서 "무엇을 그리려 했는가"를 스켈레톤 라벨로 확인한다.
+     *
+     * ⚠️ 렌더를 `await act` 로 감싼다. remote 는 `use(promise)` 로 suspend 하는데,
+     * 동기 `act`(= RTL 의 `render`) 안에서 suspend 하면 두 번째 모드부터 fallback 조차
+     * 커밋되지 않아 화면이 통째로 빈다(실측). `await act` 안에서는 그 커밋이 끝난다.
      */
     const LabPanel = await load();
 
     for (const mode of LAB_ORDER) {
-      const { unmount } = render(
-        <LabPanel mode={mode} renderedAt={RENDERED_AT} />,
-      );
+      let unmount!: () => void;
+      await act(async () => {
+        ({ unmount } = render(
+          <LabPanel mode={mode} renderedAt={RENDERED_AT} />,
+        ));
+      });
       expect(
         screen.getByText('catalog remote 에서 상품 목록 불러오는 중…'),
       ).toBeInTheDocument();

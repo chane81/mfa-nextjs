@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 
 import { MF_FILES } from '@mfa/remote-config';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearGlobalRegistries } from '@mfa/utils/test/globals';
@@ -162,7 +162,11 @@ describe('cart 배지 슬롯', () => {
     });
     const SiteHeader = await load();
 
-    render(<SiteHeader initialLines={lines} />);
+    // 배지는 `use(promise)` 로 suspend 한다 — 동기 `act`(= RTL 의 `render`) 안에서는
+    // promise 가 풀려도 재개되지 않아 스켈레톤에 머문다. `await act` 로 감싼다.
+    await act(async () => {
+      render(<SiteHeader initialLines={lines} />);
+    });
 
     expect(await screen.findByText('2')).toBeInTheDocument();
   });
@@ -181,7 +185,10 @@ describe('cart 배지 슬롯', () => {
     loadRemoteModule.mockRejectedValue(new Error('ECONNREFUSED'));
     const SiteHeader = await load();
 
-    render(<SiteHeader />);
+    // 적재 실패도 같은 경로다 — 거부된 promise 가 `await act` 안에서 경계까지 간다.
+    await act(async () => {
+      render(<SiteHeader />);
+    });
 
     expect(
       await screen.findByText("remote 'cart' 를 불러오지 못했습니다"),
