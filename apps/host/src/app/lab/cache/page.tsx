@@ -2,6 +2,7 @@ import { cacheLife, cacheTag } from 'next/cache';
 
 import { LabPanel } from '@/components/lab/LabPanel';
 import { LAB_REMOTE } from '@/components/lab/modes';
+import { readRenderClock } from '@/lib/render-clock';
 import { remoteCacheTag } from '@/mf/loader/server';
 
 /**
@@ -20,7 +21,7 @@ async function CachedShell() {
   cacheLife('minutes');
   cacheTag(remoteCacheTag(LAB_REMOTE));
 
-  return <LabPanel mode="cache" renderedAt={new Date().toISOString()} />;
+  return <LabPanel mode="cache" renderedAt={readRenderClock()} />;
 }
 
 export default function LabCachePage() {

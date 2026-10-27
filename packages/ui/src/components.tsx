@@ -38,7 +38,7 @@ export function Panel({
   return (
     <section
       style={hueVar(originHue)}
-      className={`remote-boundary flex flex-col gap-4 rounded-lg bg-surface p-5 ${className}`}
+      className={`flex flex-col gap-4 rounded-lg bg-surface p-5 remote-boundary ${className}`}
     >
       {/*
         높이는 고정이 아니라 **최소값**이다. 좁은 컬럼(홈의 장바구니 열은 280px 다)에서는
@@ -54,7 +54,7 @@ export function Panel({
               {title}
             </h2>
           ) : null}
-          <span className="text-origin border-origin rounded-sm border px-1.5 py-0.5 font-mono text-[11px] tracking-[0.04em] whitespace-nowrap">
+          <span className="rounded-sm border border-origin px-1.5 py-0.5 font-mono text-[11px] tracking-[0.04em] whitespace-nowrap text-origin">
             {origin}
           </span>
         </div>
@@ -113,7 +113,7 @@ export function Badge({
     <span
       style={hueVar(hue)}
       // pill 안에서 줄바꿈되면 알약 모양이 무너진다. 넘칠 자리는 부모가 wrap 으로 만든다
-      className="bg-origin-soft text-origin rounded-full px-2.5 py-0.5 font-mono text-xs whitespace-nowrap"
+      className="rounded-full bg-origin-soft px-2.5 py-0.5 font-mono text-xs whitespace-nowrap text-origin"
     >
       {children}
     </span>

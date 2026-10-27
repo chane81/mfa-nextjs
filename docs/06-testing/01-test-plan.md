@@ -104,8 +104,8 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] `tests/setup/dom.ts` — jest-dom 매처 + `afterEach(cleanup)` (globals 를 끄면 자동 cleanup 이 안 걸린다)
 - [x] `tsconfig.test.json` — 루트 `tests/` 와 `vitest.config.ts` 검사
 - [x] 패키지 tsconfig — 소스 옆 테스트를 **포함**하고, emit 하는 셋만 `tsconfig.build.json` 분리
-- [x] 루트 `eslint.config.js` — `tests/**` 에 React 규칙 적용
-- [x] `turbo.json` — `//#typecheck:tests` · `//#lint:tests` 루트 태스크.
+- [x] 루트 `oxlint.config.ts` — `tests/**` 에 React 규칙 적용 (49차까지는 루트 `eslint.config.js`)
+- [x] `turbo.json` — `//#typecheck:tests` 루트 태스크(`//#lint:tests` 는 49차에 없앴다 — `pnpm lint` 가 oxlint 로 저장소 전체를 돈다).
       `test` 는 일부러 turbo 를 안 태운다 — 패키지별 대응 태스크가 없어 얻는 게 캐시뿐인데,
       그 대가로 `pnpm test --project=dom` 같은 러너 플래그가 turbo 에 먹힌다
 - [x] `.github/workflows/ci.yml` — `pnpm test` 는 **`test` job 단독**. `verify`(lint · typecheck ·
@@ -207,9 +207,9 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
       못 읽는다(ADR-021 의 "파생 못 하면 대조한다"). 특히 제외 필터는 remote 가 늘 때마다
       **다른 모든 remote 의 Dockerfile 이 같이 늘어나는** 유일한 자리이고, 빠뜨려도 빌드는
       성공하고 이미지만 커져서 아무도 못 본다.
-      ⚠️ `turbo.json` 은 JSONC 라 주석을 걷어내고 읽는데, **정규식으로 하면 안 된다** —
-      값에 있는 `".next/**"` 의 `/**` 부터 먹어서 그 아래 태스크가 통째로 사라진다(실측).
-      문자열 안팎을 구분하는 스캐너가 그래서 그 파일에 있다.
+      `turbo.json` 은 49차부터 **순수 JSON** 이라 `JSON.parse` 로 바로 읽는다. 그 전엔 JSONC 라
+      주석을 걷어내는 스캐너가 있었다(정규식으로 하면 값의 `".next/**"` 를 먹어 태스크가 사라졌다).
+      주석을 다시 넣으면 이 테스트가 죽는다 — 근거는 [07-turbo-tasks.md](../02-architecture/07-turbo-tasks.md) 에 쓴다.
       42차에 둘을 더했다 — compose 헬스체크가 **`MF_FILES.versionManifest` 를 찌르는지**
       (파일명이 어긋나도 정적 서버 폴백이 200 이라 헬스체크가 통과해 버린다), 그리고
       공유 엔트리포인트에 **포트 폴백이 없는지**(기본값은 곧 어느 한쪽의 포트다 — J-2)

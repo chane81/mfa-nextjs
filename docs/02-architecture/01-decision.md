@@ -81,6 +81,9 @@
 - 결정: 지원 범위 내 최신인 **6.0.3** 을 고정한다.
 - 재검토 시점: `typescript-eslint` 가 TS7 을 지원하면 즉시 7 로 올린다.
   (`npm view typescript-eslint peerDependencies` 로 확인)
+- 갱신(49차): 린트를 oxlint 로 옮기면서 `typescript-eslint` 가 빠졌다(ADR-028). 이 ADR 의
+  맥락이던 제약은 사라졌다. 다만 TS 7 로 올리는 건 아직 아니다 — MF DTS 생성 · 번들러 셋이
+  TS 7 에서 도는지 확인한 기록이 없다([02-versions.md](../03-setup/02-versions.md)).
 
 ## ADR-007 — 캐시는 `cacheComponents` 로 이행하고, remote 재배포는 태그로 깬다
 
@@ -610,7 +613,7 @@
   - ❌ 표면이 둘이 됐다(`index.ts` · `server.ts`). 진입점은 하나지만 "무엇이 서버에
     안전한가"를 **사람이 유지해야 한다.** 누가 `server.ts` 에 `'use client'` 모듈을
     재수출하면 타입 · 린트 · 빌드가 전부 통과하고 브라우저 번들에만 나타난다 —
-    이 불변식은 이제 **린트가 지킨다**(`packages/store/eslint.config.js`) — 실제로
+    이 불변식은 이제 **린트가 지킨다**(루트 `oxlint.config.ts` 의 store override. 48차까지는 `packages/store/eslint.config.js`) — 실제로
     `server.ts` 에 `'use client'` 가 박혀 dev 콘솔에서만 터진 적이 있다(known-issues E-5).
     다만 린트가 막는 건 그 파일의 디렉티브 하나고, `'use client'` 모듈을 **재수출**하는
     경우는 여전히 사람이 본다(known-issues E-4).
@@ -1842,3 +1845,124 @@ catalogs:
 전 패키지가 `private: true` 라 publish 시 `catalog:` 치환은 문제가 되지 않는다.
 전환 전후 `pnpm-lock.yaml` 의 해석 그래프를 대조했다 — **패키지 591개, 추가·제거 0**.
 `pnpm typecheck` · `lint` · `test`(706) · `build`(host 프리렌더 포함) 모두 통과.
+
+## ADR-028 — 린트는 oxlint, 포맷은 oxfmt 로 한다
+
+**날짜** 2026-10-25 (49차) · **상태** 채택 · **관련** ADR-006(TS 6 고정), ADR-015(store 표면), ADR-027(catalog)
+
+### 맥락
+
+TS 7 을 못 쓰는 이유가 **린터 하나**였다(ADR-006). `typescript-eslint` 의 peer 가
+`typescript <6.1.0` 이고, 49차 시점 최신 `8.72.0` · canary 까지 범위가 같았다. TS 7 에는
+JS compiler API 가 없어 typescript-eslint 쪽에서 풀 방법이 없다(typescript-eslint#12518).
+
+그런데 이 저장소는 **type-aware 규칙을 하나도 쓰지 않았다**(`tseslint.configs.recommended`
+뿐이다). 쓰던 규칙은 oxlint 가 Rust 로 내장하고 있다. 린터를 바꾸면 그 제약이 통째로 빠진다.
+
+### 결정
+
+- 린트: ESLint 10 → **oxlint 1.89.0**. 설정은 루트 `oxlint.config.ts` **한 파일**.
+  영역별 차이는 `overrides` 로 적고, 패키지별 설정 파일과 `packages/eslint-config` 는 없앤다.
+- 포맷: prettier 3.6.2 → **oxfmt 0.74.0**. 설정은 루트 `oxfmt.config.ts`.
+- turbo 의 `lint` 태스크를 없앤다. `pnpm lint` 가 oxlint 를 저장소 전체에 한 번 돈다.
+- 둘 다 정확한 버전으로 고정한다([02-versions.md](../03-setup/02-versions.md)).
+
+### ESLint 규칙을 어떻게 옮겼나
+
+ESLint 의 실효 규칙(`eslint --print-config`)을 영역별로 뽑아 `oxlint --rules` 와 대조했다.
+oxlint 는 `correctness` 카테고리만 기본으로 켜므로, **ESLint 에서 켜져 있었는데 그 밖에
+있는 규칙은 하나씩 적었다.** 심각도도 ESLint 때 값을 따른다(Next 규칙 · `exhaustive-deps`
+는 warn).
+
+| ESLint 쪽                                     | oxlint 쪽                                            |
+| --------------------------------------------- | ---------------------------------------------------- |
+| `@eslint/js` · `typescript-eslint` 권장       | 내장 `eslint` · `typescript` 플러그인                |
+| `eslint-plugin-react` · `react-hooks` 7       | 내장 `react` (Compiler 규칙 포함)                    |
+| `@next/eslint-plugin-next`                    | 내장 `nextjs` — host override 에서만                 |
+| `eslint-plugin-turbo`                         | **JS 플러그인**으로 그대로                           |
+| `no-restricted-syntax` (store `'use client'`) | **JS 플러그인** `oxlint-plugin-eslint` (ESLint 원본) |
+| `no-restricted-imports` (remote 순환 차단)    | 내장                                                 |
+
+포기한 규칙: `react/no-deprecated`, `react-hooks/config` · `gating`(Compiler 설정용),
+`@next/next/no-location-assign-relative-destination`, `no-octal`(ESM 에서 구문 오류),
+`react/jsx-uses-*`(`no-unused-vars` 가 JSX 를 이미 본다). 이 저장소에 해당 코드가 없다.
+
+**불변식 규칙 셋은 위반을 직접 넣어 걸리는 것을 확인했다** — `server.ts` 에
+`'use client'`, remote 에서 `@mfa/contracts/remote` import, 미등록 env 읽기.
+
+### 결과
+
+| 측정 (로컬, 2026-10-24)                | 이전                   | 이후   |
+| -------------------------------------- | ---------------------- | ------ |
+| 린트 전체 (`turbo run lint … --force`) | 실측 3.75s · CPU 17.5s | ~0.1s  |
+| 포맷 검사 (`--check .`)                | 2.97s                  | ~0.35s |
+
+- ⭕ TS 7 을 막던 린터 제약이 사라졌다. 남은 건 MF DTS · 번들러 쪽 확인이다.
+- ⭕ 린트 설정이 `packages/eslint-config`(3개 파일) + 설정 파일 9개에서 **한 파일**이 됐다. 영역 차이가 한 화면에 보인다.
+- ⭕ ESLint 가 못 잡던 것 4건이 새로 잡혔다(`react/purity` 3 · `no-useless-empty-export` 1).
+  전부 의도된 코드다. `export {}` 는 이유를 적고 껐고, `Date` 셋은 측정점을
+  `readRenderClock()` 하나로 모아 disable 없이 통과시켰다 — 판정이 갈린 기록은 known-issues N-2.
+- ❌ 불변식 규칙 둘이 **alpha 인 JS 플러그인**에 기댄다. semver 대상이 아니라 oxlint 를
+  올릴 때 그 둘이 계속 도는지 확인해야 한다(위 주입 확인을 다시 한다).
+- ❌ 포매터가 0.x 다. 이 저장소는 문서가 산출물인데 markdown 포매터는 0.72.0 에 막 교체됐다.
+- ❌ 속도 이득은 이 규모에서 체감이 없다. 결정 근거가 아니다.
+
+### 기각한 대안
+
+- **ESLint 를 남기고 oxlint 를 앞에 세우기**(`eslint-plugin-oxlint` 로 중복 끄기) — 남은
+  ESLint 가 TS 파일을 읽으려면 결국 `typescript-eslint` 파서가 다시 들어온다. 맥락의 제약이
+  그대로 남는다.
+- **패키지마다 nested config** — oxlint 가 지원하지만, 패키지별로 쪼갤 이유였던 turbo 캐시가
+  0.1초짜리 작업에서 의미가 없다. 규칙이 9개 파일에 흩어지는 비용만 남는다.
+- **포매터는 prettier 유지** — 가능했다. 다만 린터와 포매터의 설정 · 무시 목록 · 에디터
+  연동이 두 생태계로 갈라진다. diff 가 8개 파일(+23 −29)뿐이라 같이 옮겼다.
+- **prettier 를 3.9 로 먼저 올리고 비교** — diff 중 어디까지가 버전 차이인지 가를 수
+  있었지만, 어차피 버리는 도구라 그 구분이 결정을 바꾸지 않는다.
+
+### 보강 — Dockerfile 은 린트만 한다 (같은 회차)
+
+oxlint · oxfmt 는 Dockerfile 을 다루지 않는다. 린트는 따로 붙였고, 포맷은 붙였다가 뺐다.
+
+| 할 일 | 도구                                        | 고른 이유                                                                        |
+| ----- | ------------------------------------------- | -------------------------------------------------------------------------------- |
+| 린트  | `docker build --check` (`pnpm lint:docker`) | Docker 내장이라 새 의존성이 없다. 에디터의 Docker DX 확장이 **같은 규칙**을 쓴다 |
+| 포맷  | 없음                                        | 아래 기각 참고                                                                   |
+
+- `lint:docker` 는 `pnpm lint` 에 넣지 않았다. docker 데몬이 있어야 돌고, 베이스 이미지
+  메타데이터를 받으러 네트워크를 쓴다. CI `verify` job 에서는 따로 돈다(러너에 docker 가 있다).
+- 위반을 넣어 실패하는 것을 확인했다 — `CMD node index.js` 를 붙이자 `JSONArgsRecommended`
+  경고와 함께 exit 1.
+- 기각: **hadolint** — 규칙은 더 많지만 Haskell 바이너리라 brew · 도커 이미지 · 별도 액션으로
+  깔아야 하고, npm 의 `hadolint` 패키지는 제3자 래퍼다. 에디터(Docker DX)와 CLI 가 같은 규칙을
+  보는 쪽을 골랐다.
+- 기각: **`@reteps/dockerfmt`** — 한 번 넣었다가 뺐다. npm 으로 깔리고(Go 를 WebAssembly 로 감쌌다)
+  `-c` 로 CI 검사도 됐지만, 포매터는 **oxc 툴체인이 제공하는 것만 쓴다**고 정했다. 0.x 도구를
+  하나 더 고정 · 추적하는 비용에 비해 얻는 것이 Dockerfile 마다 2줄(`RUN` 이어지는 줄 들여쓰기)
+  이었다. 그 들여쓰기 변경도 같이 되돌렸다.
+
+### 보강 — Tailwind 클래스는 `oxlint-tailwindcss` 로 본다 (같은 회차)
+
+ESLint 시절에는 Tailwind 린트가 없었다. styling 규칙의 "조용히 깨지는 셋" 중 ②(클래스 이름
+조립)는 **문서로만** 막고 있었다. oxlint 로 옮긴 김에 JS 플러그인 `oxlint-tailwindcss` 1.16.0 을
+붙였다.
+
+| 선택                                | 이유                                                                                  |
+| ----------------------------------- | ------------------------------------------------------------------------------------- |
+| 진입 CSS 를 앱마다 매핑             | 앱 셋이 각자 컴파일한다. 하나로 묶으면 앱별 `@source` · `@utility` 차이를 못 본다     |
+| 매핑은 루트 `settings` 에           | oxlint 가 `overrides` 안의 `settings` 를 거부한다. nested config 는 ADR 본문에서 기각 |
+| 규칙은 recommended 그대로           | 기존 코드에서 정렬 경고 4건만 나왔다. 더 엄격한 가드레일은 필요할 때 켠다             |
+| 범위는 `apps/**` · `packages/ui/**` | 클래스를 쓰는 곳이 거기뿐이다                                                         |
+| 정렬은 린트만(`enforce-sort-order`) | oxfmt 의 `sortTailwindcss` 를 켜면 진입 CSS 를 거기에도 따로 적어야 한다(두 곳)       |
+
+- 위반을 넣어 걸리는 것을 확인했다 — 패키지 넷 각각에 `flx` · `items-cetner`(`no-unknown-classes`),
+  `bg-${v}`(`no-dynamic-classes`). 같은 줄의 `bg-surface` · `text-origin` · `remote-boundary` 는
+  통과했다. `DEBUG=oxlint-tailwindcss` 로 파일마다 고른 CSS 도 확인했다.
+- ❌ JS 플러그인이 **셋**이 됐다. alpha 위에 얹힌 제3자 플러그인이라 oxlint 를 올릴 때 위 주입 확인을
+  같이 한다.
+- 기각: **`no-default-palette` · `no-arbitrary-value` 켜기** — 지금 위반이 없어 켜도 비용은 없지만,
+  `text-[13px]` 같은 임의값을 토큰으로 올릴지는 디자인 판단이다. 린트 도입과 섞지 않았다.
+
+### 확인
+
+`pnpm lint` · `format:check` · `typecheck` · `test`(51 파일 · 706) · `build`(host 프리렌더
+포함) 모두 통과. Node 26.12.1.

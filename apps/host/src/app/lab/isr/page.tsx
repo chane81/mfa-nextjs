@@ -2,6 +2,7 @@ import { cacheLife, cacheTag } from 'next/cache';
 
 import { LabPanel } from '@/components/lab/LabPanel';
 import { LAB_REMOTE } from '@/components/lab/modes';
+import { readRenderClock } from '@/lib/render-clock';
 import { remoteCacheTag } from '@/mf/loader/server';
 
 /**
@@ -20,7 +21,7 @@ async function IsrEquivalent() {
   // remote 재배포 웹훅은 이 태그만 만료시키면 되고, 라우트 목록을 알 필요가 없다.
   cacheTag(remoteCacheTag(LAB_REMOTE));
 
-  return <LabPanel mode="isr" renderedAt={new Date().toISOString()} />;
+  return <LabPanel mode="isr" renderedAt={readRenderClock()} />;
 }
 
 export default function LabIsrPage() {

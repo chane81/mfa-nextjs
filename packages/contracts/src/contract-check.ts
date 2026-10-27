@@ -62,4 +62,5 @@ type _ModuleIdsArePrefixed = Expect<
  * ⚠️ **여기에 타입을 export 하지 말 것.** 하나라도 내보내면 `@mf-types` 참조가
  * emit 되는 `.d.ts` 에 다시 살아나고, 위 머리말의 조용한 `any` 문제가 돌아온다.
  */
+// oxlint-disable-next-line typescript/no-useless-empty-export -- 위 이유로 일부러 비운 export 다.
 export {};

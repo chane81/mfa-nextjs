@@ -95,6 +95,7 @@ CSS 변수로 내려보내고 유틸리티가 그 변수를 읽는다.
 
 `bg-${variant}` 처럼 만들면 Tailwind 의 소스 스캔이 못 찾아 CSS 에서 빠진다.
 `packages/ui` 의 `Button` 은 variant 별 클래스를 **완성된 문자열**로 나열한다.
+`pnpm lint` 의 `tailwindcss/no-dynamic-classes` 가 이 실수를 에러로 잡는다(ADR-028 보강).
 
 ## 실측
 

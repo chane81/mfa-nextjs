@@ -56,7 +56,6 @@ COPY apps/remote-catalog/package.json apps/remote-catalog/
 # docs/05-troubleshooting/01-known-issues.md
 # 이 목록이 워크스페이스와 같은지는 `scripts/docker-context.test.ts` 가 본다.
 COPY packages/contracts/package.json packages/contracts/
-COPY packages/eslint-config/package.json packages/eslint-config/
 COPY packages/remote-config/package.json packages/remote-config/
 COPY packages/store/package.json packages/store/
 COPY packages/tailwind-config/package.json packages/tailwind-config/
@@ -104,7 +103,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 #
 # 로컬 `build` 는 워크스페이스 remote 를 먼저 빌드해 띄운다. 이미지에서 remote 는 이미
 # 배포된 공개 도메인이라 그럴 이유가 없고, 하면 catalog 빌드 실패가 host 배포까지 끌고
-# 내려간다. 근거는 turbo.json 의 해당 태스크 주석.
+# 내려간다. 근거는 docs/02-architecture/07-turbo-tasks.md 의 해당 태스크 절.
 #
 # ^build 의존성(@mfa/contracts, @mfa/ui)은 turbo 가 알아서 먼저 빌드한다.
 RUN pnpm turbo run docker:build --filter=@mfa/host

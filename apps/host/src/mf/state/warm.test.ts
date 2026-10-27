@@ -51,9 +51,8 @@ describe('적재된 버전 (isBundleReady)', () => {
 
   it('공표된 버전과 적재된 버전은 별개다', async () => {
     const { isBundleReady } = await load();
-    const { announcedVersion, rememberVersion } = await import(
-      '../versions/server'
-    );
+    const { announcedVersion, rememberVersion } =
+      await import('../versions/server');
     rememberVersion('catalog', {
       version: 't2',
       ssrEntry: '/vt2/a.cjs',

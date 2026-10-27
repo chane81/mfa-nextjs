@@ -145,7 +145,7 @@ export function RemoteComponent<K extends RemoteModuleId>({
         precedence="mfa-remote"
       />
       <Suspense fallback={placeholder}>
-        {/* eslint-disable-next-line react-hooks/static-components */}
+        {/* oxlint-disable-next-line react/static-components */}
         <Remote {...(props as Record<string, unknown>)} />
       </Suspense>
     </RemoteBoundary>

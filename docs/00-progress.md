@@ -1,5 +1,85 @@
 # 진행 상황
 
+## 2026-10-25 (49차) — 린트를 oxlint, 포맷을 oxfmt 로 옮긴다
+
+출발은 "ESLint 는 아직 TS 7 을 지원하지 않나"였다. 확인해 보니 `typescript-eslint@8.72.0`
+(canary 포함)의 peer 가 여전히 `typescript <6.1.0` 이었고, TS 7 에 JS compiler API 가 없어
+당분간 풀릴 수 없는 구조였다. 그런데 이 저장소는 type-aware 규칙을 안 쓴다 — 그렇다면
+**린터를 바꾸면 TS 7 의 걸림돌이 빠진다.** 결정과 기각안은 ADR-028.
+
+### 한 일
+
+| 무엇           | 이전                                               | 이후                                   |
+| -------------- | -------------------------------------------------- | -------------------------------------- |
+| 린터           | ESLint 10 · `packages/eslint-config` · 설정 9개    | oxlint 1.89.0 · `oxlint.config.ts` 1개 |
+| 포매터         | prettier 3.6.2 · `.prettierrc` · `.prettierignore` | oxfmt 0.74.0 · `oxfmt.config.ts`       |
+| `pnpm lint`    | turbo 가 패키지별 `eslint .` + 루트 태스크 2개     | 루트에서 `oxlint` 한 번                |
+| 린트 시간      | 3.75s (CPU 17.5s, `--force`)                       | ~0.1s                                  |
+| 포맷 검사 시간 | 2.97s                                              | ~0.35s                                 |
+
+ESLint 실효 규칙을 영역별로 `--print-config` 로 뽑아 `oxlint --rules` 와 대조했고, 켜져
+있던 건 그대로 켰다. 내장 안 된 것 중 **불변식 규칙 둘**(turbo env · store 의 `'use client'`)은
+JS 플러그인으로 살렸고, 셋 다(remote import 차단 포함) 위반을 직접 넣어 걸리는 걸 확인했다.
+
+포맷 결과가 바뀐 파일은 8개(+23 −29)다. `style:` 커밋 하나로 분리했다.
+
+### 밟은 것 → known-issues N
+
+- **N-1** `oxlint-disable-next-line` 을 설명 주석 위에 두면 아무것도 안 꺼진다.
+- **N-2** `react/purity` 가 ESLint 와 판정이 갈린다 — lab 페이지 3곳의 `new Date()`.
+  disable 대신 측정점을 `readRenderClock()` 하나로 모았다.
+- **N-3** 루트 한 번 실행으로 바꾸자 `docs/visual/cinema/engine.js` 가 린트 범위에 들어왔다.
+
+### ESLint 시절부터 있던 경고 하나를 지웠다
+
+`vitest.config.ts` 의 `process.env.CI` 가 `turbo/no-undeclared-env-vars` 경고를 냈다(main 의
+ESLint 에서도 같은 경고를 확인). `globalEnv` 에 넣는 게 아니라 **규칙 범위를 고쳤다** —
+`vitest.config.ts` · `tests/**` · `*.test.*` 는 turbo 태스크 밖에서만 돌아 이 규칙의 전제가
+없다. `TZ` 를 `globalEnv` 에서 뺀 판단(turbo.json 주석)과 같은 근거다. 이제 `pnpm lint` 는
+진단 0건이다.
+
+### `turbo.json` 의 주석을 문서로 옮겼다
+
+220줄 중 151줄이 주석이라 설정이 안 보였고, 에디터가 JSON 으로 읽어 빨간 줄을 그었다.
+주석을 전부 [07-turbo-tasks.md](02-architecture/07-turbo-tasks.md) 로 옮기고(절 제목 = 키 이름)
+`turbo.json` 은 순수 JSON 70줄로 줄였다. `turbo.jsonc` 로 이름만 바꾸는 안은 빨간 줄만 풀고
+가독성은 그대로라 기각했다.
+
+덤으로 `remote-wiring.test.ts` 의 JSONC 스캐너가 빠지고 `JSON.parse` 하나가 됐다. 주석을
+다시 넣으면 그 테스트가 죽는다. F-2(블록 주석 속 글롭이 파서를 깨는 함정)는 재현 조건이 사라졌다.
+
+### VS Code 설정을 커밋했다
+
+`.vscode/settings.json` · `extensions.json`. Oxc 확장으로 저장 시 포맷 → 린트 수정이 돈다.
+설정별 근거는 [01-getting-started.md](03-setup/01-getting-started.md#에디터-vs-code).
+
+### Tailwind 클래스도 린트한다
+
+`oxlint-tailwindcss` 1.16.0 을 JS 플러그인으로 붙였다. 앱의 **실제 진입 CSS** 를 읽어 `@theme`
+토큰과 `@utility` 까지 아는 상태로 클래스를 본다. 진입 CSS 는 파일마다 그 파일을 컴파일하는
+쪽으로 매핑했다(host · cart · catalog 각자, `@mfa/ui` 는 `theme.css`).
+
+가장 값진 건 `no-dynamic-classes` 다 — styling 규칙의 "조용히 깨지는 셋" ②(`bg-${variant}`)가
+이제 린트 에러다. 패키지 넷 모두에 오타 · 조립 클래스를 넣어 걸리는 것과 자체 토큰
+(`bg-surface` · `remote-boundary`)은 통과하는 것을 확인했다. 기존 코드에서 나온 건 정렬 경고
+4건뿐이라 `oxlint --fix` 로 맞췄다(`style:` 커밋). 판단은 ADR-028 보강 절.
+
+### Dockerfile 은 린트만 한다
+
+린트는 `docker build --check`(`pnpm lint:docker`, CI `verify` 에서도 돈다). 에디터는 Docker DX
+확장이 같은 빌드 검사 규칙을 보여준다. 포맷은 dockerfmt 를 붙였다가 뺐다 — oxc 가 제공하지 않는
+포매터는 들이지 않는다. 근거와 기각안(hadolint · dockerfmt)은 ADR-028 보강 절.
+
+### 확인
+
+`pnpm lint` · `format:check` · `typecheck` · `test`(51 파일 · 706) · `build` 통과. Node 26.12.1.
+
+### 다음에 할 것
+
+- TS 7 실험 — 린터는 더 이상 막지 않는다. `pnpm mf:types`(MF DTS) · Next 16 · Vite 8 ·
+  Rsbuild 2 를 TS 7 에서 돌려 본다. 결과는 [02-versions.md](03-setup/02-versions.md) 의 TS 7 절.
+- oxlint 를 올릴 때마다 JS 플러그인 규칙 둘이 계속 도는지 주입 확인을 다시 한다(alpha).
+
 ## 2026-10-24 (48차) — Node 를 26 LTS 라인으로 옮긴다 (26.12.1)
 
 출발은 "26 은 아직 LTS 가 아닌데 쓰기 무리인가"라는 질문이었다. `nodejs/Release` 의

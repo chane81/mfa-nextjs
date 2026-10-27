@@ -17,15 +17,12 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
-    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist .turbo"
   },
   "devDependencies": {
-    "@mfa/eslint-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
     "@types/react": "catalog:",
-    "eslint": "catalog:",
     "react": "catalog:",
     "typescript": "catalog:"
   },

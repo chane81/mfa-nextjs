@@ -41,7 +41,6 @@ COPY apps/remote-catalog/package.json apps/remote-catalog/
 # 빌드가 나중에 죽는다 — 근거는 apps/host/Dockerfile 의 같은 블록에 있다.
 # `scripts/docker-context.test.ts` 가 이 목록을 워크스페이스와 대조한다.
 COPY packages/contracts/package.json packages/contracts/
-COPY packages/eslint-config/package.json packages/eslint-config/
 COPY packages/remote-config/package.json packages/remote-config/
 COPY packages/store/package.json packages/store/
 COPY packages/tailwind-config/package.json packages/tailwind-config/

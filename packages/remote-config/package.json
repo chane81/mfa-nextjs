@@ -13,16 +13,13 @@
     "src"
   ],
   "scripts": {
-    "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit",
     "clean": "rm -rf .turbo"
   },
   "devDependencies": {
-    "@mfa/eslint-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
     "@mfa/utils": "workspace:*",
     "@types/node": "catalog:",
-    "eslint": "catalog:",
     "typescript": "catalog:"
   }
 }

@@ -22,7 +22,7 @@
  * `serve-remote-dist.ts` 는 이미 핸들러를 export 한다(테스트용). 그걸 그대로 쓰면
  * 자식 프로세스가 N+1 개에서 1개로 줄고, 포트 준비 시점을 **기다릴 수 있게** 된다 —
  * `concurrently` 로는 그 순서를 못 만든다. 지금은 컴파일이 앞을 막아 경쟁이 성립하지
- * 않지만(turbo.json 주석 참고), 그 사실에 기대지 않는 편이 낫다.
+ * 않지만(docs/02-architecture/07-turbo-tasks.md 참고), 그 사실에 기대지 않는 편이 낫다.
  */
 
 import { spawn } from 'node:child_process';

@@ -21,7 +21,7 @@ paths:
    링크라 거기 있다. `theme.css` 가 `@source '../ui/src'` 로 한 번 잡고, 앱 진입 CSS 는 자기 소스를
    따로 지정한다(`@source '.'` / `@source '../'`).
 2. **클래스 이름 조립** — `bg-${variant}` 는 소스 스캔이 못 찾는다. variant 별로 **완성된 문자열**을
-   나열한다(`packages/ui` 의 `Button` 참고).
+   나열한다(`packages/ui` 의 `Button` 참고). `pnpm lint`(`tailwindcss/no-dynamic-classes`)가 잡는다.
 3. **CSS 파일명 · 위치 변경** — host 가 주소를 계산으로 만든다. 계약은 `MF_FILES.styles` 다.
 
 ## remote 의 CSS 는 host 가 `<link>` 로 건다

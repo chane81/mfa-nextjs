@@ -447,9 +447,8 @@ describe('캐시 — 프로덕션에서만', () => {
 describe('계측', () => {
   it('성공하면 fetch · eval · load 를 순서대로 센다', async () => {
     stubFetch(() => bundle(EXPOSES));
-    const { getLoaderStats, resetLoaderStats } = await import(
-      '../state/loader-stats'
-    );
+    const { getLoaderStats, resetLoaderStats } =
+      await import('../state/loader-stats');
     resetLoaderStats();
     const { loadRemoteModuleOnServer } = await load();
 
@@ -467,9 +466,8 @@ describe('계측', () => {
     // remote 를 렌더하는 페이지는 RemoteBoundary 로 감싸여 있어 remote 가 죽어도 200 이다.
     // 그래서 이 두 축이 갈라져 있어야 진단이 된다.
     stubFetch(() => ({ ok: false, status: 500 }) as Response);
-    const { getLoaderStats, resetLoaderStats } = await import(
-      '../state/loader-stats'
-    );
+    const { getLoaderStats, resetLoaderStats } =
+      await import('../state/loader-stats');
     resetLoaderStats();
     const { loadRemoteModuleOnServer } = await load();
 
@@ -486,9 +484,8 @@ describe('계측', () => {
   it('허용 목록에서 막히면 fetch 시도도 세지 않는다', async () => {
     vi.stubEnv('REMOTE_ALLOWED_ORIGINS', 'https://only.example.com');
     stubFetch(() => bundle(EXPOSES));
-    const { getLoaderStats, resetLoaderStats } = await import(
-      '../state/loader-stats'
-    );
+    const { getLoaderStats, resetLoaderStats } =
+      await import('../state/loader-stats');
     resetLoaderStats();
     const { loadRemoteModuleOnServer } = await load();
 

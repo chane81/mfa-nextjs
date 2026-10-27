@@ -56,6 +56,32 @@ pnpm install
 > 네트워크가 느리면 `@rspack/binding-*` 다운로드에서 타임아웃이 날 수 있다.
 > `pnpm install --fetch-timeout 300000` 으로 재시도한다.
 
+## 에디터 (VS Code)
+
+`.vscode/` 를 커밋한다. 열면 Oxc 확장(`oxc.oxc-vscode`)과 Docker DX(`docker.docker`)를 권하고,
+ESLint · Prettier 확장은 비권장으로 표시한다 — 저장소가 둘 다 쓰지 않는다(ADR-028). 확장은 도구를 번들하지 않고
+`node_modules` 의 `oxlint` · `oxfmt` 를 찾아 쓰므로 `pnpm install` 이 먼저다.
+
+`settings.json` 은 주석 없이 둔다. 근거는 여기 적는다.
+
+| 설정                                           | 이유                                                                                          |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| 언어 블록 `[javascript]…[html]` 안에만 둔다    | oxfmt 가 다루는 언어에만 Oxc 를 기본 포매터로 건다. Dockerfile · 셸 · Python 은 손대지 않는다 |
+| `editor.formatOnSave: false`                   | 저장 시 포맷은 아래 code action 이 한다. 둘 다 켜면 같은 파일을 두 번 만진다                  |
+| `source.format.oxc` → `source.fixAll.oxc` 순서 | 포맷을 먼저, 린트 자동 수정을 나중에 한다. 확장 README(v1.64.1)가 권하는 조합이다             |
+
+저장할 때 린트 자동 수정까지 돈다(`fixAll`). 저장만 했는데 코드가 바뀌는 게 싫으면 사용자 설정에서
+`"source.fixAll.oxc": "explicit"` 로 덮는다(명시적으로 실행할 때만 돈다).
+
+Dockerfile 은 Docker DX 가 맡는다. 편집 중에 BuildKit 빌드 검사 경고를 띄우는데, `pnpm lint:docker`
+(`docker build --check`)와 **같은 규칙**이다. Dockerfile 포매터는 두지 않는다
+(ADR-028 보강).
+
+설정 파일이 TypeScript(`oxlint.config.ts` · `oxfmt.config.ts`)라 **TS 를 실행할 수 있는 Node** 가
+필요하다(oxlint 문서: Node v22.18+ 또는 v24+). 확장은 시스템의 `node` 를 찾는데, Dock 에서 띄운
+VS Code 는 셸의 `fnm` 설정을 못 읽어 PATH 에 다른 Node 가 잡힐 수 있다. 상태 표시줄의 `oxc` 항목이
+에러를 내면 `Oxc (Lint)` 출력 채널을 보고, 필요하면 사용자 설정에 `oxc.path.node` 를 준다.
+
 ## 전체 개발 서버 기동
 
 ```bash

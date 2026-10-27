@@ -53,15 +53,16 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 
 ## 명령
 
-| 명령             | 하는 일                                                               |
-| ---------------- | --------------------------------------------------------------------- |
-| `pnpm dev`       | 프로세스 5개(host 1 + remote 2 × web·ssr). host 는 remote 를 기다린다 |
-| `pnpm build`     | 전체 빌드. **host 프리렌더가 remote SSR 번들을 실제로 실행한다**      |
-| `pnpm test`      | Vitest 4. `--project=unit`(node) / `--project=dom`(jsdom) 로 좁힌다   |
-| `pnpm lint`      | ESLint 10 flat config                                                 |
-| `pnpm typecheck` | 네트워크 없이 돈다 — `@mf-types` 를 커밋해서 그 성질을 지킨다         |
-| `pnpm mf:types`  | remote 에서 MF DTS 타입을 다시 받아온다 (remote 기동 전제)            |
-| `pnpm format`    | prettier                                                              |
+| 명령               | 하는 일                                                               |
+| ------------------ | --------------------------------------------------------------------- |
+| `pnpm dev`         | 프로세스 5개(host 1 + remote 2 × web·ssr). host 는 remote 를 기다린다 |
+| `pnpm build`       | 전체 빌드. **host 프리렌더가 remote SSR 번들을 실제로 실행한다**      |
+| `pnpm test`        | Vitest 4. `--project=unit`(node) / `--project=dom`(jsdom) 로 좁힌다   |
+| `pnpm lint`        | oxlint. 설정은 루트 `oxlint.config.ts` 한 파일                        |
+| `pnpm lint:docker` | Dockerfile 을 `docker build --check` 로 본다(docker 필요)             |
+| `pnpm typecheck`   | 네트워크 없이 돈다 — `@mf-types` 를 커밋해서 그 성질을 지킨다         |
+| `pnpm mf:types`    | remote 에서 MF DTS 타입을 다시 받아온다 (remote 기동 전제)            |
+| `pnpm format`      | oxfmt. 설정은 `oxfmt.config.ts`                                       |
 
 `pnpm build` 통과 = "Next 16 에서 런타임 MF + SSR 이 된다"는 이 저장소의 주장이 아직 참이라는 뜻이다.
 그래서 빌드 실패를 우회하지 말고 원인을 고친다.
@@ -83,6 +84,7 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 | 버전 공표 · 캐시 무효화 · 신뢰 경계 | `docs/02-architecture/04-remote-lifecycle.md`        |
 | 스타일링 전략                       | `docs/02-architecture/05-styling.md`                 |
 | **host `src/mf` 폴더 배치**         | `docs/02-architecture/06-host-mf-layout.md`          |
+| **`turbo.json` 각 설정의 근거**     | `docs/02-architecture/07-turbo-tasks.md`             |
 | 버전 고정 근거                      | `docs/03-setup/02-versions.md`                       |
 | 테스트를 어디에 어떻게 쓰나         | `docs/06-testing/01-test-plan.md`                    |
 

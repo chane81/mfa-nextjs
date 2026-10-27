@@ -6,7 +6,7 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 
 | 폴더                                                                       | 내용                                                                                                                                         |
 | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| [visual/anatomy.html](https://chane81.github.io/mfa-nextjs/anatomy.html)   | **전체 구조 해부도** — 배포 파이프라인 · host↔remote 런타임 · remote 번들러 비교를 그림으로. GitHub Pages 로 바로 열린다                    |
+| [visual/anatomy.html](https://chane81.github.io/mfa-nextjs/anatomy.html)   | **전체 구조 해부도** — 배포 파이프라인 · host↔remote 런타임 · remote 번들러 비교를 그림으로. GitHub Pages 로 바로 열린다                     |
 | [visual/deploy.html](https://chane81.github.io/mfa-nextjs/deploy.html)     | **배포 시네마** — `git push` 이후 일어나는 일을 장면 단위로 재생한다. 정상 배포 · remote 만 배포 · 변조 배포 거부 세 시나리오                |
 | [visual/runtime.html](https://chane81.github.io/mfa-nextjs/runtime.html)   | **요청 시네마** — 사용자가 사이트를 연 뒤 host·remote 사이에서 일어나는 일. 첫 방문(remote SSR) · 경계를 넘는 이동 · remote 장애 세 시나리오 |
 | [visual/bundlers.html](https://chane81.github.io/mfa-nextjs/bundlers.html) | **번들러 시네마** — Vite 8(catalog)과 Rsbuild 2(cart)가 같은 계약을 각자 어떻게 만족시키나. 같은 계약 · 다른 구현 · 실제로 갈린 지점         |
@@ -41,6 +41,7 @@ Next.js 16 환경에서 마이크로 프론트엔드(MFA)를 구성하기 위한
 - 배포·캐시·신뢰 — [02-architecture/04-remote-lifecycle.md](./02-architecture/04-remote-lifecycle.md)
 - 스타일링 — [02-architecture/05-styling.md](./02-architecture/05-styling.md)
 - host 의 `src/mf` 배치 — [02-architecture/06-host-mf-layout.md](./02-architecture/06-host-mf-layout.md)
+- `turbo.json` 각 설정의 근거 — [02-architecture/07-turbo-tasks.md](./02-architecture/07-turbo-tasks.md)
 
 ## 지금 상태
 
