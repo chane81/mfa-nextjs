@@ -107,15 +107,17 @@
 
 ### lint · 툴체인
 
-| 증상                                                                      | 항목                                                                                                               |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `eslint-plugin-react` 가 ESLint 10 에서 크래시                            | [4](#4-eslint-plugin-react-7375-가-eslint-10-에서-크래시) (ESLint 시절)                                            |
-| `oxlint-disable-next-line` 을 달았는데 에러가 그대로                      | 설명 주석이 사이에 끼었다 — [N-1](#n-1-oxlint-disable-next-line-은-바로-다음-줄에만-걸린다)                        |
-| oxlint 가 `react(purity)` 로 `Date` 를 잡는데 ESLint 는 안 잡았다         | 판정이 갈린다 — [N-2](#n-2-reactpurity-판정이-eslint-의-react-hookspurity-와-갈린다)                               |
-| `pnpm lint` 가 `docs/visual/cinema/engine.js` 의 `no-var` 를 수십 건 보고 | 루트 한 번 실행은 범위가 저장소 전체다 — [N-3](#n-3-루트에서-한-번-돌리면-린트-범위가-저장소-전체가-된다)          |
-| 저장만 했는데 JSX 의 `"` 가 `'` 로 바뀐다                                 | 언어 블록을 묶어 개인 설정에 졌다 — [N-4](#n-4-저장하면-jsx-의-쌍따옴표가-홑따옴표로-바뀐다--언어-블록을-묶어서다) |
-| `react-hooks@7` 이 렌더 중 컴포넌트 생성을 막음                           | [5](#5-react-hooks7--렌더-중-컴포넌트-생성-금지)                                                                   |
-| `@next/next/no-html-link-for-pages` 오탐                                  | [6](#6-multi-zone-경계에서-nextnextno-html-link-for-pages-오탐-앱-삭제됨) (앱 삭제됨)                              |
+| 증상                                                                      | 항목                                                                                                                                             |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `eslint-plugin-react` 가 ESLint 10 에서 크래시                            | [4](#4-eslint-plugin-react-7375-가-eslint-10-에서-크래시) (ESLint 시절)                                                                          |
+| `oxlint-disable-next-line` 을 달았는데 에러가 그대로                      | 설명 주석이 사이에 끼었다 — [N-1](#n-1-oxlint-disable-next-line-은-바로-다음-줄에만-걸린다)                                                      |
+| oxlint 가 `react(purity)` 로 `Date` 를 잡는데 ESLint 는 안 잡았다         | 판정이 갈린다 — [N-2](#n-2-reactpurity-판정이-eslint-의-react-hookspurity-와-갈린다)                                                             |
+| `pnpm lint` 가 `docs/visual/cinema/engine.js` 의 `no-var` 를 수십 건 보고 | 루트 한 번 실행은 범위가 저장소 전체다 — [N-3](#n-3-루트에서-한-번-돌리면-린트-범위가-저장소-전체가-된다)                                        |
+| 저장만 했는데 JSX 의 `"` 가 `'` 로 바뀐다                                 | 언어 블록을 묶어 개인 설정에 졌다 — [N-4](#n-4-저장하면-jsx-의-쌍따옴표가-홑따옴표로-바뀐다--언어-블록을-묶어서다)                               |
+| `react-hooks@7` 이 렌더 중 컴포넌트 생성을 막음                           | [5](#5-react-hooks7--렌더-중-컴포넌트-생성-금지)                                                                                                 |
+| `react(static-components)` 가 동적 remote 를 렌더 중 생성으로 잡음        | 캐시 대상을 컴포넌트에서 promise 로 바꾼다 — [ADR-029](../02-architecture/01-decision.md#adr-029--remote-는-lazy-가-아니라-usepromise-로-그린다) |
+| `typescript(no-useless-empty-export)` 가 의도한 `export {}` 를 잡음       | `moduleDetection: "force"` 라 정말 불필요하다 — [O-3](#o-3-export--는-moduledetection-force-아래에서-정말로-불필요하다)                          |
+| `@next/next/no-html-link-for-pages` 오탐                                  | [6](#6-multi-zone-경계에서-nextnextno-html-link-for-pages-오탐-앱-삭제됨) (앱 삭제됨)                                                            |
 
 ### 테스트
 
@@ -123,6 +125,105 @@
 | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | 혼자 돌리면 통과하는데 같이 돌리면 실패 (시간 · 타임존이 관련)                                  | [F-1](#f-1-processenvx--original-복원은-undefined-라는-문자열을-심는다)                                                |
 | `pnpm test` 에 `ExperimentalWarning: localStorage is not available` 가 7번 찍힘 (테스트는 통과) | Node 26 내장 전역과 jsdom 이 겹친다 — [M-1](#m-1-node-26-의-내장-localstorage-때문에-jsdom-테스트가-경고를-7번-찍는다) |
+| 컴포넌트가 제한 시간까지 스켈레톤에 머묾 + `A component suspended inside an act scope`          | 렌더를 `await act` 로 안 감쌌다 — [O-1](#o-1-usepromise-로-suspend-하면-rtl-의-동기-render-에서-영원히-스켈레톤이다)   |
+| 두 번째 렌더부터 화면이 통째로 빔 (fallback 도 없음)                                            | 같은 thenable 로 다시 suspend 했다 — [O-2](#o-2-두-번째-렌더부터는-fallback-조차-커밋되지-않는다)                      |
+
+## O. (52차) `lazy()` 를 `use()` 로 바꾸며 밟은 것
+
+배경과 결정: ADR-029. 남아 있던 `oxlint-disable` 세 개를 없애는 작업이었다.
+
+### O-1. `use(promise)` 로 suspend 하면 RTL 의 동기 `render` 에서 영원히 스켈레톤이다
+
+`RemoteComponent` 가 `lazy()` 대신 `use(promise)` 로 remote 를 그리게 바꾸자
+**프로덕션은 멀쩡한데**(`pnpm build` 의 프리렌더가 remote SSR 번들을 실제로 실행하고 통과)
+jsdom 테스트 11개가 제한 시간까지 스켈레톤에 머물렀다.
+
+```
+A component suspended inside an `act` scope, but the `act` call was not awaited.
+When testing React components that depend on asynchronous data, you must await the result:
+
+await act(() => ...)
+```
+
+```
+TestingLibraryElementError: Unable to find an element with the text: remote 가 그린 목록.
+```
+
+**원인**: RTL 의 `render` 는 **동기** `act` 로 감싼다. 그 스코프 안에서 `use()` 로 suspend 한
+트리는 promise 가 풀려도 재개되지 않는다. `lazy()` 는 React 가 직접 아는 컴포넌트 타입이라
+이 경로를 타지 않았다 — 그래서 **같은 테스트가 구현을 바꾼 것만으로 깨진다**.
+
+**해결**: 적재가 끝나는 것을 보는 테스트만 렌더를 `await act` 로 감싼다.
+
+```tsx
+const renderDone = async (ui: ReactElement) => {
+  let result!: ReturnType<typeof render>;
+  await act(async () => {
+    result = render(ui);
+  });
+  return result;
+};
+```
+
+스켈레톤 상태만 보는 테스트(로더가 영영 pending)는 **그냥 `render` 를 쓴다** — 거기서는
+재개할 것이 없고, 동기 렌더가 보려는 상태에 더 가깝다. `rerender` 도 같은 이유로 감싼다.
+
+### O-2. 두 번째 렌더부터는 fallback 조차 커밋되지 않는다
+
+O-1 의 변종인데 증상이 다르다. `LabPanel.test.tsx` 가 같은 remote 를 세 모드로 **연달아**
+렌더하면서 매번 스켈레톤 라벨을 확인하는데, 2회차부터 화면이 **통째로 비었다** —
+스켈레톤조차 없다.
+
+```
+Ignored nodes: comments, script, style
+<body>
+  <div />
+  <div />
+</body>
+```
+
+로더 목은 영영 pending 인 promise 하나(`new Promise(() => {})`)를 돌려준다. 1회차에서
+React 가 그 thenable 을 pending 으로 추적하기 시작하고, 2회차 렌더가 **같은 thenable** 로
+suspend 하면 동기 `act` 안에서는 fallback 커밋까지 보류된다.
+
+"스켈레톤이 안 보인다"로 읽으면 라벨 문자열이나 `Suspense` 배치를 의심하게 되는데 —
+**둘 다 멀쩡하다.** 같은 `await act` 가 답이다.
+
+```tsx
+let unmount!: () => void;
+await act(async () => {
+  ({ unmount } = render(<LabPanel mode={mode} renderedAt={RENDERED_AT} />));
+});
+```
+
+### O-3. `export {}` 는 `moduleDetection: "force"` 아래에서 정말로 불필요하다
+
+`packages/contracts/src/contract-check.ts` 끝의 `export {}` 에는
+`oxlint-disable-next-line typescript/no-useless-empty-export` 가 붙어 있었고, 근거는
+"`isolatedModules` 아래에서 모듈로 인정받기 위한 최소 export" 였다.
+
+```
+packages/contracts/src/contract-check.ts:65:1: error typescript(no-useless-empty-export): Empty exports do nothing in module files help: Remove this empty export.
+```
+
+**린터가 맞았다.** 공용 tsconfig(`packages/typescript-config/base.json`)에
+`moduleDetection: "force"` 가 있어서 모든 파일이 이미 모듈이다. `export {}` 를 지워도
+`pnpm typecheck` 가 그대로 통과한다(검증일: 2026-10-27).
+
+다만 **"여기에 아무것도 export 하지 말 것"** 이라는 경고 자체는 살아 있는 계약이다 —
+하나라도 내보내면 emit 되는 `.d.ts` 에 `@mf-types` 참조가 되살아나 계약이 조용히 `any` 가
+된다. 그래서 경고는 파일 머리말로 옮기고, 거기에 `export {}` 가 왜 필요 없는지도 같이 적었다.
+
+### O-4. turbo env 규칙은 파일을 설정으로 빼는 쪽이 맞다
+
+`scripts/deploy-targets.ts` 머리의 `/* oxlint-disable turbo/no-undeclared-env-vars */` 는
+**파일 전체를 끄는** 디렉티브였다. 그런데 `oxlint.config.ts` 에는 같은 성질의 override 가
+이미 있었다 — "turbo 태스크 밖에서 도는 파일 — env 규칙의 전제가 없다"(`vitest.config.ts` ·
+`tests/**` · `**/*.test.{ts,tsx}`).
+
+이 스크립트도 정확히 그 범주다. 배포 워크플로의 detect job 에서 돌고, 읽는 env 는 GitHub
+Actions 런타임이 준다. 파일을 그 `files` 배열에 넣으면 **같은 판단이 한 곳에 모인다** —
+"어떤 파일이 turbo 밖인가"를 설정 한 곳에서 읽을 수 있다.
 
 ## N. (49차) ESLint · prettier 를 oxlint · oxfmt 로 옮기며 밟은 것
 
