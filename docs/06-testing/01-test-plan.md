@@ -155,10 +155,10 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 28. `packages/ui/src/<컴포넌트>/`(소스와 `*.test.tsx` 가 한 폴더) — `--hue` 변수(통로는 `@mfa/utils/style/hue` 의
       `hueVar` 다 — 감추는 건 함수가 아니라 **변수 이름이 계약이라는 사실**이다) /
       조건부 렌더 / variant 클래스 매핑
-- [x] 29. `apps/host/src/mf/components/RemoteBoundary.tsx` — 자식 throw → `ErrorBox` 내용.
+- [x] 29. `apps/host/src/mf/components/RemoteBoundary/RemoteBoundary.tsx` — 자식 throw → `ErrorBox` 내용.
       **주소는 받지 않고 `pinnedEntry` 로 스스로 고른다**(41차, J-1) — 정상 렌더에서는
       묻지도 않는다
-- [x] 30. `apps/host/src/mf/components/RemoteComponent.tsx` — Skeleton → 마크업 전이 / `<link href>` 조립 / **브라우저는 심어준 버전을 본다**(24차, `globalCell` 없이 불변 경로) / 실패 시 Boundary
+- [x] 30. `apps/host/src/mf/components/RemoteComponent/RemoteComponent.tsx` — Skeleton → 마크업 전이 / `<link href>` 조립 / **브라우저는 심어준 버전을 본다**(24차, `globalCell` 없이 불변 경로) / 실패 시 Boundary / 적재 캐시의 재적재 조건
 - [x] 31. remote exposes — cart 3종 · catalog 5종(`RelatedProducts` 포함). props 계약 + 콜백. **remote 는 host 라우터를 모른다**(ADR-013). **저장 상한(`MAX_CART_QUANTITY`)에서 담기·`+` 가 잠긴다**(33차)
 - [x] 32. host 컴포넌트 — `SiteHeader` · `MfDiagnostics` · `lab/*` · `CatalogSlot`(주소 → 카테고리 검증 / `replace` / `all` 은 주소에서 뺀다 / 다른 쿼리 보존)
 
@@ -168,7 +168,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 34. `scripts/wait-for-remotes.ts` → `remoteEntryUrl` 추출. `publicPath` 절대·`auto`·누락 / 슬래시 트리밍
 - [x] 35. `scripts/stamp-remote-version.ts` → `integrity()` · payload 조립 · **정리 대상 경계**(현재 버전만 남긴다 / `v` 접두사 밖은 안 건드린다) 추출
 - [x] 36. `apps/host/src/app/api/mf-revalidate/route.ts` → `selfOrigin()` export
-- [x] 37. `apps/host/src/mf/components/RemoteComponent.tsx` → `remoteCacheKey()` export. 브라우저에서도 버전이 키에 들어가는지 같이 본다(24차)
+- [x] 37. `apps/host/src/mf/components/RemoteComponent/module-cache.ts` — `remoteCacheKey()` 규칙. 브라우저에서도 버전이 키에 들어가는지 같이 본다(24차). 53차에 폴더로 쪼개면서 키 규칙 테스트가 `module-cache.test.ts`(DOM 없음 · node project)로 갈라졌다 — 렌더가 필요한 재적재 조건은 30번에 남는다
 - [x] 38. `packages/remote-config/src/node.test.ts` 의 `readExposes` — `.tsx` 만 센다 /
       `ignore` 가 이웃 테스트를 거른다 / 키가 `./` 로 시작한다 / `files` 는 스캔 기준
       경로다 / `ignore` 를 안 주면 아무것도 안 거른다. `exposes` 를 디렉터리 스캔으로
@@ -253,13 +253,13 @@ remote 이름인지. 그 파일은 **아무것도 export 하지 않는다** — 
 
 ## 테스트하지 않는 것
 
-| 대상                                                | 이유                                                                                                                                         |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/host/src/mf/components/RemoteVersionSync.tsx` | `'use cache'` 는 Next 컴파일러가 변환하는 디렉티브다. 변환 없이 실행하면 `cacheLife`/`cacheTag` 가 캐시 스코프 밖 호출로 throw. **e2e 영역** |
-| 실제 MF 런타임 로딩 · host 프리렌더                 | `pnpm build` 가 이미 계약 테스트로 커버한다 (CI `build` job)                                                                                 |
-| `scripts/gen-signing-key.ts`                        | 로직이 없다. 키 형식만 `@mfa/utils/test/signing` 으로 옮겨 픽스처 생성에 쓴다                                                                |
-| `scripts/mf-build-version.ts`                       | `t${Date.now().toString(36)}` 한 줄                                                                                                          |
-| 브라우저 실제 동작                                  | e2e 범위                                                                                                                                     |
+| 대상                                                                  | 이유                                                                                                                                         |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/host/src/mf/components/RemoteVersionSync/RemoteVersionSync.tsx` | `'use cache'` 는 Next 컴파일러가 변환하는 디렉티브다. 변환 없이 실행하면 `cacheLife`/`cacheTag` 가 캐시 스코프 밖 호출로 throw. **e2e 영역** |
+| 실제 MF 런타임 로딩 · host 프리렌더                                   | `pnpm build` 가 이미 계약 테스트로 커버한다 (CI `build` job)                                                                                 |
+| `scripts/gen-signing-key.ts`                                          | 로직이 없다. 키 형식만 `@mfa/utils/test/signing` 으로 옮겨 픽스처 생성에 쓴다                                                                |
+| `scripts/mf-build-version.ts`                                         | `t${Date.now().toString(36)}` 한 줄                                                                                                          |
+| 브라우저 실제 동작                                                    | e2e 범위                                                                                                                                     |
 
 ## 테스트를 쓸 때 반드시 지킬 것
 
@@ -275,7 +275,7 @@ remote 이름인지. 그 파일은 **아무것도 export 하지 않는다** — 
    `beforeEach` 에서 부른다.
 
 3. **모듈 스코프 가변 상태** — `loader/server.ts` 의 `bundleCache`, `loader/index.ts` 의 `clientCache` ·
-   `initialized`, `components/RemoteComponent.tsx` 의 `lazyCache`, `utils/cookie-storage.ts` 의 `warned: Set`.
+   `initialized`, `components/RemoteComponent/module-cache.ts` 의 `modulePromises`, `utils/cookie-storage.ts` 의 `warned: Set`.
    리셋 API 가 없어 `vi.resetModules()` + 동적 import 로만 격리된다.
 
 4. **ICU 로케일 의존** — `formatKRW`(`toLocaleString('ko-KR')`)와 `formatKst`(`Intl.DateTimeFormat`)의

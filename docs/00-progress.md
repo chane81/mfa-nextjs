@@ -1,5 +1,64 @@
 # 진행 상황
 
+## 2026-10-27 (53차) — host 의 MF 컴포넌트를 폴더 하나씩으로 나눈다
+
+`apps/host/src/mf/components/` 가 평면이었다(소스 3 + 테스트 2). 51차에 `@mfa/ui` 가 쓴
+규칙을 그대로 가져왔다 — `<이름>/<이름>.tsx` 가 본체, 같은 폴더의 `index.ts` 가 재수출,
+테스트도 그 옆. **호출부는 한 줄도 안 고쳤다**(`@/mf/components/RemoteComponent` 가 그대로
+폴더를 가리킨다).
+
+| 무엇              | before                               | after                                                                            |
+| ----------------- | ------------------------------------ | -------------------------------------------------------------------------------- |
+| `RemoteComponent` | 173줄 한 파일                        | 진입점 69줄 + `module-cache.ts` · `RemoteModuleView.tsx` · `RemoteStyleLink.tsx` |
+| 키 규칙 테스트    | `RemoteComponent.test.tsx`(jsdom) 안 | `module-cache.test.ts` — DOM 이 필요 없어 node project 로                        |
+| 주석              | 네 가지 근거가 한 파일에 섞임        | 각 파일이 자기 근거만. 배경은 docs 링크로                                        |
+
+### 173줄이 긴 게 아니라 섞여 있던 게 문제였다
+
+한 파일에 **서로 다른 네 가지 근거**가 주석으로 쌓여 있었다 — 적재 캐시 키에 버전이
+들어가야 하는 이유, promise 를 캐시하는 이유, remote CSS 주소를 host 가 만드는 이유,
+`<link>` 가 `Suspense` 밖인 이유. 각각 docs 에 본문이 있는데 주석이 그걸 다시 서술하고
+있었다(ADR-029 · known-issues A-2 · G-1 · C-3 · 05-styling.md). 쪼개면서 주석은 "무엇을
+지켜야 하나" 한두 줄로 줄이고 근거는 링크로 돌렸다.
+
+### 배럴이 `'use client'` 경계를 삼켰다
+
+코드를 한 줄도 옮기지 않았는데 `pnpm build` 가 `react-dom/client` 를 RSC 그래프에서
+발견해 죽었다. 디렉티브는 **파일 단위**라, 디렉티브 없는 `index.ts` 가 앞에 서면
+경계가 거기서 끊긴다. import trace 에는 배럴이 안 나와서 원인이 "파일을 옮긴 것"처럼
+보인다. 재현 로그와 기각한 대안 둘:
+[P-1](05-troubleshooting/01-known-issues.md#p-1-배럴을-거치면-use-client-경계가-사라진다).
+
+- `module-cache.ts` 가 자기 머리에 `'use client'` 를 적는다. 이 모듈은 `loader` 를
+  부르므로 원래부터 client 경계 안쪽이었고, 디렉티브가 그 사실을 파일에 적어 둔다.
+- 배럴에 적는 안은 기각했다 — 바로 옆 `RemoteVersionSync/index.ts` 는 서버 컴포넌트를
+  재수출하므로 같은 처방을 못 쓴다. 폴더마다 규칙이 달라지는 쪽이 비싸다.
+
+### `RemoteVersionSync` 는 파일만 옮겼다
+
+`'use cache'` 라 테스트가 없고(컴파일러 변환 전제 — test-plan 의 "테스트하지 않는 것"),
+쪼갤 조각도 없다. 머리말 주석 네 절만 핵심 세 줄로 줄이고 근거는
+`04-remote-lifecycle.md` 링크로 돌렸다.
+
+### 리뷰에서 걸린 것 — 파일을 옮기면 **가리키는 쪽**이 낡는다
+
+경로 표는 고쳤는데, 그 파일을 **이름으로 되짚던** 주석과 그림이 남아 있었다. 코드 리뷰가
+여섯 자리를 집어냈고 전부 반영했다.
+
+| 어디                                       | 무엇이 낡았나                                                                                                               |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `docs/visual/runtime.html`                 | 경로 11자리 + 52차에 마크다운만 고치고 남은 `lazy` 서술 7자리                                                               |
+| `docs/visual/anatomy-simple.html`          | `RemoteBoundary` 경로                                                                                                       |
+| `01-test-plan.md` 모듈 스코프 상태 목록    | `lazyCache` → `module-cache.ts` 의 `modulePromises`(파일·심볼 둘 다 낡음)                                                   |
+| `MfWarmup.tsx` · `config/index.ts` 두 자리 | SSOT 와 유일한 다른 소비자가 되짚는 링크                                                                                    |
+| `module-cache.ts` ↔ `RemoteComponent.tsx`  | `reloadKey` **prop**(소비자 없음)과 `remoteCacheKey` **둘째 인자**(쓰임)를 쪼개면서 섞었다 — 한쪽만 읽으면 반대 결론이 난다 |
+
+그림 쪽은 **설계 문서가 먼저, 그림이 따라간다**(`.claude/rules/docs.md`)는 규칙이
+52차에 반만 지켜진 결과다. 이번엔 같은 패스에서 같이 고쳤다.
+
+- 확인: `lint` · `typecheck` · `test`(56파일 · 706) · `build`(6/6) 통과. Node 26.12.1.
+  테스트 수는 그대로다 — 키 규칙 5개가 새 파일로 **옮겨갔을 뿐**이고 단언은 안 건드렸다.
+
 ## 2026-10-27 (52차) — 저장소에 남은 `oxlint-disable` 셋을 없앤다
 
 세 자리 모두 근거 주석이 달린 **의도한** disable 이었다. 그래서 "끄는 게 맞나"를 하나씩 다시

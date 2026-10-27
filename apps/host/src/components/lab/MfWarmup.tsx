@@ -37,7 +37,7 @@ function warmTarget(remote: RemoteName): RemoteModuleId | undefined {
 
 /**
  * `lazy` 를 쓰는 이유는 서스펜스 규약 때문이다 — 같은 프라미스를 재사용해야 React 가
- * 무한히 다시 시도하지 않는다. `RemoteComponent` 의 `lazyCache` 와 같은 이유다.
+ * 무한히 다시 시도하지 않는다. `RemoteComponent` 의 `module-cache.ts` 가 `modulePromises` 로 하는 것과 같은 이유다.
  *
  * **키 규칙도 같은 것을 쓴다**(`remoteCacheKey`). 캐시가 둘이라 규칙까지 둘이 되면
  * 한쪽에만 버전이 빠지는 식으로 조용히 갈린다 — 실제로 그랬다. 버전이 키에 없으면
