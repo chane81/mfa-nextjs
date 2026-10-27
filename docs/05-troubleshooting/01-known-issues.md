@@ -107,14 +107,15 @@
 
 ### lint · 툴체인
 
-| 증상                                                                      | 항목                                                                                                      |
-| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `eslint-plugin-react` 가 ESLint 10 에서 크래시                            | [4](#4-eslint-plugin-react-7375-가-eslint-10-에서-크래시) (ESLint 시절)                                   |
-| `oxlint-disable-next-line` 을 달았는데 에러가 그대로                      | 설명 주석이 사이에 끼었다 — [N-1](#n-1-oxlint-disable-next-line-은-바로-다음-줄에만-걸린다)               |
-| oxlint 가 `react(purity)` 로 `Date` 를 잡는데 ESLint 는 안 잡았다         | 판정이 갈린다 — [N-2](#n-2-reactpurity-판정이-eslint-의-react-hookspurity-와-갈린다)                      |
-| `pnpm lint` 가 `docs/visual/cinema/engine.js` 의 `no-var` 를 수십 건 보고 | 루트 한 번 실행은 범위가 저장소 전체다 — [N-3](#n-3-루트에서-한-번-돌리면-린트-범위가-저장소-전체가-된다) |
-| `react-hooks@7` 이 렌더 중 컴포넌트 생성을 막음                           | [5](#5-react-hooks7--렌더-중-컴포넌트-생성-금지)                                                          |
-| `@next/next/no-html-link-for-pages` 오탐                                  | [6](#6-multi-zone-경계에서-nextnextno-html-link-for-pages-오탐-앱-삭제됨) (앱 삭제됨)                     |
+| 증상                                                                      | 항목                                                                                                               |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `eslint-plugin-react` 가 ESLint 10 에서 크래시                            | [4](#4-eslint-plugin-react-7375-가-eslint-10-에서-크래시) (ESLint 시절)                                            |
+| `oxlint-disable-next-line` 을 달았는데 에러가 그대로                      | 설명 주석이 사이에 끼었다 — [N-1](#n-1-oxlint-disable-next-line-은-바로-다음-줄에만-걸린다)                        |
+| oxlint 가 `react(purity)` 로 `Date` 를 잡는데 ESLint 는 안 잡았다         | 판정이 갈린다 — [N-2](#n-2-reactpurity-판정이-eslint-의-react-hookspurity-와-갈린다)                               |
+| `pnpm lint` 가 `docs/visual/cinema/engine.js` 의 `no-var` 를 수십 건 보고 | 루트 한 번 실행은 범위가 저장소 전체다 — [N-3](#n-3-루트에서-한-번-돌리면-린트-범위가-저장소-전체가-된다)          |
+| 저장만 했는데 JSX 의 `"` 가 `'` 로 바뀐다                                 | 언어 블록을 묶어 개인 설정에 졌다 — [N-4](#n-4-저장하면-jsx-의-쌍따옴표가-홑따옴표로-바뀐다--언어-블록을-묶어서다) |
+| `react-hooks@7` 이 렌더 중 컴포넌트 생성을 막음                           | [5](#5-react-hooks7--렌더-중-컴포넌트-생성-금지)                                                                   |
+| `@next/next/no-html-link-for-pages` 오탐                                  | [6](#6-multi-zone-경계에서-nextnextno-html-link-for-pages-오탐-앱-삭제됨) (앱 삭제됨)                              |
 
 ### 테스트
 
@@ -205,6 +206,62 @@ ESLint 시절엔 **패키지마다** `eslint .` 를 돌았고, 루트 설정은 
 
 **해결**: `oxlint.config.ts` 의 `ignorePatterns` 에 `docs/**` 를 넣었다. 그 스크립트는 Pages 로
 나가는 단독 브라우저 스크립트라 저장소 린트 규칙의 대상이 아니다.
+
+### N-4. 저장하면 JSX 의 쌍따옴표가 홑따옴표로 바뀐다 — 언어 블록을 묶어서다
+
+`packages/ui/src/components.tsx` 를 VS Code 에서 저장(`cmd + s`)하자 아무것도 안 고쳤는데 diff 가 났다.
+
+```diff
+-      <header className="flex min-h-9 flex-wrap items-center justify-between gap-3">
++      <header className='flex min-h-9 flex-wrap items-center justify-between gap-3'>
+```
+
+**오진 둘을 먼저 적는다.**
+
+1. **Tailwind 린트 자동 수정이 범인처럼 보였다** — 클래스 정렬이 같이 돌던 참이었다.
+   아니다. `oxlint --fix` 는 다섯 형태(`className="…"` · `{"…"}` · 템플릿 리터럴 · 변수 ·
+   여러 줄)에서 따옴표를 한 글자도 바꾸지 않는다(`--fix-suggestions` · `--fix-dangerously` 포함).
+2. **"확장이 `oxfmt.config.ts` 를 못 읽는다"고 판단했다** — 임시 디렉터리에 `oxfmt --lsp` 를
+   띄워 재현했기 때문이다. 그 디렉터리에는 `node_modules` 가 없었고, TS 설정은 첫 줄에서
+   `import { defineConfig } from 'oxfmt'` 를 한다. **설정이 아니라 그 import 가 실패한 것**이다.
+   저장소 안에서 같은 프로브를 돌리면 `oxfmt.config.ts` 가 정상 적용된다(JS 문자열이
+   홑따옴표로 바뀐다). 설정을 `.oxfmtrc.jsonc` 로 옮길 이유가 없었다 — 되돌렸다.
+
+**진짜 원인은 VS Code 의 언어별 설정 우선순위다.** 저장소 `.vscode/settings.json` 은 열 개 언어를
+**한 블록**으로 묶고 있었다(`"[javascript][javascriptreact]…[html]"`). 그런데 VS Code 는 언어별
+설정의 우선순위를 **대괄호 문자열 전체**로 매긴다.
+
+> If a setting is configured in both a single-language block and a multiple-language block,
+> the single-language value takes precedence. This precedence is applied **before** the normal
+> setting scope precedence rules. … a `"[typescript][javascript]"` workspace setting will not
+> override a `"[javascript]"` user setting.
+> — [VS Code 문서, Settings precedence](https://code.visualstudio.com/docs/configure/settings)
+
+개인 설정에 이런 줄이 있으면 **작업 영역 설정이 져서** prettier 가 저장 때마다 포맷한다.
+
+```jsonc
+// 사용자 settings.json
+"[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+"prettier.jsxSingleQuote": true   // ← 이 줄이 따옴표를 바꾼 값이다
+```
+
+**해결은 둘 중 하나다.**
+
+| 방법                                    | 대가                                                              |
+| --------------------------------------- | ----------------------------------------------------------------- |
+| **개인 설정에서 그 언어 블록을 지운다** | 사람마다 한 번씩 해야 한다. 저장소 파일은 짧게 남는다             |
+| 저장소 블록을 **언어마다 쪼갠다**       | 같은 키끼리 겨뤄 작업 영역이 이긴다. 설정 파일이 열 배로 길어진다 |
+
+이 저장소는 **앞쪽**을 골랐다(`.vscode/settings.json` 은 한 블록, 주석으로 경고). 포맷 설정은
+oxfmt 문서의 "Team setup"(`editor.defaultFormatter` + `editor.formatOnSave: true`), 린트 자동
+수정은 oxlint 문서의 "Team setup"(`source.fixAll.oxc: "always"`)을 따른다 — 후자는 언어 블록
+**밖**이라 이 함정에 애초에 걸리지 않는다.
+
+**최상위 `editor.defaultFormatter` 는 어느 쪽이든 답이 아니다.** 언어별 설정은 스코프와 무관하게
+언어 없는 설정을 항상 이긴다. 작업 영역이 이기려면 **같은 모양의 언어 블록**이어야 한다.
+
+CI 는 이 문제를 이미 막고 있었다 — `format:check` 가 홑따옴표 JSX 를 실패로 본다.
+증상은 "저장할 때마다 엉뚱한 diff 가 나고 CI 가 막는다"였지, 조용히 통과하지는 않았다.
 
 ## M. (48차) Node 26 라인으로 옮기며 드러난 것
 
