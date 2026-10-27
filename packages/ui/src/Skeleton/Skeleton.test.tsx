@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { Skeleton } from '.';
+import { Skeleton } from './Skeleton';
 
 describe('Skeleton', () => {
   it('라벨을 그대로 보여준다', () => {

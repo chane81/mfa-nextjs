@@ -1,5 +1,5 @@
 /**
- * host / remote 가 공유하는 프리미티브. 컴포넌트마다 폴더 하나(`<이름>/index.tsx` + `index.test.tsx`)다.
+ * host / remote 가 공유하는 프리미티브. 컴포넌트마다 폴더 하나(`<이름>/<이름>.tsx` + 옆에 테스트)다.
  *
  * 스타일은 Tailwind 클래스로 적는다. **이 패키지는 CSS 를 만들지 않는다** — 클래스 이름만
  * 내보내고, 실제 CSS 는 이 패키지를 쓰는 앱이 자기 파이프라인에서 컴파일한다.
@@ -10,8 +10,8 @@
  *
  * 그래서 테스트도 "어떻게 보이나" 가 아니라 "약속한 클래스와 CSS 변수를 실제로 내보내는가" 를 본다.
  */
-export * from './Badge';
-export * from './Button';
-export * from './ErrorBox';
-export * from './Panel';
-export * from './Skeleton';
+export * from './Badge/Badge';
+export * from './Button/Button';
+export * from './ErrorBox/ErrorBox';
+export * from './Panel/Panel';
+export * from './Skeleton/Skeleton';

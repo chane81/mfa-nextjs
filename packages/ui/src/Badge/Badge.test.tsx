@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { Badge } from '.';
+import { Badge } from './Badge';
 
 describe('Badge', () => {
   it('hue 를 CSS 변수로 내려보낸다', () => {

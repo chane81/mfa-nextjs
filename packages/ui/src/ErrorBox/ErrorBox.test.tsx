@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { ErrorBox } from '.';
+import { ErrorBox } from './ErrorBox';
 
 describe('ErrorBox', () => {
   it('제목만 있으면 제목만 낸다', () => {
