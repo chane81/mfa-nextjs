@@ -86,6 +86,7 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 | **host `src/mf` 폴더 배치**         | `docs/02-architecture/06-host-mf-layout.md`          |
 | **`turbo.json` 각 설정의 근거**     | `docs/02-architecture/07-turbo-tasks.md`             |
 | 버전 고정 근거                      | `docs/03-setup/02-versions.md`                       |
+| **CI 워크플로의 근거**              | `docs/03-setup/05-ci.md`                             |
 | 테스트를 어디에 어떻게 쓰나         | `docs/06-testing/01-test-plan.md`                    |
 
 **추측하기 전에 먼저 트러블슈팅 문서의 "증상으로 찾기" 표를 본다.** 여기 있는 문제는
