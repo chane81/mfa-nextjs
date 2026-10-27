@@ -7,11 +7,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
-import { REMOTE_VERSIONS_GLOBAL } from '../versions/browser';
+import { REMOTE_VERSIONS_GLOBAL } from '../../versions/browser';
 
 /**
- * 모든 remote 소비가 지나가는 자리. 여기서 보는 것은 셋이다 —
- * 스켈레톤 → remote 마크업 전이, 스타일시트 주소 조립, 그리고 실패 시 경계로 떨어지기.
+ * 모든 remote 소비가 지나가는 자리. 여기서 보는 것은 넷이다 — 스켈레톤 → remote 마크업
+ * 전이, 스타일시트 주소 조립, 실패 시 경계로 떨어지기, 그리고 적재 캐시의 재적재 조건.
+ * 키 규칙 자체는 `module-cache.test.ts` 가 DOM 없이 본다.
  *
  * `loader/index.ts` 는 `@module-federation/runtime` 을 초기화하므로 통째로 모킹한다.
  * 여기서 검증할 것은 MF 런타임이 아니라 이 컴포넌트의 조립이다.
@@ -34,7 +35,7 @@ const { CATALOG_ORIGIN, CART_ORIGIN, loadRemoteModule, pinnedEntry } =
     pinnedEntry: vi.fn(),
   }));
 
-vi.mock('../loader', () => ({ loadRemoteModule, pinnedEntry }));
+vi.mock('../../loader', () => ({ loadRemoteModule, pinnedEntry }));
 
 beforeEach(() => {
   clearGlobalRegistries();
@@ -191,7 +192,7 @@ describe('스타일시트', () => {
   });
 
   it('버전을 알면 불변 경로를 가리킨다', async () => {
-    const { rememberVersion } = await import('../versions/server');
+    const { rememberVersion } = await import('../../versions/server');
     rememberVersion('catalog', {
       version: 't1abc',
       ssrEntry: `/vt1abc/${MF_FILES.ssrBundle}`,
@@ -305,73 +306,6 @@ describe('실패', () => {
   });
 });
 
-describe('remoteCacheKey', () => {
-  it('버전을 키에 넣는다', async () => {
-    // 안 넣으면 옛 모듈이 프로세스 수명 내내 고정된다.
-    const { remoteCacheKey } = await load();
-    const { rememberVersion } = await import('../versions/server');
-
-    expect(remoteCacheKey('catalog/ProductGrid')).toBe(
-      'catalog/ProductGrid@unversioned',
-    );
-
-    rememberVersion('catalog', {
-      version: 't1abc',
-      ssrEntry: `/vt1abc/${MF_FILES.ssrBundle}`,
-      webEntry: `/vt1abc/${MF_FILES.webManifest}`,
-    });
-
-    expect(remoteCacheKey('catalog/ProductGrid')).toBe(
-      'catalog/ProductGrid@t1abc',
-    );
-  });
-
-  it('브라우저에서는 심어준 버전이 키에 들어간다', async () => {
-    // 여기가 `unversioned` 로 굳으면 재배포해도 브라우저의 적재 캐시가 안 무효화된다.
-    stubInjectedVersions({
-      catalog: {
-        version: 't9zzz',
-        entry: `${CATALOG_ORIGIN}/vt9zzz/${MF_FILES.webManifest}`,
-      },
-    });
-    const { remoteCacheKey } = await load();
-
-    expect(remoteCacheKey('catalog/ProductGrid')).toBe(
-      'catalog/ProductGrid@t9zzz',
-    );
-    expect(remoteCacheKey('cart/CartBadge')).toBe('cart/CartBadge@unversioned');
-  });
-
-  it('reloadKey 가 있으면 뒤에 붙인다', async () => {
-    const { remoteCacheKey } = await load();
-    expect(remoteCacheKey('catalog/ProductGrid', 'nonce-1')).toBe(
-      'catalog/ProductGrid@unversioned#nonce-1',
-    );
-  });
-
-  it('remote 마다 자기 버전을 본다', async () => {
-    const { remoteCacheKey } = await load();
-    const { rememberVersion } = await import('../versions/server');
-    rememberVersion('cart', {
-      version: 't2def',
-      ssrEntry: `/vt2def/${MF_FILES.ssrBundle}`,
-      webEntry: `/vt2def/${MF_FILES.webManifest}`,
-    });
-
-    expect(remoteCacheKey('cart/CartBadge')).toBe('cart/CartBadge@t2def');
-    expect(remoteCacheKey('catalog/ProductGrid')).toBe(
-      'catalog/ProductGrid@unversioned',
-    );
-  });
-
-  it('모듈 id 가 다르면 키도 다르다', async () => {
-    const { remoteCacheKey } = await load();
-    expect(remoteCacheKey('catalog/ProductGrid')).not.toBe(
-      remoteCacheKey('catalog/ProductDetail'),
-    );
-  });
-});
-
 describe('적재 캐시', () => {
   it('같은 모듈 · 같은 버전이면 로더를 한 번만 부른다', async () => {
     // 적재 promise 를 렌더마다 새로 만들면 remote 상태가 매번 초기화된다.
@@ -417,7 +351,7 @@ describe('적재 캐시', () => {
     // 안 넣으면 재배포해도 옛 모듈이 프로세스 수명 내내 고정된다.
     loadRemoteModule.mockResolvedValue({ default: () => <p>ok</p> });
     const { RemoteComponent } = await load();
-    const { rememberVersion } = await import('../versions/server');
+    const { rememberVersion } = await import('../../versions/server');
 
     const { rerender } = await renderDone(
       <RemoteComponent module="catalog/ProductGrid" />,
