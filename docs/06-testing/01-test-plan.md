@@ -118,12 +118,12 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 3. `packages/contracts/src/remote-contract.ts` — `REMOTE_NAMES` ↔ `MODULE_IDS` 접두사 일치 (계약 드리프트)
 - [x] 4. `packages/store/src/cart/cookie-codec.ts` — 수량 강제변환·클램프 99·중복 병합·방어 파싱·퍼센트 디코딩 안 함·라운드트립
 - [x] 5. `packages/store/src/cart/totals.ts` — 빈 배열 / 합계 / `Infinity`
-- [x] 6. `packages/store/src/utils/global-singleton.ts` — create 1회 / 먼저 도착한 쪽이 이김 / name 격리
-- [x] 7. `apps/host/src/lib/format-time.ts` — 3형태 입력 / KST +9h / 자정 `00` / TZ 무관
-- [x] 8. `apps/host/src/lib/mf-secret.ts` — fail-closed / 길이 불일치 / 멀티바이트
+- [x] 6. `packages/store/src/libs/global-singleton.ts` — create 1회 / 먼저 도착한 쪽이 이김 / name 격리
+- [x] 7. `apps/host/src/app/lab/_src/libs/format-time.ts` — 3형태 입력 / KST +9h / 자정 `00` / TZ 무관
+- [x] 8. `apps/host/src/libs/mf-secret.ts` — fail-closed / 길이 불일치 / 멀티바이트
 - [x] 9. `apps/host/src/mf/loader/react-modules.ts` — `default` 언랩 / 미발견 시 원본 + dev 경고
 - [x] 10. `apps/host/src/mf/state/cell.ts` · `state/loader-stats.ts` — 셀 재사용 / 카운터 / **얕은 복사 방어** / reset
-- [x] 11. `apps/host/src/components/lab/modes.ts` — 순수 상수·매핑
+- [x] 11. `apps/host/src/app/lab/_src/constants/modes.ts` — 순수 상수·매핑
 
 ### Phase 2 — 신뢰 경계 (node, WebCrypto 실물)
 
@@ -136,7 +136,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 15. `apps/host/src/mf/loader/server.ts` — id 파싱 / 오리진·HTTP·타임아웃·무결성 분기 / requireShim / `default` 언랩 / 통계 순서 / 캐시(재사용·재로드·**실패 promise 제거**)
 - [x] 16. `apps/host/src/app/api/mf-revalidate/route.ts` — 401 / 400 / `warm=0` / 502 + **태그 미무효화** / `cause` 언래핑 / 성공 호출 순서 / `paths=1`
 - [x] 17. `apps/host/src/proxy.ts` — 시크릿 없으면 **401 이 아니라 404** / `config.matcher` / `/api/lab/*` 은 **DELETE 만** 프로덕션에서 닫힘
-- [x] 18. `apps/host/src/lib/cart-cookie.ts` — 쿠키 없음 → `[]` / 이중 디코딩 안 함
+- [x] 18. `apps/host/src/libs/cart-cookie.ts` — 쿠키 없음 → `[]` / 이중 디코딩 안 함
 - [x] 19. `apps/host/src/app/api/lab/stats/route.ts` — `refresh=1` 일 때만 fetch / **버전이 바뀐 remote 만 태그 만료**(24차) / 응답 형태 / `DELETE` / **배포본에서 DELETE 는 404** (proxy 와 별개의 이중 방어)
 - [x] 20. `apps/host/src/mf/config/index.ts` — `MFA_REMOTE_WEB_ENTRIES` 파싱 실패 삼킴 / 주입 / `WEB_ORIGINS`
 - [x] 20b. `apps/host/src/mf/versions/browser.ts` — 심어준 값 없음 → `undefined` / remote 별 격리 / **전역 이름이 `RemoteVersionSync` 와 같다**(24차 회귀)
@@ -146,7 +146,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 
 ### Phase 4 — DOM (jsdom + RTL)
 
-- [x] 22. `packages/store/src/utils/cookie-storage.ts` — `readCookie` / `secure` 프로토콜 추론 / **4096B 예산** / 되읽기 검증 / `removeItem`
+- [x] 22. `packages/store/src/libs/cookie-storage.ts` — `readCookie` / `secure` 프로토콜 추론 / **4096B 예산** / 되읽기 검증 / `removeItem`
 - [x] 23. `packages/store/src/cart/cookie-storage.ts` — 설정값 · codec 위임
 - [x] 24. `packages/store/src/cart/create-store.ts` — `add` 투영 / `setQuantity` 0·음수 → 삭제 / **`add` 에 99 상한 없음(codec 과 비대칭)**
 - [x] 25. `packages/store/src/hooks/use-revalidate-on-focus.ts` — visibility 가드 / **ref latest** / cleanup
@@ -168,7 +168,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 34. `scripts/wait-for-remotes.ts` → `remoteEntryUrl` 추출. `publicPath` 절대·`auto`·누락 / 슬래시 트리밍
 - [x] 35. `scripts/stamp-remote-version.ts` → `integrity()` · payload 조립 · **정리 대상 경계**(현재 버전만 남긴다 / `v` 접두사 밖은 안 건드린다) 추출
 - [x] 36. `apps/host/src/app/api/mf-revalidate/route.ts` → `selfOrigin()` export
-- [x] 37. `apps/host/src/mf/components/RemoteComponent/module-cache.ts` — `remoteCacheKey()` 규칙. 브라우저에서도 버전이 키에 들어가는지 같이 본다(24차). 53차에 폴더로 쪼개면서 키 규칙 테스트가 `module-cache.test.ts`(DOM 없음 · node project)로 갈라졌다 — 렌더가 필요한 재적재 조건은 30번에 남는다
+- [x] 37. `apps/host/src/mf/components/RemoteComponent/libs/module-cache.ts` — `remoteCacheKey()` 규칙. 브라우저에서도 버전이 키에 들어가는지 같이 본다(24차). 53차에 폴더로 쪼개면서 키 규칙 테스트가 `module-cache.test.ts`(DOM 없음 · node project)로 갈라졌다 — 렌더가 필요한 재적재 조건은 30번에 남는다
 - [x] 38. `packages/remote-config/src/node.test.ts` 의 `readExposes` — `.tsx` 만 센다 /
       `ignore` 가 이웃 테스트를 거른다 / 키가 `./` 로 시작한다 / `files` 는 스캔 기준
       경로다 / `ignore` 를 안 주면 아무것도 안 거른다. `exposes` 를 디렉터리 스캔으로
@@ -196,7 +196,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
       (전자는 전부 배포, 후자는 아무것도 안 한다) / 디렉터리 경계(`remote-cart` 가
       `remote-cartography` 를 안 끌어온다) / 출력이 `{ name, urlVar, appVar, workspaceDir }`
       객체 배열이다(I-11)
-- [x] 43. `apps/host/src/components/lab/MfWarmup.test.tsx` — warm 의 `lazy` 캐시가
+- [x] 43. `apps/host/src/app/internal/mf-warm/_src/components/MfWarmup/MfWarmup.test.tsx` — warm 의 `lazy` 캐시가
       **remote 수를 넘지 않는다.** nonce 는 요청마다 유일해서(`버전-Date.now()`) 키를 쌓으면
       warm 한 번마다 엔트리가 늘고 host 는 장수 프로세스라 영영 안 준다. 코드로는 회귀를
       알아채기 어렵고 증상이 한참 뒤 메모리로만 나와서 크기를 직접 본다(40차)
@@ -275,7 +275,7 @@ remote 이름인지. 그 파일은 **아무것도 export 하지 않는다** — 
    `beforeEach` 에서 부른다.
 
 3. **모듈 스코프 가변 상태** — `loader/server.ts` 의 `bundleCache`, `loader/index.ts` 의 `clientCache` ·
-   `initialized`, `components/RemoteComponent/module-cache.ts` 의 `modulePromises`, `utils/cookie-storage.ts` 의 `warned: Set`.
+   `initialized`, `components/RemoteComponent/libs/module-cache.ts` 의 `modulePromises`, `store` 의 `libs/cookie-storage.ts` 의 `warned: Set`.
    리셋 API 가 없어 `vi.resetModules()` + 동적 import 로만 격리된다.
 
 4. **ICU 로케일 의존** — `formatKRW`(`toLocaleString('ko-KR')`)와 `formatKst`(`Intl.DateTimeFormat`)의

@@ -587,7 +587,7 @@
                   '키 = module@version',
                   'promise 는 렌더 바깥에서 한 번만',
                 ],
-                src: 'apps/host/src/mf/components/RemoteComponent/module-cache.ts',
+                src: 'apps/host/src/mf/components/RemoteComponent/libs/module-cache.ts',
                 on: ['page', 'rc', 'versions'],
                 flow: [
                   ['vsync', 'page'],
@@ -734,7 +734,7 @@
                 body: '적재 캐시 키가 <code>&lt;module&gt;@&lt;version&gt;</code> 이라, 버전이 그대로면 같은 컴포넌트를 그대로 쓴다. 새 모듈만 청크로 더 받는다.',
                 why: '<b>키에 버전이 들어간 덕분에 두 요구가 동시에 성립한다</b> — 평소에는 재사용(빠름), 재배포 뒤에는 자동 교체(정확함). 버전을 빼면 앞은 얻고 뒤를 잃는다.',
                 facts: ['키 = module@version', '새 모듈만 추가 청크'],
-                src: 'apps/host/src/mf/components/RemoteComponent/module-cache.ts',
+                src: 'apps/host/src/mf/components/RemoteComponent/libs/module-cache.ts',
                 on: ['rc', 'mfrt', 'webb'],
                 flow: [['rc', 'mfrt']],
               },

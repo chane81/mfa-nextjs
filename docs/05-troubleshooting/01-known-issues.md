@@ -318,7 +318,7 @@ ESLint 시절엔 이유를 `--` 뒤 한 줄에 몰아 써서 이 모양이 나�
 
 **처음엔 줄마다 `oxlint-disable-next-line react/purity` 로 껐다가 걷어냈다.** 같은 이유의
 disable 이 세 곳에 복제되고, 실험 페이지를 하나 더 만들면 또 복제해야 한다. 대신 측정점을
-`readRenderClock()`(`apps/host/src/lib/render-clock.ts`) 하나로 모았다.
+`readRenderClock()`(`apps/host/src/app/lab/_src/libs/render-clock.ts`) 하나로 모았다.
 
 ```tsx
 // 전: 렌더 함수 안에서 시계를 직접 읽는다 → react(purity) error
