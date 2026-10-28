@@ -28,8 +28,12 @@ host 는 번들러 플러그인 없이 `@module-federation/runtime` 만 쓴다. 
 `docs/02-architecture/06-host-mf-layout.md`.
 
 `components/` 안은 **컴포넌트마다 폴더 하나**다(`<이름>/<이름>.tsx` 본체 + `index.ts` 재수출).
+그 폴더 안쪽은 다시 `components/` · `libs/` 로 나눈다 — 저장소 전역 배치 규칙은
+`.claude/rules/fe-monorepo-structure.md`. `mf/` 의 **여섯 레이어 이름은 그 규칙의 예외**다.
+
 배럴에는 `'use client'` 를 적지 않는다 — 대신 그 경계가 필요한 파일이 자기 머리에 적는다.
 디렉티브는 파일 단위라, 디렉티브 없는 배럴이 앞에 서면 경계가 거기서 끊긴다(known-issues P-1).
+파일을 `libs/` 로 내릴 때 디렉티브를 같이 옮긴다.
 
 ## SSOT 를 지킨다
 

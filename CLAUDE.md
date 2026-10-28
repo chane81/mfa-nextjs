@@ -21,12 +21,13 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
 
 현재 규칙 파일과 그 적용 범위:
 
-| 규칙                          | 언제 로드되나                                      |
-| ----------------------------- | -------------------------------------------------- |
-| `.claude/rules/mf-runtime.md` | `apps/host/src/mf` · `remote-config` · `contracts` |
-| `.claude/rules/remotes.md`    | `apps/remote-*` · `scripts`                        |
-| `.claude/rules/styling.md`    | `tailwind-config` · `ui` · `*.css` · postcss 설정  |
-| `.claude/rules/docs.md`       | `docs/` · `README.md`                              |
+| 규칙                                     | 언제 로드되나                                      |
+| ---------------------------------------- | -------------------------------------------------- |
+| `.claude/rules/fe-monorepo-structure.md` | `apps/**` · `packages/**` — 폴더 배치(콜로케이션)  |
+| `.claude/rules/mf-runtime.md`            | `apps/host/src/mf` · `remote-config` · `contracts` |
+| `.claude/rules/remotes.md`               | `apps/remote-*` · `scripts`                        |
+| `.claude/rules/styling.md`               | `tailwind-config` · `ui` · `*.css` · postcss 설정  |
+| `.claude/rules/docs.md`                  | `docs/` · `README.md`                              |
 
 ## 절대 규칙
 
