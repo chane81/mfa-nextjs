@@ -3,8 +3,8 @@
 import type { RemoteName } from '@mfa/contracts/remote';
 import { stylesPath } from '@mfa/remote-config';
 
-import { WEB_ORIGINS } from '../../config';
-import { remoteVersion } from '../../versions';
+import { WEB_ORIGINS } from '../../../../config';
+import { remoteVersion } from '../../../../versions';
 
 /**
  * remote 의 스타일시트를 host 가 건다. **CSS 는 두 로딩 경로 어디로도 따라오지 않는다** —

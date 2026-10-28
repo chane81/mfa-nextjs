@@ -9,7 +9,7 @@
  * - 컴포넌트 본문은 순수하게 남는다. `react/purity` 는 렌더 함수 안의 비순수 호출을 잡는데,
  *   이 함수는 렌더 함수가 아니다. **비순수성이 사라진 게 아니라 여기 한 곳에 모였다.**
  *
- * 값은 UTC ISO 다. 화면에 KST 로 바꾸는 건 `formatKst()`(`@/lib/format-time`)가 한다.
+ * 값은 UTC ISO 다. 화면에 KST 로 바꾸는 건 `formatKst()`(`./format-time`)가 한다.
  */
 export function readRenderClock(): string {
   return new Date().toISOString();

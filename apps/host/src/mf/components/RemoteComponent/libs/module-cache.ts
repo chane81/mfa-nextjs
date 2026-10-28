@@ -6,9 +6,9 @@ import type { ComponentType } from 'react';
 
 import type { RemoteModuleId, RemoteName } from '@mfa/contracts/remote';
 
-import { UNVERSIONED } from '../../config';
-import { loadRemoteModule } from '../../loader';
-import { remoteVersion } from '../../versions';
+import { UNVERSIONED } from '../../../config';
+import { loadRemoteModule } from '../../../loader';
+import { remoteVersion } from '../../../versions';
 
 export type RemoteModulePromise = Promise<{
   default: ComponentType<Record<string, unknown>>;

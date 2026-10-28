@@ -1,5 +1,5 @@
-import { CheckoutSection } from '@/components/CheckoutSection';
-import { readCartLines } from '@/lib/cart-cookie';
+import { CheckoutSection } from './components/CheckoutSection';
+import { readCartLines } from '@/libs/cart-cookie';
 
 /**
  * 주문서의 서버 쪽 껍데기. **쿠키를 읽는 것만** 한다. 근거는 `[[CartSlot]]` 과 같다.

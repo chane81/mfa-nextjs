@@ -1,4 +1,4 @@
-import { CheckoutSlot } from '@/components/CheckoutSlot';
+import { CheckoutSlot } from './_src/components/CheckoutSlot';
 
 /**
  * 장바구니를 `<Suspense>` 밖에서 읽는 라우트 — 프리렌더 검증에서 빠진다.

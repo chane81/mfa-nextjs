@@ -1,5 +1,5 @@
-import { SiteHeader } from '@/components/SiteHeader';
-import { readCartLines } from '@/lib/cart-cookie';
+import { SiteHeader } from './components/SiteHeader';
+import { readCartLines } from '@/libs/cart-cookie';
 
 /**
  * 헤더의 서버 쪽 껍데기. **쿠키를 읽는 것만** 한다.

@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 
 import { Skeleton } from '@mfa/ui';
 
-import { RelatedProductsSection } from '@/components/RelatedProductsSection';
+import { RelatedProductsSection } from './_src/components/RelatedProductsSection';
 import { RemoteComponent } from '@/mf/components/RemoteComponent';
 
 /**

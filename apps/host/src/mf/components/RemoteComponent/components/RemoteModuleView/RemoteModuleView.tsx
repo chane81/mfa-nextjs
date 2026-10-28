@@ -2,7 +2,7 @@
 
 import { use } from 'react';
 
-import type { RemoteModulePromise } from './module-cache';
+import type { RemoteModulePromise } from '../../libs/module-cache';
 
 /**
  * 적재된 remote 모듈을 그린다. **모듈 스코프에 한 번 정의되는 고정 컴포넌트다** —

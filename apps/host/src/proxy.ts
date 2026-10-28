@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { checkMfSecret } from '@/lib/mf-secret';
+import { checkMfSecret } from '@/libs/mf-secret';
 
 /**
  * 렌더 파이프라인 앞에서 라우트를 잘라내는 곳.

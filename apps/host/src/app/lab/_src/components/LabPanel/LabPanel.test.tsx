@@ -6,9 +6,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
-import { formatKst } from '@/lib/format-time';
+import { formatKst } from '../../libs/format-time';
 
-import { LAB_MODES, LAB_ORDER } from './modes';
+import { LAB_MODES, LAB_ORDER } from '../../constants/modes';
 
 /**
  * 세 모드를 **같은 내용**으로 렌더해 비교하는 실험 패널. 다른 건 라우트 세그먼트 설정뿐이라,
@@ -64,13 +64,13 @@ describe('HydrationStamp', () => {
   it('마운트 전에는 대기 문구를 보여준다', async () => {
     // 초기 렌더에서 시각을 읽으면 hydration mismatch 다.
     const { renderToString } = await import('react-dom/server');
-    const { HydrationStamp } = await import('./HydrationStamp');
+    const { HydrationStamp } = await import('./components/HydrationStamp');
 
     expect(renderToString(<HydrationStamp />)).toContain('hydration 대기…');
   });
 
   it('마운트 후 브라우저 시각을 채운다', async () => {
-    const { HydrationStamp } = await import('./HydrationStamp');
+    const { HydrationStamp } = await import('./components/HydrationStamp');
 
     render(<HydrationStamp />);
 

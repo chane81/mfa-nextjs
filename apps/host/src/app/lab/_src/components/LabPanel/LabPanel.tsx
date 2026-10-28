@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 import { hueVar } from '@mfa/utils/style/hue';
 
 import { CatalogSection } from '@/components/CatalogSection';
-import { formatKst } from '@/lib/format-time';
+import { formatKst } from '../../libs/format-time';
 
-import { HydrationStamp } from './HydrationStamp';
-import { LAB_MODES, type LabMode } from './modes';
+import { HydrationStamp } from './components/HydrationStamp';
+import { LAB_MODES, type LabMode } from '../../constants/modes';
 
 interface LabPanelProps {
   mode: LabMode;

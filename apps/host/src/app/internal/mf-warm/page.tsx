@@ -3,8 +3,8 @@ import { notFound } from 'next/navigation';
 
 import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
 
-import { MfWarmup } from '@/components/lab/MfWarmup';
-import { checkMfSecret } from '@/lib/mf-secret';
+import { MfWarmup } from './_src/components/MfWarmup';
+import { checkMfSecret } from '@/libs/mf-secret';
 import { bumpWarmEpoch } from '@/mf/state/warm';
 
 /**

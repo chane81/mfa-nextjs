@@ -1,5 +1,5 @@
-import { CartSection } from '@/components/CartSection';
-import { readCartLines } from '@/lib/cart-cookie';
+import { CartSection } from './components/CartSection';
+import { readCartLines } from '@/libs/cart-cookie';
 
 /**
  * 장바구니의 서버 쪽 껍데기. **쿠키를 읽는 것만** 한다. `[[SiteHeaderSlot]]` 과 같은 꼴이다.

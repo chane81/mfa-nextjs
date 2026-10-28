@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { clearGlobalRegistries } from '@mfa/utils/test/globals';
 
-import { REMOTE_VERSIONS_GLOBAL } from '../../versions/browser';
+import { REMOTE_VERSIONS_GLOBAL } from '../../../versions/browser';
 
 /**
  * 적재 캐시 키 규칙. **버전이 키에 들어가는가**가 전부다 — 빠지면 재배포해도 옛 모듈이
@@ -12,7 +12,7 @@ import { REMOTE_VERSIONS_GLOBAL } from '../../versions/browser';
  * `loader/index.ts` 는 `@module-federation/runtime` 을 초기화하므로 모킹한다.
  * 키 계산에는 DOM 이 필요 없어서 이 파일은 node project 에서 돈다.
  */
-vi.mock('../../loader', () => ({ loadRemoteModule: vi.fn() }));
+vi.mock('../../../loader', () => ({ loadRemoteModule: vi.fn() }));
 
 beforeEach(() => {
   clearGlobalRegistries();
@@ -26,7 +26,7 @@ const stubInjectedVersions = (
 ) => vi.stubGlobal(REMOTE_VERSIONS_GLOBAL, value);
 
 const announce = async (remote: 'catalog' | 'cart', version: string) => {
-  const { rememberVersion } = await import('../../versions/server');
+  const { rememberVersion } = await import('../../../versions/server');
   rememberVersion(remote, {
     version,
     ssrEntry: `/v${version}/${MF_FILES.ssrBundle}`,
