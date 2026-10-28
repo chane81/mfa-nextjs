@@ -292,7 +292,7 @@
                 ['그때 실측 증상', '매니페스트 404 + CORS 에러'],
                 ['심는 값', '버전 문자열이 아니라 매니페스트 URL'],
               ],
-              f: 'apps/host/src/mf/components/RemoteVersionSync/RemoteVersionSync.tsx',
+              f: 'apps/host/src/mf/components/RemoteVersionSync.tsx',
             },
           },
           {
@@ -350,7 +350,7 @@
                   '에러 상자에 dev 폴백 주소가 찍혀 진단이 거짓말했다',
                 ],
               ],
-              f: 'apps/host/src/mf/components/RemoteBoundary/RemoteBoundary.tsx',
+              f: 'apps/host/src/mf/components/RemoteBoundary.tsx',
             },
           },
 
@@ -485,7 +485,7 @@
                 ['포함', '버전 스크립트 · 헤더 · 스켈레톤'],
                 ['순서 보장', 'hydration 보다 반드시 먼저 도착'],
               ],
-              f: 'apps/host/src/mf/components/RemoteVersionSync/RemoteVersionSync.tsx',
+              f: 'apps/host/src/mf/components/RemoteVersionSync.tsx',
             },
           },
           {
@@ -515,7 +515,7 @@
                 ['표시', 'remote 이름 + 실제로 부른 엔트리 주소'],
                 ['다른 remote', '영향 없음'],
               ],
-              f: 'apps/host/src/mf/components/RemoteBoundary/RemoteBoundary.tsx',
+              f: 'apps/host/src/mf/components/RemoteBoundary.tsx',
             },
           },
         ];
@@ -552,7 +552,7 @@
                   'cacheTag(버전 태그)',
                   'TTL 30초로 수렴',
                 ],
-                src: 'apps/host/src/mf/components/RemoteVersionSync/RemoteVersionSync.tsx',
+                src: 'apps/host/src/mf/components/RemoteVersionSync.tsx',
                 on: ['req', 'layout', 'vsync', 'mver', 'versions'],
                 flow: [
                   ['req', 'layout'],
@@ -571,7 +571,7 @@
                   'URL 을 심는다',
                   '/v{version}/ 은 불변 경로',
                 ],
-                src: 'apps/host/src/mf/components/RemoteVersionSync/RemoteVersionSync.tsx',
+                src: 'apps/host/src/mf/components/RemoteVersionSync.tsx',
                 on: ['vsync', 'shell'],
                 flow: [['vsync', 'shell']],
                 badge: { shell: '버전 심음' },
@@ -799,7 +799,7 @@
                 body: '로더가 던진 에러를 경계가 잡는다. 그 자리에만 에러 상자가 들어가고 <b>응답은 200</b> 이다. 헤더 · 다른 remote · 라우팅은 그대로 동작한다.',
                 why: '<b>MFA 에서 가장 자주 빠뜨리는 부분이다.</b> 경계가 없으면 remote 하나의 실패가 트리 위로 올라가 페이지 전체를 500 으로 만든다. 그 순간 "독립 배포" 는 말뿐이 된다 — 배포만 독립이고 장애는 공유하는 구조다.',
                 facts: ['응답 200', '그 패널만 교체', '다른 remote 영향 없음'],
-                src: 'apps/host/src/mf/components/RemoteBoundary/RemoteBoundary.tsx',
+                src: 'apps/host/src/mf/components/RemoteBoundary.tsx',
                 on: ['boundary', 'errbox', 'panel'],
                 flow: [
                   ['srvload', 'boundary'],
@@ -816,7 +816,7 @@
                 body: '표시하는 주소는 <code>pinnedEntry</code> 가 직접 고른다. 배포 환경이라면 <code>/v{version}/mf-manifest.json</code> 이다.',
                 why: '<b>한동안 여기가 거짓말을 했다.</b> 경계가 <code>entry</code> 를 prop 으로 받았고 호출부 둘이 똑같이 dev 폴백 주소를 넘겼다. 그래서 장애 화면에 찍힌 주소와 실제로 실패한 주소가 달랐다. 고친 방법은 값을 넘기지 않는 것이다 — 호출자가 답을 대신 만들면 <b>틀릴 방법이 생긴다</b>.',
                 facts: ['pinnedEntry 가 소유', 'prop 에서 제거'],
-                src: 'apps/host/src/mf/components/RemoteBoundary/RemoteBoundary.tsx',
+                src: 'apps/host/src/mf/components/RemoteBoundary.tsx',
                 on: ['boundary', 'versions', 'errbox'],
                 flow: [['versions', 'boundary']],
                 fail: ['errbox'],

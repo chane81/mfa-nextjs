@@ -96,38 +96,49 @@ Client Component but none of its parents are marked with "use client" …
 
 과거 회차 기록과 오래된 링크를 읽을 때 쓴다.
 
-| 26차 이전                  | 지금                               |
-| -------------------------- | ---------------------------------- |
-| `mf/runtime.ts`            | `mf/loader/index.ts`               |
-| `mf/server-loader.ts`      | `mf/loader/server.ts`              |
-| `mf/interop.ts`            | `mf/loader/react-modules.ts`       |
-| `mf/remote-endpoints.ts`   | `mf/config/index.ts`               |
-| `mf/constants.ts`          | `mf/config/index.ts` (흡수)        |
-| `mf/global-state.ts`       | `mf/state/cell.ts`                 |
-| `mf/warm-state.ts`         | `mf/state/warm.ts`                 |
-| `mf/loader-stats.ts`       | `mf/state/loader-stats.ts`         |
-| `mf/remote-trust.ts`       | `mf/trust/index.ts`                |
-| `mf/RemoteComponent.tsx`   | `mf/components/RemoteComponent/`   |
-| `mf/RemoteBoundary.tsx`    | `mf/components/RemoteBoundary/`    |
-| `mf/RemoteVersionSync.tsx` | `mf/components/RemoteVersionSync/` |
-| `mf/versions/*`            | 그대로                             |
+| 26차 이전                  | 지금                                  |
+| -------------------------- | ------------------------------------- |
+| `mf/runtime.ts`            | `mf/loader/index.ts`                  |
+| `mf/server-loader.ts`      | `mf/loader/server.ts`                 |
+| `mf/interop.ts`            | `mf/loader/react-modules.ts`          |
+| `mf/remote-endpoints.ts`   | `mf/config/index.ts`                  |
+| `mf/constants.ts`          | `mf/config/index.ts` (흡수)           |
+| `mf/global-state.ts`       | `mf/state/cell.ts`                    |
+| `mf/warm-state.ts`         | `mf/state/warm.ts`                    |
+| `mf/loader-stats.ts`       | `mf/state/loader-stats.ts`            |
+| `mf/remote-trust.ts`       | `mf/trust/index.ts`                   |
+| `mf/RemoteComponent.tsx`   | `mf/components/RemoteComponent/`      |
+| `mf/RemoteBoundary.tsx`    | `mf/components/RemoteBoundary.tsx`    |
+| `mf/RemoteVersionSync.tsx` | `mf/components/RemoteVersionSync.tsx` |
+| `mf/versions/*`            | 그대로                                |
 
-53차에 `components/` 안이 한 번 더 나뉘고, 54차에 그 안쪽이 다시 나뉘었다 — 아래 절.
+53차에 `components/` 안을 전부 폴더로 나눴다가 **54차에 되돌렸다** — 아래 절.
 
-## `components/` 는 컴포넌트마다 폴더 하나다
+## `components/` 는 하나만 폴더다
 
-`@mfa/ui` 가 51차에 쓴 규칙과 같다: `<이름>/<이름>.tsx` 가 본체, 같은 폴더의 `index.ts` 가
-재수출, 테스트도 그 옆. 호출부 경로(`@/mf/components/RemoteComponent`)는 그대로다.
+배치 규칙(`.claude/rules/fe-monorepo-structure.md` 4절)은 **단순하면 파일 하나**, 전용
+조각이 생기면 폴더다. 그래서 셋 중 하나만 폴더다.
 
-54차에 저장소 전역 배치 규칙(`.claude/rules/fe-monorepo-structure.md`)이 들어오면서 폴더
-안쪽도 같은 다섯 이름으로 나뉘었다 — 전용 하위 컴포넌트는 `components/`, 순수 모듈은 `libs/`.
+```
+components/
+├─ RemoteBoundary.tsx · RemoteBoundary.test.tsx   ← 전용 조각 없음
+├─ RemoteVersionSync.tsx
+└─ RemoteComponent/
+   ├─ RemoteComponent.tsx · RemoteComponent.test.tsx · index.ts
+   ├─ components/RemoteModuleView.tsx · RemoteStyleLink.tsx
+   └─ libs/module-cache.ts · module-cache.test.ts
+```
 
-| 파일                                           | 무엇                                                      |
-| ---------------------------------------------- | --------------------------------------------------------- |
-| `RemoteComponent/RemoteComponent.tsx`          | 경계 · 스타일시트 · `Suspense` 를 조립하는 공개 진입점    |
-| `RemoteComponent/libs/module-cache.ts`         | 적재 캐시와 키 규칙(`remoteCacheKey`). `MfWarmup` 도 쓴다 |
-| `RemoteComponent/components/RemoteModuleView/` | `use(promise)` 로 적재된 모듈을 그리는 고정 컴포넌트      |
-| `RemoteComponent/components/RemoteStyleLink/`  | remote 스타일시트 `<link>` 조립                           |
+53차에 셋 다 폴더로 나눴다가 54차에 되돌렸다. **import 경로는 세 상태에서 모두 같다** —
+`@/mf/components/RemoteBoundary` 가 `RemoteBoundary.tsx` 와 `RemoteBoundary/index.ts` 를
+똑같이 해석한다. 그래서 승격·강등이 호출부를 건드리지 않는다.
+
+| 파일                                              | 무엇                                                      |
+| ------------------------------------------------- | --------------------------------------------------------- |
+| `RemoteComponent/RemoteComponent.tsx`             | 경계 · 스타일시트 · `Suspense` 를 조립하는 공개 진입점    |
+| `RemoteComponent/libs/module-cache.ts`            | 적재 캐시와 키 규칙(`remoteCacheKey`). `MfWarmup` 도 쓴다 |
+| `RemoteComponent/components/RemoteModuleView.tsx` | `use(promise)` 로 적재된 모듈을 그리는 고정 컴포넌트      |
+| `RemoteComponent/components/RemoteStyleLink.tsx`  | remote 스타일시트 `<link>` 조립                           |
 
 진입점이 셋을 조립하는 모양이 되면서 **각 조각을 따로 읽을 수 있다** — 173줄 한 파일에
 서로 다른 네 가지 근거(캐시 키 · promise 캐시 · CSS 경로 · Suspense 배치)가 주석으로

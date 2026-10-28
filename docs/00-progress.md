@@ -17,6 +17,25 @@
 이사는 **38차에 적어둔 "`components/` 를 remote 별로 가른다"를 대체한다.** remote 축으로
 가르면 remote 에 묶이지 않는 `MfDiagnostics` · `LabPanel` 이 갈 곳이 없다.
 
+### 작업 중 규칙이 한 번 바뀌었다 — 51차·53차를 되돌린다
+
+처음엔 **파일 하나뿐인 조각도 폴더를 줬다**("승격 시점을 매번 판단하지 않는다"). 그 선택을
+PR 의 "확인 부탁"으로 올렸는데, 원본 저장소에 규칙이 추가됐다 — **단순하면 파일 하나,
+전용 조각(`hooks` · `libs` · `constants` · `types` · 하위 컴포넌트)이 생기면 폴더.**
+
+| 되돌린 것                                                      | 지금                 |
+| -------------------------------------------------------------- | -------------------- |
+| `@mfa/ui` 다섯(`Badge` `Button` `ErrorBox` `Panel` `Skeleton`) | 파일 — 51차를 되돌림 |
+| `mf/components/{RemoteBoundary,RemoteVersionSync}`             | 파일 — 53차를 되돌림 |
+| host 컴포넌트 아홉 · remote 둘 · `RemoteComponent` 하위 둘     | 파일                 |
+
+폴더로 **남은** 건 전용 조각을 가진 다섯 — `SiteHeaderSlot` · `CartSlot` · `CheckoutSlot` ·
+`LabPanel` · `RemoteComponent`.
+
+되돌리는 비용이 거의 0 이었던 이유: **`./components/X` 가 `X.tsx` 와 `X/index.ts` 를 똑같이
+해석한다.** 20개 폴더를 평탄화했는데 고친 import 는 상대 깊이 7자리뿐이고 호출부는 한 줄도
+안 바뀌었다. 승격·강등이 싸다는 게 "판단을 미뤄도 된다"의 근거다.
+
 ### 어디로 갔나
 
 | 옮긴 것                                       | 어디로                                       | 왜                                                |

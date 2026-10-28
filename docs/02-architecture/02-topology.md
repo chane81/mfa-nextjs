@@ -176,7 +176,7 @@ remote 컴포넌트는 host 페이지 안에서 렌더되는데, **CSS 는 두 �
 그래서 **host 가 remote 를 소비하는 자리에서 `<link>` 를 함께 건다.**
 
 ```tsx
-// apps/host/src/mf/components/RemoteComponent/components/RemoteStyleLink/RemoteStyleLink.tsx — 모든 remote 소비가 지나간다
+// apps/host/src/mf/components/RemoteComponent/components/RemoteStyleLink.tsx — 모든 remote 소비가 지나간다
 <link
   rel="stylesheet"
   href={`${WEB_ORIGINS[remoteName]}${stylesPath(remoteVersion(remoteName))}`}

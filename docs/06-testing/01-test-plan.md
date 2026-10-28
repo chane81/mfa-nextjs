@@ -155,7 +155,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 28. `packages/ui/src/<컴포넌트>/`(소스와 `*.test.tsx` 가 한 폴더) — `--hue` 변수(통로는 `@mfa/utils/style/hue` 의
       `hueVar` 다 — 감추는 건 함수가 아니라 **변수 이름이 계약이라는 사실**이다) /
       조건부 렌더 / variant 클래스 매핑
-- [x] 29. `apps/host/src/mf/components/RemoteBoundary/RemoteBoundary.tsx` — 자식 throw → `ErrorBox` 내용.
+- [x] 29. `apps/host/src/mf/components/RemoteBoundary.tsx` — 자식 throw → `ErrorBox` 내용.
       **주소는 받지 않고 `pinnedEntry` 로 스스로 고른다**(41차, J-1) — 정상 렌더에서는
       묻지도 않는다
 - [x] 30. `apps/host/src/mf/components/RemoteComponent/RemoteComponent.tsx` — Skeleton → 마크업 전이 / `<link href>` 조립 / **브라우저는 심어준 버전을 본다**(24차, `globalCell` 없이 불변 경로) / 실패 시 Boundary / 적재 캐시의 재적재 조건
@@ -196,7 +196,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
       (전자는 전부 배포, 후자는 아무것도 안 한다) / 디렉터리 경계(`remote-cart` 가
       `remote-cartography` 를 안 끌어온다) / 출력이 `{ name, urlVar, appVar, workspaceDir }`
       객체 배열이다(I-11)
-- [x] 43. `apps/host/src/app/internal/mf-warm/_src/components/MfWarmup/MfWarmup.test.tsx` — warm 의 `lazy` 캐시가
+- [x] 43. `apps/host/src/app/internal/mf-warm/_src/components/MfWarmup.test.tsx` — warm 의 `lazy` 캐시가
       **remote 수를 넘지 않는다.** nonce 는 요청마다 유일해서(`버전-Date.now()`) 키를 쌓으면
       warm 한 번마다 엔트리가 늘고 host 는 장수 프로세스라 영영 안 준다. 코드로는 회귀를
       알아채기 어렵고 증상이 한참 뒤 메모리로만 나와서 크기를 직접 본다(40차)
@@ -253,13 +253,13 @@ remote 이름인지. 그 파일은 **아무것도 export 하지 않는다** — 
 
 ## 테스트하지 않는 것
 
-| 대상                                                                  | 이유                                                                                                                                         |
-| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/host/src/mf/components/RemoteVersionSync/RemoteVersionSync.tsx` | `'use cache'` 는 Next 컴파일러가 변환하는 디렉티브다. 변환 없이 실행하면 `cacheLife`/`cacheTag` 가 캐시 스코프 밖 호출로 throw. **e2e 영역** |
-| 실제 MF 런타임 로딩 · host 프리렌더                                   | `pnpm build` 가 이미 계약 테스트로 커버한다 (CI `build` job)                                                                                 |
-| `scripts/gen-signing-key.ts`                                          | 로직이 없다. 키 형식만 `@mfa/utils/test/signing` 으로 옮겨 픽스처 생성에 쓴다                                                                |
-| `scripts/mf-build-version.ts`                                         | `t${Date.now().toString(36)}` 한 줄                                                                                                          |
-| 브라우저 실제 동작                                                    | e2e 범위                                                                                                                                     |
+| 대상                                                | 이유                                                                                                                                         |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/host/src/mf/components/RemoteVersionSync.tsx` | `'use cache'` 는 Next 컴파일러가 변환하는 디렉티브다. 변환 없이 실행하면 `cacheLife`/`cacheTag` 가 캐시 스코프 밖 호출로 throw. **e2e 영역** |
+| 실제 MF 런타임 로딩 · host 프리렌더                 | `pnpm build` 가 이미 계약 테스트로 커버한다 (CI `build` job)                                                                                 |
+| `scripts/gen-signing-key.ts`                        | 로직이 없다. 키 형식만 `@mfa/utils/test/signing` 으로 옮겨 픽스처 생성에 쓴다                                                                |
+| `scripts/mf-build-version.ts`                       | `t${Date.now().toString(36)}` 한 줄                                                                                                          |
+| 브라우저 실제 동작                                  | e2e 범위                                                                                                                                     |
 
 ## 테스트를 쓸 때 반드시 지킬 것
 

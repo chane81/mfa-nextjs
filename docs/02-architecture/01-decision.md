@@ -2216,7 +2216,7 @@ remote 축으로 가르면 `MfDiagnostics` · `LabPanel` 처럼 remote 에 안 �
 
 | 쓰는 범위             | 어디로                    | 이 저장소의 예                           |
 | --------------------- | ------------------------- | ---------------------------------------- |
-| 그 컴포넌트만         | `<Component>/components/` | `CartSlot/components/CartSection/`       |
+| 그 컴포넌트만         | `<Component>/components/` | `CartSlot/components/CartSection.tsx`    |
 | 라우트 하나(와 하위)  | `app/<route>/_src/`       | `app/lab/_src/components/LabPanel/`      |
 | 같은 앱의 여러 라우트 | `src/`                    | `src/components/CartSlot/`(홈 · `/cart`) |
 | 2개 이상 앱           | `packages/*`              | `@mfa/ui` · `@mfa/store`                 |
@@ -2224,6 +2224,10 @@ remote 축으로 가르면 `MfDiagnostics` · `LabPanel` 처럼 remote 에 안 �
 `_src` 는 밑줄로 시작해 **Next 라우팅에서 빠진다**(Next 16.4 공식 문서
 `app/getting-started/project-structure` 의 Private folders — 폴더와 하위 전체가 제외된다).
 빌드 라우트 목록이 이사 전후로 동일한 것으로 확인했다.
+
+컴포넌트 자체는 **단순하면 파일 하나**다. 전용 `hooks` · `libs` · `constants` · `types` 나
+하위 컴포넌트가 생기는 순간 폴더로 승격한다. 그 승격은 호출부를 안 건드린다 —
+`./components/CartSlot` 이 `CartSlot.tsx` 와 `CartSlot/index.ts` 를 똑같이 해석하기 때문이다.
 
 ### 결과
 
@@ -2233,11 +2237,15 @@ remote 축으로 가르면 `MfDiagnostics` · `LabPanel` 처럼 remote 에 안 �
   하나 적고, remote 에 안 묶이는 컴포넌트도 갈 곳이 있다.
 - ⭕ 다섯 이름뿐이라 `utils` · `helpers` 같은 이름이 생길 자리가 없다. `packages/store`
   의 내부 `utils/` 도 `libs/` 로 맞췄다.
-- ❌ **깊이가 늘었다.** `app/lab/_src/components/LabPanel/components/HydrationStamp/` 는
-  여섯 단계다. 파일 하나뿐인 조각도 폴더를 주기 때문인데, 그 대가로 "언제 폴더로
-  승격하나"를 매번 판단하지 않는다.
+- ⭕ **폴더가 곧 복잡도 신호다.** 파일 하나면 파일로, 전용 조각(`hooks` · `libs` ·
+  `constants` · `types` · 하위 컴포넌트)이 생기면 폴더로 승격한다. 지금 폴더인 건
+  `SiteHeaderSlot` · `CartSlot` · `CheckoutSlot` · `LabPanel` · `RemoteComponent` 다섯이고
+  나머지는 파일이다. **승격해도 호출부가 안 바뀐다** — `./components/CartSlot` 이
+  `CartSlot.tsx` 와 `CartSlot/index.ts` 를 똑같이 해석한다.
 - ❌ 라우트 안에서 상대경로가 길어진다(`../../libs/format-time`). `@/` 로 쓰면 짧아지지만
   그러면 그 파일이 라우트 전용이라는 사실이 import 에서 사라진다.
+- ❌ **51차·53차의 "컴포넌트마다 폴더 하나"를 되돌렸다.** `@mfa/ui` 다섯과
+  `mf/components/` 둘이 파일로 돌아갔다. 같은 저장소에 규칙이 두 벌 남는 것보다 낫다고 봤다.
 
 ### 세 자리는 규칙에서 뺀다
 
@@ -2252,8 +2260,10 @@ remote 축으로 가르면 `MfDiagnostics` · `LabPanel` 처럼 remote 에 안 �
 - **`packages/` 를 `shared / domains / widgets` 로 다시 나눈다** — 원본 규칙의 삼분법이다.
   그 "여러 도메인 조합 + 2개 이상 앱" 자리는 이 저장소에서 **런타임 remote 자체**가 맡고
   있고, 그게 이 저장소가 검증하는 대상이다. 평면 배치를 유지하고 대응표만 규칙 파일에 적었다.
-- **파일이 하나인 조각은 폴더 없이 둔다** — 깊이가 줄지만 "언제 폴더로 승격하나"가 매번
-  판단거리가 된다. 규칙이 규칙이려면 판단이 없어야 한다.
+- **파일이 하나여도 폴더를 준다** — 승격 시점을 판단하지 않아도 되지만 내용 없는
+  `index.ts` 가 컴포넌트 수만큼 늘고 깊이가 여섯 단계까지 간다. 처음엔 이쪽을 골랐다가
+  **원본 규칙에 "단순하면 파일 하나"가 추가되면서 뒤집었다.** 승격이 호출부를 건드리지
+  않으므로 판단을 미뤄도 비용이 없다는 게 결정적이었다.
 - **`components/` 를 remote 별(`remote/<remote>/`)로 가른다** — 38차에 적어둔 안.
   remote 에 묶이지 않는 컴포넌트(`MfDiagnostics` · `LabPanel` · `HydrationStamp`)가 갈 곳이
   없고, 소비 범위는 여전히 폴더에 안 적힌다. 축을 소비자로 바꾸면 둘 다 해결된다.
