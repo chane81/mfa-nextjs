@@ -2224,10 +2224,16 @@ remote 축으로 가르면 `MfDiagnostics` · `LabPanel` 처럼 remote 에 안 �
 
 ### 결정
 
-소비 범위를 **폴더 깊이로** 적는다. 외부 규칙 문서를 그대로 들였다 —
-[chane81/fe-monorepo-architecture](https://github.com/chane81/fe-monorepo-architecture)
-의 `fe-monorepo-structure.md`. 이름은 다섯 개(`components / hooks / libs / constants / apis`)
-뿐이고 **모든 깊이에서 같은 뜻**이다.
+소비 범위를 **폴더 깊이로** 적는다. 외부 규칙 문서를
+([chane81/fe-monorepo-architecture](https://github.com/chane81/fe-monorepo-architecture)
+의 `fe-monorepo-structure.md`) **한 번 베껴 와** `.claude/rules/` 에 두고 이 저장소에 맞게
+고쳤다. 이름은 다섯 개(`components / hooks / libs / constants / apis`)뿐이고 **모든 깊이에서
+같은 뜻**이다.
+
+**그 저장소와 이어 두지 않는다.** 심볼릭 링크도, 동기화 검사도, 역방향 PR 도 걸지 않았다 —
+베껴 온 뒤로 `.claude/rules/fe-monorepo-structure.md` 는 **이 저장소가 소유한다.** 양쪽을
+이으면 한쪽 변경이 다른 쪽을 흔들고, 규칙은 저장소마다 사정이 다른데 그 차이를 흡수할
+자리가 없다. 거기서 출발했다는 사실만 파일 머리에 남긴다.
 
 ```
 컴포넌트 내부  →  라우트 `_src/`  →  앱 `src/`  →  `packages/*`

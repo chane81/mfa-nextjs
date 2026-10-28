@@ -2,10 +2,11 @@
 
 ## 2026-10-28 (54차) — 폴더를 "무엇인가" 축에서 "누가 쓰나" 축으로 돌린다
 
-외부 규칙 문서를 그대로 들였다 —
+외부 규칙 문서를 **한 번 베껴 왔다** —
 [chane81/fe-monorepo-architecture](https://github.com/chane81/fe-monorepo-architecture)
-의 `fe-monorepo-structure.md`. `.claude/rules/fe-monorepo-structure.md` 로 복사하고 이
-저장소에서 달라지는 세 자리를 그 안에 적었다. 판단 근거는 [ADR-030](02-architecture/01-decision.md#adr-030--코드는-쓰는-곳-옆에-둔다-콜로케이션).
+의 `fe-monorepo-structure.md`. `.claude/rules/fe-monorepo-structure.md` 로 복사하고 안
+가져온 네 자리를 왜 뺐는지 그 안에 적었다. **그 저장소와 이어 두지는 않았다** — 복사한
+뒤로 이 파일은 이 저장소가 소유한다(ADR-030 의 "그 저장소와 이어 두지 않는다"). 판단 근거는 [ADR-030](02-architecture/01-decision.md#adr-030--코드는-쓰는-곳-옆에-둔다-콜로케이션).
 
 | 무엇               | before                     | after                                                      |
 | ------------------ | -------------------------- | ---------------------------------------------------------- |
