@@ -7,7 +7,9 @@ paths:
 # 폴더 구조 규칙 — 콜로케이션
 
 파일·폴더를 새로 만들거나 옮길 때 이 규칙을 따른다.
-출처: [chane81/fe-monorepo-architecture](https://github.com/chane81/fe-monorepo-architecture/blob/main/.claude/rules/fe-monorepo-structure.md).
+출처: [chane81/fe-monorepo-architecture](https://github.com/chane81/fe-monorepo-architecture)
+— [규칙 파일](https://github.com/chane81/fe-monorepo-architecture/blob/main/.claude/rules/fe-monorepo-structure.md) ·
+[README](https://github.com/chane81/fe-monorepo-architecture/blob/main/README.md)(판단 가이드와 전체 트리).
 이 저장소에 맞춰 달라지는 부분은 마지막 절에 모아 둔다 — 그쪽이 우선한다.
 
 ## 1. 다섯 이름을 모든 깊이에서 반복한다
@@ -18,6 +20,8 @@ components/  hooks/  libs/  constants/  apis/
 
 앱이든 라우트든 컴포넌트 내부든 **같은 뜻**이다. 다른 이름을 새로 만들지 않는다 —
 `utils` · `helpers` · `services` · `common` 금지.
+
+앱·패키지 **루트에만** `types/` 가 하나 더 허용된다(여러 층이 공유하는 타입 선언).
 
 ## 2. 쓰는 곳 가장 가까이에 둔다
 
@@ -44,23 +48,41 @@ components/  hooks/  libs/  constants/  apis/
 안에서만** 적용한다. 이 저장소에서 그 도메인은 `apps/host/src/mf`(런타임 MF)와
 `packages/{contracts,remote-config,store}` 다.
 
-## 4. 이름 규칙
+## 4. 컴포넌트는 단순하면 파일 하나, 복잡해지면 폴더
 
-- 컴포넌트 폴더: `PascalCase/` + `PascalCase.tsx` + `index.ts`(공개 진입점)
-- 하위 조각도 같은 모양이다. 파일이 하나뿐이어도 폴더를 준다 — 승격 시점을 매번
-  판단하지 않기 위해서다
-- 훅: `useXxx.ts` / 이 저장소의 패키지 안에서는 기존 `use-xxx.ts` 를 유지한다(5절)
-- 테스트는 대상 옆에(`Foo.tsx` → `Foo.test.tsx`). 환경은 확장자로 갈린다 —
-  `.test.ts` = node, `.test.tsx` = jsdom
+```
+components/Badge.tsx                  ← 단순. 이게 기본값이다
+components/CartSlot/                  ← 전용 조각이 생긴 뒤
+  CartSlot.tsx · index.ts
+  components/CartSection.tsx
+```
 
-## 5. 경계와 import
+폴더로 바꾸는 **조건**은 그 컴포넌트 전용 `hooks` · `libs` · `constants` · `types` 나
+하위 컴포넌트가 생기는 것이다. 파일이 하나뿐이면 폴더를 주지 않는다.
 
-- 폴더 밖에서는 **`index.ts` 로만** import 한다. 남의 폴더 내부(`X/libs/...`)를 직접
+**import 경로는 둘 다 같다** — `./components/CartSlot` 이 `CartSlot.tsx` 와
+`CartSlot/index.ts` 를 똑같이 해석한다. 그래서 승격해도 호출부가 안 바뀐다.
+
+테스트 파일은 폴더로 바꾸는 조건이 **아니다**. 대상 옆에 평평하게 둔다
+(`Badge.tsx` → `Badge.test.tsx`).
+
+## 5. 이름 규칙
+
+- 컴포넌트: `PascalCase.tsx`. 폴더면 `PascalCase/` + `PascalCase.tsx` + `index.ts`
+- **`index.tsx` 에 컴포넌트를 직접 쓰지 않는다.** `index.ts` 는 재수출만 한다
+- 훅: `useXxx.ts` / 이 저장소의 패키지 안에서는 기존 `use-xxx.ts` 를 유지한다
+  (`packages/store/src/hooks/` — 이름을 바꾸면 `exports` 와 문서가 같이 움직인다)
+- API: `<resource>.api.ts` · `<resource>.types.ts` — `api.ts` 처럼 리소스 없는 이름 금지
+- 테스트는 대상 옆에. 환경은 확장자로 갈린다 — `.test.ts` = node, `.test.tsx` = jsdom
+
+## 6. 경계와 import
+
+- 폴더 밖에서는 **진입점으로만** import 한다. 남의 폴더 내부(`X/libs/...`)를 직접
   가리키지 않는다
 - 부모 라우트의 `_src` 는 하위 라우트가 가져다 써도 된다. 그 반대는 금지
 - 라우트 안에서는 상대경로, 라우트 밖으로 나갈 때는 `@/` alias
 
-## 6. 애매하면 묻는다
+## 7. 애매하면 묻는다
 
 규칙으로 안 떨어지는 배치는 임의로 정하지 않는다. 선택지와 각각의 근거(쓰는 범위,
 코드의 주인)를 제시해 사용자에게 묻는다.
