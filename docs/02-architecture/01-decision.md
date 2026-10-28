@@ -667,8 +667,11 @@
     탭 동기화(`useCartSync`) · 하이드레이션 경계(`useHydrated`) · 경계 전후 값 선택을
     한 훅이 쥔다. remote 세 곳이 같은 네 줄을 복붙하고 있었다. `useCartSync` 는 배럴에서
     내렸다 — 둘 다 공개하면 "탭 동기화를 누가 거는가"가 화면마다 갈린다.
-  - host 의 `CartSlot` · `CheckoutSlot`(`SiteHeaderSlot` 과 같은 꼴). 쿠키를 읽는 서버
-    껍데기가 client 섹션을 감싼다. 페이지에는 **라우트 정책만** 남는다(`instant = false`).
+  - host 의 `CartSlot` · `SiteHeaderSlot`. 쿠키를 읽는 서버 껍데기가 client 섹션을
+    감싸고, 페이지에는 **라우트 정책만** 남는다(`instant = false`).
+    > 54차: `CheckoutSlot` 은 접었다. 소비자가 `/checkout` 하나뿐이라 그 page 가 직접
+    > 읽는다 — 읽는 주체가 라우트라는 이 ADR 의 요지는 그대로다. 껍데기가 필요한 건
+    > 라우트 둘이 쓰거나(`CartSlot`) `<Suspense>` 안쪽이어야 할 때(`SiteHeaderSlot`)다.
 
 - 대가:
   - ❌ `initialLines` 는 그대로 contracts 의 props 계약에 남는다. remote 는 여전히
@@ -1149,6 +1152,10 @@ Vite 플러그인은 명시해야 `mf-manifest.json` 을 내고 Rsbuild 플러�
 
 ## ADR-025 — 테스트 헬퍼는 워크스페이스 패키지로 두되, 배포 경로에서 뺀다
 
+> **54차 개명:** 이 패키지는 지금 `@mfa/libs`(`packages/libs`)다. 배치 규칙이 다섯 이름만
+> 쓰게 하면서 `utils` 라는 이름을 버렸다([ADR-030](#adr-030--코드는-쓰는-곳-옆에-둔다-콜로케이션)).
+> 아래 판단 — "소유자가 없는 범용 유틸의 자리" — 는 그대로다.
+
 **날짜** 2026-09-10 (41차) · **상태** 채택 · **대체** "공유 자산은 루트 `tests/` 에 둔다"(초기 규약)
 
 ### 맥락
@@ -1222,6 +1229,10 @@ pnpm 심링크가 해석을 맡는다.
   안전한 쪽으로 작동한다 — 프로덕션 유틸이 들어와도 배포 판별이 이미 맞다.
 
 ## ADR-026 — `@mfa/utils` 는 범용 패키지다. 테스트 헬퍼는 그 안의 한 갈래일 뿐이다
+
+> **54차 개명:** 이 패키지는 지금 `@mfa/libs`(`packages/libs`)다. 배치 규칙이 다섯 이름만
+> 쓰게 하면서 `utils` 라는 이름을 버렸다([ADR-030](#adr-030--코드는-쓰는-곳-옆에-둔다-콜로케이션)).
+> 아래 판단 — "소유자가 없는 범용 유틸의 자리" — 는 그대로다.
 
 **날짜** 2026-09-18 (42차) · **상태** 채택 · **범위 확정** ADR-025
 
@@ -1646,6 +1657,10 @@ Vite 플러그인은 명시해야 `mf-manifest.json` 을 내고 Rsbuild 플러�
 
 ## ADR-025 — 테스트 헬퍼는 워크스페이스 패키지로 두되, 배포 경로에서 뺀다
 
+> **54차 개명:** 이 패키지는 지금 `@mfa/libs`(`packages/libs`)다. 배치 규칙이 다섯 이름만
+> 쓰게 하면서 `utils` 라는 이름을 버렸다([ADR-030](#adr-030--코드는-쓰는-곳-옆에-둔다-콜로케이션)).
+> 아래 판단 — "소유자가 없는 범용 유틸의 자리" — 는 그대로다.
+
 **날짜** 2026-09-10 (41차) · **상태** 채택 · **대체** "공유 자산은 루트 `tests/` 에 둔다"(초기 규약)
 
 ### 맥락
@@ -1719,6 +1734,10 @@ pnpm 심링크가 해석을 맡는다.
   안전한 쪽으로 작동한다 — 프로덕션 유틸이 들어와도 배포 판별이 이미 맞다.
 
 ## ADR-026 — `@mfa/utils` 는 범용 패키지다. 테스트 헬퍼는 그 안의 한 갈래일 뿐이다
+
+> **54차 개명:** 이 패키지는 지금 `@mfa/libs`(`packages/libs`)다. 배치 규칙이 다섯 이름만
+> 쓰게 하면서 `utils` 라는 이름을 버렸다([ADR-030](#adr-030--코드는-쓰는-곳-옆에-둔다-콜로케이션)).
+> 아래 판단 — "소유자가 없는 범용 유틸의 자리" — 는 그대로다.
 
 **날짜** 2026-09-18 (42차) · **상태** 채택 · **범위 확정** ADR-025
 
@@ -2236,10 +2255,12 @@ remote 축으로 가르면 `MfDiagnostics` · `LabPanel` 처럼 remote 에 안 �
 - ⭕ remote 가 늘어도 한 폴더가 안 쌓인다. 38차의 처방(remote 별로 가른다)보다 축이
   하나 적고, remote 에 안 묶이는 컴포넌트도 갈 곳이 있다.
 - ⭕ 다섯 이름뿐이라 `utils` · `helpers` 같은 이름이 생길 자리가 없다. `packages/store`
-  의 내부 `utils/` 도 `libs/` 로 맞췄다.
+  의 내부 `utils/` 도 `libs/` 로 맞췄고, **`@mfa/utils` 패키지는 `@mfa/libs` 가 됐다**
+  (`packages/utils/` → `packages/libs/`). ADR-025 · ADR-026 의 판단은 그대로이고 이름만
+  바뀐다 — 그쪽에 개명 주석을 달았다.
 - ⭕ **폴더가 곧 복잡도 신호다.** 파일 하나면 파일로, 전용 조각(`hooks` · `libs` ·
   `constants` · `types` · 하위 컴포넌트)이 생기면 폴더로 승격한다. 지금 폴더인 건
-  `SiteHeaderSlot` · `CartSlot` · `CheckoutSlot` · `LabPanel` · `RemoteComponent` 다섯이고
+  `SiteHeaderSlot` · `CartSlot` · `LabPanel` · `RemoteComponent` 넷이고
   나머지는 파일이다. **승격해도 호출부가 안 바뀐다** — `./components/CartSlot` 이
   `CartSlot.tsx` 와 `CartSlot/index.ts` 를 똑같이 해석한다.
 - ❌ 라우트 안에서 상대경로가 길어진다(`../../libs/format-time`). `@/` 로 쓰면 짧아지지만

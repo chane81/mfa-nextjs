@@ -29,8 +29,8 @@ PR 의 "확인 부탁"으로 올렸는데, 원본 저장소에 규칙이 추가�
 | `mf/components/{RemoteBoundary,RemoteVersionSync}`             | 파일 — 53차를 되돌림 |
 | host 컴포넌트 아홉 · remote 둘 · `RemoteComponent` 하위 둘     | 파일                 |
 
-폴더로 **남은** 건 전용 조각을 가진 다섯 — `SiteHeaderSlot` · `CartSlot` · `CheckoutSlot` ·
-`LabPanel` · `RemoteComponent`.
+폴더로 **남은** 건 전용 조각을 가진 넷 — `SiteHeaderSlot` · `CartSlot` · `LabPanel` ·
+`RemoteComponent`.
 
 되돌리는 비용이 거의 0 이었던 이유: **`./components/X` 가 `X.tsx` 와 `X/index.ts` 를 똑같이
 해석한다.** 20개 폴더를 평탄화했는데 고친 import 는 상대 깊이 7자리뿐이고 호출부는 한 줄도
@@ -38,17 +38,17 @@ PR 의 "확인 부탁"으로 올렸는데, 원본 저장소에 규칙이 추가�
 
 ### 어디로 갔나
 
-| 옮긴 것                                       | 어디로                                       | 왜                                                |
-| --------------------------------------------- | -------------------------------------------- | ------------------------------------------------- |
-| `CheckoutSlot` · `CheckoutSection`            | `app/checkout/_src/components/CheckoutSlot/` | `/checkout` 만 쓴다                               |
-| `RelatedProductsSection`                      | `app/products/[id]/_src/components/`         | 그 라우트만                                       |
-| `MfDiagnostics`                               | `app/debug/_src/components/`                 | `/debug` 만                                       |
-| `LabPanel` · `HydrationStamp` · `modes.ts`    | `app/lab/_src/{components,constants}/`       | `/lab/*` 넷이 쓴다 — 부모 `_src`                  |
-| `format-time` · `render-clock`                | `app/lab/_src/libs/`                         | 소비자가 lab 안에만 있다                          |
-| `MfWarmup`                                    | `app/internal/mf-warm/_src/components/`      | 그 라우트 전용. `lab/` 과 무관이었다              |
-| `SiteHeaderSlot` · `CartSlot` · `CatalogSlot` | `src/components/<이름>/`                     | 두 라우트 이상이 쓴다                             |
-| `CatalogSection`                              | `src/components/CatalogSection/`             | 주인이 둘(`CatalogSlot` · `LabPanel`) — 중첩 불가 |
-| `cart-cookie` · `mf-secret`                   | `src/libs/`                                  | 라우트를 넘어 쓰인다                              |
+| 옮긴 것                                       | 어디로                                  | 왜                                                |
+| --------------------------------------------- | --------------------------------------- | ------------------------------------------------- |
+| `CheckoutSection`                             | `app/checkout/_src/components/`         | `/checkout` 만 쓴다. 껍데기는 page 가 흡수(아래)  |
+| `RelatedProductsSection`                      | `app/products/[id]/_src/components/`    | 그 라우트만                                       |
+| `MfDiagnostics`                               | `app/debug/_src/components/`            | `/debug` 만                                       |
+| `LabPanel` · `HydrationStamp` · `modes.ts`    | `app/lab/_src/{components,constants}/`  | `/lab/*` 넷이 쓴다 — 부모 `_src`                  |
+| `format-time` · `render-clock`                | `app/lab/_src/libs/`                    | 소비자가 lab 안에만 있다                          |
+| `MfWarmup`                                    | `app/internal/mf-warm/_src/components/` | 그 라우트 전용. `lab/` 과 무관이었다              |
+| `SiteHeaderSlot` · `CartSlot` · `CatalogSlot` | `src/components/<이름>/`                | 두 라우트 이상이 쓴다                             |
+| `CatalogSection`                              | `src/components/CatalogSection/`        | 주인이 둘(`CatalogSlot` · `LabPanel`) — 중첩 불가 |
+| `cart-cookie` · `mf-secret`                   | `src/libs/`                             | 라우트를 넘어 쓰인다                              |
 
 `MfWarmup` 이 `components/lab/` 에 있던 건 "lab 페이지에서 쓰니까" 였는데 그건 소유가
 아니다. 규칙을 적용하자 형제로 갈라졌다.
@@ -88,12 +88,43 @@ Next 16.4 공식 문서 `app/getting-started/project-structure` 의 "Private fol
 걸린다는 생각을 안 했다. 조건을 "props 또는 `src` 배치"로 넓혔다 —
 **좁게 적힌 조건은 밟기 전에는 맞아 보인다.**
 
+### 쿠키를 읽는 껍데기가 필요한 조건
+
+`CheckoutSlot` 을 **접어서 `app/checkout/page.tsx` 안으로 넣었다.** 본문이 두 줄이었고
+주석에 "지금은 부르는 라우트가 하나뿐이라 중복이 없지만 자리를 맞춰 둔다"고 적혀 있었다 —
+추측으로 만든 층이다. page 도 서버 컴포넌트라 쿠키를 직접 읽으면 된다.
+
+나머지 둘은 **접으면 틀린다.**
+
+| Slot             | 접히나    | 왜                                                                                  |
+| ---------------- | --------- | ----------------------------------------------------------------------------------- |
+| `CheckoutSlot`   | 접었다    | 소비자가 `/checkout` 하나. page 가 서버 컴포넌트다                                  |
+| `CartSlot`       | 못 접는다 | `/` · `/cart` 둘이 쓰고 `compact` prop 을 받는다                                    |
+| `SiteHeaderSlot` | 못 접는다 | layout 본문에서 읽으면 `<Suspense>` **밖**이 되어 모든 라우트가 프리렌더에서 빠진다 |
+
+조건이 하나가 아니라 둘이다 — **라우트 둘 이상이 쓰거나, 경계 안쪽이어야 하거나.**
+ADR-020 의 요지("읽는 주체가 라우트")는 안 바뀐다. `/checkout` 의 캐시 성질도 그대로다
+(빌드 라우트 목록에서 `ƒ /checkout`).
+
+### `@mfa/utils` → `@mfa/libs`
+
+금지된 이름이 패키지 이름에도 남아 있을 이유가 없어서 개명했다(`packages/utils/` →
+`packages/libs/`). 소비처 45파일 + 세 Dockerfile 의 `COPY` + `vitest.config.ts` alias +
+`turbo.json` 의 `inputs` 가 같이 움직인다.
+
+⚠️ **Dockerfile 세 개가 `COPY packages/utils/package.json` 을 들고 있었다.** 빠뜨리면
+`pnpm install --frozen-lockfile` 이 이미지 안에서 죽는다. `docker-context.test.ts` 가
+그 줄을 대조하므로 `pnpm test` 가 잡는다 — 그래서 조용한 자리는 아니다.
+
+`style/` · `test/` 같은 그 안의 갈래 이름은 그대로 뒀다. 그건 `exports` 서브패스
+(`@mfa/libs/test/globals`)로 공개된 **API** 이고, 규칙이 금지하는 건 코드 배치 폴더 이름이다.
+ADR-025 · ADR-026 의 판단은 안 바뀌어서 그쪽엔 개명 주석만 달았다.
+
 ### 남은 것
 
 - **`packages/` 삼분법**(`shared / domains / widgets`)은 적용하지 않았다. 그 "여러 도메인
   조합 + 2개 이상 앱" 자리를 이 저장소에서는 런타임 remote 가 맡는다 — 대응표만 규칙
-  파일에 적었다. `@mfa/utils` 라는 패키지 **이름**도 그대로 뒀다(규칙이 금지하는 건
-  폴더 이름이다).
+  파일에 적었다.
 - ⚠️ `02-architecture/01-decision.md` 에 **ADR-020~027 이 두 벌 있다**(883줄대 · 1380줄대).
   뒤쪽이 낡은 사본이다 — `peerDependencies` 를 카탈로그로 나눈다는 뒤집힌 판단이 거기
   남아 있다. 이번 작업에서 만든 게 아니라 발견한 것이고, 지우지 않았다.

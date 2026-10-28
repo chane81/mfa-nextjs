@@ -49,7 +49,7 @@ packages/store/src/cart/cookie-codec.test.ts   ← 바로 옆
 tests/
   setup/dom.ts                  jest-dom 매처 + RTL cleanup (러너 설정이다 — vitest.config.ts 가 가리킨다)
 
-packages/utils/                 @mfa/utils — 테스트 헬퍼 패키지 (빌드 없음)
+packages/libs/                  @mfa/libs — 소유자 없는 범용 유틸 (빌드 없음)
   src/test/globals.ts           globalThis 싱글턴 레지스트리 정리
   src/test/cookies.ts           jsdom document.cookie 비우기
   src/test/http.ts              가짜 req/res
@@ -60,7 +60,7 @@ packages/utils/                 @mfa/utils — 테스트 헬퍼 패키지 (빌�
 설정 파일이라 `vitest.config.ts` 옆에 있는 게 맞고, 헬퍼는 여러 패키지의 테스트가
 import 하는 **라이브러리**라 의존성이 `package.json` 에 적히는 게 맞다(ADR-025).
 
-테스트 파일에서는 `@mfa/utils/test/…` 로 부른다. 배럴이 없다 — 서브패스마다 필요한
+테스트 파일에서는 `@mfa/libs/test/…` 로 부른다. 배럴이 없다 — 서브패스마다 필요한
 환경이 다르기 때문이다(`test/cookies` 는 DOM, `test/http` · `test/signing` 은 node).
 배럴을 두면 DOM 없는 패키지가 `test/globals` 하나를 쓰려다 `document` 를 만난다.
 
@@ -78,7 +78,7 @@ import 하는 **라이브러리**라 의존성이 `package.json` 에 적히는 �
 넣지 못해 `@mfa/*` 를 통째로 못 찾는다(`ts(2307)`) — 러너는 멀쩡히 도는데
 에디터만 빨갛게 되는 상태다. 한 번 그렇게 만들었다가 되돌렸다.
 
-`rootDir` 도 `tsconfig.build.json` 쪽이다. 검사 프로그램에 두면 테스트가 `@mfa/utils` 의
+`rootDir` 도 `tsconfig.build.json` 쪽이다. 검사 프로그램에 두면 테스트가 `@mfa/libs` 의
 헬퍼를 import 하는 순간 `TS6059: not under rootDir` 로 죽는다.
 
 emit 하지 않는 나머지(host · remote 둘 · remote-config)는 파일 하나로 충분하다.
@@ -152,7 +152,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
 - [x] 25. `packages/store/src/hooks/use-revalidate-on-focus.ts` — visibility 가드 / **ref latest** / cleanup
 - [x] 26. `use-hydrated.ts` · `use-cart-lines.ts` — `renderToString` SSR 경로 / 클라이언트 전환
 - [x] 27. `packages/store/src/cart/use-cart-sync.ts` — 기준선 3-상태 / 동일 원문 스킵 / **정규화 후 reseed**
-- [x] 28. `packages/ui/src/<컴포넌트>/`(소스와 `*.test.tsx` 가 한 폴더) — `--hue` 변수(통로는 `@mfa/utils/style/hue` 의
+- [x] 28. `packages/ui/src/<컴포넌트>.tsx`(`*.test.tsx` 가 그 옆) — `--hue` 변수(통로는 `@mfa/libs/style/hue` 의
       `hueVar` 다 — 감추는 건 함수가 아니라 **변수 이름이 계약이라는 사실**이다) /
       조건부 렌더 / variant 클래스 매핑
 - [x] 29. `apps/host/src/mf/components/RemoteBoundary.tsx` — 자식 throw → `ErrorBox` 내용.
@@ -214,7 +214,7 @@ turbo 태스크에 `^build` 를 걸 필요도 없다.
       (파일명이 어긋나도 정적 서버 폴백이 200 이라 헬스체크가 통과해 버린다), 그리고
       공유 엔트리포인트에 **포트 폴백이 없는지**(기본값은 곧 어느 한쪽의 포트다 — J-2)
 - [x] 45. `scripts/deploy-targets.test.ts` 의 "공유 코드는 전부 배포한다" 에
-      `packages/utils/` 를 넣었다(41차) — 그 패키지는 **테스트 헬퍼뿐이라** 배포에서
+      `packages/libs/` 를 넣었다(41차 · 당시 이름은 `packages/utils`) — 그 패키지는 **테스트 헬퍼뿐이라** 배포에서
       빼고 싶어지는 자리다. 빼면 정반대 사고가 열린다: 거기 프로덕션 유틸이 하나
       들어오는 순간 배포가 그 변경을 **안 물고 나가고**, 증상은 "고쳤는데 반영이
       안 된다" 뿐이다. 통짜 규칙을 지키는 쪽이 틀려도 무해하다(ADR-025)
@@ -257,7 +257,7 @@ remote 이름인지. 그 파일은 **아무것도 export 하지 않는다** — 
 | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/host/src/mf/components/RemoteVersionSync.tsx` | `'use cache'` 는 Next 컴파일러가 변환하는 디렉티브다. 변환 없이 실행하면 `cacheLife`/`cacheTag` 가 캐시 스코프 밖 호출로 throw. **e2e 영역** |
 | 실제 MF 런타임 로딩 · host 프리렌더                 | `pnpm build` 가 이미 계약 테스트로 커버한다 (CI `build` job)                                                                                 |
-| `scripts/gen-signing-key.ts`                        | 로직이 없다. 키 형식만 `@mfa/utils/test/signing` 으로 옮겨 픽스처 생성에 쓴다                                                                |
+| `scripts/gen-signing-key.ts`                        | 로직이 없다. 키 형식만 `@mfa/libs/test/signing` 으로 옮겨 픽스처 생성에 쓴다                                                                 |
 | `scripts/mf-build-version.ts`                       | `t${Date.now().toString(36)}` 한 줄                                                                                                          |
 | 브라우저 실제 동작                                  | e2e 범위                                                                                                                                     |
 
@@ -271,7 +271,7 @@ remote 이름인지. 그 파일은 **아무것도 export 하지 않는다** — 
    이 모듈은 `versions/server` · `loader/server` · `loader` · `RemoteComponent` 가 전부 전이 의존한다.
 
 2. **globalThis 오염** — `globalCell`(host) 과 `globalSingleton`(store) 은 `Symbol.for` 레지스트리라
-   `vi.resetModules()` 로 안 지워진다. `@mfa/utils/test/globals` 의 `clearGlobalRegistries()` 를
+   `vi.resetModules()` 로 안 지워진다. `@mfa/libs/test/globals` 의 `clearGlobalRegistries()` 를
    `beforeEach` 에서 부른다.
 
 3. **모듈 스코프 가변 상태** — `loader/server.ts` 의 `bundleCache`, `loader/index.ts` 의 `clientCache` ·
