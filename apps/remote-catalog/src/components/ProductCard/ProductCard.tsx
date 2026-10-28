@@ -2,9 +2,9 @@ import { formatKRW, type Product } from '@mfa/contracts';
 import { MAX_CART_QUANTITY, useCart, useHydrated } from '@mfa/store';
 import { Badge, Button } from '@mfa/ui';
 
-import { ORIGIN_HUE } from '../origin';
+import { ORIGIN_HUE } from '../../origin';
 
-import { StockBadge } from './StockBadge';
+import { StockBadge } from '../StockBadge';
 
 export interface ProductCardProps {
   product: Product;
