@@ -10,7 +10,7 @@ import { type StoreApi } from 'zustand/vanilla';
 
 import { type CartLine, type Product } from '@mfa/contracts';
 
-import { globalSingleton } from '../utils';
+import { globalSingleton } from '../libs';
 
 import { cartCookieStorage, CART_STORAGE_KEY } from './cookie-storage';
 
