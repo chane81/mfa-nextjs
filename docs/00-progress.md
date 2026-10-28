@@ -103,8 +103,23 @@ Next 16.4 공식 문서 `app/getting-started/project-structure` 의 "Private fol
 | `SiteHeaderSlot` | 못 접는다 | layout 본문에서 읽으면 `<Suspense>` **밖**이 되어 모든 라우트가 프리렌더에서 빠진다 |
 
 조건이 하나가 아니라 둘이다 — **라우트 둘 이상이 쓰거나, 경계 안쪽이어야 하거나.**
+이 기준을 규칙 8절로 올렸다.
 ADR-020 의 요지("읽는 주체가 라우트")는 안 바뀐다. `/checkout` 의 캐시 성질도 그대로다
 (빌드 라우트 목록에서 `ƒ /checkout`).
+
+### 라우트 파일에 남아 있던 컴포넌트
+
+`app/products/[id]/page.tsx` 가 `ProductDetail` 을 **그 파일 안에** 선언하고 있었다.
+라우트 전용 컴포넌트니 `_src/components/ProductDetail.tsx` 로 내렸다. page 에는 셸과
+`<Suspense>` 만 남는다. `◐ /products/[id]`(Partial Prerender)는 그대로다.
+
+`/lab/{ssr,isr,cache}` 의 `DynamicPanel` · `IsrEquivalent` · `CachedShell` **셋은 남겼다.**
+그 함수들은 UI 를 조립하지 않는다 — `'use cache'` · `connection()` · `cacheLife()` 를
+지니는 것이 전부고, 본문은 `LabPanel` 한 줄 위임이다. 떼어내면 **라우트를 읽어도 그
+라우트의 캐시 성질을 알 수 없다**. 세 페이지를 나란히 놓고 정책만 비교하는 게 그 실험의
+형태다(`docs/04-experiments/03-cache-modes.md`).
+
+가른 기준을 규칙 7절로 올렸다 — **UI 를 조립하면 내리고, 디렉티브만 지니면 남긴다.**
 
 ### `@mfa/utils` → `@mfa/libs`
 
