@@ -54,7 +54,7 @@
   `@mfa/contracts` 가 각 번들에 중복 포함되면 장바구니 상태가 갈라진다.
 - 결정: 스토어 **인스턴스**를 realm 전역에 한 번만 심는다.
   MF `shared` 설정이 어긋나도 상태는 하나로 유지된다.
-  (구현은 `packages/store/src/utils/global-singleton.ts` — `Symbol.for` 레지스트리 한 개)
+  (구현은 `packages/store/src/libs/global-singleton.ts` — `Symbol.for` 레지스트리 한 개)
 - 결과:
   - ⭕ MF 설정 실수에 강건하다. Multi-Zones 쪽에서도 `localStorage` 로 이어진다.
   - ⭕ 구독 방식이 React 버전에 독립적이다.
@@ -277,7 +277,7 @@
   src/cart/create-store.ts       스토어 + globalSingleton + useCart ('use client')
   src/cart/totals.ts             cartTotals — 셀렉터가 아닌 순수 함수
   src/cart/index.ts              도메인 공개 표면
-  src/utils/global-singleton.ts  (내부)  번들 경계를 넘는 인스턴스 1개 보장
+  src/libs/global-singleton.ts   (내부)  번들 경계를 넘는 인스턴스 1개 보장
   src/index.ts                   → "@mfa/store"  도메인 index 들을 모은다
   ```
 
@@ -608,7 +608,7 @@
 
 - 대가:
   - ❌ host 가 `@mfa/store` 에 의존하게 됐다. 이 의존이 없던 유일한 앱이었다. 다만
-    닿는 표면은 순수 함수 진입점 하나(`apps/host/src/lib/cart-cookie.ts` 한 파일)고,
+    닿는 표면은 순수 함수 진입점 하나(`apps/host/src/libs/cart-cookie.ts` 한 파일)고,
     브라우저 번들은 위 실측대로 변화가 없다.
   - ❌ 표면이 둘이 됐다(`index.ts` · `server.ts`). 진입점은 하나지만 "무엇이 서버에
     안전한가"를 **사람이 유지해야 한다.** 누가 `server.ts` 에 `'use client'` 모듈을
@@ -1005,7 +1005,7 @@ CatalogSection  category · onCategoryChange 를 받는다  홈 · /lab/* 넷이
 remote 의 `shared` 에는 `react` · `react-dom` 둘뿐이다. `@mfa/store` 와 `@mfa/ui` 는
 각 remote 번들에 **복제**된다. remote 가 늘면 전송량도 그만큼 는다.
 
-런타임 정합성은 이미 지켜지고 있다 — `packages/store/src/utils/global-singleton.ts` 가
+런타임 정합성은 이미 지켜지고 있다 — `packages/store/src/libs/global-singleton.ts` 가
 스토어 인스턴스를 `globalThis` 에 걸어두므로 복제본이 몇 벌이든 상태는 하나다.
 그래서 지금 깨지는 건 없고, 남는 건 payload 와 **버전 스큐 표면**이다.
 
@@ -1502,7 +1502,7 @@ CatalogSection  category · onCategoryChange 를 받는다  홈 · /lab/* 넷이
 remote 의 `shared` 에는 `react` · `react-dom` 둘뿐이다. `@mfa/store` 와 `@mfa/ui` 는
 각 remote 번들에 **복제**된다. remote 가 늘면 전송량도 그만큼 는다.
 
-런타임 정합성은 이미 지켜지고 있다 — `packages/store/src/utils/global-singleton.ts` 가
+런타임 정합성은 이미 지켜지고 있다 — `packages/store/src/libs/global-singleton.ts` 가
 스토어 인스턴스를 `globalThis` 에 걸어두므로 복제본이 몇 벌이든 상태는 하나다.
 그래서 지금 깨지는 건 없고, 남는 건 payload 와 **버전 스큐 표면**이다.
 
@@ -2182,3 +2182,78 @@ React 19.2.8 기준. `use` 는 19.0 부터의 안정 API다.
   지적한 구조는 그대로 남는다. `use()` 전환이 빌드까지 통과하는 걸 확인한 뒤 이쪽을 접었다.
 - **`MODULE_IDS` 로 모든 remote 의 lazy 를 미리 만든다** — 목록은 컴파일 타임에 유한하지만
   버전 · `reloadKey` 가 키에 들어가므로 결국 런타임 생성이 남는다. 문제를 못 없앤다.
+
+## ADR-030 — 코드는 쓰는 곳 옆에 둔다 (콜로케이션)
+
+**날짜** 2026-10-28 (54차) · **상태** 채택 · **관련** ADR-020(Slot ↔ Section), ADR-026,
+규칙 파일 `.claude/rules/fe-monorepo-structure.md`
+
+### 맥락
+
+`apps/host/src/` 가 **역할축 평면**이었다 — `components/` 14파일, `lib/` 4파일이 각자 한
+층에 나란히 있었다. 그 배치는 "이게 무엇인가"는 알려주지만 **"누가 쓰나"는 안 알려준다.**
+
+실제로 그게 비용이 된 자리가 둘 있었다.
+
+| 자리                                     | 무슨 일이 있었나                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------ |
+| `CatalogSection` 에 `useSearchParams`    | 홈만 쓰는 줄 알고 넣었는데 `LabPanel` 을 거쳐 `/lab/*` 셋이 같이 썼다(I-9)     |
+| `components/` 를 remote 별로 가르자는 안 | 38차 "다음에 할 것" 에 남아 있었다 — remote 가 늘면 한 폴더에 수십 개가 쌓인다 |
+
+앞은 **소비자 범위를 폴더가 안 적어둔 탓**이고, 뒤는 그 처방을 remote 축으로 잡은 것이다.
+remote 축으로 가르면 `MfDiagnostics` · `LabPanel` 처럼 remote 에 안 묶이는 것이 갈 곳이 없다.
+
+### 결정
+
+소비 범위를 **폴더 깊이로** 적는다. 외부 규칙 문서를 그대로 들였다 —
+[chane81/fe-monorepo-architecture](https://github.com/chane81/fe-monorepo-architecture)
+의 `fe-monorepo-structure.md`. 이름은 다섯 개(`components / hooks / libs / constants / apis`)
+뿐이고 **모든 깊이에서 같은 뜻**이다.
+
+```
+컴포넌트 내부  →  라우트 `_src/`  →  앱 `src/`  →  `packages/*`
+```
+
+| 쓰는 범위             | 어디로                    | 이 저장소의 예                           |
+| --------------------- | ------------------------- | ---------------------------------------- |
+| 그 컴포넌트만         | `<Component>/components/` | `CartSlot/components/CartSection/`       |
+| 라우트 하나(와 하위)  | `app/<route>/_src/`       | `app/lab/_src/components/LabPanel/`      |
+| 같은 앱의 여러 라우트 | `src/`                    | `src/components/CartSlot/`(홈 · `/cart`) |
+| 2개 이상 앱           | `packages/*`              | `@mfa/ui` · `@mfa/store`                 |
+
+`_src` 는 밑줄로 시작해 **Next 라우팅에서 빠진다**(Next 16.4 공식 문서
+`app/getting-started/project-structure` 의 Private folders — 폴더와 하위 전체가 제외된다).
+빌드 라우트 목록이 이사 전후로 동일한 것으로 확인했다.
+
+### 결과
+
+- ⭕ **`CatalogSection` 류의 사고가 구조로 막힌다.** 두 라우트가 쓰는 것은 `src/` 에
+  있고, 한 라우트만 쓰는 것은 그 라우트 안에 있다 — 폴더를 보면 범위를 안다.
+- ⭕ remote 가 늘어도 한 폴더가 안 쌓인다. 38차의 처방(remote 별로 가른다)보다 축이
+  하나 적고, remote 에 안 묶이는 컴포넌트도 갈 곳이 있다.
+- ⭕ 다섯 이름뿐이라 `utils` · `helpers` 같은 이름이 생길 자리가 없다. `packages/store`
+  의 내부 `utils/` 도 `libs/` 로 맞췄다.
+- ❌ **깊이가 늘었다.** `app/lab/_src/components/LabPanel/components/HydrationStamp/` 는
+  여섯 단계다. 파일 하나뿐인 조각도 폴더를 주기 때문인데, 그 대가로 "언제 폴더로
+  승격하나"를 매번 판단하지 않는다.
+- ❌ 라우트 안에서 상대경로가 길어진다(`../../libs/format-time`). `@/` 로 쓰면 짧아지지만
+  그러면 그 파일이 라우트 전용이라는 사실이 import 에서 사라진다.
+
+### 세 자리는 규칙에서 뺀다
+
+| 뺀 것                | 왜                                                                                                         |
+| -------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `app/_src/`          | 모든 라우트가 `app/` 의 자식이라 앱 전역과 **구별되지 않는다.** 이름이 둘인데 뜻이 하나가 된다             |
+| `mf/` 의 여섯 레이어 | `loader` · `versions` · `trust` · `state` 를 `libs/` 로 뭉개면 의존 방향을 읽을 수 없다(06-host-mf-layout) |
+| remote 의 `exposes/` | MF 빌드 설정이 직접 가리키는 **계약 경계**다. 폴더로 감싸면 host 의 `loadRemote()` 키와 어긋난다           |
+
+### 기각한 대안
+
+- **`packages/` 를 `shared / domains / widgets` 로 다시 나눈다** — 원본 규칙의 삼분법이다.
+  그 "여러 도메인 조합 + 2개 이상 앱" 자리는 이 저장소에서 **런타임 remote 자체**가 맡고
+  있고, 그게 이 저장소가 검증하는 대상이다. 평면 배치를 유지하고 대응표만 규칙 파일에 적었다.
+- **파일이 하나인 조각은 폴더 없이 둔다** — 깊이가 줄지만 "언제 폴더로 승격하나"가 매번
+  판단거리가 된다. 규칙이 규칙이려면 판단이 없어야 한다.
+- **`components/` 를 remote 별(`remote/<remote>/`)로 가른다** — 38차에 적어둔 안.
+  remote 에 묶이지 않는 컴포넌트(`MfDiagnostics` · `LabPanel` · `HydrationStamp`)가 갈 곳이
+  없고, 소비 범위는 여전히 폴더에 안 적힌다. 축을 소비자로 바꾸면 둘 다 해결된다.

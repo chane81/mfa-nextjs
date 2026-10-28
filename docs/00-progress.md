@@ -1,5 +1,76 @@
 # 진행 상황
 
+## 2026-10-28 (54차) — 폴더를 "무엇인가" 축에서 "누가 쓰나" 축으로 돌린다
+
+외부 규칙 문서를 그대로 들였다 —
+[chane81/fe-monorepo-architecture](https://github.com/chane81/fe-monorepo-architecture)
+의 `fe-monorepo-structure.md`. `.claude/rules/fe-monorepo-structure.md` 로 복사하고 이
+저장소에서 달라지는 세 자리를 그 안에 적었다. 판단 근거는 [ADR-030](02-architecture/01-decision.md#adr-030--코드는-쓰는-곳-옆에-둔다-콜로케이션).
+
+| 무엇               | before                     | after                                                      |
+| ------------------ | -------------------------- | ---------------------------------------------------------- |
+| 축                 | 역할(`components/` `lib/`) | **소비 범위**(컴포넌트 → 라우트 → 앱 → 패키지)             |
+| host `components/` | 평면 14파일                | 폴더 6 + 라우트 `_src/` 안으로 7                           |
+| host `lib/`        | 평면 4파일                 | `libs/` 2 + `app/lab/_src/libs/` 2                         |
+| 이름               | `components` `lib` `utils` | 다섯 개만 — `components / hooks / libs / constants / apis` |
+
+이사는 **38차에 적어둔 "`components/` 를 remote 별로 가른다"를 대체한다.** remote 축으로
+가르면 remote 에 묶이지 않는 `MfDiagnostics` · `LabPanel` 이 갈 곳이 없다.
+
+### 어디로 갔나
+
+| 옮긴 것                                       | 어디로                                       | 왜                                                |
+| --------------------------------------------- | -------------------------------------------- | ------------------------------------------------- |
+| `CheckoutSlot` · `CheckoutSection`            | `app/checkout/_src/components/CheckoutSlot/` | `/checkout` 만 쓴다                               |
+| `RelatedProductsSection`                      | `app/products/[id]/_src/components/`         | 그 라우트만                                       |
+| `MfDiagnostics`                               | `app/debug/_src/components/`                 | `/debug` 만                                       |
+| `LabPanel` · `HydrationStamp` · `modes.ts`    | `app/lab/_src/{components,constants}/`       | `/lab/*` 넷이 쓴다 — 부모 `_src`                  |
+| `format-time` · `render-clock`                | `app/lab/_src/libs/`                         | 소비자가 lab 안에만 있다                          |
+| `MfWarmup`                                    | `app/internal/mf-warm/_src/components/`      | 그 라우트 전용. `lab/` 과 무관이었다              |
+| `SiteHeaderSlot` · `CartSlot` · `CatalogSlot` | `src/components/<이름>/`                     | 두 라우트 이상이 쓴다                             |
+| `CatalogSection`                              | `src/components/CatalogSection/`             | 주인이 둘(`CatalogSlot` · `LabPanel`) — 중첩 불가 |
+| `cart-cookie` · `mf-secret`                   | `src/libs/`                                  | 라우트를 넘어 쓰인다                              |
+
+`MfWarmup` 이 `components/lab/` 에 있던 건 "lab 페이지에서 쓰니까" 였는데 그건 소유가
+아니다. 규칙을 적용하자 형제로 갈라졌다.
+
+### `_src` 는 라우팅에서 빠진다
+
+밑줄로 시작하는 폴더는 **그 폴더와 하위 전체가** Next 라우팅 대상에서 제외된다(근거:
+Next 16.4 공식 문서 `app/getting-started/project-structure` 의 "Private folders").
+`pnpm build` 의 라우트 목록이 이사 전후로 동일한 것으로 확인했다 — `/checkout/_src`
+같은 항목은 생기지 않는다.
+
+### 규칙에서 뺀 세 자리
+
+| 뺀 것                | 왜                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------ |
+| `app/_src/`          | 모든 라우트가 `app/` 의 자식이라 앱 전역과 구별되지 않는다                           |
+| `mf/` 의 여섯 레이어 | `loader` · `versions` · `trust` · `state` 를 `libs/` 로 뭉개면 의존 방향이 안 보인다 |
+| remote 의 `exposes/` | MF 빌드 설정이 직접 가리키는 계약 경계다                                             |
+
+`mf/components/RemoteComponent/` **안쪽**에는 적용했다 — `libs/module-cache.ts` ·
+`components/RemoteModuleView/` · `components/RemoteStyleLink/`. `'use client'` 디렉티브는
+파일을 따라 같이 내려갔다(53차 P-1).
+
+### 검증
+
+`format:check` · `lint` · `typecheck`(13/13) · `test`(56파일 · 706) · `build`(6/6, host
+프리렌더가 remote SSR 번들 실제 실행). 테스트 수는 그대로다 — 파일만 옮겼다.
+
+### 남은 것
+
+- **`packages/` 삼분법**(`shared / domains / widgets`)은 적용하지 않았다. 그 "여러 도메인
+  조합 + 2개 이상 앱" 자리를 이 저장소에서는 런타임 remote 가 맡는다 — 대응표만 규칙
+  파일에 적었다. `@mfa/utils` 라는 패키지 **이름**도 그대로 뒀다(규칙이 금지하는 건
+  폴더 이름이다).
+- `packages/contracts/src/generated/@mf-types/catalog/compiled-types/src/components/ProductCard.d.ts`
+  는 **낡은 경로로 남아 있다.** 아무도 import 하지 않는 고아 파일이고, 다음 `pnpm mf:types`
+  에서 새 경로로 바뀐다.
+- ⚠️ `02-architecture/01-decision.md` 에 **ADR-020~027 이 두 벌 있다**(883줄대 · 1380줄대).
+  뒤쪽이 낡은 사본이다 — `peerDependencies` 를 카탈로그로 나눈다는 뒤집힌 판단이 거기
+  남아 있다. 이번 작업에서 만든 게 아니라 발견한 것이고, 지우지 않았다.
+
 ## 2026-10-27 (53차) — host 의 MF 컴포넌트를 폴더 하나씩으로 나눈다
 
 `apps/host/src/mf/components/` 가 평면이었다(소스 3 + 테스트 2). 51차에 `@mfa/ui` 가 쓴

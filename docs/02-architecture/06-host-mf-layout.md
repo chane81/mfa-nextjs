@@ -51,6 +51,12 @@ components/  →  loader/  →  versions/  →  trust/  →  config/
 - 역방향 화살표가 없다. `trust/` 가 `versions/` 를 부르거나 `config/` 가 `loader/` 를
   부르는 코드가 생기면 그건 그 값이 잘못된 폴더에 있다는 신호다.
 
+**여섯 이름은 저장소 전역 배치 규칙의 예외다.** 그 규칙은 다섯 이름
+(`components / hooks / libs / constants / apis`)만 쓰라고 하지만, `loader` · `versions` ·
+`trust` · `state` 를 `libs/` 로 뭉개면 위 화살표를 읽을 수 없다 — 규칙의 "코드의 주인을
+먼저 본다"(`.claude/rules/fe-monorepo-structure.md`)가 이 경우다. 폴더 **안쪽**에는
+다섯 이름을 적용한다.
+
 ## 26차에 같이 정리한 중복
 
 폴더를 나누면서 **같은 것이 두 곳에 적혀 있던 자리**를 걷어냈다.
@@ -106,19 +112,22 @@ Client Component but none of its parents are marked with "use client" …
 | `mf/RemoteVersionSync.tsx` | `mf/components/RemoteVersionSync/` |
 | `mf/versions/*`            | 그대로                             |
 
-53차에 `components/` 안이 한 번 더 나뉘었다 — 아래 절.
+53차에 `components/` 안이 한 번 더 나뉘고, 54차에 그 안쪽이 다시 나뉘었다 — 아래 절.
 
 ## `components/` 는 컴포넌트마다 폴더 하나다
 
 `@mfa/ui` 가 51차에 쓴 규칙과 같다: `<이름>/<이름>.tsx` 가 본체, 같은 폴더의 `index.ts` 가
 재수출, 테스트도 그 옆. 호출부 경로(`@/mf/components/RemoteComponent`)는 그대로다.
 
-| 파일                                   | 무엇                                                      |
-| -------------------------------------- | --------------------------------------------------------- |
-| `RemoteComponent/RemoteComponent.tsx`  | 경계 · 스타일시트 · `Suspense` 를 조립하는 공개 진입점    |
-| `RemoteComponent/module-cache.ts`      | 적재 캐시와 키 규칙(`remoteCacheKey`). `MfWarmup` 도 쓴다 |
-| `RemoteComponent/RemoteModuleView.tsx` | `use(promise)` 로 적재된 모듈을 그리는 고정 컴포넌트      |
-| `RemoteComponent/RemoteStyleLink.tsx`  | remote 스타일시트 `<link>` 조립                           |
+54차에 저장소 전역 배치 규칙(`.claude/rules/fe-monorepo-structure.md`)이 들어오면서 폴더
+안쪽도 같은 다섯 이름으로 나뉘었다 — 전용 하위 컴포넌트는 `components/`, 순수 모듈은 `libs/`.
+
+| 파일                                           | 무엇                                                      |
+| ---------------------------------------------- | --------------------------------------------------------- |
+| `RemoteComponent/RemoteComponent.tsx`          | 경계 · 스타일시트 · `Suspense` 를 조립하는 공개 진입점    |
+| `RemoteComponent/libs/module-cache.ts`         | 적재 캐시와 키 규칙(`remoteCacheKey`). `MfWarmup` 도 쓴다 |
+| `RemoteComponent/components/RemoteModuleView/` | `use(promise)` 로 적재된 모듈을 그리는 고정 컴포넌트      |
+| `RemoteComponent/components/RemoteStyleLink/`  | remote 스타일시트 `<link>` 조립                           |
 
 진입점이 셋을 조립하는 모양이 되면서 **각 조각을 따로 읽을 수 있다** — 173줄 한 파일에
 서로 다른 네 가지 근거(캐시 키 · promise 캐시 · CSS 경로 · Suspense 배치)가 주석으로
@@ -126,7 +135,7 @@ Client Component but none of its parents are marked with "use client" …
 
 ⚠️ **배럴을 두면 `'use client'` 경계가 그 앞에서 끊긴다.** 디렉티브는 파일 단위라,
 디렉티브 없는 `index.ts` 가 앞에 서면 그 폴더의 디렉티브 없는 모듈이 RSC 그래프에
-남는다. `module-cache.ts` 가 자기 머리에 디렉티브를 적는 이유다 — 재현과 기각한 대안:
+남는다. `libs/module-cache.ts` 가 자기 머리에 디렉티브를 적는 이유다 — 재현과 기각한 대안:
 [P-1](../05-troubleshooting/01-known-issues.md#p-1-배럴을-거치면-use-client-경계가-사라진다).
 
 ## 새 파일을 어디에 두나
