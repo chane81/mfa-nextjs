@@ -48,8 +48,9 @@ host(Next 16 / Turbopack) 1 + remote 2(catalog = Vite 8, cart = Rsbuild 2), pnpm
   host 는 MF DTS 로 받아간다. 계약 패키지로 옮기면 host·remote 가 같은 선언을 가리키게
   되어 DTS 가 아무것도 전달하지 못한다(known-issues I-2).
 - **`packages/contracts/src/generated/` 는 생성물이지만 커밋한다.** `remote-contract.ts` 가
-  그 타입을 쓰기 때문이다. remote 의 props 를 고쳤으면 `pnpm mf:types` 를 돌리고 결과를
-  같이 커밋한다. 그 파일은 **배럴에 실리지 않는다**(`@mfa/contracts/remote` 전용) —
+  그 타입을 쓰기 때문이다. remote 의 **props 를 고쳤거나 `src` 배치를 바꿨으면**
+  `pnpm mf:types` 를 돌리고 결과를 같이 커밋한다 — `compiled-types/` 가 remote 의 파일
+  배치를 그대로 비추므로 파일을 옮기기만 해도 낡는다(known-issues Q-1). 그 파일은 **배럴에 실리지 않는다**(`@mfa/contracts/remote` 전용) —
   실으면 remote 빌드가 자기 산출물을 요구하는 순환이 된다.
 
 ## 명령

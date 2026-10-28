@@ -58,15 +58,23 @@ Next 16.4 공식 문서 `app/getting-started/project-structure` 의 "Private fol
 `format:check` · `lint` · `typecheck`(13/13) · `test`(56파일 · 706) · `build`(6/6, host
 프리렌더가 remote SSR 번들 실제 실행). 테스트 수는 그대로다 — 파일만 옮겼다.
 
+### CI 가 잡은 것 — MF DTS 는 파일을 옮기기만 해도 낡는다
+
+위 다섯 검사가 로컬에서 전부 통과하고 **CI 의 `build` job 만 죽었다.** `compiled-types/`
+가 remote 의 `src` 배치를 그대로 비추므로 props 를 안 고쳐도 **파일 목록**이 달라진다.
+재현과 오진 경로: [Q-1](05-troubleshooting/01-known-issues.md#q-1-mf-dts-는-props-를-안-고쳐도-파일을-옮기면-낡는다).
+
+처음엔 "아무도 import 하지 않는 고아 파일이니 다음 생성 때 바뀐다"로 넘겼다. 루트
+`CLAUDE.md` 의 조건이 **"remote 의 props 를 고쳤으면"** 이라 적혀 있어서 배치 변경이
+걸린다는 생각을 안 했다. 조건을 "props 또는 `src` 배치"로 넓혔다 —
+**좁게 적힌 조건은 밟기 전에는 맞아 보인다.**
+
 ### 남은 것
 
 - **`packages/` 삼분법**(`shared / domains / widgets`)은 적용하지 않았다. 그 "여러 도메인
   조합 + 2개 이상 앱" 자리를 이 저장소에서는 런타임 remote 가 맡는다 — 대응표만 규칙
   파일에 적었다. `@mfa/utils` 라는 패키지 **이름**도 그대로 뒀다(규칙이 금지하는 건
   폴더 이름이다).
-- `packages/contracts/src/generated/@mf-types/catalog/compiled-types/src/components/ProductCard.d.ts`
-  는 **낡은 경로로 남아 있다.** 아무도 import 하지 않는 고아 파일이고, 다음 `pnpm mf:types`
-  에서 새 경로로 바뀐다.
 - ⚠️ `02-architecture/01-decision.md` 에 **ADR-020~027 이 두 벌 있다**(883줄대 · 1380줄대).
   뒤쪽이 낡은 사본이다 — `peerDependencies` 를 카탈로그로 나눈다는 뒤집힌 판단이 거기
   남아 있다. 이번 작업에서 만든 게 아니라 발견한 것이고, 지우지 않았다.

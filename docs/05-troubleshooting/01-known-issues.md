@@ -31,6 +31,7 @@
 | Turbopack 이 상대경로 `.js` 를 못 찾음                               | [2](#2-turbopack-이-상대경로-js-확장자를-못-찾음)                                                                                                                                                                                       |
 | `You're importing a component that imports react-dom/client`         | 공유 모듈 파일이 RSC 그래프에 딸려 들어갔다 — [H-1](#h-1-공유-모듈-표에-react-domclient-실체를-담으면-rsc-그래프가-막는다). 컴포넌트를 폴더로 쪼갠 직후라면 배럴이 경계를 삼켰다 — [P-1](#p-1-배럴을-거치면-use-client-경계가-사라진다) |
 | `@mfa/contracts` 빌드가 `window` 를 못 찾음                          | [7](#7-mfacontracts-빌드가-window-를-못-찾음)                                                                                                                                                                                           |
+| CI 의 `build` job 만 실패: `커밋된 MF 타입/모듈 목록이 낡았습니다`   | remote 의 파일을 옮겼다 — [Q-1](#q-1-mf-dts-는-props-를-안-고쳐도-파일을-옮기면-낡는다)                                                                                                                                                 |
 | 배포 빌드만 다른 경로로 통과함                                       | [B-6](#b-6-배포-빌드는-문서에-없는-경로로-통과하고-있었다)                                                                                                                                                                              |
 
 ### remote 가 안 뜨거나 깨짐
@@ -127,6 +128,39 @@
 | `pnpm test` 에 `ExperimentalWarning: localStorage is not available` 가 7번 찍힘 (테스트는 통과) | Node 26 내장 전역과 jsdom 이 겹친다 — [M-1](#m-1-node-26-의-내장-localstorage-때문에-jsdom-테스트가-경고를-7번-찍는다) |
 | 컴포넌트가 제한 시간까지 스켈레톤에 머묾 + `A component suspended inside an act scope`          | 렌더를 `await act` 로 안 감쌌다 — [O-1](#o-1-usepromise-로-suspend-하면-rtl-의-동기-render-에서-영원히-스켈레톤이다)   |
 | 두 번째 렌더부터 화면이 통째로 빔 (fallback 도 없음)                                            | 같은 thenable 로 다시 suspend 했다 — [O-2](#o-2-두-번째-렌더부터는-fallback-조차-커밋되지-않는다)                      |
+
+## Q. (54차) 폴더를 콜로케이션 축으로 돌리며 밟은 것
+
+### Q-1. MF DTS 는 props 를 안 고쳐도 파일을 옮기면 낡는다
+
+remote 컴포넌트를 폴더로 감쌌다(`components/ProductCard.tsx` → `components/ProductCard/`).
+**props 는 한 글자도 안 고쳤고** 로컬 `pnpm build` 6/6 · `typecheck` 13/13 · `test` 706개가
+전부 통과했다. CI 의 `build` job 만 죽었다.
+
+```
+diff --git a/packages/contracts/src/generated/@mf-types/catalog/compiled-types/src/components/ProductCard.d.ts b/...
+deleted file mode 100644
+--- a/packages/contracts/src/generated/@mf-types/catalog/compiled-types/src/components/ProductCard.d.ts
++++ /dev/null
+##[error]커밋된 MF 타입/모듈 목록이 낡았습니다. 로컬에서 'pnpm mf:types' 를 돌리고 결과를 커밋하세요.
+```
+
+원인은 `compiled-types/` 가 **remote 의 `src` 배치를 그대로 비추기** 때문이다. 파일을
+옮기면 그 트리의 경로도 옮겨간다 — 타입의 **내용**이 같아도 **파일 목록**이 달라진다.
+
+로컬에서 안 걸린 이유가 둘이다.
+
+| 왜 안 걸렸나                            | 무슨 일                                                            |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| 그 `.d.ts` 를 아무도 import 하지 않는다 | 노출된 모듈의 `.d.ts` 는 props 를 자기 안에 적는다 — 고아 파일이다 |
+| `pnpm mf:types` 는 기본 검사에 없다     | remote 기동이 필요해서다. CI 만 `serve-all-remotes` 로 띄워 돌린다 |
+
+**해결**: `node scripts/serve-all-remotes.ts -- pnpm mf:types` 를 돌려 결과를 같이 커밋한다.
+`git diff` 에는 **삭제만** 보인다 — 새 경로는 추적되지 않은 파일이라 `git status` 로 봐야
+한다. CI 로그도 삭제만 보여주므로 "파일이 사라진다"로 오진하기 쉽다.
+
+루트 `CLAUDE.md` 의 규칙이 "remote 의 **props 를** 고쳤으면" 이라 적혀 있었다. 조건을
+"props 또는 `src` 배치"로 넓혔다 — 좁게 적힌 조건은 밟기 전에는 맞아 보인다.
 
 ## P. (53차) host 의 MF 컴포넌트를 폴더로 나누며 밟은 것
 
