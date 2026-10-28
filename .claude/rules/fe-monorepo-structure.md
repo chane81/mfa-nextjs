@@ -129,7 +129,7 @@ components/CartSlot/                  ← 전용 조각이 생긴 뒤
 | 원본                         | 이 저장소                                        |
 | ---------------------------- | ------------------------------------------------ |
 | `packages/shared/components` | `packages/ui`                                    |
-| `packages/shared/libs`       | `packages/utils`                                 |
+| `packages/shared/libs`       | `packages/libs`                                  |
 | `packages/domains/<domain>`  | `packages/store` · `contracts` · `remote-config` |
 | `packages/widgets`           | `apps/remote-*` (런타임 MF)                      |
 | `packages/config`            | `typescript-config` · `tailwind-config`          |

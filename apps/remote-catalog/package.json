@@ -23,7 +23,7 @@
   "devDependencies": {
     "@mfa/remote-config": "workspace:*",
     "@mfa/typescript-config": "workspace:*",
-    "@mfa/utils": "workspace:*",
+    "@mfa/libs": "workspace:*",
     "@module-federation/vite": "catalog:",
     "@tailwindcss/vite": "catalog:",
     "@types/node": "catalog:",

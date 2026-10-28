@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { hueVar } from '@mfa/utils/style/hue';
+import { hueVar } from '@mfa/libs/style/hue';
 
 export interface PanelProps {
   /** 어느 앱(remote)이 렌더링했는지 시각적으로 표시 */

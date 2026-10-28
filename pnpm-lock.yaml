@@ -166,15 +166,15 @@ importers:
 
   .:
     devDependencies:
+      '@mfa/libs':
+        specifier: workspace:*
+        version: link:packages/libs
       '@mfa/remote-config':
         specifier: workspace:*
         version: link:packages/remote-config
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:packages/typescript-config
-      '@mfa/utils':
-        specifier: workspace:*
-        version: link:packages/utils
       '@testing-library/dom':
         specifier: ^10.4.1
         version: 10.4.1
@@ -241,6 +241,9 @@ importers:
       '@mfa/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@mfa/libs':
+        specifier: workspace:*
+        version: link:../../packages/libs
       '@mfa/remote-config':
         specifier: workspace:*
         version: link:../../packages/remote-config
@@ -253,9 +256,6 @@ importers:
       '@mfa/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@mfa/utils':
-        specifier: workspace:*
-        version: link:../../packages/utils
       '@module-federation/runtime':
         specifier: 'catalog:'
         version: 2.8.2
@@ -296,6 +296,9 @@ importers:
       '@mfa/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@mfa/libs':
+        specifier: workspace:*
+        version: link:../../packages/libs
       '@mfa/store':
         specifier: workspace:*
         version: link:../../packages/store
@@ -305,9 +308,6 @@ importers:
       '@mfa/ui':
         specifier: workspace:*
         version: link:../../packages/ui
-      '@mfa/utils':
-        specifier: workspace:*
-        version: link:../../packages/utils
       react:
         specifier: 'catalog:'
         version: 19.2.8
@@ -376,15 +376,15 @@ importers:
         specifier: 'catalog:'
         version: 19.2.8(react@19.2.8)
     devDependencies:
+      '@mfa/libs':
+        specifier: workspace:*
+        version: link:../../packages/libs
       '@mfa/remote-config':
         specifier: workspace:*
         version: link:../../packages/remote-config
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:../../packages/typescript-config
-      '@mfa/utils':
-        specifier: workspace:*
-        version: link:../../packages/utils
       '@module-federation/vite':
         specifier: 'catalog:'
         version: 1.20.7(typescript@6.0.3)(vite@8.2.1(@types/node@26.6.5)(jiti@2.4.2))
@@ -441,14 +441,29 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
 
-  packages/remote-config:
+  packages/libs:
     devDependencies:
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
-      '@mfa/utils':
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.5
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/remote-config:
+    devDependencies:
+      '@mfa/libs':
         specifier: workspace:*
-        version: link:../utils
+        version: link:../libs
+      '@mfa/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -468,12 +483,12 @@ importers:
         specifier: ^5.0.15
         version: 5.0.15(@types/react@19.2.18)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
     devDependencies:
+      '@mfa/libs':
+        specifier: workspace:*
+        version: link:../libs
       '@mfa/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
-      '@mfa/utils':
-        specifier: workspace:*
-        version: link:../utils
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -497,9 +512,9 @@ importers:
 
   packages/ui:
     dependencies:
-      '@mfa/utils':
+      '@mfa/libs':
         specifier: workspace:*
-        version: link:../utils
+        version: link:../libs
     devDependencies:
       '@mfa/typescript-config':
         specifier: workspace:*
@@ -510,21 +525,6 @@ importers:
       react:
         specifier: 'catalog:'
         version: 19.2.8
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-
-  packages/utils:
-    devDependencies:
-      '@mfa/typescript-config':
-        specifier: workspace:*
-        version: link:../typescript-config
-      '@types/node':
-        specifier: 'catalog:'
-        version: 26.6.5
-      '@types/react':
-        specifier: 'catalog:'
-        version: 19.2.18
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

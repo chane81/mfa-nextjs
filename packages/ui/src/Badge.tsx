@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { hueVar } from '@mfa/utils/style/hue';
+import { hueVar } from '@mfa/libs/style/hue';
 
 export interface BadgeProps {
   children: ReactNode;

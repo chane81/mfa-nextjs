@@ -1,7 +1,7 @@
 import { MF_FILES, REACT_REQUIRED_VERSION } from '@mfa/remote-config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@mfa/utils/test/globals';
+import { clearGlobalRegistries } from '@mfa/libs/test/globals';
 
 import { SHARED_PROBES } from './react-modules';
 import { REMOTE_VERSIONS_GLOBAL } from '../versions/browser';

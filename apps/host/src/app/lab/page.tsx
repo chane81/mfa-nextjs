@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { hueVar } from '@mfa/utils/style/hue';
+import { hueVar } from '@mfa/libs/style/hue';
 
 import { LAB_MODES, LAB_ORDER } from './_src/constants/modes';
 
