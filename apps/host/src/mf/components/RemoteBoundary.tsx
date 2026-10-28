@@ -5,7 +5,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 import type { RemoteName } from '@mfa/contracts/remote';
 import { ErrorBox } from '@mfa/ui';
 
-import { pinnedEntry } from '../../loader';
+import { pinnedEntry } from '../loader';
 
 interface Props {
   remoteName: RemoteName;

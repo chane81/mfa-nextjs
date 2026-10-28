@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 
-import { formatKst } from '../../../../libs/format-time';
+import { formatKst } from '../../../libs/format-time';
 
 /**
  * hydration 이후 브라우저 시각을 찍는다.
