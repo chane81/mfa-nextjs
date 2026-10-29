@@ -39,17 +39,17 @@ PR 의 "확인 부탁"으로 올렸는데, 원본 저장소에 규칙이 추가�
 
 ### 어디로 갔나
 
-| 옮긴 것                                       | 어디로                                  | 왜                                                |
-| --------------------------------------------- | --------------------------------------- | ------------------------------------------------- |
-| `CheckoutSection`                             | `app/checkout/_src/components/`         | `/checkout` 만 쓴다. 껍데기는 page 가 흡수(아래)  |
-| `RelatedProductsSection`                      | `app/products/[id]/_src/components/`    | 그 라우트만                                       |
-| `MfDiagnostics`                               | `app/debug/_src/components/`            | `/debug` 만                                       |
-| `LabPanel` · `HydrationStamp` · `modes.ts`    | `app/lab/_src/{components,constants}/`  | `/lab/*` 넷이 쓴다 — 부모 `_src`                  |
-| `format-time` · `render-clock`                | `app/lab/_src/libs/`                    | 소비자가 lab 안에만 있다                          |
-| `MfWarmup`                                    | `app/internal/mf-warm/_src/components/` | 그 라우트 전용. `lab/` 과 무관이었다              |
-| `SiteHeaderSlot` · `CartSlot` · `CatalogSlot` | `src/components/<이름>/`                | 두 라우트 이상이 쓴다                             |
-| `CatalogSection`                              | `src/components/CatalogSection/`        | 주인이 둘(`CatalogSlot` · `LabPanel`) — 중첩 불가 |
-| `cart-cookie` · `mf-secret`                   | `src/libs/`                             | 라우트를 넘어 쓰인다                              |
+| 옮긴 것                                       | 어디로                                   | 왜                                                   |
+| --------------------------------------------- | ---------------------------------------- | ---------------------------------------------------- |
+| `CheckoutSection`                             | `app/checkout/_src/components/`          | `/checkout` 만 쓴다. 껍데기는 page 가 흡수(아래)     |
+| `RelatedProductsSection`                      | `app/products/[id]/_src/components/`     | 그 라우트만                                          |
+| `MfDiagnostics`                               | `app/debug/_src/components/`             | `/debug` 만                                          |
+| `LabPanel` · `HydrationStamp` · `modes.ts`    | `app/lab/_src/{components,constants}/`   | `/lab/*` 넷이 쓴다 — 부모 `_src`                     |
+| `format-time` · `render-clock`                | `app/lab/_src/libs/`                     | 소비자가 lab 안에만 있다                             |
+| `MfWarmup`                                    | `app/internal/mf-warm/_src/components/`  | 그 라우트 전용. `lab/` 과 무관이었다                 |
+| `SiteHeaderSlot` · `CartSlot` · `CatalogSlot` | `src/components/<이름>/`                 | 두 라우트 이상이 쓴다                                |
+| `CatalogSection`                              | `src/components/CatalogSlot/components/` | 주인이 둘이지만 Slot 안에 두고 진입점으로 공개(아래) |
+| `cart-cookie` · `mf-secret`                   | `src/libs/`                              | 라우트를 넘어 쓰인다                                 |
 
 `MfWarmup` 이 `components/lab/` 에 있던 건 "lab 페이지에서 쓰니까" 였는데 그건 소유가
 아니다. 규칙을 적용하자 형제로 갈라졌다.
@@ -194,6 +194,50 @@ UI 본문을 page 가 직접 들고 있던 자리다.
 상태 코드를 못 바꾼다). 라우트 정책이라 라우트 파일이 주인이다.
 
 > 라우트 목록과 캐시 성질은 **이사 전후로 동일하다** — `◐ /lab` · `ƒ /` 그대로다.
+
+### `CatalogSlot` 도 폴더로 모았다 — 규칙 6절을 넓혔다
+
+`components/` 에 `CatalogSlot.tsx` 와 `CatalogSection.tsx` 가 **형제로 평면에** 있었다.
+`CartSlot/` · `SiteHeaderSlot/` 과 모양이 달랐던 이유는 `CatalogSection` 의 소비자가 둘
+(`CatalogSlot` · `/lab/*` 의 `LabPanel`)이라, Slot 안에 넣으면 `LabPanel` 이 **남의 폴더
+내부를 직접 import** 해야 해서였다(6절 금지).
+
+그래서 **6절에 길을 하나 더 뚫었다.** 금지의 반대는 "꺼내는 것"만이 아니다.
+
+| 길                            | 언제                         |
+| ----------------------------- | ---------------------------- |
+| `X/index.ts` 에서 같이 export | Y 가 **X 의 것**으로 읽힐 때 |
+| 공통 부모로 승격(2절)         | Y 가 X 와 **무관해진** 때    |
+
+내부 경로 직접 import 금지는 그대로다 — 공개하려면 **진입점을 지나게** 한다.
+
+```ts
+// components/CatalogSlot/index.ts
+export * from './CatalogSlot';
+export * from './components/CatalogSection'; // /lab/* 이 이것만 꺼낸다
+```
+
+#### 대가를 쟀다 — 배럴은 형제 모듈을 소비자 청크로 끌고 온다
+
+`'use client'` 경계가 깨질까(P-1) 걱정했는데 **안 깨졌다.** 대신 번들에서 값을 치렀다.
+`/lab/ssr` 의 프리렌더 HTML 이 참조하는 청크를 이사 전후로 센 결과다.
+
+|                        | 청크 수 | 바이트             | `useSearchParams` 를 가진 청크 |
+| ---------------------- | ------- | ------------------ | ------------------------------ |
+| 전(평면 · 직접 import) | 10      | 653,181            | 1 (Next 공용)                  |
+| 후(폴더 · 배럴)        | 10      | **653,690** (+509) | **2**                          |
+
+청크 목록을 대조하면 **하나가 교체됐다** — `CatalogSection` 을 담던 청크에 `CatalogSlot`
+(`useSearchParams`)이 합쳐졌다. `LabPanel` 은 섹션만 쓰는데도 따라온다.
+
+> **프리렌더는 그대로다** — `◐ /lab` · `◐ /lab/{ssr,isr,cache}` 유지. 훅이 그 라우트에서
+> **실행되지 않기** 때문이다. I-9 는 훅이 렌더되는 자리에 있어서 깨졌던 것이고, 번들에
+> 실리는 것만으로는 깨지지 않는다.
+
+그래서 6절에 적은 차단 조건은 "번들에 실리면 안 된다"가 아니라 **"실행될 때 경계를 깨면
+승격한다"** 다. 측정값(+509 B)이 그 선을 어디에 그을지의 근거다.
+
+검증일: 2026-10-29 · `pnpm build` 6/6 · 테스트 56파일 706개 · typecheck 13/13.
 
 ### 남은 것
 
