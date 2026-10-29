@@ -292,6 +292,40 @@ import { CatalogSection } from '@/components/CatalogSlot/components/CatalogSecti
 
 검증일: 2026-10-29 · `next@16.4.2` · `pnpm build` 6/6 · 테스트 56파일 706개 · typecheck 13/13.
 
+### 새 배럴 규칙으로 저장소를 다시 훑었다
+
+규칙이 바뀌었으니(배럴은 폴더당 하나 · 네임드 · 타입은 별 줄) 전체를 그 기준에 대 봤다.
+**고친 건 둘, 통과는 나머지 전부**다.
+
+| 자리                            | 판정                                                            |
+| ------------------------------- | --------------------------------------------------------------- |
+| 컴포넌트 배럴 다섯              | `export *` → 네임드                                             |
+| 인라인 `type` 재수출 네 자리    | 값과 타입을 다른 줄로                                           |
+| **`@mfa/ui` 배럴**              | `export *` 다섯 → 네임드 + 타입 다섯 줄. **주석이 낡아 있었다** |
+| `@mfa/store` · `@mfa/contracts` | `export *` 유지 — 도메인 묶음을 모으는 집합 진입점이다          |
+| remote 둘                       | 배럴 없음 · `components/` 평면 · `exposes/` 평면 — 규칙 그대로  |
+| 폴더인 컴포넌트 다섯            | 전부 `components/` 나 `libs/` 를 갖는다(4절 조건 충족)          |
+
+`packages/ui/src/index.ts` 의 주석이 **"컴포넌트마다 폴더 하나다"** 라고 적고 있었다 —
+51차 배치인데 54차에 평면으로 되돌렸으니 그때 같이 고쳐야 했다. 지금 실제 배치(파일 다섯
+
+- 테스트 다섯)로 맞췄다.
+
+#### `export *` 를 남긴 기준과 예외 둘
+
+- **집합 진입점**(`store/src/index.ts` 가 `./cart` · `./hooks` 를 모으는 자리)에만 남긴다.
+  컴포넌트를 모으는 배럴은 깊이와 무관하게 네임드다 — `@mfa/ui` 도 그렇다
+- `@mfa/ui` 는 `'use client'` 가 **없다**(전부 서버 컴포넌트). 그래서 `export *` 였어도
+  client reference manifest 비용은 0 이었다 — 바꾼 이유는 번들이 아니라 **자동 유출**이다
+- `@mfa/store` 배럴은 일부러 `'use client'` 를 지닌다 — 진입점을 둘로 갈라
+  (`index.ts` / `server.ts`) `react-server` 조건이 RSC 를 서버로 보낸다(ADR-015).
+  6절의 "배럴에 디렉티브 금지"와 외형이 충돌하니 예외로 적었다
+- `apps/remote-cart/src/index.tsx` 는 배럴이 아니라 **Rsbuild 기본 엔트리**다(설정에
+  `entry` 가 없다). 이름을 바꾸면 빌드가 깨지므로 5절의 `index.tsx` 금지에서 뺐다 —
+  catalog 는 Vite 라 같은 자리가 `main.tsx` 다
+
+번들은 전 구간 불변이다(`/lab/ssr` 653,181 B · manifest 모듈 1개).
+
 ### 남은 것
 
 - **`packages/` 삼분법**(`shared / domains / widgets`)은 적용하지 않았다. 그 "여러 도메인
