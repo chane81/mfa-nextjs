@@ -1,1 +1,1 @@
-export * from './LabPanel';
+export { LabPanel } from './LabPanel';

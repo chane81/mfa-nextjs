@@ -1,1 +1,1 @@
-export * from './SiteHeaderSlot';
+export { SiteHeaderSlot } from './SiteHeaderSlot';
