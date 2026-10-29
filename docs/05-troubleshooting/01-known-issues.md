@@ -32,6 +32,7 @@
 | `You're importing a component that imports react-dom/client`         | 공유 모듈 파일이 RSC 그래프에 딸려 들어갔다 — [H-1](#h-1-공유-모듈-표에-react-domclient-실체를-담으면-rsc-그래프가-막는다). 컴포넌트를 폴더로 쪼갠 직후라면 배럴이 경계를 삼켰다 — [P-1](#p-1-배럴을-거치면-use-client-경계가-사라진다) |
 | `@mfa/contracts` 빌드가 `window` 를 못 찾음                          | [7](#7-mfacontracts-빌드가-window-를-못-찾음)                                                                                                                                                                                           |
 | CI 의 `build` job 만 실패: `커밋된 MF 타입/모듈 목록이 낡았습니다`   | remote 의 파일을 옮겼다 — [Q-1](#q-1-mf-dts-는-props-를-안-고쳐도-파일을-옮기면-낡는다)                                                                                                                                                 |
+| 안 쓰는 컴포넌트가 라우트 청크에 실림 (빌드는 통과)                  | 폴더 배럴이 둘을 같이 내보낸다 — [Q-2](#q-2-폴더-배럴이-라우트의-client-reference-목록을-넓힌다)                                                                                                                                        |
 | 배포 빌드만 다른 경로로 통과함                                       | [B-6](#b-6-배포-빌드는-문서에-없는-경로로-통과하고-있었다)                                                                                                                                                                              |
 
 ### remote 가 안 뜨거나 깨짐
@@ -161,6 +162,42 @@ deleted file mode 100644
 
 루트 `CLAUDE.md` 의 규칙이 "remote 의 **props 를** 고쳤으면" 이라 적혀 있었다. 조건을
 "props 또는 `src` 배치"로 넓혔다 — 좁게 적힌 조건은 밟기 전에는 맞아 보인다.
+
+### Q-2. 폴더 배럴이 라우트의 client reference 목록을 넓힌다
+
+`CatalogSlot/index.ts` 가 Slot 과 `CatalogSection` 을 **같이** 재수출했다. `/lab/*` 은
+섹션만 쓰는데 `useSearchParams` 를 가진 `CatalogSlot` 이 그 라우트의 클라이언트 청크로
+따라 들어왔다.
+
+**빌드는 통과하고 프리렌더도 안 깨진다**(`◐` 유지) — 훅이 그 라우트에서 실행되지 않기
+때문이다. 증상은 번들 크기뿐이라 눈에 안 띈다.
+
+```
+.next/server/app/lab/ssr/page_client-reference-manifest.js
+  한 배럴 → src/components/CatalogSlot/CatalogSlot.tsx          ← 안 쓰는데 등록된다
+           src/components/CatalogSlot/components/CatalogSection.tsx
+  가름   → src/components/CatalogSlot/components/CatalogSection.tsx
+```
+
+**트리쉐이킹 문제가 아니다.** 죽은 코드를 못 털어낸 게 아니라 배럴이 manifest 를 넓힌다.
+그래서 번들러 설정으로는 안 고쳐진다.
+
+| 시도                                                | `/lab/ssr` 청크 | manifest     |
+| --------------------------------------------------- | --------------- | ------------ |
+| 한 배럴                                             | 653,690 B       | 모듈 2개     |
+| `experimental.optimizePackageImports` 에 alias 추가 | 653,132 B       | **그대로**   |
+| `sideEffects: ["*.css"]`                            | 653,132 B       | **그대로**   |
+| **진입점 분리**                                     | 653,181 B       | **모듈 1개** |
+
+`optimizePackageImports` 는 **패키지명 대상**이라 `@/` alias 에 걸리지 않는다.
+`sideEffects` 는 앱 전체를 −558 B 줄이지만(직교하는 이득) manifest 와 무관하다.
+`turbopackInferModuleSideEffects` · `turbopackScopeHoisting` 은 프로덕션 기본값이 이미
+`true` 다 — 켤 것이 없다.
+
+**해결**: 성질이 다른 모듈을 한 배럴에 담지 않는다. 진입점을 가른다
+(`X/index.ts` + `X/components/index.ts`). 배치 규칙 6절에 성문화했다.
+
+검증일: 2026-10-29 · `next@16.4.2` · Turbopack.
 
 ## P. (53차) host 의 MF 컴포넌트를 폴더로 나누며 밟은 것
 

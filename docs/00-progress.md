@@ -217,27 +217,67 @@ export * from './CatalogSlot';
 export * from './components/CatalogSection'; // /lab/* 이 이것만 꺼낸다
 ```
 
-#### 대가를 쟀다 — 배럴은 형제 모듈을 소비자 청크로 끌고 온다
+#### 한 배럴에 담았더니 안 쓰는 코드가 실렸다 — 진입점을 갈라 되돌렸다
 
-`'use client'` 경계가 깨질까(P-1) 걱정했는데 **안 깨졌다.** 대신 번들에서 값을 치렀다.
-`/lab/ssr` 의 프리렌더 HTML 이 참조하는 청크를 이사 전후로 센 결과다.
+처음엔 `CatalogSlot/index.ts` 에 Slot 과 Section 을 **같이** 담았다. 걱정한 건 P-1
+(`'use client'` 경계가 배럴에서 끊기는 것)이었는데 **그쪽은 안 깨졌고**, 값은 번들에서
+치렀다. `/lab/ssr` 의 프리렌더 HTML 이 참조하는 청크를 재 보면:
 
-|                        | 청크 수 | 바이트             | `useSearchParams` 를 가진 청크 |
-| ---------------------- | ------- | ------------------ | ------------------------------ |
-| 전(평면 · 직접 import) | 10      | 653,181            | 1 (Next 공용)                  |
-| 후(폴더 · 배럴)        | 10      | **653,690** (+509) | **2**                          |
+| 배치                   | 청크 수 | 바이트             | `useSearchParams` 보유 청크 |
+| ---------------------- | ------- | ------------------ | --------------------------- |
+| 전(평면 · 직접 import) | 10      | 653,181            | 1 (Next 공용)               |
+| 한 배럴에 둘 다        | 10      | **653,690** (+509) | **2**                       |
+| **진입점 둘로 가름**   | 10      | **653,181** (±0)   | **1**                       |
 
-청크 목록을 대조하면 **하나가 교체됐다** — `CatalogSection` 을 담던 청크에 `CatalogSlot`
-(`useSearchParams`)이 합쳐졌다. `LabPanel` 은 섹션만 쓰는데도 따라온다.
+`LabPanel` 은 섹션만 쓰는데 `CatalogSlot` 을 받는다. 그래서 **진입점을 둘로 갈랐다.**
 
-> **프리렌더는 그대로다** — `◐ /lab` · `◐ /lab/{ssr,isr,cache}` 유지. 훅이 그 라우트에서
-> **실행되지 않기** 때문이다. I-9 는 훅이 렌더되는 자리에 있어서 깨졌던 것이고, 번들에
-> 실리는 것만으로는 깨지지 않는다.
+```
+components/CatalogSlot/
+├─ index.ts              ← URL 정책을 아는 쪽(Slot)
+├─ CatalogSlot.tsx · CatalogSlot.test.tsx
+└─ components/
+   ├─ index.ts           ← URL 없이 섹션만 쓰는 쪽
+   └─ CatalogSection.tsx
+```
 
-그래서 6절에 적은 차단 조건은 "번들에 실리면 안 된다"가 아니라 **"실행될 때 경계를 깨면
-승격한다"** 다. 측정값(+509 B)이 그 선을 어디에 그을지의 근거다.
+`/lab/*` 은 `@/components/CatalogSlot/components` 를 지난다. **승격한 것과 번들이 같고**
+폴더 모양은 남는다. 선례가 있다 — `@mfa/remote-config` 의 `index.ts`(브라우저 안전) /
+`node.ts`(node 전용).
 
-검증일: 2026-10-29 · `pnpm build` 6/6 · 테스트 56파일 706개 · typecheck 13/13.
+#### 트리쉐이킹 설정으로는 못 고친다 — manifest 층이다
+
+"한 배럴에 담고 트리쉐이킹으로 털면 되지 않나"를 셋 다 재 봤다. **안 된다.** 죽은 코드를
+못 털어낸 게 아니라 배럴이 **client reference manifest 를 넓히는** 것이다.
+
+| 시도                                                | `/lab/ssr` 청크 | manifest     |
+| --------------------------------------------------- | --------------- | ------------ |
+| 한 배럴                                             | 653,690 B       | 모듈 2개     |
+| `experimental.optimizePackageImports` 에 alias 추가 | 653,132 B       | **그대로**   |
+| `sideEffects: ["*.css"]`                            | 653,132 B       | **그대로**   |
+| **진입점 분리**                                     | 653,181 B       | **모듈 1개** |
+
+```
+.next/server/app/lab/ssr/page_client-reference-manifest.js
+  한 배럴 → CatalogSlot.tsx ← /lab/* 이 안 쓰는데 등록된다
+           CatalogSlot/components/CatalogSection.tsx
+  가름   → CatalogSlot/components/CatalogSection.tsx
+```
+
+- `optimizePackageImports` 는 **패키지명 대상**이라 `@/` alias 에 안 걸린다
+- `sideEffects: ["*.css"]` 는 앱 전체를 −558 B 줄인다(**직교하는 이득**) — manifest 와는
+  무관하다. 이번엔 **안 넣었다**: 0.08 % 를 얻으려고 앱 전역의 부작용 가정을 바꾸는 것이고,
+  MF 런타임처럼 모듈 스코프에서 일하는 코드가 있는 저장소에서는 값이 싸지 않다
+- `turbopackInferModuleSideEffects` · `turbopackScopeHoisting` 은 프로덕션 기본값이 이미
+  `true` 다(`next@16.4.2` 문서) — 켤 것이 없다
+
+> **프리렌더는 세 배치 모두 그대로다** — `◐ /lab` · `◐ /lab/{ssr,isr,cache}` 유지. 훅이 그
+> 라우트에서 **실행되지 않기** 때문이다. I-9 는 훅이 렌더되는 자리에 있어서 깨졌던 것이고,
+> 번들에 실리는 것만으로는 깨지지 않는다.
+
+그래서 6절의 차단 조건은 "번들에 실리면 안 된다"가 아니라 **"실행될 때 경계를 깨면
+승격한다"** 다. 번들은 금지 사유가 아니라 **진입점을 가르라는 신호**다. 함정은 Q-2 에 남겼다.
+
+검증일: 2026-10-29 · `next@16.4.2` · `pnpm build` 6/6 · 테스트 56파일 706개 · typecheck 13/13.
 
 ### 남은 것
 
