@@ -1,0 +1,24 @@
+/**
+ * 홈의 머리 섹션 — 어느 영역이 host 고 어느 영역이 remote 인지 설명한다.
+ *
+ * 소비자는 루트 라우트(`app/page.tsx`) 하나뿐이지만 `app/_src/` 는 만들지 않는다
+ * (배치 규칙 9절 — 루트 라우트 전용은 앱 전역과 구별되지 않는다). 그래서 자리가
+ * `src/components/` 다.
+ */
+export function HomeIntro() {
+  return (
+    <section className="rounded-lg border border-line bg-surface p-6">
+      <h1 className="m-0 text-[22px]">
+        Next.js 16 host + 런타임 Module Federation
+      </h1>
+      <p className="text-sm leading-[1.7] text-muted">
+        이 페이지의 뼈대(헤더 · 레이아웃 · 라우팅)는 <strong>host</strong> 가
+        SSR 하고, 점선으로 감싸인 영역은 브라우저에서 별도 배포된 remote 번들을
+        받아 그린다.
+        <br />
+        보라색 = <code>catalog</code> (Vite), 초록색 = <code>cart</code>{' '}
+        (Rsbuild).
+      </p>
+    </section>
+  );
+}
