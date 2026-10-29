@@ -201,8 +201,29 @@ deleted file mode 100644
 `turbopackInferModuleSideEffects` · `turbopackScopeHoisting` 은 프로덕션 기본값이 이미
 `true` 다 — 켤 것이 없다.
 
-**해결**: 성질이 다른 모듈을 한 배럴에 담지 않는다. 진입점을 가른다
+**해결**: 소비자 집합이 다른 모듈을 한 배럴에 담지 않는다. 진입점을 가른다
 (`X/index.ts` + `X/components/index.ts`). 배치 규칙 6절에 성문화했다.
+
+**깊이로는 안 풀린다.** `X/components/index.ts` 에 공개 조각을 여럿 담고 그 소비자가
+갈리면 같은 일이 그 층에서 또 난다. 더미 컴포넌트(홈만 쓰는 `'use client'` 하나)를 그
+배럴에 올려 재현했다 — `/lab/ssr` manifest 에 등록되고 청크에 +188 B 실렸다.
+
+### 재는 방법
+
+```bash
+pnpm build
+# 1) 이 라우트가 어떤 클라이언트 모듈을 받는가
+grep -o 'src/components/[A-Za-z0-9_/.-]*\.tsx' \
+  apps/host/.next/server/app/lab/ssr/page_client-reference-manifest.js | sort -u
+# 2) 그 라우트 HTML 이 참조하는 청크의 총 바이트
+for c in $(grep -o 'static/chunks/[a-z0-9_.-]*\.js' \
+             apps/host/.next/server/app/lab/ssr.html | sort -u); do
+  stat -f%z "apps/host/.next/$c"
+done | paste -sd+ - | bc
+```
+
+청크 **이름은 내용 해시**라 이사 전후로 전부 바뀐다 — 이름을 비교하지 말고 **개수와
+바이트**, 그리고 manifest 의 모듈 목록을 본다.
 
 검증일: 2026-10-29 · `next@16.4.2` · Turbopack.
 
