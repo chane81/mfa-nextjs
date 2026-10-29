@@ -130,14 +130,21 @@ import { Y } from '@/components/X/components';
 `.next/server/app/lab/ssr/page_client-reference-manifest.js` 에 `CatalogSlot.tsx` 가 등록된다
 — 그 라우트가 쓰지 않는데도. 가르면 `CatalogSection.tsx` 만 남는다.
 
-| 시도                                                | 결과                                          |
-| --------------------------------------------------- | --------------------------------------------- |
-| `experimental.optimizePackageImports` 에 alias 추가 | **무효** — 패키지명 대상이다. manifest 그대로 |
-| `sideEffects: ["*.css"]`                            | 전체 −558 B, **manifest 는 안 바뀐다**        |
-| 진입점 분리                                         | manifest 가 좁아진다                          |
+| 시도                                                | 결과                                                |
+| --------------------------------------------------- | --------------------------------------------------- |
+| `export *` 대신 **네임드 재수출**                   | **무효** — `export *` 와 바이트까지 같다            |
+| 배럴에 `'use client'`                               | manifest 는 한 줄로 줄지만 **번들은 +432 B** 커진다 |
+| `experimental.optimizePackageImports` 에 alias 추가 | **무효** — 패키지명 대상이다. manifest 그대로       |
+| `sideEffects: ["*.css"]`                            | 전체 −558 B, **manifest 는 안 바뀐다**              |
+| 진입점 분리                                         | manifest 가 좁아진다                                |
 
 `turbopackInferModuleSideEffects` · `turbopackScopeHoisting` 은 프로덕션 기본값이 이미
 `true` 다(`next@16.4.2` 문서 `app/api-reference/turbopack`). 켤 것이 남아 있지 않다.
+
+재수출 **문법**은 원인이 아니다 — 배럴 모듈이 두 클라이언트 모듈을 **참조한다는 사실**이
+원인이다. 배럴에 `'use client'` 를 붙이면 경계가 배럴로 올라가 manifest 에는 배럴 하나만
+남지만, 그때는 폴더 전체가 한 덩어리가 되어 번들이 오히려 커진다(6절이 배럴에 디렉티브를
+금지하는 이유와 같은 자리다).
 
 - **내부 경로를 직접 가리키는 import 는 그대로 금지다.** 공개하려면 진입점을 지난다 —
   `X/components/Y` 가 아니라 `X/components`
