@@ -1,12 +1,6 @@
-export * from './CatalogSlot';
-
 /**
- * `CatalogSection` 은 이 폴더 안에 있지만 밖에서도 쓴다 — `/lab/*` 의 `LabPanel` 이
- * URL 정책 없이(= Slot 없이) 같은 섹션을 그린다. 그래서 **공개 API 에 올린다**
- * (배치 규칙 6절 "폴더 안의 조각에 외부 소비자가 생기면").
- *
- * 내부 경로(`@/components/CatalogSlot/components/CatalogSection`)로 직접 들어가지 않는다.
- * 대가는 이 배럴을 거치는 소비자의 청크에 `CatalogSlot`(`useSearchParams`)이 같이
- * 실리는 것이고, 실측 +509 B 다. 프리렌더는 깨지지 않는다 — 훅이 거기서 실행되지 않는다.
+ * 이 폴더의 진입점은 **둘이다.** 여기는 URL 정책을 아는 쪽(`CatalogSlot`)만 내보낸다.
+ * URL 없이 섹션만 쓰는 소비자는 `./components` 로 간다 — 섞어서 한 배럴에 담으면
+ * 그쪽 청크에 `useSearchParams` 가 따라 들어간다(배치 규칙 6절, 실측 +509 B).
  */
-export * from './components/CatalogSection';
+export * from './CatalogSlot';

@@ -18,7 +18,8 @@ import { RemoteComponent } from '@/mf/components/RemoteComponent';
  * 그 결정은 `[[CatalogSlot]]` 이 쥐고, 여기는 값과 콜백만 받는다.
  *
  * 그래서 이 파일은 Slot 폴더 안에 있으면서 **밖으로도 공개된다** — `/lab/*` 은
- * `@/components/CatalogSlot` 배럴에서 이것만 꺼내 쓴다(배치 규칙 6절).
+ * `@/components/CatalogSlot/components` 를 지나 이것만 꺼내 쓴다(배치 규칙 6절).
+ * Slot 쪽 배럴과 가른 이유는 그 진입점 주석에 있다.
  */
 export function CatalogSection({
   category = 'all',

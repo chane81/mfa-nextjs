@@ -2,9 +2,10 @@ import type { ReactNode } from 'react';
 
 import { hueVar } from '@mfa/libs/style/hue';
 
-// `CatalogSection` 은 `CatalogSlot/` 안에 살지만 진입점으로 공개된다 — URL 정책이
-// 없는 이 라우트는 Slot 을 거치지 않고 섹션만 쓴다(배치 규칙 6절).
-import { CatalogSection } from '@/components/CatalogSlot';
+// `CatalogSection` 은 `CatalogSlot/` 안에 살지만 **두 번째 진입점**으로 공개된다.
+// Slot 배럴(`@/components/CatalogSlot`)로 가져오면 그쪽의 `useSearchParams` 가 이
+// 라우트 청크까지 따라온다 — 그래서 `/components` 를 지난다(배치 규칙 6절).
+import { CatalogSection } from '@/components/CatalogSlot/components';
 import { formatKst } from '../../libs/format-time';
 
 import { HydrationStamp } from './components/HydrationStamp';
