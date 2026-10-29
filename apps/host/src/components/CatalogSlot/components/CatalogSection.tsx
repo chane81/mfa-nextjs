@@ -17,9 +17,9 @@ import { RemoteComponent } from '@/mf/components/RemoteComponent';
  * 으로 죽는다(실제로 빌드가 깨졌다). 필터를 주소에 남길지는 라우트마다 다른 정책이라
  * 그 결정은 `[[CatalogSlot]]` 이 쥐고, 여기는 값과 콜백만 받는다.
  *
- * 그래서 이 파일은 Slot 폴더 안에 있으면서 **밖으로도 공개된다** — `/lab/*` 은
- * `@/components/CatalogSlot/components` 를 지나 이것만 꺼내 쓴다(배치 규칙 6절).
- * Slot 쪽 배럴과 가른 이유는 그 진입점 주석에 있다.
+ * 그래서 이 파일은 Slot 폴더 안에 있으면서 **밖에서도 쓴다** — `/lab/*` 이 이 파일을
+ * 경로로 직접 가리킨다. Slot 배럴에 함께 올리지 않는 이유는 그쪽 주석에 있다
+ * (배치 규칙 6절).
  */
 export function CatalogSection({
   category = 'all',

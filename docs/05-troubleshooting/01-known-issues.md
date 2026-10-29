@@ -201,12 +201,15 @@ deleted file mode 100644
 `turbopackInferModuleSideEffects` · `turbopackScopeHoisting` 은 프로덕션 기본값이 이미
 `true` 다 — 켤 것이 없다.
 
-**해결**: 소비자 집합이 다른 모듈을 한 배럴에 담지 않는다. 진입점을 가른다
-(`X/index.ts` + `X/components/index.ts`). 배치 규칙 6절에 성문화했다.
+**해결**: 배럴에는 그 폴더의 **대표 컴포넌트만** 올린다. 안쪽 조각을 밖에서 쓰면 그
+**파일 경로**로 가리킨다(`@/components/CatalogSlot/components/CatalogSection`).
+배치 규칙 6절에 성문화했다.
 
-**깊이로는 안 풀린다.** `X/components/index.ts` 에 공개 조각을 여럿 담고 그 소비자가
-갈리면 같은 일이 그 층에서 또 난다. 더미 컴포넌트(홈만 쓰는 `'use client'` 하나)를 그
-배럴에 올려 재현했다 — `/lab/ssr` manifest 에 등록되고 청크에 +188 B 실렸다.
+**조각 전용 배럴로는 안 풀린다.** `X/components/index.ts` 를 만들어도 거기에 조각이 둘
+이상 모이고 소비자가 갈리면 같은 일이 그 층에서 또 난다. 더미 컴포넌트(홈만 쓰는
+`'use client'` 하나)를 그 배럴에 올려 재현했다 — `/lab/ssr` manifest 에 등록되고 청크에
++188 B 실렸다. 그래서 **내부 폴더에는 배럴을 두지 않는다** — 소비자 집합을 매번 세는
+판단 자체를 없앤다.
 
 ### 재는 방법
 

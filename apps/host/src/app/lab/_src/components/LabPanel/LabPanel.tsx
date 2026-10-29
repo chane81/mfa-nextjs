@@ -2,10 +2,10 @@ import type { ReactNode } from 'react';
 
 import { hueVar } from '@mfa/libs/style/hue';
 
-// `CatalogSection` 은 `CatalogSlot/` 안에 살지만 **두 번째 진입점**으로 공개된다.
-// Slot 배럴(`@/components/CatalogSlot`)로 가져오면 그쪽의 `useSearchParams` 가 이
-// 라우트 청크까지 따라온다 — 그래서 `/components` 를 지난다(배치 규칙 6절).
-import { CatalogSection } from '@/components/CatalogSlot/components';
+// `CatalogSlot/` 안의 조각을 **파일 경로로** 가리킨다. Slot 배럴
+// (`@/components/CatalogSlot`)로 가져오면 그쪽의 `useSearchParams` 가 이 라우트 청크까지
+// 따라온다 — 배럴은 재수출하는 모든 모듈을 끌고 온다(배치 규칙 6절).
+import { CatalogSection } from '@/components/CatalogSlot/components/CatalogSection';
 import { formatKst } from '../../libs/format-time';
 
 import { HydrationStamp } from './components/HydrationStamp';

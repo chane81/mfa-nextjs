@@ -217,32 +217,43 @@ export * from './CatalogSlot';
 export * from './components/CatalogSection'; // /lab/* 이 이것만 꺼낸다
 ```
 
-#### 한 배럴에 담았더니 안 쓰는 코드가 실렸다 — 진입점을 갈라 되돌렸다
+#### 한 배럴에 담았더니 안 쓰는 코드가 실렸다 — 배럴을 폴더당 하나로 줄였다
 
 처음엔 `CatalogSlot/index.ts` 에 Slot 과 Section 을 **같이** 담았다. 걱정한 건 P-1
 (`'use client'` 경계가 배럴에서 끊기는 것)이었는데 **그쪽은 안 깨졌고**, 값은 번들에서
 치렀다. `/lab/ssr` 의 프리렌더 HTML 이 참조하는 청크를 재 보면:
 
-| 배치                   | 청크 수 | 바이트             | `useSearchParams` 보유 청크 |
-| ---------------------- | ------- | ------------------ | --------------------------- |
-| 전(평면 · 직접 import) | 10      | 653,181            | 1 (Next 공용)               |
-| 한 배럴에 둘 다        | 10      | **653,690** (+509) | **2**                       |
-| **진입점 둘로 가름**   | 10      | **653,181** (±0)   | **1**                       |
+| 배치                           | 청크 수 | 바이트             | `useSearchParams` 보유 청크 |
+| ------------------------------ | ------- | ------------------ | --------------------------- |
+| 전(평면 · 직접 import)         | 10      | 653,181            | 1 (Next 공용)               |
+| 한 배럴에 둘 다                | 10      | **653,690** (+509) | **2**                       |
+| 조각 전용 배럴(`X/components`) | 10      | 653,181 (±0)       | 1                           |
+| **조각을 파일 경로로**         | 10      | **653,181** (±0)   | **1**                       |
 
-`LabPanel` 은 섹션만 쓰는데 `CatalogSlot` 을 받는다. 그래서 **진입점을 둘로 갈랐다.**
+`LabPanel` 은 섹션만 쓰는데 `CatalogSlot` 을 받는다. 아래 셋은 **바이트까지 같아서** 조각
+전용 배럴은 이득이 없고 **판단거리만 남긴다** — 그 배럴에 조각이 둘 이상 모이고 소비자가
+갈리면 같은 일이 그 층에서 또 난다(더미로 재현: +188 B). 그래서 규칙을 하나로 줄였다 —
+**배럴은 폴더당 하나, 대표 컴포넌트만.**
 
 ```
 components/CatalogSlot/
-├─ index.ts              ← URL 정책을 아는 쪽(Slot)
+├─ index.ts              ← 대표(Slot) 하나만 재수출
 ├─ CatalogSlot.tsx · CatalogSlot.test.tsx
 └─ components/
-   ├─ index.ts           ← URL 없이 섹션만 쓰는 쪽
-   └─ CatalogSection.tsx
+   └─ CatalogSection.tsx  ← 밖에서는 이 파일 경로로 가리킨다
 ```
 
-`/lab/*` 은 `@/components/CatalogSlot/components` 를 지난다. **승격한 것과 번들이 같고**
-폴더 모양은 남는다. 선례가 있다 — `@mfa/remote-config` 의 `index.ts`(브라우저 안전) /
-`node.ts`(node 전용).
+```ts
+import { CatalogSlot } from '@/components/CatalogSlot'; // 대표 — 짧다
+import { CatalogSection } from '@/components/CatalogSlot/components/CatalogSection';
+```
+
+**잃는 것은 "다른 폴더로 이사"뿐이다.** 조각을 파일 → 폴더로 승격하는 것은 호출부를
+건드리지 않는다 — `components/CatalogSection` 이 `.tsx` 와 `/index.ts` 를 똑같이
+해석한다(4절). 폴더를 옮기는 경우는 소비 범위가 바뀐 것이라 어차피 2절로 돌아간다.
+
+경로가 길어지는 건 **신호로 쓴다.** 여러 곳이 그 조각을 가리키고 있으면 그건 이미 Slot 의
+것이 아니다 — 공통 부모로 승격할 때다.
 
 #### 트리쉐이킹 설정으로는 못 고친다 — manifest 층이다
 
