@@ -1,6 +1,9 @@
 /**
- * host / remote 가 공유하는 프리미티브. 컴포넌트마다 폴더 하나다 — `<이름>/<이름>.tsx` 가 본체,
- * 같은 폴더의 `index.ts` 가 그걸 재수출하고 테스트도 그 옆에 둔다.
+ * host / remote 가 공유하는 프리미티브. **컴포넌트마다 파일 하나다** — 전용 조각이 없으니
+ * 폴더를 주지 않고(배치 규칙 4절), 테스트는 대상 옆에 평평하게 둔다.
+ *
+ * 재수출은 네임드다(5절). `export *` 로 묶으면 각 파일이 내부 헬퍼를 하나 export 하는
+ * 순간 그게 공개 API 가 된다 — 이 패키지는 host 와 remote 둘이 쓰는 경계다.
  *
  * 스타일은 Tailwind 클래스로 적는다. **이 패키지는 CSS 를 만들지 않는다** — 클래스 이름만
  * 내보내고, 실제 CSS 는 이 패키지를 쓰는 앱이 자기 파이프라인에서 컴파일한다.
@@ -11,8 +14,14 @@
  *
  * 그래서 테스트도 "어떻게 보이나" 가 아니라 "약속한 클래스와 CSS 변수를 실제로 내보내는가" 를 본다.
  */
-export * from './Badge';
-export * from './Button';
-export * from './ErrorBox';
-export * from './Panel';
-export * from './Skeleton';
+export { Badge } from './Badge';
+export { Button } from './Button';
+export { ErrorBox } from './ErrorBox';
+export { Panel } from './Panel';
+export { Skeleton } from './Skeleton';
+
+export type { BadgeProps } from './Badge';
+export type { ButtonProps } from './Button';
+export type { ErrorBoxProps } from './ErrorBox';
+export type { PanelProps } from './Panel';
+export type { SkeletonProps } from './Skeleton';
