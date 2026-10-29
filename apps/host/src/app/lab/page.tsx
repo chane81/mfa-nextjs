@@ -1,8 +1,8 @@
 import Link from 'next/link';
 
-import { hueVar } from '@mfa/utils/style/hue';
+import { hueVar } from '@mfa/libs/style/hue';
 
-import { LAB_MODES, LAB_ORDER } from '@/components/lab/modes';
+import { LAB_MODES, LAB_ORDER } from './_src/constants/modes';
 
 /**
  * 캐시 실험 인덱스.

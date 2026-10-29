@@ -5,7 +5,7 @@
      * **검사 전용 설정.** 편집기의 TS 서버와 `pnpm typecheck` 가 이걸 본다.
      *
      * emit 옵션(`outDir` · `rootDir` · `declaration`)은 전부 `tsconfig.build.json` 으로 옮겼다.
-     * 여기 두면 소스 옆 테스트가 `@mfa/utils` 의 헬퍼를 import 하는 순간
+     * 여기 두면 소스 옆 테스트가 `@mfa/libs` 의 헬퍼를 import 하는 순간
      * `TS6059: not under rootDir` 로 죽는다 — 그 파일은 `src` 밖에 있다.
      */
     "noEmit": true,

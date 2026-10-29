@@ -2,7 +2,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 
 import { REMOTE_NAMES, type RemoteName } from '@mfa/contracts';
 
-import { checkMfSecret, mfSecretHeader } from '@/lib/mf-secret';
+import { checkMfSecret, mfSecretHeader } from '@/libs/mf-secret';
 import {
   fetchRemoteVersion,
   announcedVersion,

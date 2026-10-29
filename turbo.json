@@ -51,7 +51,7 @@
     },
     "//#typecheck:scripts": {
       "dependsOn": ["^build"],
-      "inputs": ["scripts/**/*.ts", "packages/utils/src/**", "tsconfig.json"]
+      "inputs": ["scripts/**/*.ts", "packages/libs/src/**", "tsconfig.json"]
     },
     "//#typecheck:tests": {
       "inputs": ["tests/**", "vitest.config.ts", "tsconfig.test.json"]

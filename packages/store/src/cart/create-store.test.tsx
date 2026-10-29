@@ -3,8 +3,8 @@ import '@testing-library/jest-dom/vitest';
 import { PRODUCTS } from '@mfa/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearCookies } from '@mfa/utils/test/cookies';
-import { clearGlobalRegistries } from '@mfa/utils/test/globals';
+import { clearCookies } from '@mfa/libs/test/cookies';
+import { clearGlobalRegistries } from '@mfa/libs/test/globals';
 
 import { MAX_CART_QUANTITY, serializeCartCookie } from './cookie-codec';
 

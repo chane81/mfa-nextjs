@@ -1,5 +1,184 @@
 # 진행 상황
 
+## 2026-10-28 (54차) — 폴더를 "무엇인가" 축에서 "누가 쓰나" 축으로 돌린다
+
+외부 규칙 문서를 **한 번 베껴 왔다** —
+[chane81/fe-monorepo-architecture](https://github.com/chane81/fe-monorepo-architecture)
+의 `fe-monorepo-structure.md`. `.claude/rules/fe-monorepo-structure.md` 로 복사하고 안
+가져온 네 자리를 왜 뺐는지 그 안에 적었다. **그 저장소와 이어 두지는 않았다** — 복사한
+뒤로 이 파일은 이 저장소가 소유한다(ADR-030 의 "그 저장소와 이어 두지 않는다"). 판단 근거는 [ADR-030](02-architecture/01-decision.md#adr-030--코드는-쓰는-곳-옆에-둔다-콜로케이션).
+
+| 무엇               | before                     | after                                                      |
+| ------------------ | -------------------------- | ---------------------------------------------------------- |
+| 축                 | 역할(`components/` `lib/`) | **소비 범위**(컴포넌트 → 라우트 → 앱 → 패키지)             |
+| host `components/` | 평면 14파일                | 폴더 6 + 라우트 `_src/` 안으로 7                           |
+| host `lib/`        | 평면 4파일                 | `libs/` 2 + `app/lab/_src/libs/` 2                         |
+| 이름               | `components` `lib` `utils` | 다섯 개만 — `components / hooks / libs / constants / apis` |
+
+이사는 **38차에 적어둔 "`components/` 를 remote 별로 가른다"를 대체한다.** remote 축으로
+가르면 remote 에 묶이지 않는 `MfDiagnostics` · `LabPanel` 이 갈 곳이 없다.
+
+### 작업 중 규칙이 한 번 바뀌었다 — 51차·53차를 되돌린다
+
+처음엔 **파일 하나뿐인 조각도 폴더를 줬다**("승격 시점을 매번 판단하지 않는다"). 그 선택을
+PR 의 "확인 부탁"으로 올렸는데, 원본 저장소에 규칙이 추가됐다 — **단순하면 파일 하나,
+전용 조각(`hooks` · `libs` · `constants` · `types` · 하위 컴포넌트)이 생기면 폴더.**
+
+| 되돌린 것                                                      | 지금                 |
+| -------------------------------------------------------------- | -------------------- |
+| `@mfa/ui` 다섯(`Badge` `Button` `ErrorBox` `Panel` `Skeleton`) | 파일 — 51차를 되돌림 |
+| `mf/components/{RemoteBoundary,RemoteVersionSync}`             | 파일 — 53차를 되돌림 |
+| host 컴포넌트 아홉 · remote 둘 · `RemoteComponent` 하위 둘     | 파일                 |
+
+폴더로 **남은** 건 전용 조각을 가진 넷 — `SiteHeaderSlot` · `CartSlot` · `LabPanel` ·
+`RemoteComponent`.
+
+되돌리는 비용이 거의 0 이었던 이유: **`./components/X` 가 `X.tsx` 와 `X/index.ts` 를 똑같이
+해석한다.** 20개 폴더를 평탄화했는데 고친 import 는 상대 깊이 7자리뿐이고 호출부는 한 줄도
+안 바뀌었다. 승격·강등이 싸다는 게 "판단을 미뤄도 된다"의 근거다.
+
+### 어디로 갔나
+
+| 옮긴 것                                       | 어디로                                  | 왜                                                |
+| --------------------------------------------- | --------------------------------------- | ------------------------------------------------- |
+| `CheckoutSection`                             | `app/checkout/_src/components/`         | `/checkout` 만 쓴다. 껍데기는 page 가 흡수(아래)  |
+| `RelatedProductsSection`                      | `app/products/[id]/_src/components/`    | 그 라우트만                                       |
+| `MfDiagnostics`                               | `app/debug/_src/components/`            | `/debug` 만                                       |
+| `LabPanel` · `HydrationStamp` · `modes.ts`    | `app/lab/_src/{components,constants}/`  | `/lab/*` 넷이 쓴다 — 부모 `_src`                  |
+| `format-time` · `render-clock`                | `app/lab/_src/libs/`                    | 소비자가 lab 안에만 있다                          |
+| `MfWarmup`                                    | `app/internal/mf-warm/_src/components/` | 그 라우트 전용. `lab/` 과 무관이었다              |
+| `SiteHeaderSlot` · `CartSlot` · `CatalogSlot` | `src/components/<이름>/`                | 두 라우트 이상이 쓴다                             |
+| `CatalogSection`                              | `src/components/CatalogSection/`        | 주인이 둘(`CatalogSlot` · `LabPanel`) — 중첩 불가 |
+| `cart-cookie` · `mf-secret`                   | `src/libs/`                             | 라우트를 넘어 쓰인다                              |
+
+`MfWarmup` 이 `components/lab/` 에 있던 건 "lab 페이지에서 쓰니까" 였는데 그건 소유가
+아니다. 규칙을 적용하자 형제로 갈라졌다.
+
+### `_src` 는 라우팅에서 빠진다
+
+밑줄로 시작하는 폴더는 **그 폴더와 하위 전체가** Next 라우팅 대상에서 제외된다(근거:
+Next 16.4 공식 문서 `app/getting-started/project-structure` 의 "Private folders").
+`pnpm build` 의 라우트 목록이 이사 전후로 동일한 것으로 확인했다 — `/checkout/_src`
+같은 항목은 생기지 않는다.
+
+### 규칙에서 뺀 세 자리
+
+| 뺀 것                | 왜                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------ |
+| `app/_src/`          | 모든 라우트가 `app/` 의 자식이라 앱 전역과 구별되지 않는다                           |
+| `mf/` 의 여섯 레이어 | `loader` · `versions` · `trust` · `state` 를 `libs/` 로 뭉개면 의존 방향이 안 보인다 |
+| remote 의 `exposes/` | MF 빌드 설정이 직접 가리키는 계약 경계다                                             |
+
+`mf/components/RemoteComponent/` **안쪽**에는 적용했다 — `libs/module-cache.ts` ·
+`components/RemoteModuleView/` · `components/RemoteStyleLink/`. `'use client'` 디렉티브는
+파일을 따라 같이 내려갔다(53차 P-1).
+
+### 검증
+
+`format:check` · `lint` · `typecheck`(13/13) · `test`(56파일 · 706) · `build`(6/6, host
+프리렌더가 remote SSR 번들 실제 실행). 테스트 수는 그대로다 — 파일만 옮겼다.
+
+### CI 가 잡은 것 — MF DTS 는 파일을 옮기기만 해도 낡는다
+
+위 다섯 검사가 로컬에서 전부 통과하고 **CI 의 `build` job 만 죽었다.** `compiled-types/`
+가 remote 의 `src` 배치를 그대로 비추므로 props 를 안 고쳐도 **파일 목록**이 달라진다.
+재현과 오진 경로: [Q-1](05-troubleshooting/01-known-issues.md#q-1-mf-dts-는-props-를-안-고쳐도-파일을-옮기면-낡는다).
+
+처음엔 "아무도 import 하지 않는 고아 파일이니 다음 생성 때 바뀐다"로 넘겼다. 루트
+`CLAUDE.md` 의 조건이 **"remote 의 props 를 고쳤으면"** 이라 적혀 있어서 배치 변경이
+걸린다는 생각을 안 했다. 조건을 "props 또는 `src` 배치"로 넓혔다 —
+**좁게 적힌 조건은 밟기 전에는 맞아 보인다.**
+
+### 쿠키를 읽는 껍데기가 필요한 조건
+
+`CheckoutSlot` 을 **접어서 `app/checkout/page.tsx` 안으로 넣었다.** 본문이 두 줄이었고
+주석에 "지금은 부르는 라우트가 하나뿐이라 중복이 없지만 자리를 맞춰 둔다"고 적혀 있었다 —
+추측으로 만든 층이다. page 도 서버 컴포넌트라 쿠키를 직접 읽으면 된다.
+
+나머지 둘은 **접으면 틀린다.**
+
+| Slot             | 접히나    | 왜                                                                                  |
+| ---------------- | --------- | ----------------------------------------------------------------------------------- |
+| `CheckoutSlot`   | 접었다    | 소비자가 `/checkout` 하나. page 가 서버 컴포넌트다                                  |
+| `CartSlot`       | 못 접는다 | `/` · `/cart` 둘이 쓰고 `compact` prop 을 받는다                                    |
+| `SiteHeaderSlot` | 못 접는다 | layout 본문에서 읽으면 `<Suspense>` **밖**이 되어 모든 라우트가 프리렌더에서 빠진다 |
+
+조건이 하나가 아니라 둘이다 — **라우트 둘 이상이 쓰거나, 경계 안쪽이어야 하거나.**
+이 기준을 규칙 8절로 올렸다.
+ADR-020 의 요지("읽는 주체가 라우트")는 안 바뀐다. `/checkout` 의 캐시 성질도 그대로다
+(빌드 라우트 목록에서 `ƒ /checkout`).
+
+### 라우트 파일에 남아 있던 컴포넌트
+
+`app/products/[id]/page.tsx` 가 `ProductDetail` 을 **그 파일 안에** 선언하고 있었다.
+라우트 전용 컴포넌트니 `_src/components/ProductDetail.tsx` 로 내렸다. page 에는 셸과
+`<Suspense>` 만 남는다. `◐ /products/[id]`(Partial Prerender)는 그대로다.
+
+`/lab/{ssr,isr,cache}` 의 `DynamicPanel` · `IsrEquivalent` · `CachedShell` **셋은 남겼다.**
+그 함수들은 UI 를 조립하지 않는다 — `'use cache'` · `connection()` · `cacheLife()` 를
+지니는 것이 전부고, 본문은 `LabPanel` 한 줄 위임이다. 떼어내면 **라우트를 읽어도 그
+라우트의 캐시 성질을 알 수 없다**. 세 페이지를 나란히 놓고 정책만 비교하는 게 그 실험의
+형태다(`docs/04-experiments/03-cache-modes.md`).
+
+가른 기준을 규칙 7절로 올렸다 — **UI 를 조립하면 내리고, 디렉티브만 지니면 남긴다.**
+
+### `@mfa/utils` → `@mfa/libs`
+
+금지된 이름이 패키지 이름에도 남아 있을 이유가 없어서 개명했다(`packages/utils/` →
+`packages/libs/`). 소비처 45파일 + 세 Dockerfile 의 `COPY` + `vitest.config.ts` alias +
+`turbo.json` 의 `inputs` 가 같이 움직인다.
+
+⚠️ **Dockerfile 세 개가 `COPY packages/utils/package.json` 을 들고 있었다.** 빠뜨리면
+`pnpm install --frozen-lockfile` 이 이미지 안에서 죽는다. `docker-context.test.ts` 가
+그 줄을 대조하므로 `pnpm test` 가 잡는다 — 그래서 조용한 자리는 아니다.
+
+`style/` · `test/` 같은 그 안의 갈래 이름은 그대로 뒀다. 그건 `exports` 서브패스
+(`@mfa/libs/test/globals`)로 공개된 **API** 이고, 규칙이 금지하는 건 코드 배치 폴더 이름이다.
+ADR-025 · ADR-026 의 판단은 안 바뀌어서 그쪽엔 개명 주석만 달았다.
+
+### 밟은 것을 규칙 네 절로 올렸다
+
+함정이 known-issues 에만 남으면 다음에 또 밟는다. 그래서 이번에 밟은 것 중 **배치 규칙을
+지키다가 생기는 것**은 규칙 파일로 올렸다.
+
+| 절                                         | 이번에 뭘 밟았나                                        |
+| ------------------------------------------ | ------------------------------------------------------- |
+| 6절 ⚠️ 배럴이 `'use client'` 경계를 삼킨다 | 4절대로 폴더로 승격했더니 빌드가 죽었다(P-1)            |
+| 7절 라우트 파일에는 라우트만               | `page.tsx` 안의 `ProductDetail` · `CachedShell`         |
+| 8절 껍데기는 조건이 맞을 때만              | `CheckoutSlot` 이 "나중에 둘째가 생길 테니" 로 존재했다 |
+| 9절 `app/_src/` 는 만들지 않는다           | 루트 라우트 전용 ≡ 앱 전역. 이름이 둘인데 뜻이 하나다   |
+
+6절이 특히 그렇다 — **4절(단순→폴더 승격)을 지킬 때마다 재현되는** 함정이라 경고가 규칙
+옆에 없으면 같은 값을 매번 다시 치른다. 에러 원문과 "import trace 에 배럴이 안 나온다"는
+오진 조건까지 같이 적었다.
+
+### 베껴 온 쪽이 그 뒤 바뀌었다 — 둘만 가져왔다
+
+규칙을 올린 뒤 그 저장소가 세 번 더 바뀌었다(예시 파일 분리 · 본문을 묶음과 bullet 로
+재정리 · 정책 래퍼). **따라가지 않는 것이 기본**이므로(규칙 파일 머리) 하나씩 보고
+가져올 것만 손으로 옮겼다.
+
+| 그쪽 변경                            | 여기선              | 왜                                                                                  |
+| ------------------------------------ | ------------------- | ----------------------------------------------------------------------------------- |
+| `packages` 조건 · 역방향 import 금지 | **2절에 넣었다**    | 우리 2절은 승격 방향만 말하고 **반대를 막지 않았다**                                |
+| ✅/❌ 예시를 별도 파일로 분리        | 안 가져왔다         | 그쪽 ✅ 예시가 **우리 실물을 베낀 것**이다 — 두 벌이 되고 파일을 옮기면 낡는다(Q-1) |
+| 본문을 번호 bullet 로 재정리         | 안 가져왔다         | 절 번호를 바꾸면 "N절" 참조 일곱 자리가 끊긴다(규칙 파일 안 다섯 + 다른 문서 둘)    |
+| 정책 래퍼(그쪽 9-3)                  | 이미 있다(7절 예외) | 이번 PR 에서 먼저 넣었다                                                            |
+
+가져온 둘은 **지금 위반이 없다** — 일곱 패키지가 전부 host·catalog·cart 셋에 들어가고,
+`packages/*/src` 에서 `apps/` 나 `@/` 로 나가는 import 는 0 이다. 그래서 이건 고치는 규칙이
+아니라 **다음을 막는 규칙**이다. 린트로 박는 건(`no-restricted-imports` 를
+`packages/**` 에 거는 것) 하지 않았다 — 규칙 선정은 ADR-028 이 관리한다.
+
+### 남은 것
+
+- **`packages/` 삼분법**(`shared / domains / widgets`)은 적용하지 않았다. 그 "여러 도메인
+  조합 + 2개 이상 앱" 자리를 이 저장소에서는 런타임 remote 가 맡는다 — 대응표만 규칙
+  파일에 적었다.
+- ⚠️ `02-architecture/01-decision.md` 에 **ADR-020~027 이 두 벌 있다**(883줄대 · 1380줄대).
+  뒤쪽이 낡은 사본이다 — `peerDependencies` 를 카탈로그로 나눈다는 뒤집힌 판단이 거기
+  남아 있다. 이번 작업에서 만든 게 아니라 발견한 것이고, 지우지 않았다.
+
 ## 2026-10-27 (53차) — host 의 MF 컴포넌트를 폴더 하나씩으로 나눈다
 
 `apps/host/src/mf/components/` 가 평면이었다(소스 3 + 테스트 2). 51차에 `@mfa/ui` 가 쓴
