@@ -87,7 +87,10 @@ components/CartSlot/                  ← 전용 조각이 생긴 뒤
 ## 5. 이름 규칙
 
 - 컴포넌트: `PascalCase.tsx`. 폴더면 `PascalCase/` + `PascalCase.tsx` + `index.ts`
-- **`index.tsx` 에 컴포넌트를 직접 쓰지 않는다.** `index.ts` 는 재수출만 한다
+- **`index.tsx` 에 컴포넌트를 직접 쓰지 않는다.** `index.ts` 는 재수출만 한다.
+  예외는 **번들러가 규약으로 집는 엔트리** 하나다 — `apps/remote-cart/src/index.tsx` 는
+  Rsbuild 의 기본 엔트리(설정에 `entry` 가 없다)라 이름을 바꾸면 빌드가 깨진다.
+  catalog 는 Vite 라 같은 자리가 `main.tsx` 다
 - 재수출은 **네임드로 적는다** — `export { X } from './X'`. `export *` 는 쓰지 않는다:
   1. **공개 API 가 배럴에 보인다.** `export *` 면 원본에 `export` 를 하나 더 다는 순간
      조용히 공개된다.
@@ -99,8 +102,10 @@ components/CartSlot/                  ← 전용 조각이 생긴 뒤
   **공개 API 목록**으로 읽을 때 값과 타입의 경계가 안 보인다. `import` 쪽은 반대로 인라인이
   규칙이다(`oxlint.config.ts` 의 `consistent-type-imports` · `fixStyle: inline-type-imports`)
   — 소비 지점은 한 줄에 모이는 편이 읽기 싸고, 배럴은 목록이라 갈리는 편이 싸다
-- `export *` 는 **여러 모듈을 모으는 패키지 진입점**에만 남긴다(`packages/*/src/index.ts`).
-  거기서는 "그 폴더 전체가 공개 API" 가 의도이고, 경계는 `exports` 서브패스가 따로 친다
+- `export *` 는 **도메인 묶음을 한 번 더 모으는 집합 진입점**에만 남긴다
+  (`packages/store/src/index.ts` 가 `./cart` · `./hooks` 를 모으는 자리). 거기서는 "그
+  도메인 전체가 공개 API" 가 의도이고, 경계는 `exports` 서브패스가 따로 친다.
+  **컴포넌트를 모으는 배럴은 깊이와 무관하게 네임드다** — `@mfa/ui` 도 그렇다
 - 훅: `useXxx.ts` / 이 저장소의 패키지 안에서는 기존 `use-xxx.ts` 를 유지한다
   (`packages/store/src/hooks/` — 이름을 바꾸면 `exports` 와 문서가 같이 움직인다)
 - API: `<resource>.api.ts` · `<resource>.types.ts` — `api.ts` 처럼 리소스 없는 이름 금지
@@ -193,7 +198,12 @@ Client Component but none of its parents are marked with "use client".
 `[Server Component]` 로 찍혀서 원인이 "파일을 옮긴 것"처럼 보인다.
 
 - 배럴에 `'use client'` 를 적어 덮지 않는다 — 폴더마다 규칙이 갈린다. 서버 컴포넌트를
-  재수출하는 배럴도 있다(`RemoteVersionSync`)
+  재수출하는 배럴도 있다(`RemoteVersionSync`). 번들에서도 손해다: 경계가 배럴로 올라가
+  폴더 전체가 한 덩어리가 된다(실측 +432 B)
+- **예외는 `@mfa/store` 다.** 그 배럴은 일부러 `'use client'` 를 지닌다 — 패키지가
+  진입점을 둘로 갈라 두고(`index.ts` / `server.ts`) `package.json` 의 `react-server`
+  조건이 RSC 를 서버 쪽으로 보낸다. 디렉티브가 "이 진입점은 브라우저용"이라는 선언이고,
+  소비처는 양쪽 다 `@mfa/store` 로 부른다. 근거: ADR-015
 - **경계가 필요한 파일이 자기 머리에 디렉티브를 적는다.** 그 파일을 `libs/` 로 내릴 때
   디렉티브도 같이 옮긴다
 
