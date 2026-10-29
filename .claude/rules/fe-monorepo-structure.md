@@ -40,13 +40,19 @@ components/  hooks/  libs/  constants/  apis/
 | 라우트 하나(와 하위)  | `app/<route>/_src/{components,libs,…}` |
 | 같은 앱의 여러 라우트 | `src/{components,libs,…}`              |
 | 2개 이상 앱           | `packages/*`                           |
+| 범용(앱 수 무관)      | `packages/ui` · `packages/libs`        |
 
 `_src/` 는 밑줄로 시작해 **Next 라우팅에서 빠진다**(근거: Next 16.4 공식 문서
 `app/getting-started/project-structure` 의 "Private folders" — 폴더와 그 하위 전체가
 라우팅 대상에서 제외된다).
 
-표의 마지막 줄은 **조건이지 목표가 아니다.** `packages/*` 는 기준이 "모든 앱"이 아니라
-**"둘 이상"** 이고, 앱 하나만 쓰는 코드를 미리 올리지 않는다 — 둘째가 생길 때 올린다.
+`packages/*` 는 **조건이지 목표가 아니다.** 기준은 "모든 앱"이 아니라 **"둘 이상"** 이고,
+앱 하나만 쓰는 코드를 미리 올리지 않는다 — 둘째가 생길 때 올린다.
+
+**예외는 범용 코드다.** 앱 수와 상관없이 처음부터 둔다 — 컴포넌트는 `packages/ui`
+(Button, Badge), 훅·순수 함수·상수는 `packages/libs`(`useDebounce`, `formatDate`).
+범용 = 앱·도메인·화면 이름 없이 설명되고, 다른 앱에 그대로 옮겨도 동작한다.
+`formatPrice`(상품 가격 표시)처럼 도메인을 아는 코드는 범용이 아니다 — 사다리를 탄다.
 한 칸씩 올리는 것도 같다. 형제 라우트 둘이 쓰기 시작하면 그 **공통 부모의 `_src/`** 로
 올리고 `src/` 로 건너뛰지 않는다.
 
@@ -83,10 +89,11 @@ components/CartSlot/                  ← 전용 조각이 생긴 뒤
 - 컴포넌트: `PascalCase.tsx`. 폴더면 `PascalCase/` + `PascalCase.tsx` + `index.ts`
 - **`index.tsx` 에 컴포넌트를 직접 쓰지 않는다.** `index.ts` 는 재수출만 한다
 - 재수출은 **네임드로 적는다** — `export { X } from './X'`. `export *` 는 쓰지 않는다:
-  배럴을 열어도 **뭐가 공개인지 안 보이고**, 원본에 `export` 를 하나 더 달면 그게 조용히
-  공개된다("대표만 공개"를 파일이 스스로 못 지킨다). 이름이 겹치면 star 끼리는 **조용히
-  사라지지만**(ES 스펙상 모호한 star export 는 제외된다) 네임드는 컴파일에서 걸린다.
-  번들에는 차이가 없다(실측: 같은 바이트)
+  1. **공개 API 가 배럴에 보인다.** `export *` 면 원본에 `export` 를 하나 더 다는 순간
+     조용히 공개된다.
+  2. **이름의 출처가 한 곳으로 정해진다.** `export *` 면 도구가 모든 대상을 뒤져 이름을
+     찾고, 대상에 CommonJS·외부 모듈이 있으면 못 찾은 이름은 런타임 조회로 넘어간다.
+     네임드는 번들러·에디터·사람 모두 바로 추적한다.
 - **타입은 값과 다른 줄에 적는다** — `export { X } from './X'` 다음 줄에
   `export type { XProps } from './X'`. 한 줄에 섞은 `export { X, type XProps }` 는 배럴을
   **공개 API 목록**으로 읽을 때 값과 타입의 경계가 안 보인다. `import` 쪽은 반대로 인라인이
