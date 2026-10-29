@@ -12,4 +12,5 @@ export * from './product';
  * 그쪽까지 `@mfa/contracts/remote` 를 거치게 하면 **`@mf-types` 없이는 못 도는 코드**가
  * 이유 없이 늘어난다.
  */
-export { REMOTE_NAMES, type RemoteName } from '@mfa/remote-config';
+export { REMOTE_NAMES } from '@mfa/remote-config';
+export type { RemoteName } from '@mfa/remote-config';

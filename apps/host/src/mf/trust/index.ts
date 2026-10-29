@@ -13,7 +13,8 @@ import { ssrOrigin } from '../config';
  * 소비처 편의를 위해 여기서 다시 내보낸다 — 이 모듈을 쓰는 쪽은 신뢰 검사 함수들과
  * 이 직렬화를 거의 항상 같이 쓴다.
  */
-export { signedPayload, type SignedManifestFields } from '@mfa/remote-config';
+export { signedPayload } from '@mfa/remote-config';
+export type { SignedManifestFields } from '@mfa/remote-config';
 
 /**
  * remote 신뢰 경계.

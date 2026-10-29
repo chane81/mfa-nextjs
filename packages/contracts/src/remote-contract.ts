@@ -57,7 +57,8 @@ import { MODULE_IDS, type RemoteModuleId } from './generated/module-ids';
  * 생성 파일이 값에서 타입을 파생하면 emit 되는 선언에 외부 참조가 남지 않는다.
  * 생성 결과가 실제 계약과 맞는지는 `./contract-check` 가 `@mf-types` 와 대조한다.
  */
-export { MODULE_IDS, type RemoteModuleId } from './generated/module-ids';
+export { MODULE_IDS } from './generated/module-ids';
+export type { RemoteModuleId } from './generated/module-ids';
 
 /**
  * 모듈 id → 그 모듈의 실제 타입.
@@ -98,7 +99,8 @@ export type RemoteModule<K extends RemoteModuleId> = Awaited<
  * 여기서 재-export 하는 이유는 소비처 때문이다. host 는 이 이름과 모듈 id 를
  * 거의 항상 같이 쓰므로 import 를 둘로 쪼개면 읽기만 나빠진다.
  */
-export { REMOTE_NAMES, type RemoteName } from '@mfa/remote-config';
+export { REMOTE_NAMES } from '@mfa/remote-config';
+export type { RemoteName } from '@mfa/remote-config';
 
 /** 한 remote 가 노출하는 모듈 이름들 (`catalog/ProductGrid` → `ProductGrid`) */
 export function exposedNames(remote: RemoteName): string[] {

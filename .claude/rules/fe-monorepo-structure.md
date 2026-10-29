@@ -86,8 +86,12 @@ components/CartSlot/                  ← 전용 조각이 생긴 뒤
   배럴을 열어도 **뭐가 공개인지 안 보이고**, 원본에 `export` 를 하나 더 달면 그게 조용히
   공개된다("대표만 공개"를 파일이 스스로 못 지킨다). 이름이 겹치면 star 끼리는 **조용히
   사라지지만**(ES 스펙상 모호한 star export 는 제외된다) 네임드는 컴파일에서 걸린다.
-  번들에는 차이가 없다(실측: 같은 바이트). 타입은 `export type { … }` 로 가른다 —
-  `verbatimModuleSyntax: true` 다
+  번들에는 차이가 없다(실측: 같은 바이트)
+- **타입은 값과 다른 줄에 적는다** — `export { X } from './X'` 다음 줄에
+  `export type { XProps } from './X'`. 한 줄에 섞은 `export { X, type XProps }` 는 배럴을
+  **공개 API 목록**으로 읽을 때 값과 타입의 경계가 안 보인다. `import` 쪽은 반대로 인라인이
+  규칙이다(`oxlint.config.ts` 의 `consistent-type-imports` · `fixStyle: inline-type-imports`)
+  — 소비 지점은 한 줄에 모이는 편이 읽기 싸고, 배럴은 목록이라 갈리는 편이 싸다
 - `export *` 는 **여러 모듈을 모으는 패키지 진입점**에만 남긴다(`packages/*/src/index.ts`).
   거기서는 "그 폴더 전체가 공개 API" 가 의도이고, 경계는 `exports` 서브패스가 따로 친다
 - 훅: `useXxx.ts` / 이 저장소의 패키지 안에서는 기존 `use-xxx.ts` 를 유지한다

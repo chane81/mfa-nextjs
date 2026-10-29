@@ -6,9 +6,5 @@
  * `createCookieStorage({ read, write })`.
  */
 export { globalSingleton } from './global-singleton';
-export {
-  createCookieStorage,
-  readCookie,
-  type CookieAttributes,
-  type CookieStorageOptions,
-} from './cookie-storage';
+export { createCookieStorage, readCookie } from './cookie-storage';
+export type { CookieAttributes, CookieStorageOptions } from './cookie-storage';
