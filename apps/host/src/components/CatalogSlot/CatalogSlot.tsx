@@ -4,7 +4,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { PRODUCT_CATEGORIES, type ProductCategory } from '@mfa/contracts';
 
-import { CatalogSection } from '@/components/CatalogSection';
+import { CatalogSection } from './components/CatalogSection';
 
 /** 주소창의 값은 사용자가 손으로 고칠 수 있다 — 아는 카테고리만 통과시킨다 */
 function toCategory(raw: string | null): ProductCategory | 'all' {

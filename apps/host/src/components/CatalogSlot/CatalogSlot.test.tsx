@@ -23,7 +23,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => search,
 }));
 
-vi.mock('@/components/CatalogSection', () => ({
+vi.mock('./components/CatalogSection', () => ({
   CatalogSection: ({
     category,
     onCategoryChange,

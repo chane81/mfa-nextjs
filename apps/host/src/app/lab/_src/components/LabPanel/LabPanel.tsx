@@ -2,7 +2,9 @@ import type { ReactNode } from 'react';
 
 import { hueVar } from '@mfa/libs/style/hue';
 
-import { CatalogSection } from '@/components/CatalogSection';
+// `CatalogSection` 은 `CatalogSlot/` 안에 살지만 진입점으로 공개된다 — URL 정책이
+// 없는 이 라우트는 Slot 을 거치지 않고 섹션만 쓴다(배치 규칙 6절).
+import { CatalogSection } from '@/components/CatalogSlot';
 import { formatKst } from '../../libs/format-time';
 
 import { HydrationStamp } from './components/HydrationStamp';
