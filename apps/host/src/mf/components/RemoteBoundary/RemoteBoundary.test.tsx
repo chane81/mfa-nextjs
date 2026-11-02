@@ -13,7 +13,7 @@ import { RemoteBoundary } from './RemoteBoundary';
  * 그대로 나오는지를 본다 — 호출부가 다른 주소를 넘길 수 있던 시절의 반대다.
  */
 const { pinnedEntry } = vi.hoisted(() => ({ pinnedEntry: vi.fn() }));
-vi.mock('../loader', () => ({ pinnedEntry }));
+vi.mock('../../loader', () => ({ pinnedEntry }));
 
 function Boom({ message }: { message: string }): never {
   throw new Error(message);

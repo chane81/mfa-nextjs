@@ -86,8 +86,8 @@ export const SSR_ENTRIES = byRemote((remote) => ssrBundleUrl(remote));
  * 구워 넣은 것이라 브라우저에서도 배포된 오리진을 정확히 가리킨다. 서버 렌더와 값이
  * 같으므로 하이드레이션도 어긋나지 않는다.
  *
- * 쓰는 곳: `RemoteComponent` 가 remote 스타일시트 주소를 만들 때
- * (`stylesPath` 와 합쳐서). 그쪽 주석에 근거가 있다.
+ * 쓰는 곳: `components/RemoteComponent/RemoteStyleLink.tsx` 가 remote 스타일시트 주소를
+ * 만들 때(`stylesPath` 와 합쳐서). 그쪽 주석에 근거가 있다.
  */
 export const WEB_ORIGINS = byRemote(
   (remote) => new URL(WEB_ENTRIES[remote]).origin,
@@ -121,8 +121,9 @@ export const REMOTE_FETCH_TIMEOUT_MS = 10_000;
 /**
  * 버전을 공표하지 않은 remote 를 가리키는 이름.
  *
- * dev 에는 `mf-version.json` 이 없다. 그 상태를 `null` 로 흘려보내면 브라우저 lazy 캐시
- * 키(`RemoteComponent`)와 서버 번들 캐시 키(`loader/server.ts`)가 각자 자기 문자열을
+ * dev 에는 `mf-version.json` 이 없다. 그 상태를 `null` 로 흘려보내면 브라우저 적재 캐시
+ * 키(`components/RemoteComponent/module-cache.ts`)와 서버 번들 캐시 키(`loader/server.ts`)가
+ * 각자 자기 문자열을
  * 만들어 쓴다 — 두 캐시가 같은 상태를 다른 이름으로 부르게 되고, 한쪽만 무효화된다.
  * 이름을 여기 한 곳에 두면 그 갈라짐이 안 생긴다.
  */

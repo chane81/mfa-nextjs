@@ -27,6 +27,10 @@ host 는 번들러 플러그인 없이 `@module-federation/runtime` 만 쓴다. 
 테스트는 대상 소스 옆에 그대로 둔다. 배치 근거와 옛 경로 대응표:
 `docs/02-architecture/06-host-mf-layout.md`.
 
+`components/` 안은 **컴포넌트마다 폴더 하나**다(`<이름>/<이름>.tsx` 본체 + `index.ts` 재수출).
+배럴에는 `'use client'` 를 적지 않는다 — 대신 그 경계가 필요한 파일이 자기 머리에 적는다.
+디렉티브는 파일 단위라, 디렉티브 없는 배럴이 앞에 서면 경계가 거기서 끊긴다(known-issues P-1).
+
 ## SSOT 를 지킨다
 
 | 무엇                      | 어디                                                                      |

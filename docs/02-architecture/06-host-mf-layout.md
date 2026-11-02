@@ -8,14 +8,14 @@ host 가 remote 를 소비하는 코드는 전부 `apps/host/src/mf/` 안에 있
 지금은 **여섯 폴더**다. 나눈 축은 레이어(client/server)가 아니라 **그 폴더가 답하는
 질문**이다.
 
-| 폴더          | 답하는 질문                       | 파일                                                       |
-| ------------- | --------------------------------- | ---------------------------------------------------------- |
-| `config/`     | remote 주소는? 호출 예산은?       | `index.ts`                                                 |
-| `versions/`   | 지금 가리켜야 할 버전이 무엇인가? | `index.ts` · `browser.ts` · `server.ts`                    |
-| `state/`      | 이 프로세스가 지금 뭘 들고 있나?  | `cell.ts` · `warm.ts` · `loader-stats.ts`                  |
-| `trust/`      | 이 remote 를 믿어도 되나?         | `index.ts`                                                 |
-| `loader/`     | 어떻게 가져와서 실행하나?         | `index.ts` · `server.ts` · `react-modules.ts`              |
-| `components/` | 화면에 어떻게 붙나?               | `RemoteComponent` · `RemoteBoundary` · `RemoteVersionSync` |
+| 폴더          | 답하는 질문                       | 파일                                                          |
+| ------------- | --------------------------------- | ------------------------------------------------------------- |
+| `config/`     | remote 주소는? 호출 예산은?       | `index.ts`                                                    |
+| `versions/`   | 지금 가리켜야 할 버전이 무엇인가? | `index.ts` · `browser.ts` · `server.ts`                       |
+| `state/`      | 이 프로세스가 지금 뭘 들고 있나?  | `cell.ts` · `warm.ts` · `loader-stats.ts`                     |
+| `trust/`      | 이 remote 를 믿어도 되나?         | `index.ts`                                                    |
+| `loader/`     | 어떻게 가져와서 실행하나?         | `index.ts` · `server.ts` · `react-modules.ts`                 |
+| `components/` | 화면에 어떻게 붙나?               | `RemoteComponent/` · `RemoteBoundary/` · `RemoteVersionSync/` |
 
 테스트는 저장소 규칙대로 **대상 소스 옆**에 그대로 둔다(`trust/index.ts` →
 `trust/index.test.ts`). 폴더를 나누면 테스트도 같이 나뉜다 — 그게 이 배치의 실질적인
@@ -90,21 +90,44 @@ Client Component but none of its parents are marked with "use client" …
 
 과거 회차 기록과 오래된 링크를 읽을 때 쓴다.
 
-| 26차 이전                  | 지금                                  |
-| -------------------------- | ------------------------------------- |
-| `mf/runtime.ts`            | `mf/loader/index.ts`                  |
-| `mf/server-loader.ts`      | `mf/loader/server.ts`                 |
-| `mf/interop.ts`            | `mf/loader/react-modules.ts`          |
-| `mf/remote-endpoints.ts`   | `mf/config/index.ts`                  |
-| `mf/constants.ts`          | `mf/config/index.ts` (흡수)           |
-| `mf/global-state.ts`       | `mf/state/cell.ts`                    |
-| `mf/warm-state.ts`         | `mf/state/warm.ts`                    |
-| `mf/loader-stats.ts`       | `mf/state/loader-stats.ts`            |
-| `mf/remote-trust.ts`       | `mf/trust/index.ts`                   |
-| `mf/RemoteComponent.tsx`   | `mf/components/RemoteComponent.tsx`   |
-| `mf/RemoteBoundary.tsx`    | `mf/components/RemoteBoundary.tsx`    |
-| `mf/RemoteVersionSync.tsx` | `mf/components/RemoteVersionSync.tsx` |
-| `mf/versions/*`            | 그대로                                |
+| 26차 이전                  | 지금                               |
+| -------------------------- | ---------------------------------- |
+| `mf/runtime.ts`            | `mf/loader/index.ts`               |
+| `mf/server-loader.ts`      | `mf/loader/server.ts`              |
+| `mf/interop.ts`            | `mf/loader/react-modules.ts`       |
+| `mf/remote-endpoints.ts`   | `mf/config/index.ts`               |
+| `mf/constants.ts`          | `mf/config/index.ts` (흡수)        |
+| `mf/global-state.ts`       | `mf/state/cell.ts`                 |
+| `mf/warm-state.ts`         | `mf/state/warm.ts`                 |
+| `mf/loader-stats.ts`       | `mf/state/loader-stats.ts`         |
+| `mf/remote-trust.ts`       | `mf/trust/index.ts`                |
+| `mf/RemoteComponent.tsx`   | `mf/components/RemoteComponent/`   |
+| `mf/RemoteBoundary.tsx`    | `mf/components/RemoteBoundary/`    |
+| `mf/RemoteVersionSync.tsx` | `mf/components/RemoteVersionSync/` |
+| `mf/versions/*`            | 그대로                             |
+
+53차에 `components/` 안이 한 번 더 나뉘었다 — 아래 절.
+
+## `components/` 는 컴포넌트마다 폴더 하나다
+
+`@mfa/ui` 가 51차에 쓴 규칙과 같다: `<이름>/<이름>.tsx` 가 본체, 같은 폴더의 `index.ts` 가
+재수출, 테스트도 그 옆. 호출부 경로(`@/mf/components/RemoteComponent`)는 그대로다.
+
+| 파일                                   | 무엇                                                      |
+| -------------------------------------- | --------------------------------------------------------- |
+| `RemoteComponent/RemoteComponent.tsx`  | 경계 · 스타일시트 · `Suspense` 를 조립하는 공개 진입점    |
+| `RemoteComponent/module-cache.ts`      | 적재 캐시와 키 규칙(`remoteCacheKey`). `MfWarmup` 도 쓴다 |
+| `RemoteComponent/RemoteModuleView.tsx` | `use(promise)` 로 적재된 모듈을 그리는 고정 컴포넌트      |
+| `RemoteComponent/RemoteStyleLink.tsx`  | remote 스타일시트 `<link>` 조립                           |
+
+진입점이 셋을 조립하는 모양이 되면서 **각 조각을 따로 읽을 수 있다** — 173줄 한 파일에
+서로 다른 네 가지 근거(캐시 키 · promise 캐시 · CSS 경로 · Suspense 배치)가 주석으로
+섞여 있던 상태를 폴더가 대신 설명한다.
+
+⚠️ **배럴을 두면 `'use client'` 경계가 그 앞에서 끊긴다.** 디렉티브는 파일 단위라,
+디렉티브 없는 `index.ts` 가 앞에 서면 그 폴더의 디렉티브 없는 모듈이 RSC 그래프에
+남는다. `module-cache.ts` 가 자기 머리에 디렉티브를 적는 이유다 — 재현과 기각한 대안:
+[P-1](../05-troubleshooting/01-known-issues.md#p-1-배럴을-거치면-use-client-경계가-사라진다).
 
 ## 새 파일을 어디에 두나
 
