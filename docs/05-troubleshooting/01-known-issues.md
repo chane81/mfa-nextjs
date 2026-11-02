@@ -31,6 +31,8 @@
 | Turbopack 이 상대경로 `.js` 를 못 찾음                               | [2](#2-turbopack-이-상대경로-js-확장자를-못-찾음)                                                                                                                                                                                       |
 | `You're importing a component that imports react-dom/client`         | 공유 모듈 파일이 RSC 그래프에 딸려 들어갔다 — [H-1](#h-1-공유-모듈-표에-react-domclient-실체를-담으면-rsc-그래프가-막는다). 컴포넌트를 폴더로 쪼갠 직후라면 배럴이 경계를 삼켰다 — [P-1](#p-1-배럴을-거치면-use-client-경계가-사라진다) |
 | `@mfa/contracts` 빌드가 `window` 를 못 찾음                          | [7](#7-mfacontracts-빌드가-window-를-못-찾음)                                                                                                                                                                                           |
+| CI 의 `build` job 만 실패: `커밋된 MF 타입/모듈 목록이 낡았습니다`   | remote 의 파일을 옮겼다 — [Q-1](#q-1-mf-dts-는-props-를-안-고쳐도-파일을-옮기면-낡는다)                                                                                                                                                 |
+| 안 쓰는 컴포넌트가 라우트 청크에 실림 (빌드는 통과)                  | 폴더 배럴이 둘을 같이 내보낸다 — [Q-2](#q-2-폴더-배럴이-라우트의-client-reference-목록을-넓힌다)                                                                                                                                        |
 | 배포 빌드만 다른 경로로 통과함                                       | [B-6](#b-6-배포-빌드는-문서에-없는-경로로-통과하고-있었다)                                                                                                                                                                              |
 
 ### remote 가 안 뜨거나 깨짐
@@ -127,6 +129,106 @@
 | `pnpm test` 에 `ExperimentalWarning: localStorage is not available` 가 7번 찍힘 (테스트는 통과) | Node 26 내장 전역과 jsdom 이 겹친다 — [M-1](#m-1-node-26-의-내장-localstorage-때문에-jsdom-테스트가-경고를-7번-찍는다) |
 | 컴포넌트가 제한 시간까지 스켈레톤에 머묾 + `A component suspended inside an act scope`          | 렌더를 `await act` 로 안 감쌌다 — [O-1](#o-1-usepromise-로-suspend-하면-rtl-의-동기-render-에서-영원히-스켈레톤이다)   |
 | 두 번째 렌더부터 화면이 통째로 빔 (fallback 도 없음)                                            | 같은 thenable 로 다시 suspend 했다 — [O-2](#o-2-두-번째-렌더부터는-fallback-조차-커밋되지-않는다)                      |
+
+## Q. (54차) 폴더를 콜로케이션 축으로 돌리며 밟은 것
+
+### Q-1. MF DTS 는 props 를 안 고쳐도 파일을 옮기면 낡는다
+
+remote 컴포넌트를 폴더로 감쌌다(`components/ProductCard.tsx` → `components/ProductCard/`).
+**props 는 한 글자도 안 고쳤고** 로컬 `pnpm build` 6/6 · `typecheck` 13/13 · `test` 706개가
+전부 통과했다. CI 의 `build` job 만 죽었다.
+
+```
+diff --git a/packages/contracts/src/generated/@mf-types/catalog/compiled-types/src/components/ProductCard.d.ts b/...
+deleted file mode 100644
+--- a/packages/contracts/src/generated/@mf-types/catalog/compiled-types/src/components/ProductCard.d.ts
++++ /dev/null
+##[error]커밋된 MF 타입/모듈 목록이 낡았습니다. 로컬에서 'pnpm mf:types' 를 돌리고 결과를 커밋하세요.
+```
+
+원인은 `compiled-types/` 가 **remote 의 `src` 배치를 그대로 비추기** 때문이다. 파일을
+옮기면 그 트리의 경로도 옮겨간다 — 타입의 **내용**이 같아도 **파일 목록**이 달라진다.
+
+로컬에서 안 걸린 이유가 둘이다.
+
+| 왜 안 걸렸나                            | 무슨 일                                                            |
+| --------------------------------------- | ------------------------------------------------------------------ |
+| 그 `.d.ts` 를 아무도 import 하지 않는다 | 노출된 모듈의 `.d.ts` 는 props 를 자기 안에 적는다 — 고아 파일이다 |
+| `pnpm mf:types` 는 기본 검사에 없다     | remote 기동이 필요해서다. CI 만 `serve-all-remotes` 로 띄워 돌린다 |
+
+**해결**: `node scripts/serve-all-remotes.ts -- pnpm mf:types` 를 돌려 결과를 같이 커밋한다.
+`git diff` 에는 **삭제만** 보인다 — 새 경로는 추적되지 않은 파일이라 `git status` 로 봐야
+한다. CI 로그도 삭제만 보여주므로 "파일이 사라진다"로 오진하기 쉽다.
+
+루트 `CLAUDE.md` 의 규칙이 "remote 의 **props 를** 고쳤으면" 이라 적혀 있었다. 조건을
+"props 또는 `src` 배치"로 넓혔다 — 좁게 적힌 조건은 밟기 전에는 맞아 보인다.
+
+### Q-2. 폴더 배럴이 라우트의 client reference 목록을 넓힌다
+
+`CatalogSlot/index.ts` 가 Slot 과 `CatalogSection` 을 **같이** 재수출했다. `/lab/*` 은
+섹션만 쓰는데 `useSearchParams` 를 가진 `CatalogSlot` 이 그 라우트의 클라이언트 청크로
+따라 들어왔다.
+
+**빌드는 통과하고 프리렌더도 안 깨진다**(`◐` 유지) — 훅이 그 라우트에서 실행되지 않기
+때문이다. 증상은 번들 크기뿐이라 눈에 안 띈다.
+
+```
+.next/server/app/lab/ssr/page_client-reference-manifest.js
+  한 배럴 → src/components/CatalogSlot/CatalogSlot.tsx          ← 안 쓰는데 등록된다
+           src/components/CatalogSlot/components/CatalogSection.tsx
+  가름   → src/components/CatalogSlot/components/CatalogSection.tsx
+```
+
+**트리쉐이킹 문제가 아니다.** 죽은 코드를 못 털어낸 게 아니라 배럴이 manifest 를 넓힌다.
+그래서 번들러 설정으로는 안 고쳐진다.
+
+| 시도                                                | `/lab/ssr` 청크 | manifest     |
+| --------------------------------------------------- | --------------- | ------------ |
+| 한 배럴 (`export *`)                                | 653,690 B       | 모듈 2개     |
+| 한 배럴 (**네임드 재수출**)                         | 653,690 B       | 모듈 2개     |
+| 한 배럴 + 배럴에 `'use client'`                     | 653,613 B       | 배럴 1개     |
+| `experimental.optimizePackageImports` 에 alias 추가 | 653,132 B       | **그대로**   |
+| `sideEffects: ["*.css"]`                            | 653,132 B       | **그대로**   |
+| **진입점 분리**                                     | 653,181 B       | **모듈 1개** |
+
+**재수출 문법은 원인이 아니다** — 네임드로 바꿔도 바이트까지 같다. 배럴 모듈이 두
+클라이언트 모듈을 참조한다는 사실이 원인이다. 배럴에 `'use client'` 를 붙이면 manifest 는
+한 줄로 줄지만(본체가 배럴 뒤로 숨는다) 경계가 배럴로 올라가 폴더 전체가 한 덩어리가 되고
+번들이 커진다.
+
+`optimizePackageImports` 는 **패키지명 대상**이라 `@/` alias 에 걸리지 않는다.
+`sideEffects` 는 앱 전체를 −558 B 줄이지만(직교하는 이득) manifest 와 무관하다.
+`turbopackInferModuleSideEffects` · `turbopackScopeHoisting` 은 프로덕션 기본값이 이미
+`true` 다 — 켤 것이 없다.
+
+**해결**: 배럴에는 그 폴더의 **대표 컴포넌트만** 올린다. 안쪽 조각을 밖에서 쓰면 그
+**파일 경로**로 가리킨다(`@/components/CatalogSlot/components/CatalogSection`).
+배치 규칙 6절에 성문화했다.
+
+**조각 전용 배럴로는 안 풀린다.** `X/components/index.ts` 를 만들어도 거기에 조각이 둘
+이상 모이고 소비자가 갈리면 같은 일이 그 층에서 또 난다. 더미 컴포넌트(홈만 쓰는
+`'use client'` 하나)를 그 배럴에 올려 재현했다 — `/lab/ssr` manifest 에 등록되고 청크에
++188 B 실렸다. 그래서 **내부 폴더에는 배럴을 두지 않는다** — 소비자 집합을 매번 세는
+판단 자체를 없앤다.
+
+### 재는 방법
+
+```bash
+pnpm build
+# 1) 이 라우트가 어떤 클라이언트 모듈을 받는가
+grep -o 'src/components/[A-Za-z0-9_/.-]*\.tsx' \
+  apps/host/.next/server/app/lab/ssr/page_client-reference-manifest.js | sort -u
+# 2) 그 라우트 HTML 이 참조하는 청크의 총 바이트
+for c in $(grep -o 'static/chunks/[a-z0-9_.-]*\.js' \
+             apps/host/.next/server/app/lab/ssr.html | sort -u); do
+  stat -f%z "apps/host/.next/$c"
+done | paste -sd+ - | bc
+```
+
+청크 **이름은 내용 해시**라 이사 전후로 전부 바뀐다 — 이름을 비교하지 말고 **개수와
+바이트**, 그리고 manifest 의 모듈 목록을 본다.
+
+검증일: 2026-10-29 · `next@16.4.2` · Turbopack.
 
 ## P. (53차) host 의 MF 컴포넌트를 폴더로 나누며 밟은 것
 
@@ -318,7 +420,7 @@ ESLint 시절엔 이유를 `--` 뒤 한 줄에 몰아 써서 이 모양이 나�
 
 **처음엔 줄마다 `oxlint-disable-next-line react/purity` 로 껐다가 걷어냈다.** 같은 이유의
 disable 이 세 곳에 복제되고, 실험 페이지를 하나 더 만들면 또 복제해야 한다. 대신 측정점을
-`readRenderClock()`(`apps/host/src/lib/render-clock.ts`) 하나로 모았다.
+`readRenderClock()`(`apps/host/src/app/lab/_src/libs/render-clock.ts`) 하나로 모았다.
 
 ```tsx
 // 전: 렌더 함수 안에서 시계를 직접 읽는다 → react(purity) error
@@ -1255,7 +1357,7 @@ optimizeDeps: {
 Vite dev 설정에는 없다 — **있어야 할 이유도 없다.** 테스트는 애초에 dev 모듈 그래프에
 들어갈 파일이 아니다.
 
-> 41차에 헬퍼가 `@mfa/utils/test/*` 로 옮겨가면서 **이 줄은 해석된다.** 대신 같은
+> 41차에 헬퍼가 `@mfa/libs/test/*`(당시 `@mfa/utils`) 로 옮겨가면서 **이 줄은 해석된다.** 대신 같은
 > 파일의 `vitest` · `@testing-library/*` import 가 같은 자리에서 같은 모양으로 터진다.
 > 고침(파일을 dev 그래프에 안 들인다)은 그대로다.
 
@@ -1488,9 +1590,9 @@ $ tsc -p tsconfig.json --noEmit --listFiles | grep mfa-nextjs/tests/
 .../tests/helpers/signing.ts
 ```
 
-> 41차에 헬퍼가 `packages/utils` 로 옮겨갔다. **성질은 그대로다** — 그 패키지는 빌드가
+> 41차에 헬퍼가 `packages/libs`(당시 `packages/utils`) 로 옮겨갔다. **성질은 그대로다** — 그 패키지는 빌드가
 > 없어서 `exports` 가 소스를 직접 가리키고, `^build` 는 빌드 태스크가 없으니 건너뛴다.
-> 그래서 inputs 에 `packages/utils/src/**` 를 적어야 하는 것도 그대로다.
+> 그래서 inputs 에 `packages/libs/src/**` 를 적어야 하는 것도 그대로다.
 
 inputs 에 없으니 헬퍼를 깨도 turbo 가 캐시된 PASS 를 재생한다. 실측 — 헬퍼에 한 줄 넣고 재실행:
 

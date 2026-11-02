@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { fakeResponse } from '@mfa/utils/test/http';
+import { fakeResponse } from '@mfa/libs/test/http';
 
 import { MF_FILES } from '@mfa/remote-config';
 

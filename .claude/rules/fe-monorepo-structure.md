@@ -1,0 +1,298 @@
+---
+paths:
+  - 'apps/**'
+  - 'packages/**'
+---
+
+# 폴더 구조 규칙 — 콜로케이션
+
+파일·폴더를 새로 만들거나 옮길 때 이 규칙을 따른다. **이 파일이 이 저장소의 배치 SSOT 다.**
+
+2026-10-28 에 [chane81/fe-monorepo-architecture](https://github.com/chane81/fe-monorepo-architecture)
+의 규칙 문서를 **한 번 베껴 와** 이 저장소에 맞게 고쳤다. 거기서 출발했다는 사실 말고는
+이어진 데가 없다 — **그쪽이 바뀌어도 따라가지 않고, 여기서 바뀐 것도 올리지 않는다.**
+고칠 일이 생기면 이 파일만 고친다.
+
+마지막 절은 저 문서에서 **일부러 뺀 것**을 왜 뺐는지 적어 둔 자리다.
+
+## 1. 다섯 이름을 모든 깊이에서 반복한다
+
+```
+components/  hooks/  libs/  constants/  apis/
+```
+
+앱이든 라우트든 컴포넌트 내부든 **같은 뜻**이다. 다른 이름을 새로 만들지 않는다 —
+`utils` · `helpers` · `services` · `common` 금지.
+
+앱·패키지 **루트에만** `types/` 가 하나 더 허용된다(여러 층이 공유하는 타입 선언).
+
+## 2. 쓰는 곳 가장 가까이에 둔다
+
+처음부터 위로 올리지 않는다. 공유 범위가 넓어지면 **가장 가까운 공통 부모로 승격**한다.
+
+```
+컴포넌트 내부  →  라우트 `_src/`  →  앱 `src/`  →  `packages/*`
+```
+
+| 쓰는 범위             | 어디에                                 |
+| --------------------- | -------------------------------------- |
+| 컴포넌트 하나         | `<Component>/{hooks,libs,constants}/`  |
+| 라우트 하나(와 하위)  | `app/<route>/_src/{components,libs,…}` |
+| 같은 앱의 여러 라우트 | `src/{components,libs,…}`              |
+| 2개 이상 앱           | `packages/*`                           |
+| 범용(앱 수 무관)      | `packages/ui` · `packages/libs`        |
+
+`_src/` 는 밑줄로 시작해 **Next 라우팅에서 빠진다**(근거: Next 16.4 공식 문서
+`app/getting-started/project-structure` 의 "Private folders" — 폴더와 그 하위 전체가
+라우팅 대상에서 제외된다).
+
+`packages/*` 는 **조건이지 목표가 아니다.** 기준은 "모든 앱"이 아니라 **"둘 이상"** 이고,
+앱 하나만 쓰는 코드를 미리 올리지 않는다 — 둘째가 생길 때 올린다.
+
+**예외는 범용 코드다.** 앱 수와 상관없이 처음부터 둔다 — 컴포넌트는 `packages/ui`
+(Button, Badge), 훅·순수 함수·상수는 `packages/libs`(`useDebounce`, `formatDate`).
+범용 = 앱·도메인·화면 이름 없이 설명되고, 다른 앱에 그대로 옮겨도 동작한다.
+`formatPrice`(상품 가격 표시)처럼 도메인을 아는 코드는 범용이 아니다 — 사다리를 탄다.
+한 칸씩 올리는 것도 같다. 형제 라우트 둘이 쓰기 시작하면 그 **공통 부모의 `_src/`** 로
+올리고 `src/` 로 건너뛰지 않는다.
+
+**역방향은 없다** — `packages/*` 는 `apps/*` 를 import 하지 않는다. 패키지가 앱의 값을
+필요로 하면 그건 "그 값이 패키지 쪽 SSOT 여야 한다"는 신호다(remote 배치는
+`@mfa/remote-config`, 모듈 이름은 `@mfa/contracts`).
+
+## 3. 층을 넘을 때는 "코드의 주인"을 먼저 본다
+
+도메인 로직은 소비자가 한 곳뿐이어도 그 도메인에 둔다. "쓰는 곳 가까이" 는 **같은 층
+안에서만** 적용한다. 이 저장소에서 그 도메인은 `apps/host/src/mf`(런타임 MF)와
+`packages/{contracts,remote-config,store}` 다.
+
+## 4. 컴포넌트는 단순하면 파일 하나, 복잡해지면 폴더
+
+```
+components/Badge.tsx                  ← 단순. 이게 기본값이다
+components/CartSlot/                  ← 전용 조각이 생긴 뒤
+  CartSlot.tsx · index.ts
+  components/CartSection.tsx
+```
+
+폴더로 바꾸는 **조건**은 그 컴포넌트 전용 `hooks` · `libs` · `constants` · `types` 나
+하위 컴포넌트가 생기는 것이다. 파일이 하나뿐이면 폴더를 주지 않는다.
+
+**import 경로는 둘 다 같다** — `./components/CartSlot` 이 `CartSlot.tsx` 와
+`CartSlot/index.ts` 를 똑같이 해석한다. 그래서 승격해도 호출부가 안 바뀐다.
+
+테스트 파일은 폴더로 바꾸는 조건이 **아니다**. 대상 옆에 평평하게 둔다
+(`Badge.tsx` → `Badge.test.tsx`).
+
+## 5. 이름 규칙
+
+- 컴포넌트: `PascalCase.tsx`. 폴더면 `PascalCase/` + `PascalCase.tsx` + `index.ts`
+- **`index.tsx` 에 컴포넌트를 직접 쓰지 않는다.** `index.ts` 는 재수출만 한다.
+  예외는 **번들러가 규약으로 집는 엔트리** 하나다 — `apps/remote-cart/src/index.tsx` 는
+  Rsbuild 의 기본 엔트리(설정에 `entry` 가 없다)라 이름을 바꾸면 빌드가 깨진다.
+  catalog 는 Vite 라 같은 자리가 `main.tsx` 다
+- 재수출은 **네임드로 적는다** — `export { X } from './X'`. `export *` 는 쓰지 않는다:
+  1. **공개 API 가 배럴에 보인다.** `export *` 면 원본에 `export` 를 하나 더 다는 순간
+     조용히 공개된다.
+  2. **이름의 출처가 한 곳으로 정해진다.** `export *` 면 도구가 모든 대상을 뒤져 이름을
+     찾고, 대상에 CommonJS·외부 모듈이 있으면 못 찾은 이름은 런타임 조회로 넘어간다.
+     네임드는 번들러·에디터·사람 모두 바로 추적한다.
+- **타입은 값과 다른 줄에 적는다** — `export { X } from './X'` 다음 줄에
+  `export type { XProps } from './X'`. 한 줄에 섞은 `export { X, type XProps }` 는 배럴을
+  **공개 API 목록**으로 읽을 때 값과 타입의 경계가 안 보인다. `import` 쪽은 반대로 인라인이
+  규칙이다(`oxlint.config.ts` 의 `consistent-type-imports` · `fixStyle: inline-type-imports`)
+  — 소비 지점은 한 줄에 모이는 편이 읽기 싸고, 배럴은 목록이라 갈리는 편이 싸다
+- `export *` 는 **도메인 묶음을 한 번 더 모으는 집합 진입점**에만 남긴다
+  (`packages/store/src/index.ts` 가 `./cart` · `./hooks` 를 모으는 자리). 거기서는 "그
+  도메인 전체가 공개 API" 가 의도이고, 경계는 `exports` 서브패스가 따로 친다.
+  **컴포넌트를 모으는 배럴은 깊이와 무관하게 네임드다** — `@mfa/ui` 도 그렇다
+- 훅: `useXxx.ts` / 이 저장소의 패키지 안에서는 기존 `use-xxx.ts` 를 유지한다
+  (`packages/store/src/hooks/` — 이름을 바꾸면 `exports` 와 문서가 같이 움직인다)
+- API: `<resource>.api.ts` · `<resource>.types.ts` — `api.ts` 처럼 리소스 없는 이름 금지
+- 테스트는 대상 옆에. 환경은 확장자로 갈린다 — `.test.ts` = node, `.test.tsx` = jsdom
+
+## 6. 경계와 import
+
+- 폴더의 **대표 컴포넌트는 진입점으로** import 한다(`@/components/X`). 안쪽 조각이
+  필요하면 그 **파일 경로**로 가리킨다(`@/components/X/components/Y`) — 내부 폴더에는
+  배럴을 두지 않는다(아래)
+- 부모 라우트의 `_src` 는 하위 라우트가 가져다 써도 된다. 그 반대는 금지
+- 라우트 안에서는 상대경로, 라우트 밖으로 나갈 때는 `@/` alias
+
+### 배럴은 폴더당 하나 — 대표 컴포넌트만 올린다
+
+```
+X/
+├─ index.ts          ← X 하나만 재수출한다. 내부 폴더에는 index.ts 를 두지 않는다
+├─ X.tsx
+└─ components/Y.tsx
+```
+
+```ts
+import { X } from '@/components/X'; // 대표 — 짧게 쓴다
+import { Y } from '@/components/X/components/Y'; // 조각 — 파일 경로로 가리킨다
+```
+
+**`components/` · `hooks/` · `libs/` 같은 내부 폴더에는 배럴을 만들지 않는다.** 밖에서 조각
+하나를 쓰게 됐으면 그 **파일 경로**로 가리킨다.
+
+왜 조각까지 배럴에 모으지 않나 — 배럴은 자기가 재수출하는 **모든 모듈을 소비자의 청크로
+끌고 온다.** `X/index.ts` 에 X 와 Y 를 같이 담으면 Y 만 쓰는 소비자가 X 까지 받는다.
+
+| 배치                           | `/lab/ssr` 클라이언트 청크 | `useSearchParams` 보유 청크 |
+| ------------------------------ | -------------------------- | --------------------------- |
+| `X/index.ts` 에 둘 다          | 653,690 B                  | 2                           |
+| **조각을 파일 경로로**         | **653,181 B** (−509)       | **1**                       |
+| 조각 전용 배럴(`X/components`) | 653,181 B                  | 1                           |
+| 승격해서 폴더 밖으로           | 653,181 B                  | 1                           |
+
+실측: `CatalogSlot` / `CatalogSection`, 54차(검증일 2026-10-29).
+
+아래 셋은 **바이트까지 같다.** 그래서 조각 전용 배럴은 이득이 없고 **판단거리만 만든다** —
+그 배럴에 조각이 둘 이상 모이고 소비자가 갈리면 같은 일이 그 층에서 또 난다(더미로 재현:
+`/lab/*` 이 안 쓰는 컴포넌트가 manifest 에 등록되고 +188 B). 그때마다 "이 둘의 소비자가
+같은가"를 세는 대신, **내부 폴더에 배럴을 안 두는 쪽**이 규칙 하나로 끝난다.
+
+**잃는 것은 "다른 폴더로 이사"뿐이다.** 조각을 파일 → 폴더로 승격하는 것은 호출부를 건드리지
+않는다 — `X/components/Y` 가 `Y.tsx` 와 `Y/index.ts` 를 똑같이 해석한다(4절). 폴더를 옮기는
+경우는 소비 범위가 바뀐 것이고, 그때는 어차피 2절대로 자리를 다시 정한다.
+
+#### 트리쉐이킹 설정으로는 못 고친다 — manifest 층이다
+
+번들러가 죽은 코드를 못 털어낸 것이 아니라, 배럴이 **client reference manifest 를 넓히는**
+것이다. 한 배럴일 때 `.next/server/app/lab/ssr/page_client-reference-manifest.js` 에
+`CatalogSlot.tsx` 가 등록된다 — 그 라우트가 쓰지 않는데도.
+
+| 시도                                                | 결과                                                |
+| --------------------------------------------------- | --------------------------------------------------- |
+| `export *` 대신 **네임드 재수출**                   | **무효** — `export *` 와 바이트까지 같다            |
+| 배럴에 `'use client'`                               | manifest 는 한 줄로 줄지만 **번들은 +432 B** 커진다 |
+| `experimental.optimizePackageImports` 에 alias 추가 | **무효** — 패키지명 대상이다. manifest 그대로       |
+| `sideEffects: ["*.css"]`                            | 전체 −558 B, **manifest 는 안 바뀐다**              |
+| 조각을 배럴에서 빼기                                | manifest 가 좁아진다                                |
+
+`turbopackInferModuleSideEffects` · `turbopackScopeHoisting` 은 프로덕션 기본값이 이미
+`true` 다(`next@16.4.2` 문서 `app/api-reference/turbopack`). 켤 것이 남아 있지 않다.
+
+재수출 **문법**은 원인이 아니다 — 배럴 모듈이 두 클라이언트 모듈을 **참조한다는 사실**이
+원인이다. 측정 절차는 known-issues Q-2.
+
+- 조각을 가리키는 경로가 길어지는 건 **의도한 신호다.** `X/components/Y` 를 여러 곳에서
+  쓰고 있으면 Y 는 이미 X 의 것이 아니다 — 2절대로 공통 부모로 승격한다
+- ⚠️ 배럴이 끌고 와도 **프리렌더는 깨지지 않는다**(`◐` 유지) — 훅이 그 라우트에서
+  실행되지 않기 때문이다. 그 모듈이 **실행될 때** 경계를 깨는 경우(렌더되는 자리에서
+  디렉티브·훅이 돌아 빌드가 막히는 것)만 배치를 다시 본다
+
+### ⚠️ `index.ts` 는 `'use client'` 경계를 전달하지 않는다
+
+`'use client'` 는 **파일 단위** 경계다. 4절대로 파일 → 폴더로 승격하면서 `index.ts` 가
+앞에 서면, 디렉티브 없는 그 배럴이 서버 모듈이 되고 **배럴이 재수출하는 디렉티브 없는
+모듈**은 RSC 그래프에 그대로 남는다. 그 모듈이 브라우저 전용 코드에 닿으면 빌드가 막힌다.
+
+```
+You're importing a component that imports react-dom/client. It only works in a
+Client Component but none of its parents are marked with "use client".
+```
+
+**import trace 에는 배럴이 안 나온다.** `page.tsx` 다음에 바로 본체 파일이
+`[Server Component]` 로 찍혀서 원인이 "파일을 옮긴 것"처럼 보인다.
+
+- 배럴에 `'use client'` 를 적어 덮지 않는다 — 폴더마다 규칙이 갈린다. 서버 컴포넌트를
+  재수출하는 배럴도 있다(`RemoteVersionSync`). 번들에서도 손해다: 경계가 배럴로 올라가
+  폴더 전체가 한 덩어리가 된다(실측 +432 B)
+- **예외는 `@mfa/store` 다.** 그 배럴은 일부러 `'use client'` 를 지닌다 — 패키지가
+  진입점을 둘로 갈라 두고(`index.ts` / `server.ts`) `package.json` 의 `react-server`
+  조건이 RSC 를 서버 쪽으로 보낸다. 디렉티브가 "이 진입점은 브라우저용"이라는 선언이고,
+  소비처는 양쪽 다 `@mfa/store` 로 부른다. 근거: ADR-015
+- **경계가 필요한 파일이 자기 머리에 디렉티브를 적는다.** 그 파일을 `libs/` 로 내릴 때
+  디렉티브도 같이 옮긴다
+
+재현과 기각한 대안: known-issues P-1.
+
+## 7. 라우트 파일에는 라우트만 둔다
+
+`page.tsx` · `layout.tsx` 에는 **그 파일의 default export 와 라우트 세그먼트 설정**만
+둔다. 같은 파일에 선언한 보조 컴포넌트는 `_src/components/` 로 내린다 — 라우트 전용이라는
+사실은 폴더가 이미 적고 있다.
+
+**캐시 정책은 그 정책의 주인 안에 적는다.** `'use cache'` · `cacheLife()` · `connection()`
+은 정책이 컴포넌트나 데이터의 성질이면(어디서 쓰든 같은 정책) 그 컴포넌트 안이나 `apis/`
+함수 안에 적는다. 컴포넌트 하나에 정책 하나뿐인데 page 에 래퍼를 두면 간접 한 단계일 뿐이다
+(8절의 껍데기와 같다).
+
+**예외: 정책의 주인이 라우트인 경우.** 공용 컴포넌트 하나를 라우트마다 다른 정책으로 쓸 때
+(`/lab/{ssr,isr,cache}` 의 `LabPanel`)는 **선언만 지니고 그 컴포넌트를 반환하는 래퍼**를 각
+라우트 파일에 둔다. 디렉티브는 문법이라 prop 으로 켜고 끌 수 없으니 정책마다 함수가 하나씩
+필요하고, 그 함수가 곧 그 라우트의 캐시 성질이다. 래퍼에 마크업이나 데이터 읽기가 섞이면 그
+부분은 `_src/components/` 로 내리고 래퍼에는 선언만 남긴다.
+
+| page.tsx 안의 함수                                      | 어디로                            |
+| ------------------------------------------------------- | --------------------------------- |
+| UI 를 조립한다 (remote · Section · 레이아웃)            | `_src/components/`                |
+| 정책 하나 + 컴포넌트 하나 (정책이 컴포넌트·데이터 성질) | 그 컴포넌트 안 또는 `apis/` 함수  |
+| 공용 컴포넌트 + 라우트마다 다른 정책                    | 정책마다 래퍼, 라우트 파일에 남김 |
+
+## 8. 껍데기(Slot)는 조건이 맞을 때만 만든다
+
+서버에서 쿠키·헤더를 읽어 client 컴포넌트에 넘기는 껍데기는 **둘 중 하나일 때만** 둔다.
+
+1. 라우트 **둘 이상**이 같은 읽기를 한다
+2. 그 읽기가 특정 **경계 안쪽**이어야 한다(`<Suspense>` 밖에서 읽으면 프리렌더가 깨지는 경우)
+
+소비자가 라우트 하나뿐이고 경계 제약도 없으면 **그 `page.tsx` 가 직접 읽는다.** page 도
+서버 컴포넌트다. "나중에 둘째 라우트가 생길 테니 자리를 맞춰 둔다"로 층을 만들지 않는다 —
+둘째가 생길 때 올리는 비용이 더 싸다(4절: 승격이 호출부를 안 건드린다).
+
+## 9. `app/_src/` 는 만들지 않는다
+
+모든 라우트가 `app/` 의 자식이라, 루트 라우트(`app/page.tsx`)만 쓰는 코드는 앱 전역과
+**구별되지 않는다** — 6절("부모 라우트의 `_src` 는 하위 라우트가 가져다 써도 된다")대로면
+`app/_src` 는 모든 라우트가 쓸 수 있는 자리다. 이름이 둘인데 뜻이 하나가 되므로 `src/` 에
+둔다. `_src` 는 **루트가 아닌** 라우트 세그먼트의 것이다.
+
+## 10. 애매하면 묻는다
+
+규칙으로 안 떨어지는 배치는 임의로 정하지 않는다. 선택지와 각각의 근거(쓰는 범위,
+코드의 주인)를 제시해 사용자에게 묻는다.
+
+---
+
+## 베껴 오면서 뺀 것
+
+그 문서는 "여러 앱 + 도메인 패키지" 모노레포를 전제한다. 여기는 **런타임 MF 검증
+저장소**라 세 자리를 안 가져왔다. 왜 뺐는지를 같이 적어 둔다 — 안 적으면 다음에
+"규칙대로 안 돼 있다"로 읽힌다.
+
+### `mf/` 의 레이어 이름은 그대로 둔다
+
+`apps/host/src/mf` 는 컴포넌트 묶음이 아니라 **의존 방향이 고정된 레이어**다
+(`components/` → `loader/` → `versions/` → `trust/` → `config/`, 배경:
+`docs/02-architecture/06-host-mf-layout.md`). `loader` · `versions` · `trust` ·
+`state` 를 `libs/` 로 뭉개면 그 방향을 읽을 수 없다. 3절의 "코드의 주인" 이 이 경우다.
+
+폴더 안쪽에는 다섯 이름을 적용한다 — `mf/components/RemoteComponent/components/` ·
+`.../libs/` 처럼.
+
+⚠️ `mf/components/*/libs/` 로 파일을 내릴 때 **`'use client'` 를 같이 옮긴다** — 6절의
+배럴 경고가 바로 이 자리에서 나왔다.
+
+### remote 의 `exposes/` 는 평면을 유지한다
+
+`apps/remote-*/src/exposes/*.tsx` 는 MF 빌드 설정이 직접 가리키는 **계약 경계**다
+(`@mfa/contracts` 의 모듈 이름과 1:1). 폴더로 감싸면 노출 경로가 바뀌어 host 의
+`loadRemote()` 키와 어긋난다. 컴포넌트 폴더 규칙은 `exposes/` 를 제외한 나머지에만
+적용한다.
+
+### `packages/` 는 `shared / domains / widgets` 로 나누지 않는다
+
+원본의 그 삼분법은 여러 앱이 도메인을 공유하는 전제에서 나온다. 여기서 "여러 도메인
+조합 + 2개 이상 앱" 자리는 **런타임 remote 자체**(`apps/remote-*`)가 맡는다 — 그게 이
+저장소가 검증하는 대상이다. 그래서 현재 평면 배치를 유지한다.
+
+| 원본                         | 이 저장소                                        |
+| ---------------------------- | ------------------------------------------------ |
+| `packages/shared/components` | `packages/ui`                                    |
+| `packages/shared/libs`       | `packages/libs`                                  |
+| `packages/domains/<domain>`  | `packages/store` · `contracts` · `remote-config` |
+| `packages/widgets`           | `apps/remote-*` (런타임 MF)                      |
+| `packages/config`            | `typescript-config` · `tailwind-config`          |

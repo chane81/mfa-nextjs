@@ -5,8 +5,8 @@ import { act, render, screen } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearCookies } from '@mfa/utils/test/cookies';
-import { clearGlobalRegistries } from '@mfa/utils/test/globals';
+import { clearCookies } from '@mfa/libs/test/cookies';
+import { clearGlobalRegistries } from '@mfa/libs/test/globals';
 
 import { type CartLine } from './create-store';
 

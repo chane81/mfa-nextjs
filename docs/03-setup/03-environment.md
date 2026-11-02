@@ -141,7 +141,7 @@ remote 가 env 로 받는 값은 `REMOTE_*_PUBLIC_URL` 하나뿐이고, 그건 *
 
 | 이름                   | 읽는 곳                                   | 설정 위치         | 기본값                   |
 | ---------------------- | ----------------------------------------- | ----------------- | ------------------------ |
-| `MF_REVALIDATE_SECRET` | `host/src/lib/mf-secret.ts`               | host `.env.local` | 없음 → **항상 거부**     |
+| `MF_REVALIDATE_SECRET` | `host/src/libs/mf-secret.ts`              | host `.env.local` | 없음 → **항상 거부**     |
 | `MF_SELF_ORIGIN`       | `host/src/app/api/mf-revalidate/route.ts` | host `.env.local` | `http://127.0.0.1:$PORT` |
 | `PORT`                 | 위 루프백 주소 조립                       | 셸 / 플랫폼       | `3000`                   |
 

@@ -327,7 +327,7 @@ export const EXPOSE_SCAN = {
    * 그래서 이 폴더에는 expose 가 아닌 이웃 파일이 같이 산다(`exposes.test.tsx`).
    * 거르지 않으면 remote 의 공개 계약이 조용히 늘어나고, dev 에서는 사전 transform 까지
    * 시도하다 테스트 전용 import 에서 터진다. 당시 실측(헬퍼가 `@tests/*` alias 로
-   * 오던 시절이다 — 지금은 `@mfa/utils/test/*` 라 이 줄에서는 해석되고 대신
+   * 오던 시절이다 — 지금은 `@mfa/libs/test/*` 라 이 줄에서는 해석되고 대신
    * `vitest` · `@testing-library/*` 에서 같은 모양으로 터진다):
    *
    *     Pre-transform error: Failed to resolve import "@tests/helpers/globals"

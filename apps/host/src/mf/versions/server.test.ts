@@ -1,8 +1,8 @@
 import { MF_FILES, versionedPath } from '@mfa/remote-config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@mfa/utils/test/globals';
-import { generateSigningKeyPair, signPayload } from '@mfa/utils/test/signing';
+import { clearGlobalRegistries } from '@mfa/libs/test/globals';
+import { generateSigningKeyPair, signPayload } from '@mfa/libs/test/signing';
 
 /**
  * 이 모듈은 `globalCell` 세 개를 **모듈 스코프에 캐시**하고, 전이 의존하는

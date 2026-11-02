@@ -1,7 +1,7 @@
 import { MF_FILES, versionedPath } from '@mfa/remote-config';
 import { describe, expect, it, vi } from 'vitest';
 
-import { generateSigningKeyPair, signPayload } from '@mfa/utils/test/signing';
+import { generateSigningKeyPair, signPayload } from '@mfa/libs/test/signing';
 
 import {
   allowedOrigins,

@@ -5,7 +5,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { clearGlobalRegistries } from '@mfa/utils/test/globals';
+import { clearGlobalRegistries } from '@mfa/libs/test/globals';
 
 import { REMOTE_VERSIONS_GLOBAL } from '../../versions/browser';
 

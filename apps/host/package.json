@@ -17,7 +17,7 @@
     "@mfa/store": "workspace:*",
     "@mfa/tailwind-config": "workspace:*",
     "@mfa/ui": "workspace:*",
-    "@mfa/utils": "workspace:*",
+    "@mfa/libs": "workspace:*",
     "@module-federation/runtime": "catalog:",
     "next": "catalog:",
     "react": "catalog:",

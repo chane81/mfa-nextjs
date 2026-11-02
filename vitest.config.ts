@@ -72,7 +72,7 @@ export default defineConfig({
        */
       {
         find: /^@mfa\/utils\/(.*)$/,
-        replacement: `${at('./packages/utils/src')}/$1.ts`,
+        replacement: `${at('./packages/libs/src')}/$1.ts`,
       },
     ],
     /**

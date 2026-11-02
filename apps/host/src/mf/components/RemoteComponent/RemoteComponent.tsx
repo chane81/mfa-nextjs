@@ -10,9 +10,9 @@ import type {
 import { Skeleton } from '@mfa/ui';
 
 import { RemoteBoundary } from '../RemoteBoundary';
-import { remoteCacheKey, remoteModulePromise } from './module-cache';
-import { RemoteModuleView } from './RemoteModuleView';
-import { RemoteStyleLink } from './RemoteStyleLink';
+import { remoteCacheKey, remoteModulePromise } from './libs/module-cache';
+import { RemoteModuleView } from './components/RemoteModuleView';
+import { RemoteStyleLink } from './components/RemoteStyleLink';
 
 type PropsOf<K extends RemoteModuleId> =
   RemoteModule<K>['default'] extends ComponentType<infer P> ? P : never;

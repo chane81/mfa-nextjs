@@ -1,6 +1,6 @@
 import { type CartLine } from '@mfa/contracts';
 
-import { createCookieStorage } from '../utils';
+import { createCookieStorage } from '../libs';
 
 import {
   CART_COOKIE_MAX_AGE,

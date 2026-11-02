@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 
 import { useRevalidateOnFocus } from '../hooks';
-import { globalSingleton, readCookie } from '../utils';
+import { globalSingleton, readCookie } from '../libs';
 
 import { CART_COOKIE_NAME } from './cookie-codec';
 import { useCart } from './create-store';

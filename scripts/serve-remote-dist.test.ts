@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { fakeResponse } from '@mfa/utils/test/http';
+import { fakeResponse } from '@mfa/libs/test/http';
 
 import { createHandler } from './serve-remote-dist';
 

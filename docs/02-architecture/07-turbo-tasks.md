@@ -155,7 +155,7 @@ host 의 `build` 는 빌드하는 동안 3001/3002 에 정적 서버를 띄운�
 - `^build` 가 필요한 이유: `stamp-remote-version.ts` 와 `wait-for-remotes.ts` 가
   `@mfa/remote-config` 를 읽는데, 그 패키지는 빌드가 없지만 tsc 가 타입을 풀려면 워크스페이스
   그래프가 서 있어야 한다.
-- `inputs` 에 `packages/utils/src/**` 가 있는 이유: `scripts/*.test.ts` 가 `@mfa/utils/test/*` 를
+- `inputs` 에 `packages/libs/src/**` 가 있는 이유: `scripts/*.test.ts` 가 `@mfa/libs/test/*` 를
   import 하는데 그 패키지는 **빌드가 없어서** `exports` 가 소스를 그대로 가리킨다 — 헬퍼 소스가
   **이 프로그램 안에** 들어온다(`tsc -p tsconfig.json --listFiles` 로 확인). 빼두면 헬퍼를 깨도
   turbo 가 캐시된 PASS 를 재생한다(F-3). `^build` 로는 안 잡힌다(빌드 태스크가 없으니 건너뛴다).

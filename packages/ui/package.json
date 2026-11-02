@@ -27,6 +27,6 @@
     "typescript": "catalog:"
   },
   "dependencies": {
-    "@mfa/utils": "workspace:*"
+    "@mfa/libs": "workspace:*"
   }
 }
